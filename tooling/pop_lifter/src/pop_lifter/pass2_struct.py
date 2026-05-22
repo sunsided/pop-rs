@@ -80,6 +80,7 @@ from dataclasses import replace
 from .ir1 import (
     AdcAbs,
     AdcImm,
+    AdcIndexed,
     Asl,
     Bit,
     Bitwise,
@@ -88,6 +89,7 @@ from .ir1 import (
     Clc,
     CmpAbs,
     CmpImm,
+    CmpIndexed,
     Compare,
     DecTarget,
     Goto,
@@ -107,6 +109,7 @@ from .ir1 import (
     Routine,
     SbcAbs,
     SbcImm,
+    SbcIndexed,
     Sec,
     Transfer,
     Unsupported,
@@ -165,11 +168,15 @@ def _affected_register(item: Item):
     if isinstance(item, Bitwise):
         from .ir1 import Reg
         return Reg.A
-    if isinstance(item, (SbcImm, SbcAbs, Lsr)):
-        # All three define A's new value as their flag-side-effect,
+    if isinstance(item, (SbcImm, SbcAbs, SbcIndexed, Lsr)):
+        # All four define A's new value as their flag-side-effect,
         # so a subsequent `beq`/`bne`/`bpl`/`bmi` reads Z/N of A.
         from .ir1 import Reg
         return Reg.A
+    # Adc{Imm,Abs,Indexed} deliberately NOT here — Adc both reads
+    # and writes C, and pass-2's existing fusion paths haven't been
+    # extended to track that pair properly. Adding any of them would
+    # need to land together to keep the contract consistent.
     if isinstance(item, Pla):
         # PLA sets Z/N from the popped value (which lands in A).
         # `pla ; beq L` is the canonical "did the saved A end up
@@ -201,6 +208,22 @@ def _fuse_pair(prev: Item, branch: Branch) -> If | None:
             target=branch.target,
             src=branch.src,
         )
+    if isinstance(prev, CmpIndexed) and cond_op is not None:
+        # `cmp tbl,x ; bne :next` → `if a != *(tbl)[x] goto :next`.
+        # Compare.rhs accepts Imm or Abs today; for indexed we pass
+        # the wrapping IndexedAbs through so dumps render
+        # `*(tbl + x)`. Pass 3 / pass 4 will care about the indexed
+        # shape when they emit Rust subscripts.
+        from .ir1 import IndexedAbs
+        return If(
+            cond=Compare(
+                reg=prev.reg,
+                op=cond_op,
+                rhs=IndexedAbs(base=prev.base, index=prev.index),
+            ),
+            target=branch.target,
+            src=branch.src,
+        )
     affected = _affected_register(prev)
     if affected is not None:
         load_op = _LOAD_FUSE_OPS.get(branch.cond)
@@ -229,10 +252,16 @@ def _defines_flags(item: Item) -> bool:
     return isinstance(
         item,
         (
-            CmpImm, CmpAbs, LoadImm, LoadAbs, LoadIndexed, LoadIndirect,
+            CmpImm, CmpAbs, CmpIndexed,
+            LoadImm, LoadAbs, LoadIndexed, LoadIndirect,
             IncTarget, DecTarget, Transfer, Bitwise,
-            SbcImm, SbcAbs, Lsr, Bit,
+            SbcImm, SbcAbs, SbcIndexed, Lsr, Bit,
             Pla,
+            # AdcIndexed: see `_affected_register` note — adc lacks
+            # the symmetric fusion path the others have, so its
+            # presence in the body is treated as fusion-opaque
+            # rather than a flag-setter the next branch can consume.
+            AdcIndexed,
         ),
     )
 
@@ -501,17 +530,28 @@ def _backward_sweep(
             live -= {"Z", "N"}
             continue
 
-        if isinstance(item, (AdcImm, AdcAbs)):
-            # Adc writes Z,N,C and reads C.
+        if isinstance(item, (AdcImm, AdcAbs, AdcIndexed)):
+            # Adc writes Z,N,C and reads C. Indexed form has the same
+            # flag effect as the abs/imm variants.
             live -= {"Z", "N", "C"}
             live.add("C")
             continue
 
-        if isinstance(item, (SbcImm, SbcAbs)):
+        if isinstance(item, (SbcImm, SbcAbs, SbcIndexed)):
             # Sbc is symmetric with Adc: writes Z,N,C; reads C (the
             # borrow flag chains through subsequent sbc's).
             live -= {"Z", "N", "C"}
             live.add("C")
+            continue
+
+        if isinstance(item, CmpIndexed):
+            # Same flag effect as CmpImm/CmpAbs: writes Z,N,C without
+            # touching A/X/Y. Elidable if its flags are dead — but
+            # unlike the pure imm/abs cmps we conservatively keep it
+            # because indexed reads can hit I/O space and the read
+            # itself may be side-effecting (same rationale as
+            # Bit(Abs)).
+            live -= {"Z", "N", "C"}
             continue
 
         if isinstance(item, (Asl, Lsr)):

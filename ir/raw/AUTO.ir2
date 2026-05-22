@@ -450,8 +450,8 @@ fn MaybeAdvance {
   if a != #0x00 goto ]rts  ; AUTO.S:757
 :dumb:
   call rndp                  ; AUTO.S:759
-  ??? cmp advprob,x            ; AUTO.S:760
-  if cs goto ]rts       ; AUTO.S:761
+  cmp a, *(advprob@0x0006 + x)   ; AUTO.S:760
+  if a >= *(advprob@0x0006 + x) goto ]rts  ; AUTO.S:761
   tail_call DoAdvance                ; AUTO.S:763
 ]rts:
   return                           ; AUTO.S:745
@@ -469,14 +469,14 @@ fn MaybeBlock {
   a = *justblocked@0x007e        ; AUTO.S:779
   if a != #0x00 goto :impaired  ; AUTO.S:780
   call rndp                  ; AUTO.S:781
-  ??? cmp blockprob,x            ; AUTO.S:782
-  if cc goto :block       ; AUTO.S:783
+  cmp a, *(blockprob@0x0004 + x)   ; AUTO.S:782
+  if a < *(blockprob@0x0004 + x) goto :block  ; AUTO.S:783
 ]rts:
   return                           ; AUTO.S:784
 :impaired:
   call rndp                  ; AUTO.S:787
-  ??? cmp impblockprob,x            ; AUTO.S:788
-  if cs goto ]rts       ; AUTO.S:789
+  cmp a, *(impblockprob@0x0005 + x)   ; AUTO.S:788
+  if a >= *(impblockprob@0x0005 + x) goto ]rts  ; AUTO.S:789
 :block:
   tail_call DoBlock                ; AUTO.S:790
 }
@@ -489,13 +489,13 @@ fn MaybeStrike {
   if x == #0xa1 goto :restrike  ; AUTO.S:806
   if x == #0x96 goto :restrike  ; AUTO.S:808
   call rndp                  ; AUTO.S:810
-  ??? cmp strikeprob,x            ; AUTO.S:811
-  if cs goto ]rts       ; AUTO.S:812
+  cmp a, *(strikeprob@0x0002 + x)   ; AUTO.S:811
+  if a >= *(strikeprob@0x0002 + x) goto ]rts  ; AUTO.S:812
   tail_call DoStrike                ; AUTO.S:813
 :restrike:
   call rndp                  ; AUTO.S:816
-  ??? cmp restrikeprob,x            ; AUTO.S:817
-  if cs goto ]rts       ; AUTO.S:818
+  cmp a, *(restrikeprob@0x0003 + x)   ; AUTO.S:817
+  if a >= *(restrikeprob@0x0003 + x) goto ]rts  ; AUTO.S:818
   tail_call DoStrike                ; AUTO.S:819
 ]rts:
   return                           ; AUTO.S:784
@@ -1381,7 +1381,7 @@ AddNormalGd:
   x = *level@0x03f4        ; AUTO.S:1930
   a = *(basiccolor@0x000b + x)   ; AUTO.S:1931
   x = *guardprog@0x00dd        ; AUTO.S:1932
-  ??? eor specialcolor,x            ; AUTO.S:1933
+  a = a ^ *(specialcolor@0x0008 + x)              ; AUTO.S:1933
   *GuardColor@0x0216 = a            ; AUTO.S:1934
   tail_call SaveShad                ; AUTO.S:1936
 }
@@ -1457,7 +1457,6 @@ fn :not5  (aka AddNormalGd) {
   *CharAction@0x0046 = a            ; AUTO.S:1921
   x = *VisScrn@0x00cb        ; AUTO.S:1923
   a = *(GdStartProg-1@0xbfa6 + x)   ; AUTO.S:1924
-  cmp a, #numprogs              ; AUTO.S:1925
   if a < #numprogs goto :ok  ; AUTO.S:1926
   a = #0x03                  ; AUTO.S:1927
 :ok:
@@ -1465,7 +1464,7 @@ fn :not5  (aka AddNormalGd) {
   x = *level@0x03f4        ; AUTO.S:1930
   a = *(basiccolor@0x000b + x)   ; AUTO.S:1931
   x = *guardprog@0x00dd        ; AUTO.S:1932
-  ??? eor specialcolor,x            ; AUTO.S:1933
+  a = a ^ *(specialcolor@0x0008 + x)              ; AUTO.S:1933
   *GuardColor@0x0216 = a            ; AUTO.S:1934
   tail_call SaveShad                ; AUTO.S:1936
 ]rts:
@@ -1477,7 +1476,7 @@ fn getgdstrength {
   a = *(basicstrength@0x000a + x)   ; AUTO.S:1943
   x = *guardprog@0x00dd        ; AUTO.S:1944
   c = 0                            ; AUTO.S:1945
-  ??? adc extrastrength,x            ; AUTO.S:1946
+  a = a + *(extrastrength@0x0009 + x) + c   ; AUTO.S:1946
   *MaxOppStr@0x00dc = a            ; AUTO.S:1947
   *OppStrength@0x00cc = a            ; AUTO.S:1948
 ]rts:

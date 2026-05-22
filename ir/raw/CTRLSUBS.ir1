@@ -246,7 +246,7 @@ fn GETINFRONT {
   x += 1                         ; CTRLSUBS.S:422
   a = *CharBlockX@0x0044        ; CTRLSUBS.S:423
   c = 0                            ; CTRLSUBS.S:424
-  ??? adc plus1,x            ; CTRLSUBS.S:425
+  a = a + *(plus1@0x0000 + x) + c   ; CTRLSUBS.S:425
   *infrontx@0x008e = a            ; CTRLSUBS.S:426
   x = a                            ; CTRLSUBS.S:427
   y = *CharBlockY@0x0045        ; CTRLSUBS.S:429
@@ -259,9 +259,9 @@ fn GET2INFRONT {
   x += 1                         ; CTRLSUBS.S:435
   a = *CharBlockX@0x0044        ; CTRLSUBS.S:436
   c = 0                            ; CTRLSUBS.S:437
-  ??? adc plus1,x            ; CTRLSUBS.S:438
+  a = a + *(plus1@0x0000 + x) + c   ; CTRLSUBS.S:438
   c = 0                            ; CTRLSUBS.S:439
-  ??? adc plus1,x            ; CTRLSUBS.S:440
+  a = a + *(plus1@0x0000 + x) + c   ; CTRLSUBS.S:440
   x = a                            ; CTRLSUBS.S:441
   y = *CharBlockY@0x0045        ; CTRLSUBS.S:443
   a = *CharScrn@0x004b        ; CTRLSUBS.S:444
@@ -273,7 +273,7 @@ fn GETBEHIND {
   x += 1                         ; CTRLSUBS.S:449
   a = *CharBlockX@0x0044        ; CTRLSUBS.S:450
   c = 0                            ; CTRLSUBS.S:451
-  ??? adc minus1,x            ; CTRLSUBS.S:452
+  a = a + *(minus1@0x0001 + x) + c   ; CTRLSUBS.S:452
   *behindx@0x008f = a            ; CTRLSUBS.S:453
   x = a                            ; CTRLSUBS.S:454
   y = *CharBlockY@0x0045        ; CTRLSUBS.S:456
@@ -295,7 +295,7 @@ fn GETABOVEINF {
   x += 1                         ; CTRLSUBS.S:471
   a = *CharBlockX@0x0044        ; CTRLSUBS.S:472
   c = 0                            ; CTRLSUBS.S:473
-  ??? adc plus1,x            ; CTRLSUBS.S:474
+  a = a + *(plus1@0x0000 + x) + c   ; CTRLSUBS.S:474
   *infrontx@0x008e = a            ; CTRLSUBS.S:475
   x = a                            ; CTRLSUBS.S:476
   y = *CharBlockY@0x0045        ; CTRLSUBS.S:478
@@ -310,7 +310,7 @@ fn GETABOVEBEH {
   x += 1                         ; CTRLSUBS.S:487
   a = *CharBlockX@0x0044        ; CTRLSUBS.S:488
   c = 0                            ; CTRLSUBS.S:489
-  ??? adc minus1,x            ; CTRLSUBS.S:490
+  a = a + *(minus1@0x0001 + x) + c   ; CTRLSUBS.S:490
   *behindx@0x008f = a            ; CTRLSUBS.S:491
   x = a                            ; CTRLSUBS.S:492
   y = *CharBlockY@0x0045        ; CTRLSUBS.S:494
@@ -380,7 +380,7 @@ fn GETBLOCKX {
 fn GETBLOCKY {
   x = #0x03                  ; CTRLSUBS.S:586
 :loop:
-  ??? cmp BlockTop+1,x            ; CTRLSUBS.S:587
+  cmp a, *(BlockTop+1@0x1275 + x)   ; CTRLSUBS.S:587
   if cs goto :gotY       ; CTRLSUBS.S:588
   x -= 1                         ; CTRLSUBS.S:589
   if pl goto :loop       ; CTRLSUBS.S:590
@@ -392,7 +392,7 @@ fn GETBLOCKY {
 fn GETBLOCKYP {
   x = #0x03                  ; CTRLSUBS.S:596
 :loop:
-  ??? cmp FloorY+1,x            ; CTRLSUBS.S:597
+  cmp a, *(FloorY+1@0x127f + x)   ; CTRLSUBS.S:597
   if cs goto :gotY       ; CTRLSUBS.S:598
   x -= 1                         ; CTRLSUBS.S:599
   if pl goto :loop       ; CTRLSUBS.S:600
@@ -411,7 +411,7 @@ fn INDEXBLOCK {
   cmp a, #0x0a              ; CTRLSUBS.S:622
   if cs goto :os       ; CTRLSUBS.S:623
   c = 0                            ; CTRLSUBS.S:625
-  ??? adc Mult10,y            ; CTRLSUBS.S:626
+  a = a + *(Mult10@0x1200 + y) + c   ; CTRLSUBS.S:626
   y = a                            ; CTRLSUBS.S:628
   c = 0                            ; CTRLSUBS.S:629
   return                           ; CTRLSUBS.S:630
@@ -1237,7 +1237,7 @@ fn MARKWIPE {
   a = *(wipebuf@0x5eb4 + y)   ; CTRLSUBS.S:1747
   if eq goto :2       ; CTRLSUBS.S:1748
   a = *height@0x0004        ; CTRLSUBS.S:1749
-  ??? cmp whitebuf,y            ; CTRLSUBS.S:1750
+  cmp a, *(whitebuf@0x5f0e + y)   ; CTRLSUBS.S:1750
   if cc goto :1       ; CTRLSUBS.S:1751
 :2:
   a = *height@0x0004        ; CTRLSUBS.S:1752

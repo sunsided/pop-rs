@@ -777,12 +777,12 @@ fn BREAD {
 
 fn cvtpdl {
   a = *(joyX@0x003b + x)   ; GRAFIX.S:1179
-  ??? cmp jthres1x,x            ; GRAFIX.S:1180
+  cmp a, *(jthres1x@0x0206 + x)   ; GRAFIX.S:1180
   if cs goto :1       ; GRAFIX.S:1181
   a = #0xff                  ; GRAFIX.S:1182
   if ne goto :3       ; GRAFIX.S:1183
 :1:
-  ??? cmp jthres2x,x            ; GRAFIX.S:1184
+  cmp a, *(jthres2x@0x0208 + x)   ; GRAFIX.S:1184
   if cs goto :2       ; GRAFIX.S:1185
   a = #0x00                  ; GRAFIX.S:1186
   if eq goto :3       ; GRAFIX.S:1187
