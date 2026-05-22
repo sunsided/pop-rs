@@ -1,0 +1,23 @@
+; module AUTO from 01 POP Source/Source/AUTO.S
+
+fn chgshadposn {
+  *ztemp@0x00f0 = a            ; AUTO.S:1048
+  *ztemp+1@0x00f1 = x            ; AUTO.S:1049
+  y = #0x06                  ; AUTO.S:1050
+  loop {                          ; AUTO.S:1054
+    ??? lda (ztemp),y            ; AUTO.S:1051
+    *(Char@0x0040 + y) = a   ; AUTO.S:1052
+    ??? dey             ; AUTO.S:1053
+    if mi {                ; AUTO.S:1054
+      break                            ; AUTO.S:1054
+    }
+  }
+  y = #0x07                  ; AUTO.S:1056
+  ??? lda (ztemp),y            ; AUTO.S:1057
+  call jumpseq                ; AUTO.S:1058
+  a = #0x01                  ; AUTO.S:1060
+  *CharID@0x004d = a            ; AUTO.S:1061
+  a = #0x00                  ; AUTO.S:1063
+  *PlayCount@0x00a0 = a            ; AUTO.S:1064
+  return                           ; AUTO.S:1065
+}

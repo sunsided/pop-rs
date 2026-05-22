@@ -22,18 +22,35 @@ What this slice covers — enough for CHECKFLOOR's shape:
   structures. Pass 3 will revisit those once the lifter recognises
   the missing flag-setters.
 
-Out of scope:
+Loop handling (this slice):
 
-* Loops. The relooper bails out on any backward local jump — see
-  `_wrap_unstructured` below. The fallback walks the IR2 body in
-  order and emits a 1-for-1 IR3 stream (`Label`/`Goto`/`Return`/
-  `TailCall`/`Call` map to their IR3 counterparts; `If`/`Branch`
-  become a structured `IfStmt`/`RawIfStmt` whose then-block holds a
-  `GotoStmt` to the original target; atoms become `RawStmt`). The
-  shape isn't *structured* but it round-trips through `format_module`
-  and survives downstream passes' shape assumptions. CHECKFLOOR has
-  no loops, so the fallback only triggers for chase callees in the
-  pilot.
+* **Simple do-while**: a single back-edge `(s, t)` where `t` is the
+  loop header, the block range `[t..s]` is contiguous and contains
+  no other exits, and `s`'s terminator is a conditional jump with
+  one edge back to `t` (continue) and one edge forward (break) ⇒
+  emitted as `LoopStmt { body... ; if !cond { break } }`. The exit
+  guard sits at the bottom because 6502 do-while loops evaluate
+  the continue condition after the body. Covers the classic 6502
+  counter loop (`:hdr ... dex ; bpl :hdr`).
+
+Loop handling (out of scope, still pending):
+
+* Multiple back-edges to the same header (nested or unstructured).
+* Loops with mid-body exits (`break` not at the bottom).
+* While-style loops where the cond is checked at the TOP (rare in
+  6502 — usually surfaces as a forward `bcc` over the body plus a
+  `jmp` back at the bottom).
+* Irreducible flow (back-edge target doesn't dominate the source).
+  POP's combat / physics code has a few of these; they'll need the
+  `loop { match pc { ... } }` dispatcher fallback from the plan.
+
+When the relooper can't structure a routine (or any loop within it)
+it falls back via `_wrap_unstructured` — see below. The fallback
+walks the IR2 body in order and emits a 1-for-1 IR3 stream
+(`Label`/`Goto`/`Return`/`TailCall`/`Call` map to their IR3
+counterparts; `If`/`Branch` become a structured `IfStmt`/`RawIfStmt`
+whose then-block holds a `GotoStmt` to the original target; atoms
+become `RawStmt`). Correctness preserved, structure not improved.
 * Post-dominator analysis. The current algorithm may emit a small
   amount of code duplication when a block is reached from both the
   taken edge of an `if` and the fall-through path of the next block.
@@ -45,9 +62,20 @@ Out of scope:
 
 from __future__ import annotations
 
-from .cfg import CFG, build_cfg
+from dataclasses import replace as dataclass_replace
+
+from .cfg import (
+    CFG,
+    build_cfg,
+    compute_idoms,
+    dominates,
+    find_back_edges,
+    find_dfs_back_edges,
+    natural_loop_body,
+)
 from .ir1 import (
     Branch,
+    Compare,
     Goto,
     If,
     Label,
@@ -60,10 +88,13 @@ from .ir1 import (
 )
 from .ir3 import (
     Block,
+    BreakStmt,
     CallStmt,
+    ContinueStmt,
     GotoStmt,
     IfStmt,
     LabelStmt,
+    LoopStmt,
     ModuleIR3,
     RawIfStmt,
     RawStmt,
@@ -74,34 +105,156 @@ from .ir3 import (
 )
 
 
-def _has_backward_local_jump(cfg: CFG) -> bool:
-    """The relooper's only hard bail-out: if any local edge points
-    backwards in block order it's (probably) a loop, and the simple
-    recursive walk below would either infinite-loop or emit something
-    wrong. CHECKFLOOR has none; combat/physics routines will need a
-    loop-aware reloop pass in a later slice."""
-    for src, succs in cfg.succ.items():
-        for dst in succs:
-            if dst <= src:
-                return True
-    return False
+# ----------------------------------------------------------------------
+# Loop discovery — simple do-while shapes only.
+#
+# A *simple do-while* in IR2 is the classic 6502 counter loop:
+#
+#     :header           (block T)
+#     ... body ...
+#     ... more body ... (block S, terminator is `If`/`Branch` taken=T)
+#     :after            (S+1, fall-through-out)
+#
+# Recognised if and only if:
+#
+# 1. There is exactly one back-edge `(S, T)`.
+# 2. `T` dominates `S` (reducible).
+# 3. `T..S` is contiguous in block order and S is the back-edge source.
+# 4. `S`'s terminator is a conditional `If` or `Branch` with taken=T
+#    (continue) and fall-through=S+1 (break).
+# 5. No other block in `[T..S]` exits the loop (every successor stays
+#    inside `[T..S]` or is the back-edge to T).
+#
+# When all five hold we emit a `LoopStmt` whose body is the
+# restructured range `[T..S-1]` followed by the synthesized exit guard
+# at the bottom — the natural Rust shape:
+#
+#     loop {
+#         ...body...
+#         if !cond { break; }
+#     }
+
+
+from typing import NamedTuple
+
+
+class SimpleLoop(NamedTuple):
+    header: int          # block id of the loop entry (= back-edge target)
+    tail: int            # back-edge source — the conditional at the bottom
+    exit_block: int      # block immediately after the tail (fall-through)
+    # The exit guard at the bottom of the loop body. Recorded so the
+    # relooper can emit it with the cond inverted.
+    cond: object         # ir1.Compare or str (Branch cond suffix)
+    cond_is_compare: bool
+
+
+def _detect_simple_loops(cfg: CFG) -> tuple[dict[int, SimpleLoop], set[int]]:
+    """Find every simple do-while loop in `cfg`. Returns a mapping from
+    header block id to `SimpleLoop` plus the set of *all* blocks that
+    belong to a recognised loop body (header through tail). Anything
+    in `loop_blocks` is consumed when the parent walker reaches the
+    header; nothing else should structure them."""
+    if not cfg.blocks:
+        return {}, set()
+    try:
+        idom = compute_idoms(cfg)
+    except Exception:
+        return {}, set()
+    back = find_back_edges(cfg)
+    loops: dict[int, SimpleLoop] = {}
+    loop_blocks: set[int] = set()
+
+    # Detect headers that are entered by more than one back-edge — we
+    # don't structure those in this slice.
+    header_counts: dict[int, int] = {}
+    for _, h in back:
+        header_counts[h] = header_counts.get(h, 0) + 1
+
+    for src, hdr in back:
+        if header_counts.get(hdr, 0) != 1:
+            continue
+        if not dominates(idom, hdr, src):
+            continue
+        # Contiguous block range?
+        if src < hdr:
+            continue
+        body = set(range(hdr, src + 1))
+        # Tail's terminator must be a conditional with taken=hdr
+        # and fall-through=src+1 (= exit_block).
+        term = cfg.blocks[src].terminator
+        if not isinstance(term, (Branch, If)):
+            continue
+        if cfg.label_to_block.get(term.target) != hdr:
+            continue
+        exit_block = src + 1
+        if exit_block >= len(cfg.blocks):
+            # No fall-through — shape isn't a do-while.
+            continue
+        # Every block in the body must only have successors inside
+        # `body` OR be exactly the back-edge to `hdr` OR — for the
+        # tail — the exit_block. Anything else is a mid-body exit
+        # which we don't structure yet.
+        clean = True
+        for b in body:
+            for s in cfg.succ[b]:
+                if s in body:
+                    continue
+                if b == src and s == exit_block:
+                    continue
+                clean = False
+                break
+            if not clean:
+                break
+        if not clean:
+            continue
+        # Make sure none of the blocks already belong to another
+        # recognised loop (nested loops aren't handled in this slice).
+        if any(b in loop_blocks for b in body):
+            continue
+
+        loops[hdr] = SimpleLoop(
+            header=hdr,
+            tail=src,
+            exit_block=exit_block,
+            cond=term.cond,
+            cond_is_compare=isinstance(term, If),
+        )
+        loop_blocks.update(body)
+
+    return loops, loop_blocks
 
 
 def reloop_routine(routine: Routine) -> RoutineIR3:
-    """Structure `routine` into an IR3 routine. If the CFG can't be
-    structured by this slice's algorithm (loop, malformed control
-    flow), fall back to wrapping the whole IR2 body as a sequence of
-    `RawStmt`s — correctness preserved, structure not improved.
+    """Structure `routine` into an IR3 routine. Simple do-while loops
+    are recognised and emitted as `LoopStmt`; anything else with a
+    backward local jump falls back to `_wrap_unstructured`.
     """
     cfg = build_cfg(routine)
-    if _has_backward_local_jump(cfg):
+
+    # Every cycle in the CFG must belong to a recognised simple loop.
+    # We use `find_dfs_back_edges` (not `find_back_edges`) here so the
+    # gate catches *irreducible* loops too — those have no dominator
+    # back-edge but still represent cycles the linear walker can't
+    # safely traverse. Without this stricter check the walker's
+    # `visiting` escape hatch would fire mid-cycle and emit a
+    # `GotoStmt` referencing a synthesised `BB{n}` label that nothing
+    # downstream can resolve.
+    cycle_edges = find_dfs_back_edges(cfg) if cfg.blocks else []
+    loops, loop_blocks = _detect_simple_loops(cfg)
+    if cycle_edges and not all(
+        src in loop_blocks and dst in loop_blocks for src, dst in cycle_edges
+    ):
         return _wrap_unstructured(routine)
 
-    # `visiting` guards against accidental infinite recursion if the
-    # CFG turns out to have a cycle we missed (shouldn't happen given
-    # the bail-out, but cheap insurance).
     visiting: set[int] = set()
-    body = _emit_block(cfg, cfg.entry_id, exit_id=None, visiting=visiting)
+    body = _emit_block(
+        cfg, cfg.entry_id,
+        exit_id=None,
+        visiting=visiting,
+        loops=loops,
+        loop_blocks=loop_blocks,
+        active_loop_tail=None,
+    )
     return RoutineIR3(
         name=routine.name,
         entry_aliases=list(routine.entry_aliases),
@@ -210,27 +363,77 @@ def _wrap_unstructured(routine: Routine) -> RoutineIR3:
     )
 
 
+_INVERT_BRANCH_COND: dict[str, str] = {
+    "eq": "ne", "ne": "eq",
+    "cs": "cc", "cc": "cs",
+    "pl": "mi", "mi": "pl",
+    "vs": "vc", "vc": "vs",
+}
+
+
+_INVERT_COMPARE_OP: dict[str, str] = {
+    "==": "!=", "!=": "==",
+    "<": ">=", ">=": "<",
+    "<0": ">=0", ">=0": "<0",
+}
+
+
+def _invert_loop_exit(cond, cond_is_compare: bool):
+    """Invert the tail's continue-condition into a break-condition.
+    The tail's `If`/`Branch` originally said "loop back to header if
+    cond"; the structured form needs "break if NOT cond" at the
+    bottom of the body."""
+    if cond_is_compare:
+        assert isinstance(cond, Compare)
+        return dataclass_replace(cond, op=_INVERT_COMPARE_OP[cond.op])
+    return _INVERT_BRANCH_COND[cond]
+
+
 def _emit_block(
     cfg: CFG,
     bid: int | None,
     exit_id: int | None,
     visiting: set[int],
+    *,
+    loops: dict[int, SimpleLoop],
+    loop_blocks: set[int],
+    active_loop_tail: int | None,
 ) -> Block:
     """Recursively emit IR3 stmts for block `bid` up to (but not
     including) `exit_id`. `exit_id=None` means "emit until the
     routine exits".
 
+    `loops` / `loop_blocks` carry the pre-computed simple-loop
+    layout. When the walker hits a loop header, it switches into
+    loop-body mode (`active_loop_tail` set) and emits the contained
+    blocks as a `LoopStmt`. Inside the loop body, the tail's
+    conditional jump becomes the bottom-of-loop break guard; any
+    other back-edge to the same header surfaces as `continue`.
+
     Code duplication note: when a block is reached from two paths
     (e.g. CHECKFLOOR's `:ong` from both `B2.taken` and `B3.fall-
     through`), this algorithm emits its body once per visit. The
     duplication is structurally innocuous (each emission terminates
-    via tail-call or return) but pass 3 may merge them once it has
-    post-dominator data.
+    via tail-call, return, or break) but pass 3 may merge them once
+    it has post-dominator data.
     """
     stmts: list[Stmt] = []
     while bid is not None and bid != exit_id:
+        # If we've walked into a loop header, materialise the whole
+        # loop as a single `LoopStmt` and resume after its exit.
+        if (
+            bid in loops
+            and active_loop_tail != loops[bid].tail
+        ):
+            loop = loops[bid]
+            loop_body = _emit_loop_body(
+                cfg, loop, visiting, loops, loop_blocks,
+            )
+            stmts.append(LoopStmt(body=loop_body, src=cfg.blocks[bid].terminator.src))
+            bid = loop.exit_block
+            continue
+
         if bid in visiting:
-            # Cycle — emit a goto as the escape hatch and stop.
             label = cfg.blocks[bid].label or f"BB{bid}"
             stmts.append(GotoStmt(target=label, src=cfg.blocks[bid].terminator.src))
             break
@@ -255,14 +458,17 @@ def _emit_block(
                 stmts.append(TailCallStmt(target=t.target, src=t.src))
                 visiting.discard(bid)
                 break
-            # local goto — continue the linear walk at the target.
             visiting.discard(bid)
-            bid = cfg.label_to_block.get(t.target)
-            if bid is None:
-                # Cross-routine local goto (shouldn't happen given how
-                # pass 1 emits, but be safe).
+            target_id = cfg.label_to_block.get(t.target)
+            if target_id is None:
                 stmts.append(GotoStmt(target=t.target, src=t.src))
                 break
+            # Inside a loop body: an unconditional goto to the loop
+            # header is `continue`.
+            if active_loop_tail is not None and target_id == _loop_for_tail(loops, active_loop_tail).header:
+                stmts.append(ContinueStmt(src=t.src))
+                break
+            bid = target_id
             continue
 
         if isinstance(t, (If, Branch)):
@@ -272,17 +478,15 @@ def _emit_block(
 
             then_stmts: list[Stmt]
             if taken_id is None:
-                # Cross-module: the taken edge is a conditional tail
-                # call. The relooper emits a single TailCallStmt in
-                # the then-branch; nothing inside the routine follows.
                 then_stmts = [TailCallStmt(target=taken_label, src=t.src)]
+            elif active_loop_tail is not None and taken_id == _loop_for_tail(loops, active_loop_tail).header:
+                # Conditional back-edge inside a loop body → continue.
+                then_stmts = [ContinueStmt(src=t.src)]
             else:
-                # Local: structure the taken subgraph until it
-                # rejoins the fall-through (`exit=ft_id`). For early-
-                # exit shapes this typically just emits a Return or
-                # TailCall.
                 then_stmts = list(_emit_block(
                     cfg, taken_id, exit_id=ft_id, visiting=visiting,
+                    loops=loops, loop_blocks=loop_blocks,
+                    active_loop_tail=active_loop_tail,
                 ).stmts)
 
             if isinstance(t, If):
@@ -292,7 +496,7 @@ def _emit_block(
                     else_block=None,
                     src=t.src,
                 ))
-            else:  # Branch
+            else:
                 stmts.append(RawIfStmt(
                     cond=t.cond,
                     then_block=Block.of(then_stmts),
@@ -304,7 +508,83 @@ def _emit_block(
             bid = ft_id
             continue
 
-        # Unknown terminator — shouldn't happen.
         raise AssertionError(f"unexpected terminator: {t!r}")
 
     return Block.of(stmts)
+
+
+def _loop_for_tail(loops: dict[int, SimpleLoop], tail: int) -> SimpleLoop:
+    """Helper: find the loop whose tail is `tail`. The lookup is
+    linear over `loops` but `loops` is small (at most a handful per
+    routine), so this isn't worth indexing."""
+    for loop in loops.values():
+        if loop.tail == tail:
+            return loop
+    raise AssertionError(f"no loop with tail={tail}")
+
+
+def _emit_loop_body(
+    cfg: CFG,
+    loop: SimpleLoop,
+    visiting: set[int],
+    loops: dict[int, SimpleLoop],
+    loop_blocks: set[int],
+) -> Block:
+    """Emit the body of a `LoopStmt` for the simple do-while `loop`.
+
+    The walker emits the header through (tail - 1) using the normal
+    machinery, then appends the tail's body atoms followed by the
+    inverted exit guard:
+
+        ...header body...
+        ...intermediate blocks...
+        ...tail body atoms...
+        if !continue_cond { break; }
+
+    The conditional terminator on the tail isn't recursed through —
+    we rewrite it inline as the bottom-of-loop break.
+    """
+    body_stmts: list[Stmt] = []
+
+    # Walk the header up to (but not including) the tail. The exit_id
+    # is the tail's id so the walker stops just before it; we then
+    # emit the tail's body atoms manually so the conditional
+    # terminator can be rewritten into the break guard.
+    visiting_inner: set[int] = set()
+    head_body = _emit_block(
+        cfg, loop.header,
+        exit_id=loop.tail,
+        visiting=visiting_inner,
+        loops=loops, loop_blocks=loop_blocks,
+        active_loop_tail=loop.tail,
+    )
+    body_stmts.extend(head_body.stmts)
+
+    # Emit the tail block's body atoms (loads/stores/etc.) and then
+    # the synthesised exit guard.
+    tail_block = cfg.blocks[loop.tail]
+    for item in tail_block.body:
+        if isinstance(item, IR1Call):
+            body_stmts.append(CallStmt(target=item.target, src=item.src))
+        else:
+            body_stmts.append(RawStmt(item=item))
+
+    term = tail_block.terminator
+    inverted_cond = _invert_loop_exit(loop.cond, loop.cond_is_compare)
+    break_block = Block.of([BreakStmt(src=term.src)])
+    if loop.cond_is_compare:
+        body_stmts.append(IfStmt(
+            cond=inverted_cond,
+            then_block=break_block,
+            else_block=None,
+            src=term.src,
+        ))
+    else:
+        body_stmts.append(RawIfStmt(
+            cond=inverted_cond,
+            then_block=break_block,
+            else_block=None,
+            src=term.src,
+        ))
+
+    return Block.of(body_stmts)

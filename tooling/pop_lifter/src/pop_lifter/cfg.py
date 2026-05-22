@@ -167,3 +167,160 @@ def _local_successors(
             out.append(b.id + 1)
         return out
     raise ValueError(f"unexpected terminator: {t!r}")
+
+
+# ---------------------------------------------------------------- dominators
+
+
+def reverse_postorder(cfg: CFG) -> list[int]:
+    """Reverse post-order traversal of `cfg` from the entry block.
+    Used as the iteration order for the dominator solver and as the
+    primary scan order for the loop-relooper."""
+    order: list[int] = []
+    visited: set[int] = set()
+
+    def dfs(b: int) -> None:
+        visited.add(b)
+        for s in cfg.succ[b]:
+            if s not in visited:
+                dfs(s)
+        order.append(b)
+
+    dfs(cfg.entry_id)
+    return list(reversed(order))
+
+
+def compute_idoms(cfg: CFG) -> dict[int, int]:
+    """Cooper / Harvey / Kennedy iterative immediate-dominator
+    computation. Returns a map `block_id -> idom_id`; the entry
+    block's idom is itself (sentinel). Unreachable blocks aren't in
+    the result.
+
+    Reference: "A Simple, Fast Dominance Algorithm",
+    Cooper, Harvey & Kennedy (Rice CS-TR-06-33870).
+    """
+    rpo = reverse_postorder(cfg)
+    rpo_idx = {b: i for i, b in enumerate(rpo)}
+
+    idom: dict[int, int] = {cfg.entry_id: cfg.entry_id}
+
+    def intersect(b1: int, b2: int) -> int:
+        finger1, finger2 = b1, b2
+        while finger1 != finger2:
+            while rpo_idx[finger1] > rpo_idx[finger2]:
+                finger1 = idom[finger1]
+            while rpo_idx[finger2] > rpo_idx[finger1]:
+                finger2 = idom[finger2]
+        return finger1
+
+    changed = True
+    while changed:
+        changed = False
+        for b in rpo:
+            if b == cfg.entry_id:
+                continue
+            processed_preds = [p for p in cfg.pred[b] if p in idom]
+            if not processed_preds:
+                continue
+            new_idom = processed_preds[0]
+            for p in processed_preds[1:]:
+                new_idom = intersect(p, new_idom)
+            if idom.get(b) != new_idom:
+                idom[b] = new_idom
+                changed = True
+    return idom
+
+
+def dominates(idom: dict[int, int], a: int, b: int) -> bool:
+    """True if `a` dominates `b` (every path from entry to `b` passes
+    through `a`). `a` dominates itself by convention."""
+    if a == b:
+        return True
+    cur = b
+    while idom.get(cur, cur) != cur:
+        cur = idom[cur]
+        if cur == a:
+            return True
+    return False
+
+
+# ---------------------------------------------------------------- loops
+
+
+def find_back_edges(cfg: CFG) -> list[tuple[int, int]]:
+    """Return all back-edges `(source, target)` where `target`
+    dominates `source`. These are the canonical loop entries: each
+    back-edge induces a natural loop with `target` as the header.
+
+    Only catches *reducible* loops. For arbitrary-cycle detection
+    (including irreducible flow that has no dominator back-edge),
+    use `find_dfs_back_edges`.
+    """
+    idom = compute_idoms(cfg)
+    edges: list[tuple[int, int]] = []
+    for s, succs in cfg.succ.items():
+        if s not in idom:
+            continue
+        for d in succs:
+            if d in idom and dominates(idom, d, s):
+                edges.append((s, d))
+    return edges
+
+
+def find_dfs_back_edges(cfg: CFG) -> list[tuple[int, int]]:
+    """DFS classification of back-edges: any edge `(s, d)` where `d`
+    is on the DFS stack when `s` is being explored. Catches *every*
+    cycle in the CFG including irreducible ones (the kind without
+    a dominator back-edge — Tarjan's "cross-into-SCC" shape).
+
+    Pass 2's relooper uses this for the fallback gate: if the CFG
+    has any cycle that doesn't fully belong to a recognised simple
+    do-while, the routine takes the unstructured fallback. Sticking
+    with `find_back_edges` for that gate would silently miss
+    irreducible loops, which would then trip the walker's `visiting`
+    escape hatch and emit `GotoStmt`s to synthesized labels that no
+    interpreter can resolve.
+    """
+    visited: set[int] = set()
+    on_stack: set[int] = set()
+    edges: list[tuple[int, int]] = []
+
+    def dfs(b: int) -> None:
+        visited.add(b)
+        on_stack.add(b)
+        for s in cfg.succ.get(b, []):
+            if s in on_stack:
+                edges.append((b, s))
+            elif s not in visited:
+                dfs(s)
+        on_stack.discard(b)
+
+    if cfg.blocks:
+        dfs(cfg.entry_id)
+    return edges
+
+
+def natural_loop_body(cfg: CFG, source: int, header: int) -> set[int]:
+    """Body of the natural loop induced by back-edge `(source, header)`:
+    the header plus every block that can reach `source` without going
+    through the header. Computed as a reverse BFS from `source` along
+    predecessor edges, stopping at `header`. The header itself is
+    always included.
+
+    Self-loop edge case: when `source == header` the loop is a single
+    block (a back-edge from the header to itself). The body is just
+    `{header}`; we don't seed the worklist, which would otherwise
+    walk past the header into the preheader.
+    """
+    body: set[int] = {header}
+    if source == header:
+        return body
+    body.add(source)
+    worklist: list[int] = [source]
+    while worklist:
+        b = worklist.pop()
+        for p in cfg.pred[b]:
+            if p not in body:
+                body.add(p)
+                worklist.append(p)
+    return body
