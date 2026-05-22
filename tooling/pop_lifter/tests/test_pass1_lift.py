@@ -234,15 +234,15 @@ def test_rnd_lift_shape(source_dir):
 
 
 def test_jsr_lifts_to_call(source_dir):
-    """Every `jsr X` becomes a `Call(X)` IR node. AUTO.S has plenty of
-    sites; pick `:dumb` in the AUTOCTRL chain (`jsr rndp`)."""
+    """Every `jsr X` becomes a `Call(X)` IR node. AUTOCTRL's first
+    instruction is `jsr DoRelease`, which is a stable anchor across
+    refactors of the surrounding control flow."""
     from pop_lifter.ir1 import Call
 
-    # Lift AUTOCTRL — its body contains multiple `jsr rndp` sites.
     module = _lift(source_dir, "AUTO.S", ["AUTOCTRL"])
     auto = module.find("AUTOCTRL")
     assert auto is not None
     calls = [item for item in auto.body if isinstance(item, Call)]
     assert any(c.target == "DoRelease" for c in calls), (
-        "AUTOCTRL starts with `jsr DoRelease`"
+        "AUTOCTRL must lift `jsr DoRelease` (line 161) into a Call"
     )
