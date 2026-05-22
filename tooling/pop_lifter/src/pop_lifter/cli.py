@@ -174,7 +174,7 @@ def _cmd_lift(args: argparse.Namespace) -> int:
         local_entries = [e for e in args.entry if e in defined and e not in handled]
         if not local_entries:
             continue
-        report = lift_file(file_ast, ast.equates, local_entries)
+        report = lift_file(file_ast, ast.symbols(), local_entries)
         if not report.module.routines:
             continue
         dumps.append((
@@ -255,7 +255,7 @@ def _cmd_struct(args: argparse.Namespace) -> int:
         local_entries = [e for e in args.entry if e in defined and e not in handled]
         if not local_entries:
             continue
-        ir1_module = lift_file(file_ast, ast.equates, local_entries).module
+        ir1_module = lift_file(file_ast, ast.symbols(), local_entries).module
         ir2_module = structure_module(ir1_module)
         f, u = fusion_stats(ir2_module)
         cmp_left, setc_left = elision_stats(ir2_module)
@@ -339,7 +339,7 @@ def _cmd_reloop(args: argparse.Namespace) -> int:
         local_entries = [e for e in args.entry if e in defined and e not in handled]
         if not local_entries:
             continue
-        ir1_module = lift_file(file_ast, ast.equates, local_entries).module
+        ir1_module = lift_file(file_ast, ast.symbols(), local_entries).module
         ir2_module = structure_module(ir1_module)
         ir3_module = reloop_module(ir2_module)
         total_routines += len(ir3_module.routines)
@@ -421,7 +421,7 @@ def _cmd_lift_all(args: argparse.Namespace) -> int:
             skipped.append(src_path.name)
             continue
 
-        report = lift_file(file_ast, ast.equates, entries)
+        report = lift_file(file_ast, ast.symbols(), entries)
         if not report.module.routines:
             skipped.append(src_path.name)
             continue

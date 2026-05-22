@@ -44,7 +44,7 @@ def _ir3_module(source_dir: Path):
         search_paths=[source_dir],
     )
     ctrl = next(f for f in ast.files if Path(f.path).name == "CTRL.S")
-    ir1 = lift_file(ctrl, ast.equates, ["CHECKFLOOR"]).module
+    ir1 = lift_file(ctrl, ast.symbols(), ["CHECKFLOOR"]).module
     ir2 = structure_module(ir1)
     ir3 = reloop_module(ir2)
     ir3.routines = [r for r in ir3.routines if r.name == "CHECKFLOOR"]
@@ -306,7 +306,7 @@ def test_chgshadposn_loop_structures(source_dir):
         search_paths=[source_dir],
     )
     auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
-    ir1 = lift_file(auto, ast.equates, ["chgshadposn"]).module
+    ir1 = lift_file(auto, ast.symbols(), ["chgshadposn"]).module
     ir3 = reloop_module(structure_module(ir1))
     r = ir3.find("chgshadposn")
     assert _structured_loop_count(r) == 1, (
@@ -488,7 +488,7 @@ def test_relooper_preserves_every_checkfloor_path(source_dir):
         search_paths=[source_dir],
     )
     ctrl = next(f for f in ast.files if Path(f.path).name == "CTRL.S")
-    ir1 = lift_file(ctrl, ast.equates, ["CHECKFLOOR"]).module
+    ir1 = lift_file(ctrl, ast.symbols(), ["CHECKFLOOR"]).module
     ir2 = structure_module(ir1)
     # Strip chase callees from the IR2 (the test stubs them).
     ir2.routines = [

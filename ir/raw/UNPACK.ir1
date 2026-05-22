@@ -393,12 +393,12 @@ PROMPT:
   if eq goto :1       ; UNPACK.S:586
   a = #0x42                  ; UNPACK.S:587
 :1:
-  ??? sta msg2            ; UNPACK.S:588
+  *msg2@0x03c0 = a            ; UNPACK.S:588
   call blackout                  ; UNPACK.S:590
   *RAMWRTmain@0xc004 = a            ; UNPACK.S:592
   x = #0x00                  ; UNPACK.S:594
 :loop:
-  ??? lda msg1,x            ; UNPACK.S:595
+  a = *(msg1@0x03bf + x)   ; UNPACK.S:595
   cmp a, #0x40              ; UNPACK.S:596
   if eq goto :done       ; UNPACK.S:597
   *($528+2@0x052a + x) = a   ; UNPACK.S:598
@@ -423,12 +423,12 @@ fn PROMPT {
   if eq goto :1       ; UNPACK.S:586
   a = #0x42                  ; UNPACK.S:587
 :1:
-  ??? sta msg2            ; UNPACK.S:588
+  *msg2@0x03c0 = a            ; UNPACK.S:588
   call blackout                  ; UNPACK.S:590
   *RAMWRTmain@0xc004 = a            ; UNPACK.S:592
   x = #0x00                  ; UNPACK.S:594
 :loop:
-  ??? lda msg1,x            ; UNPACK.S:595
+  a = *(msg1@0x03bf + x)   ; UNPACK.S:595
   cmp a, #0x40              ; UNPACK.S:596
   if eq goto :done       ; UNPACK.S:597
   *($528+2@0x052a + x) = a   ; UNPACK.S:598
@@ -522,7 +522,7 @@ FADEIN:
   *$C029@0xc029 = a            ; UNPACK.S:721
   ??? rep $20            ; UNPACK.S:722
   x = #0x00                  ; UNPACK.S:726
-  ??? ldy #new_palette            ; UNPACK.S:727
+  y = #0xca                  ; UNPACK.S:727
   a = #0x1f                  ; UNPACK.S:728
   ??? phb             ; UNPACK.S:729
 :sm2:
@@ -562,7 +562,7 @@ fn FADEIN {
   *$C029@0xc029 = a            ; UNPACK.S:721
   ??? rep $20            ; UNPACK.S:722
   x = #0x00                  ; UNPACK.S:726
-  ??? ldy #new_palette            ; UNPACK.S:727
+  y = #0xca                  ; UNPACK.S:727
   a = #0x1f                  ; UNPACK.S:728
   ??? phb             ; UNPACK.S:729
 :sm2:

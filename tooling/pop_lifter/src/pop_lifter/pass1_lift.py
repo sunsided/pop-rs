@@ -119,18 +119,35 @@ def _is_local_label(name: str) -> bool:
 
 def _parse_immediate(operand: str, equates: dict[str, int]) -> Imm | None:
     """Parse a `#expr` immediate operand. Returns `None` if `operand`
-    isn't a `#`-prefixed immediate (the caller decides what to do)."""
+    isn't a `#`-prefixed immediate (the caller decides what to do).
+
+    Merlin's `<expr` / `>expr` prefixes select the low / high byte of
+    `expr`. We previously stripped these because the pilot operands
+    were already byte-sized, but now that pass 0 collects label
+    addresses (which are 16-bit values in the 0x10000+ synthetic
+    range), the operator matters: `#<Label` should give the low
+    byte of the synthetic address, `#>Label` the high byte. Both
+    are then masked into the byte the lifted `LoadImm` will store
+    into A/X/Y."""
     s = operand.strip()
     if not s.startswith("#"):
         return None
-    expr = s[1:].lstrip("<>")  # Merlin `<expr` / `>expr` = low/high byte;
-                               # for the pilot the operands are simple
-                               # constants so stripping is safe. A later
-                               # slice will keep the operator and apply it.
+    expr = s[1:].lstrip()
+    byte_op: str | None = None
+    if expr.startswith("<"):
+        byte_op = "low"
+        expr = expr[1:].lstrip()
+    elif expr.startswith(">"):
+        byte_op = "high"
+        expr = expr[1:].lstrip()
     try:
         value = eval_expr(expr, equates)
     except ValueError:
         return None
+    if byte_op == "low":
+        value = value & 0xff
+    elif byte_op == "high":
+        value = (value >> 8) & 0xff
     return Imm(value=value, text=s)
 
 

@@ -41,7 +41,7 @@ def _module(source_dir: Path):
         search_paths=[source_dir],
     )
     file_ast = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
-    return lift_file(file_ast, ast.equates, PILOT_ENTRIES).module
+    return lift_file(file_ast, ast.symbols(), PILOT_ENTRIES).module
 
 
 def _run_pilot(source_dir, entry):
@@ -161,8 +161,8 @@ def _two_module(source_dir):
     )
     auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
     grafix = next(f for f in ast.files if Path(f.path).name == "GRAFIX.S")
-    m_auto = lift_file(auto, ast.equates, ["rndp"]).module
-    m_grafix = lift_file(grafix, ast.equates, ["RND"]).module
+    m_auto = lift_file(auto, ast.symbols(), ["rndp"]).module
+    m_grafix = lift_file(grafix, ast.symbols(), ["RND"]).module
     return m_auto, m_grafix
 
 
@@ -252,7 +252,7 @@ def _checkfloor_module(source_dir):
         search_paths=[source_dir],
     )
     ctrl = next(f for f in ast.files if Path(f.path).name == "CTRL.S")
-    real = lift_file(ctrl, ast.equates, ["CHECKFLOOR"]).module
+    real = lift_file(ctrl, ast.symbols(), ["CHECKFLOOR"]).module
 
     # The lifted module already includes a partial `falling`, `fallon`,
     # `onground` (the tail-call chase pulled them in). Replace them

@@ -82,12 +82,12 @@ fn MOVEAUXLC {
   call Tmovemem                  ; MISC.S:168
   a = #0xf0                  ; MISC.S:172
   *$FFFE@0xfffe = a            ; MISC.S:173
-  a = #0xf0                  ; MISC.S:174
+  a = #0x04                  ; MISC.S:174
   *$FFFF@0xffff = a            ; MISC.S:175
   *ALTZPoff@0xc008 = a            ; MISC.S:177
   a = #0xf0                  ; MISC.S:179
   *$FFFE@0xfffe = a            ; MISC.S:180
-  a = #0xf0                  ; MISC.S:181
+  a = #0x04                  ; MISC.S:181
   *$FFFF@0xffff = a            ; MISC.S:182
   return                           ; MISC.S:184
 }
@@ -612,14 +612,14 @@ fn DOSAVEGAME {
 }
 
 fn LOADLEVELX {
-  ??? lda bluepTRKlst,x            ; MISC.S:796
+  a = *(bluepTRKlst@0x026d + x)   ; MISC.S:796
   *bluepTRK@0x03f0 = a            ; MISC.S:797
-  ??? lda bluepREGlst,x            ; MISC.S:798
+  a = *(bluepREGlst@0x026e + x)   ; MISC.S:798
   *bluepREG@0x03f1 = a            ; MISC.S:799
-  ??? lda bgset1,x            ; MISC.S:801
+  a = *(bgset1@0x026a + x)   ; MISC.S:801
   push a                           ; MISC.S:802
-  ??? lda bgset2,x            ; MISC.S:803
-  ??? ldy chset,x            ; MISC.S:804
+  a = *(bgset2@0x026b + x)   ; MISC.S:803
+  y = *(chset@0x026c + x)   ; MISC.S:804
   x = a                            ; MISC.S:805
   a = pop                          ; MISC.S:806
   tail_call loadlevel                ; MISC.S:808

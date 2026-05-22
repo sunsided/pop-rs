@@ -213,7 +213,7 @@ fn ADDPEEL {
   a = *PAGE@0x0000        ; GRAFIX.S:439
   if eq goto :1       ; GRAFIX.S:440
   x = *purpleflag@0x00da        ; GRAFIX.S:443
-  ??? lda dummy,x            ; GRAFIX.S:444
+  a = *(dummy@0x019d + x)   ; GRAFIX.S:444
   a = #0x2e                  ; GRAFIX.S:447
 :1:
   ??? sta :sm+1            ; GRAFIX.S:450
@@ -263,7 +263,7 @@ fn DOGEN {
   cmp x, #0x01              ; GRAFIX.S:522
   if ne goto ]rts       ; GRAFIX.S:523
   a = #0x00                  ; GRAFIX.S:524
-  ??? sta dummy-1,x            ; GRAFIX.S:525
+  *(dummy-1@0x019c + x) = a   ; GRAFIX.S:525
 ]rts:
   return                           ; GRAFIX.S:527
 }
@@ -501,10 +501,10 @@ fn setbgimg {
   if pl goto :bg1       ; GRAFIX.S:829
   a = a & #0x7f              ; GRAFIX.S:831
   *IMAGE@0x0004 = a            ; GRAFIX.S:832
-  a = #0x00                  ; GRAFIX.S:834
+  a = #0x84                  ; GRAFIX.S:834
   if ne goto :ok       ; GRAFIX.S:835
 :bg1:
-  a = #0x00                  ; GRAFIX.S:837
+  a = #0x60                  ; GRAFIX.S:837
 :ok:
   *TABLE+1@0x0008 = a            ; GRAFIX.S:838
   a = y                            ; GRAFIX.S:840
@@ -514,11 +514,11 @@ fn setbgimg {
 fn setcharimg {
   push a                           ; GRAFIX.S:854
   y = *TABLE@0x0007        ; GRAFIX.S:856
-  ??? lda chtabbank,y            ; GRAFIX.S:857
+  a = *(chtabbank@0x019b + y)   ; GRAFIX.S:857
   *BANK@0x0012 = a            ; GRAFIX.S:858
   a = #0x00                  ; GRAFIX.S:860
   *TABLE@0x0007 = a            ; GRAFIX.S:861
-  ??? lda chtablist,y            ; GRAFIX.S:862
+  a = *(chtablist@0x019c + y)   ; GRAFIX.S:862
   *TABLE+1@0x0008 = a            ; GRAFIX.S:863
   a = pop                          ; GRAFIX.S:865
   return                           ; GRAFIX.S:866
@@ -649,14 +649,14 @@ fn ZEROPEEL {
   *peelX+maxpeel@0xb143 = a            ; GRAFIX.S:1003
   a = #0x00                  ; GRAFIX.S:1004
   *PEELBUF@0x0009 = a            ; GRAFIX.S:1005
-  a = #0x00                  ; GRAFIX.S:1006
+  a = #0xd6                  ; GRAFIX.S:1006
   *PEELBUF+1@0x000a = a            ; GRAFIX.S:1007
   return                           ; GRAFIX.S:1008
 :page1:
   *peelX@0xb115 = a            ; GRAFIX.S:1010
   a = #0x00                  ; GRAFIX.S:1011
   *PEELBUF@0x0009 = a            ; GRAFIX.S:1012
-  a = #0x00                  ; GRAFIX.S:1013
+  a = #0xd0                  ; GRAFIX.S:1013
   *PEELBUF+1@0x000a = a            ; GRAFIX.S:1014
   return                           ; GRAFIX.S:1015
 }
@@ -914,7 +914,7 @@ fn MOVEMEM {
 
 fn GTONE {
   y = #0x0f                  ; GRAFIX.S:1314
-  x = #0x0f                  ; GRAFIX.S:1315
+  x = #0x00                  ; GRAFIX.S:1315
   a = #0x32                  ; GRAFIX.S:1316
   tail_call tone                ; GRAFIX.S:1317
 }
@@ -1273,36 +1273,36 @@ fn posthr {
 
 fn SAVEBLUE {
   call ]bank1in                  ; GRAFIX.S:1698
-  a = #0x00                  ; GRAFIX.S:1699
-  x = #0x00                  ; GRAFIX.S:1700
-  y = #0x00                  ; GRAFIX.S:1701
+  a = #0xd7                  ; GRAFIX.S:1699
+  x = #0xb7                  ; GRAFIX.S:1700
+  y = #0xc0                  ; GRAFIX.S:1701
   call movemem                  ; GRAFIX.S:1702
   goto ]bank2in                ; GRAFIX.S:1703
 }
 
 fn SAVEBINFO {
   call ]bank1in                  ; GRAFIX.S:1706
-  a = #0x00                  ; GRAFIX.S:1707
-  x = #0x00                  ; GRAFIX.S:1708
-  y = #0x00                  ; GRAFIX.S:1709
+  a = #0xd0                  ; GRAFIX.S:1707
+  x = #0xa6                  ; GRAFIX.S:1708
+  y = #0xac                  ; GRAFIX.S:1709
   call movemem                  ; GRAFIX.S:1710
   goto ]bank2in                ; GRAFIX.S:1711
 }
 
 fn RELOADBLUE {
   call ]bank1in                  ; GRAFIX.S:1719
-  a = #0x00                  ; GRAFIX.S:1720
-  x = #0x00                  ; GRAFIX.S:1721
-  y = #0x00                  ; GRAFIX.S:1722
+  a = #0xb7                  ; GRAFIX.S:1720
+  x = #0xd7                  ; GRAFIX.S:1721
+  y = #0xe0                  ; GRAFIX.S:1722
   call movemem                  ; GRAFIX.S:1723
   goto ]bank2in                ; GRAFIX.S:1724
 }
 
 fn RELOADBINFO {
   call ]bank1in                  ; GRAFIX.S:1727
-  a = #0x00                  ; GRAFIX.S:1728
-  x = #0x00                  ; GRAFIX.S:1729
-  y = #0x00                  ; GRAFIX.S:1730
+  a = #0xa6                  ; GRAFIX.S:1728
+  x = #0xd0                  ; GRAFIX.S:1729
+  y = #0xd6                  ; GRAFIX.S:1730
   call movemem                  ; GRAFIX.S:1731
   goto ]bank2in                ; GRAFIX.S:1732
 }
@@ -1323,14 +1323,14 @@ fn CALCBLUE {
   a = a + #0x00 + c              ; GRAFIX.S:1768
   *BlueType@0x0024 = a            ; GRAFIX.S:1769
   a = *(Mult30+1@0x1221 + x)   ; GRAFIX.S:1771
-  a = a + #0x00 + c              ; GRAFIX.S:1772
+  a = a + #0xb7 + c              ; GRAFIX.S:1772
   *BlueType+1@0x0025 = a            ; GRAFIX.S:1773
   a = *BlueType@0x0024        ; GRAFIX.S:1775
   c = 0                            ; GRAFIX.S:1776
   a = a + #0xd0 + c              ; GRAFIX.S:1777
   *BlueSpec@0x0026 = a            ; GRAFIX.S:1778
   a = *BlueType+1@0x0025        ; GRAFIX.S:1780
-  a = a + #0xd0 + c              ; GRAFIX.S:1781
+  a = a + #0x02 + c              ; GRAFIX.S:1781
   *BlueSpec+1@0x0027 = a            ; GRAFIX.S:1782
 ]rts:
   return                           ; GRAFIX.S:1784
@@ -1339,11 +1339,11 @@ fn CALCBLUE {
 fn calcmenu {
   a = #0x0f                  ; GRAFIX.S:1787
   *BlueType@0x0024 = a            ; GRAFIX.S:1788
-  a = #0x0f                  ; GRAFIX.S:1789
+  a = #0x96                  ; GRAFIX.S:1789
   *BlueType+1@0x0025 = a            ; GRAFIX.S:1790
   a = #0x2d                  ; GRAFIX.S:1792
   *BlueSpec@0x0026 = a            ; GRAFIX.S:1793
-  a = #0x2d                  ; GRAFIX.S:1794
+  a = #0x96                  ; GRAFIX.S:1794
   *BlueSpec+1@0x0027 = a            ; GRAFIX.S:1795
   return                           ; GRAFIX.S:1796
 }
@@ -1467,11 +1467,11 @@ fn VBLANK  (aka :loop1) {
 fn VBLANKIIc {
   ??? cli             ; GRAFIX.S:1956
 :loop1:
-  ??? bit vblflag            ; GRAFIX.S:1958
+  bit *vblflag@0x01fb                ; GRAFIX.S:1958
   if pl goto :loop1       ; GRAFIX.S:1959
   ??? lsr vblflag            ; GRAFIX.S:1960
 :loop2:
-  ??? bit vblflag            ; GRAFIX.S:1962
+  bit *vblflag@0x01fb                ; GRAFIX.S:1962
   if pl goto :loop2       ; GRAFIX.S:1963
   ??? lsr vblflag            ; GRAFIX.S:1964
   ??? sei             ; GRAFIX.S:1966
@@ -1493,10 +1493,10 @@ fn InitVBLANK {
   a = *$FBC0@0xfbc0        ; GRAFIX.S:1987
   if ne goto ]rts       ; GRAFIX.S:1988
   *RAMWRTaux@0xc005 = a            ; GRAFIX.S:1990
-  ??? lda #VBLANKIIc            ; GRAFIX.S:1992
-  ??? sta VBLvect+1            ; GRAFIX.S:1993
-  ??? lda #>VBLANKIIc            ; GRAFIX.S:1994
-  ??? sta VBLvect+2            ; GRAFIX.S:1995
+  a = #0xfd                  ; GRAFIX.S:1992
+  *VBLvect+1@0x019b = a            ; GRAFIX.S:1993
+  a = #0x01                  ; GRAFIX.S:1994
+  *VBLvect+2@0x019c = a            ; GRAFIX.S:1995
   ??? sei             ; GRAFIX.S:1997
   *$c079@0xc079 = a            ; GRAFIX.S:1998
   *$c05b@0xc05b = a            ; GRAFIX.S:1999

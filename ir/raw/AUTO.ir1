@@ -157,8 +157,8 @@ fn Shad5 {
   a = #0x00                  ; AUTO.S:293
   *PreRecPtr@0x0309 = a            ; AUTO.S:294
 :1:
-  ??? lda #ShadProg5            ; AUTO.S:296
-  ??? ldx #>ShadProg5            ; AUTO.S:297
+  a = #0x3a                  ; AUTO.S:296
+  x = #0x00                  ; AUTO.S:297
   call AutoPlayback                  ; AUTO.S:298
   a = *CharX@0x0041        ; AUTO.S:300
   cmp a, #0x0f              ; AUTO.S:301
@@ -195,8 +195,8 @@ fn FinalShad {
   *shadowaction@0x0217 = a            ; AUTO.S:335
   if ne goto :cont       ; AUTO.S:336
 :hold:
-  ??? lda #shadpos12            ; AUTO.S:338
-  ??? ldx #>shadpos12            ; AUTO.S:339
+  a = #0x39                  ; AUTO.S:338
+  x = #0x00                  ; AUTO.S:339
   tail_call csps                ; AUTO.S:340
 ]rts:
   return                           ; AUTO.S:341
@@ -726,7 +726,7 @@ fn CHECKSTAB {
   call StabChar                  ; AUTO.S:1019
   call SaveShad                  ; AUTO.S:1020
   call rndp                  ; AUTO.S:1022
-  ??? lda refractimer,x            ; AUTO.S:1023
+  a = *(refractimer@0x0007 + x)   ; AUTO.S:1023
   *refract@0x00a1 = a            ; AUTO.S:1024
 :1:
   a = *KidAction@0x0056        ; AUTO.S:1026
@@ -1341,8 +1341,8 @@ fn ADDGUARD {
   *shadowaction@0x0217 = a            ; AUTO.S:1774
   a = #0x01                  ; AUTO.S:1775
   *exitopen@0x0086 = a            ; AUTO.S:1776
-  ??? lda #shadpos12            ; AUTO.S:1777
-  ??? ldx #>shadpos12            ; AUTO.S:1778
+  a = #0x39                  ; AUTO.S:1777
+  x = #0x00                  ; AUTO.S:1778
   tail_call csps                ; AUTO.S:1779
 :not12:
   a = *level@0x03f4        ; AUTO.S:1784
@@ -1361,8 +1361,8 @@ fn ADDGUARD {
   a = #0x4d                  ; AUTO.S:1799
   *exitopen@0x0086 = a            ; AUTO.S:1800
 :norepeat:
-  ??? lda #shadpos6a            ; AUTO.S:1802
-  ??? ldx #>shadpos6a            ; AUTO.S:1803
+  a = #0x37                  ; AUTO.S:1802
+  x = #0x00                  ; AUTO.S:1803
   tail_call csps                ; AUTO.S:1804
 :not6:
   a = *level@0x03f4        ; AUTO.S:1808
@@ -1377,8 +1377,8 @@ fn ADDGUARD {
   call rdblock                  ; AUTO.S:1819
   cmp a, #0x0a              ; AUTO.S:1820
   if ne goto ]rts       ; AUTO.S:1821
-  ??? lda #shadpos5            ; AUTO.S:1823
-  ??? ldx #>shadpos5            ; AUTO.S:1824
+  a = #0x38                  ; AUTO.S:1823
+  x = #0x00                  ; AUTO.S:1824
   tail_call csps                ; AUTO.S:1825
 ]rts:
   return                           ; AUTO.S:1826
@@ -1466,7 +1466,7 @@ AddNormalGd:
 :ok:
   *guardprog@0x00dd = a            ; AUTO.S:1928
   x = *level@0x03f4        ; AUTO.S:1930
-  ??? lda basiccolor,x            ; AUTO.S:1931
+  a = *(basiccolor@0x000b + x)   ; AUTO.S:1931
   x = *guardprog@0x00dd        ; AUTO.S:1932
   ??? eor specialcolor,x            ; AUTO.S:1933
   *GuardColor@0x0216 = a            ; AUTO.S:1934
@@ -1556,7 +1556,7 @@ fn :not5  (aka AddNormalGd) {
 :ok:
   *guardprog@0x00dd = a            ; AUTO.S:1928
   x = *level@0x03f4        ; AUTO.S:1930
-  ??? lda basiccolor,x            ; AUTO.S:1931
+  a = *(basiccolor@0x000b + x)   ; AUTO.S:1931
   x = *guardprog@0x00dd        ; AUTO.S:1932
   ??? eor specialcolor,x            ; AUTO.S:1933
   *GuardColor@0x0216 = a            ; AUTO.S:1934
@@ -1567,7 +1567,7 @@ fn :not5  (aka AddNormalGd) {
 
 fn getgdstrength {
   x = *level@0x03f4        ; AUTO.S:1942
-  ??? lda basicstrength,x            ; AUTO.S:1943
+  a = *(basicstrength@0x000a + x)   ; AUTO.S:1943
   x = *guardprog@0x00dd        ; AUTO.S:1944
   c = 0                            ; AUTO.S:1945
   ??? adc extrastrength,x            ; AUTO.S:1946

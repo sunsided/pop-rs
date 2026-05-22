@@ -2,7 +2,7 @@
 
 fn entry {
   a = #0x60                  ; BOOT.S:23
-  ??? sta entry            ; BOOT.S:24
+  *entry@0x0072 = a            ; BOOT.S:24
   a = #0xff                  ; BOOT.S:26
   *$4fb@0x04fb = a            ; BOOT.S:27
   *$3f3@0x03f3 = a            ; BOOT.S:28
@@ -30,9 +30,9 @@ fn entry {
   *sector@0x0050 = a            ; BOOT.S:51
 :0:
   y = *sector@0x0050        ; BOOT.S:53
-  ??? lda skewtbl,y            ; BOOT.S:54
+  a = *(skewtbl@0x0073 + y)   ; BOOT.S:54
   *$3d@0x003d = a            ; BOOT.S:55
-  ??? lda sectaddr,y            ; BOOT.S:56
+  a = *(sectaddr@0x0074 + y)   ; BOOT.S:56
   if eq goto :1       ; BOOT.S:57
   *$27@0x0027 = a            ; BOOT.S:58
 :rdsect:
@@ -88,7 +88,7 @@ fn check128k {
   if mi goto NOT128K       ; BOOT.S:154
   ??? ldx #CHECKEND            ; BOOT.S:156
 :0:
-  ??? lda CHECKER,X            ; BOOT.S:157
+  a = *(CHECKER@0x0076 + x)   ; BOOT.S:157
   *($180@0x0180 + x) = a   ; BOOT.S:158
   x -= 1                         ; BOOT.S:159
   if pl goto :0       ; BOOT.S:160
@@ -106,7 +106,7 @@ fn NOT128K {
   call vtab                  ; BOOT.S:176
   y = #0x00                  ; BOOT.S:178
 :0:
-  ??? lda MEMTEXT,Y            ; BOOT.S:179
+  a = *(MEMTEXT@0x0079 + y)   ; BOOT.S:179
   if eq goto *       ; BOOT.S:180
   call cout                  ; BOOT.S:181
   cmp a, #0x8d              ; BOOT.S:182

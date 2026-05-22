@@ -63,9 +63,30 @@ class FileAST:
 @dataclass
 class ProgramAST:
     equates: dict[str, int] = field(default_factory=dict)
+    # Program labels (every globally-scoped label encountered across
+    # all parsed files). Mapped to *synthetic* addresses in the
+    # 0x10000+ range so they don't alias any real 16-bit RAM location.
+    # Pass 1 merges these with `equates` when resolving operands so
+    # `lda #SymbolicLabel` and `ldx symbol_table,x` lift instead of
+    # falling through to Unsupported. The interpreter rejects any
+    # memory access whose effective address >= 0x10000 with a clear
+    # InterpError — synthetic addresses can't be safely dereferenced
+    # because we haven't actually assembled the program.
+    labels: dict[str, int] = field(default_factory=dict)
     dum_blocks: list[DumBlock] = field(default_factory=list)
     files: list[FileAST] = field(default_factory=list)
     diagnostics: list[str] = field(default_factory=list)
+
+    def symbols(self) -> dict[str, int]:
+        """Merged symbol table — equates first, then labels (label
+        names never override equates of the same name). Callers that
+        need to resolve operands should use this rather than
+        `equates` alone, otherwise references to program labels stay
+        unresolvable and lift as `Unsupported`."""
+        merged = dict(self.equates)
+        for name, addr in self.labels.items():
+            merged.setdefault(name, addr)
+        return merged
 
     def to_json(self) -> str:
         # File paths are rewritten to be repo-relative so the JSON dump
@@ -430,6 +451,47 @@ class Parser:
         )
 
 
+_LABEL_SENTINEL_BASE = 0x10000
+"""Synthetic-address range start for program labels. Anything ≥
+`_LABEL_SENTINEL_BASE` is a label, not a real 16-bit memory address —
+the interpreter rejects accesses to these so unresolved-pointer bugs
+surface immediately instead of silently aliasing into low RAM."""
+
+
+def _collect_labels(ast: ProgramAST) -> None:
+    """Sweep every parsed file for globally-scoped labels (anything
+    that isn't a `:foo` / `]foo` local label, isn't already in
+    `equates`, and was declared on a non-blank line). Each gets a
+    unique sentinel address in the 0x10000+ range.
+
+    Why we need this: pass 1's operand parser calls `eval_expr` to
+    resolve symbols, and previously only entries in `equates` (from
+    `LABEL = EXPR` equate lines plus dum-block offsets) were
+    visible. Anything else — including the hundreds of routine
+    entry points and data-table labels that POP loads via `lda
+    #SymbolicLabel` / `ldx #>SymbolicLabel` — failed parsing and
+    fell through to `Unsupported`. Collecting them here closes the
+    gap; the addresses are synthetic because we don't actually
+    assemble the program, but the symbolic names are what
+    downstream passes care about anyway."""
+    counter = 0
+    for file_ast in ast.files:
+        for line in file_ast.lines:
+            label = line.label
+            if not label:
+                continue
+            # Local labels (`:foo`, `]foo`) and `LABEL = EXPR`
+            # equate definitions are handled elsewhere.
+            if label.startswith(":") or label.startswith("]"):
+                continue
+            if line.is_equate:
+                continue
+            if label in ast.equates or label in ast.labels:
+                continue
+            ast.labels[label] = _LABEL_SENTINEL_BASE + counter
+            counter += 1
+
+
 def parse_files(paths: list[Path], search_paths: list[Path] | None = None) -> ProgramAST:
     """Parse one or more `.S` files into a single `ProgramAST`. Files are
     processed in order; symbols from earlier files are visible to later
@@ -437,4 +499,5 @@ def parse_files(paths: list[Path], search_paths: list[Path] | None = None) -> Pr
     parser = Parser(search_paths or [])
     for p in paths:
         parser.parse(p)
+    _collect_labels(parser.ast)
     return parser.ast

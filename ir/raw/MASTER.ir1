@@ -89,8 +89,8 @@ fn driveoff {
 }
 
 fn set1stlevel {
-  ??? lda firstlevel            ; MASTER.S:351
-  ??? ldx firstlevel+1            ; MASTER.S:352
+  a = *firstlevel@0x021b        ; MASTER.S:351
+  x = *firstlevel+1@0x021c        ; MASTER.S:352
 SetLevel:
   *params@0x03f0 = a            ; MASTER.S:353
   *params+1@0x03f1 = x            ; MASTER.S:354
@@ -106,8 +106,8 @@ fn SetLevel {
 }
 
 fn setdemolevel {
-  ??? lda demolevel            ; MASTER.S:358
-  ??? ldx demolevel+1            ; MASTER.S:359
+  a = *demolevel@0x021a        ; MASTER.S:358
+  x = *demolevel+1@0x021b        ; MASTER.S:359
   tail_call SetLevel                ; MASTER.S:360
 }
 
@@ -221,7 +221,7 @@ fn rdbg1 {
   cmp x, *BGset1@0x0303    ; MASTER.S:531
   if eq goto :rts       ; MASTER.S:532
   *BGset1@0x0303 = x            ; MASTER.S:533
-  ??? lda bg1trk,x            ; MASTER.S:534
+  a = *(bg1trk@0x022b + x)   ; MASTER.S:534
   *track@0x00fe = a            ; MASTER.S:535
   call rw18                  ; MASTER.S:536
   call rw18                  ; MASTER.S:538
@@ -235,7 +235,7 @@ fn rdbg2 {
   cmp x, *BGset2@0x0304    ; MASTER.S:544
   if eq goto ]rts       ; MASTER.S:545
   *BGset2@0x0304 = x            ; MASTER.S:546
-  ??? lda bg2trk,x            ; MASTER.S:547
+  a = *(bg2trk@0x022c + x)   ; MASTER.S:547
   *track@0x00fe = a            ; MASTER.S:548
   call rw18                  ; MASTER.S:549
   return                           ; MASTER.S:551
@@ -248,9 +248,9 @@ fn rdch4 {
   cmp x, *CHset@0x0305    ; MASTER.S:554
   if eq goto ]rts       ; MASTER.S:555
   *CHset@0x0305 = x            ; MASTER.S:556
-  ??? lda ch4trk,x            ; MASTER.S:557
+  a = *(ch4trk@0x022d + x)   ; MASTER.S:557
   *track@0x00fe = a            ; MASTER.S:558
-  ??? lda ch4off,x            ; MASTER.S:559
+  a = *(ch4off@0x022e + x)   ; MASTER.S:559
   if eq goto :off0       ; MASTER.S:560
   cmp a, #0x06              ; MASTER.S:561
   if eq goto :off6       ; MASTER.S:562

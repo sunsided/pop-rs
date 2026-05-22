@@ -45,7 +45,7 @@ def _regen_auto_combat(source_dir: Path) -> str:
         search_paths=[source_dir],
     )
     file_ast = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
-    report = lift_file(file_ast, ast.equates, PILOT_ENTRIES)
+    report = lift_file(file_ast, ast.symbols(), PILOT_ENTRIES)
     return ir1_mod.format_module(report.module)
 
 
@@ -101,8 +101,8 @@ def _regen_rndp_pilot(source_dir: Path) -> str:
     )
     auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
     grafix = next(f for f in ast.files if Path(f.path).name == "GRAFIX.S")
-    m_auto = lift_file(auto, ast.equates, ["rndp"]).module
-    m_grafix = lift_file(grafix, ast.equates, ["RND"]).module
+    m_auto = lift_file(auto, ast.symbols(), ["rndp"]).module
+    m_grafix = lift_file(grafix, ast.symbols(), ["RND"]).module
     return "\n".join([
         ir1_mod.format_module(m_auto),
         ir1_mod.format_module(m_grafix),
@@ -135,7 +135,7 @@ def _regen_checkfloor_pilot(source_dir: Path) -> str:
         search_paths=[source_dir],
     )
     ctrl = next(f for f in ast.files if Path(f.path).name == "CTRL.S")
-    report = lift_file(ctrl, ast.equates, ["CHECKFLOOR"])
+    report = lift_file(ctrl, ast.symbols(), ["CHECKFLOOR"])
     return ir1_mod.format_module(report.module)
 
 
@@ -167,7 +167,7 @@ def _regen_checkfloor_ir2(source_dir: Path) -> str:
         search_paths=[source_dir],
     )
     ctrl = next(f for f in ast.files if Path(f.path).name == "CTRL.S")
-    ir1_module = lift_file(ctrl, ast.equates, ["CHECKFLOOR"]).module
+    ir1_module = lift_file(ctrl, ast.symbols(), ["CHECKFLOOR"]).module
     ir2_module = structure_module(ir1_module)
     return ir1_mod.format_module(ir2_module)
 
@@ -202,7 +202,7 @@ def _regen_checkfloor_ir3(source_dir: Path) -> str:
         search_paths=[source_dir],
     )
     ctrl = next(f for f in ast.files if Path(f.path).name == "CTRL.S")
-    ir1_module = lift_file(ctrl, ast.equates, ["CHECKFLOOR"]).module
+    ir1_module = lift_file(ctrl, ast.symbols(), ["CHECKFLOOR"]).module
     ir3_module = reloop_module(structure_module(ir1_module))
     return ir3_mod.format_module(ir3_module)
 
@@ -237,7 +237,7 @@ def _regen_chgshadposn_ir3(source_dir: Path) -> str:
         search_paths=[source_dir],
     )
     auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
-    ir1_module = lift_file(auto, ast.equates, ["chgshadposn"]).module
+    ir1_module = lift_file(auto, ast.symbols(), ["chgshadposn"]).module
     ir3_module = reloop_module(structure_module(ir1_module))
     return ir3_mod.format_module(ir3_module)
 
@@ -282,7 +282,7 @@ def _regen_raw_lift(source_dir: Path) -> dict[str, str]:
         entries = discover_entries(file_ast)
         if not entries:
             continue
-        report = lift_file(file_ast, ast.equates, entries)
+        report = lift_file(file_ast, ast.symbols(), entries)
         if not report.module.routines:
             continue
         out[f"{src_path.stem.upper()}.ir1"] = ir1_mod.format_module(report.module)

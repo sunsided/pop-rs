@@ -172,36 +172,36 @@ fn getnextstate {
 }
 
 fn pburn {
-  ??? ldx ptorchcount            ; SUBS.S:320
+  x = *ptorchcount@0x0345        ; SUBS.S:320
   x += 1                         ; SUBS.S:321
-  ??? lda ptorchx,x            ; SUBS.S:322
+  a = *(ptorchx@0x0341 + x)   ; SUBS.S:322
   if pl goto :ok       ; SUBS.S:323
   x = #0x00                  ; SUBS.S:324
 :ok:
-  ??? stx ptorchcount            ; SUBS.S:325
-  ??? lda ptorchx,x            ; SUBS.S:326
+  *ptorchcount@0x0345 = x            ; SUBS.S:325
+  a = *(ptorchx@0x0341 + x)   ; SUBS.S:326
   *XCO@0x0001 = a            ; SUBS.S:327
-  ??? lda ptorchoff,x            ; SUBS.S:328
+  a = *(ptorchoff@0x0342 + x)   ; SUBS.S:328
   *OFFSET@0x0003 = a            ; SUBS.S:329
-  ??? lda ptorchy,x            ; SUBS.S:330
+  a = *(ptorchy@0x0343 + x)   ; SUBS.S:330
   *YCO@0x0002 = a            ; SUBS.S:331
-  ??? lda ptorchstate,x            ; SUBS.S:332
+  a = *(ptorchstate@0x0344 + x)   ; SUBS.S:332
   call getflameframe                  ; SUBS.S:333
-  ??? sta ptorchstate,x            ; SUBS.S:334
+  *(ptorchstate@0x0344 + x) = a   ; SUBS.S:334
   x = a                            ; SUBS.S:335
   call psetupflame                  ; SUBS.S:336
   tail_call lay                ; SUBS.S:337
 }
 
 fn pflow {
-  ??? ldx psandcount            ; SUBS.S:345
+  x = *psandcount@0x0346        ; SUBS.S:345
   if mi goto ]rts       ; SUBS.S:346
   x += 1                         ; SUBS.S:347
   cmp x, #0x03              ; SUBS.S:348
   if cc goto :ok       ; SUBS.S:349
   x = #0x00                  ; SUBS.S:350
 :ok:
-  ??? stx psandcount            ; SUBS.S:351
+  *psandcount@0x0346 = x            ; SUBS.S:351
   y = *GlassState@0x0213        ; SUBS.S:352
   tail_call flow                ; SUBS.S:353
 ]rts:
@@ -211,7 +211,7 @@ fn pflow {
 fn pstars {
   x = #0x03                  ; SUBS.S:361
 :loop:
-  ??? lda pstarcount,x            ; SUBS.S:362
+  a = *(pstarcount@0x0347 + x)   ; SUBS.S:362
   if eq goto :ok       ; SUBS.S:363
   ??? dec pstarcount,x            ; SUBS.S:364
   if ne goto :ok       ; SUBS.S:365
@@ -236,7 +236,7 @@ fn pstars {
   a = a & #0x03              ; SUBS.S:386
   x = a                            ; SUBS.S:387
   a = pop                          ; SUBS.S:388
-  ??? sta pstarcount,x            ; SUBS.S:389
+  *(pstarcount@0x0347 + x) = a   ; SUBS.S:389
   tail_call twinkle                ; SUBS.S:390
 ]rts:
   return                           ; SUBS.S:299
@@ -273,9 +273,9 @@ fn PLAYCUT {
   a = pop                          ; SUBS.S:437
   x = a                            ; SUBS.S:438
   tail_call PlayCut4                ; SUBS.S:441
-  ??? lda AddrL,x            ; SUBS.S:444
+  a = *(AddrL@0x034c + x)   ; SUBS.S:444
   ??? sta :sm+1            ; SUBS.S:445
-  ??? lda AddrH,x            ; SUBS.S:446
+  a = *(AddrH@0x034d + x)   ; SUBS.S:446
   ??? sta :sm+2            ; SUBS.S:447
 :sm:
   call $FFFF                  ; SUBS.S:448
@@ -534,7 +534,7 @@ fn PlayCut0 {
   a = #0x05                  ; SUBS.S:730
   call play                  ; SUBS.S:731
   a = #0x00                  ; SUBS.S:732
-  ??? sta psandcount            ; SUBS.S:733
+  *psandcount@0x0346 = a            ; SUBS.S:733
   a = #0x0b                  ; SUBS.S:734
   x = #0x08                  ; SUBS.S:735
   call PlaySongI                  ; SUBS.S:736
@@ -561,7 +561,7 @@ fn PlayCut0 {
 
 fn addglass {
   a = #0x00                  ; SUBS.S:764
-  ??? sta psandcount            ; SUBS.S:765
+  *psandcount@0x0346 = a            ; SUBS.S:765
 addglass1:
   *GlassState@0x0213 = x            ; SUBS.S:767
   a = #0x02                  ; SUBS.S:768
@@ -683,7 +683,7 @@ fn flashoff {
 }
 
 fn play {
-  ??? sta SceneCount            ; SUBS.S:877
+  *SceneCount@0x0338 = a            ; SUBS.S:877
 playloop:
   call rnd                  ; SUBS.S:879
   a = *SPEED@0x030c        ; SUBS.S:881
@@ -710,7 +710,7 @@ playloop:
   call playback                  ; SUBS.S:908
   call zerosound                  ; SUBS.S:909
 :1:
-  ??? dec SceneCount            ; SUBS.S:913
+  *SceneCount@0x0338 -= 1                         ; SUBS.S:913
   if ne goto playloop       ; SUBS.S:914
   return                           ; SUBS.S:915
 ]rts:
@@ -743,7 +743,7 @@ fn playloop {
   call playback                  ; SUBS.S:908
   call zerosound                  ; SUBS.S:909
 :1:
-  ??? dec SceneCount            ; SUBS.S:913
+  *SceneCount@0x0338 -= 1                         ; SUBS.S:913
   if ne goto playloop       ; SUBS.S:914
   return                           ; SUBS.S:915
 ]rts:
@@ -981,8 +981,8 @@ fn startK7 {
 }
 
 fn DEMO {
-  ??? lda #DemoProg1            ; SUBS.S:1234
-  ??? ldx #>DemoProg1            ; SUBS.S:1235
+  a = #0x79                  ; SUBS.S:1234
+  x = #0x03                  ; SUBS.S:1235
   tail_call AutoPlayback                ; SUBS.S:1236
 }
 
@@ -994,14 +994,14 @@ fn initit {
   *redrawglass@0x0214 = a            ; SUBS.S:1248
   *KidPosn@0x0050 = a            ; SUBS.S:1249
   *ShadPosn@0x0060 = a            ; SUBS.S:1250
-  ??? sta ptorchcount            ; SUBS.S:1251
+  *ptorchcount@0x0345 = a            ; SUBS.S:1251
   x = #0x03                  ; SUBS.S:1252
 :loop:
-  ??? sta pstarcount,x            ; SUBS.S:1253
+  *(pstarcount@0x0347 + x) = a   ; SUBS.S:1253
   x -= 1                         ; SUBS.S:1254
   if pl goto :loop       ; SUBS.S:1255
   a = #0xff                  ; SUBS.S:1257
-  ??? sta psandcount            ; SUBS.S:1258
+  *psandcount@0x0346 = a            ; SUBS.S:1258
   a = #0x0c                  ; SUBS.S:1260
   *SPEED@0x030c = a            ; SUBS.S:1261
   call zeropeels                  ; SUBS.S:1263
