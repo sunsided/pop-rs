@@ -1149,12 +1149,12 @@ fn ADDSWORDOBJ {
 fn GETSEQ {
   y = #0x00                  ; CTRLSUBS.S:1630
   a = *(CharSeq@0x0049)[y]   ; CTRLSUBS.S:1631
-  ??? pha             ; CTRLSUBS.S:1632
+  push a                           ; CTRLSUBS.S:1632
   *CharSeq@0x0049 += 1                         ; CTRLSUBS.S:1634
   if ne goto :done       ; CTRLSUBS.S:1635
   *CharSeq+1@0x004a += 1                         ; CTRLSUBS.S:1636
 :done:
-  ??? pla             ; CTRLSUBS.S:1638
+  a = pop                          ; CTRLSUBS.S:1638
   return                           ; CTRLSUBS.S:1639
 }
 
@@ -1233,7 +1233,7 @@ fn MARKFRED {
 
 fn MARKWIPE {
   if cs goto ]rts       ; CTRLSUBS.S:1745
-  ??? pha             ; CTRLSUBS.S:1746
+  push a                           ; CTRLSUBS.S:1746
   a = *(wipebuf@0x5eb4 + y)   ; CTRLSUBS.S:1747
   if eq goto :2       ; CTRLSUBS.S:1748
   a = *height@0x0004        ; CTRLSUBS.S:1749
@@ -1243,7 +1243,7 @@ fn MARKWIPE {
   a = *height@0x0004        ; CTRLSUBS.S:1752
   *(whitebuf@0x5f0e + y) = a   ; CTRLSUBS.S:1753
 :1:
-  ??? pla             ; CTRLSUBS.S:1754
+  a = pop                          ; CTRLSUBS.S:1754
   *(wipebuf@0x5eb4 + y) = a   ; CTRLSUBS.S:1755
   c = 0                            ; CTRLSUBS.S:1756
   return                           ; CTRLSUBS.S:1757

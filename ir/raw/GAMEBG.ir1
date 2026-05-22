@@ -70,11 +70,11 @@ fn TIMELEFTMSG {
   cmp a, #0x02              ; GAMEBG.S:256
   if cs goto ]rts       ; GAMEBG.S:257
   a = *YCO@0x0002        ; GAMEBG.S:259
-  ??? pha             ; GAMEBG.S:260
+  push a                           ; GAMEBG.S:260
   ??? lda #seconds            ; GAMEBG.S:261
   ??? ldx #>seconds            ; GAMEBG.S:262
   call setupimage                  ; GAMEBG.S:263
-  ??? pla             ; GAMEBG.S:264
+  a = pop                          ; GAMEBG.S:264
   *YCO@0x0002 = a            ; GAMEBG.S:265
   a = #0x02                  ; GAMEBG.S:266
   *OPACITY@0x0006 = a            ; GAMEBG.S:267
@@ -739,9 +739,9 @@ fn ADDCHAROBJ {
   a = *FCharX+1@0x0072        ; GAMEBG.S:1061
   *OFFSET@0x0003 = a            ; GAMEBG.S:1062
   a = x                            ; GAMEBG.S:1064
-  ??? pha             ; GAMEBG.S:1065
+  push a                           ; GAMEBG.S:1065
   call cvtx                  ; GAMEBG.S:1066
-  ??? pla             ; GAMEBG.S:1067
+  a = pop                          ; GAMEBG.S:1067
   x = a                            ; GAMEBG.S:1068
   a = *XCO@0x0001        ; GAMEBG.S:1070
   *(objX@0xb493 + x) = a   ; GAMEBG.S:1071

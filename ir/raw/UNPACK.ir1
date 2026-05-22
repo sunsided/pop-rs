@@ -369,16 +369,16 @@ fn INVERTY {
   y = #0x00                  ; UNPACK.S:542
 :loop:
   a = *(YLO@0xe000 + x)   ; UNPACK.S:546
-  ??? pha             ; UNPACK.S:547
+  push a                           ; UNPACK.S:547
   a = *(YLO@0xe000 + y)   ; UNPACK.S:548
   *(YLO@0xe000 + x) = a   ; UNPACK.S:549
-  ??? pla             ; UNPACK.S:550
+  a = pop                          ; UNPACK.S:550
   *(YLO@0xe000 + y) = a   ; UNPACK.S:551
   a = *(YHI@0xe0c0 + x)   ; UNPACK.S:553
-  ??? pha             ; UNPACK.S:554
+  push a                           ; UNPACK.S:554
   a = *(YHI@0xe0c0 + y)   ; UNPACK.S:555
   *(YHI@0xe0c0 + x) = a   ; UNPACK.S:556
-  ??? pla             ; UNPACK.S:557
+  a = pop                          ; UNPACK.S:557
   *(YHI@0xe0c0 + y) = a   ; UNPACK.S:558
   x -= 1                         ; UNPACK.S:562
   y += 1                         ; UNPACK.S:563

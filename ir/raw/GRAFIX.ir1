@@ -273,7 +273,7 @@ fn DRAWWIPE {
   if eq goto ]rts       ; GRAFIX.S:538
   a = #0x01                  ; GRAFIX.S:540
 :loop:
-  ??? pha             ; GRAFIX.S:541
+  push a                           ; GRAFIX.S:541
   x = a                            ; GRAFIX.S:542
   a = *(wipeH@0xb0d9 + x)   ; GRAFIX.S:544
   *IMAGE@0x0004 = a            ; GRAFIX.S:545
@@ -286,7 +286,7 @@ fn DRAWWIPE {
   a = *(wipeCOL@0xb101 + x)   ; GRAFIX.S:552
   *OPACITY@0x0006 = a            ; GRAFIX.S:553
   call fastblack                  ; GRAFIX.S:554
-  ??? pla             ; GRAFIX.S:556
+  a = pop                          ; GRAFIX.S:556
   c = 0                            ; GRAFIX.S:557
   a = a + #0x01 + c              ; GRAFIX.S:558
   cmp a, *wipeX@0xb0b1    ; GRAFIX.S:559
@@ -361,7 +361,7 @@ fn SNGPEEL {
   a = *(peelX@0xb115 + x)   ; GRAFIX.S:646
   if eq goto ]rts       ; GRAFIX.S:647
 :loop:
-  ??? pha             ; GRAFIX.S:649
+  push a                           ; GRAFIX.S:649
   c = 0                            ; GRAFIX.S:650
 :sm:
   a = a + #0x00 + c              ; GRAFIX.S:651
@@ -377,7 +377,7 @@ fn SNGPEEL {
   a = #0x02                  ; GRAFIX.S:662
   *OPACITY@0x0006 = a            ; GRAFIX.S:663
   call peel                  ; GRAFIX.S:664
-  ??? pla             ; GRAFIX.S:666
+  a = pop                          ; GRAFIX.S:666
   c = 1                            ; GRAFIX.S:667
   a = a - #0x01 - (1 - c)        ; GRAFIX.S:668
   if ne goto :loop       ; GRAFIX.S:669
@@ -512,7 +512,7 @@ fn setbgimg {
 }
 
 fn setcharimg {
-  ??? pha             ; GRAFIX.S:854
+  push a                           ; GRAFIX.S:854
   y = *TABLE@0x0007        ; GRAFIX.S:856
   ??? lda chtabbank,y            ; GRAFIX.S:857
   *BANK@0x0012 = a            ; GRAFIX.S:858
@@ -520,7 +520,7 @@ fn setcharimg {
   *TABLE@0x0007 = a            ; GRAFIX.S:861
   ??? lda chtablist,y            ; GRAFIX.S:862
   *TABLE+1@0x0008 = a            ; GRAFIX.S:863
-  ??? pla             ; GRAFIX.S:865
+  a = pop                          ; GRAFIX.S:865
   return                           ; GRAFIX.S:866
 }
 
@@ -1383,9 +1383,9 @@ fn switchzp {
 }
 
 fn CALLMINIT {
-  ??? pha             ; GRAFIX.S:1853
+  push a                           ; GRAFIX.S:1853
   call switchzp                  ; GRAFIX.S:1854
-  ??? pla             ; GRAFIX.S:1855
+  a = pop                          ; GRAFIX.S:1855
   call _minit                  ; GRAFIX.S:1856
   tail_call switchzp                ; GRAFIX.S:1857
 }
@@ -1396,9 +1396,9 @@ fn CALLMPLAY {
   if eq goto :silent       ; GRAFIX.S:1870
   call switchzp                  ; GRAFIX.S:1872
   call _mplay                  ; GRAFIX.S:1873
-  ??? pha             ; GRAFIX.S:1874
+  push a                           ; GRAFIX.S:1874
   call switchzp                  ; GRAFIX.S:1875
-  ??? pla             ; GRAFIX.S:1876
+  a = pop                          ; GRAFIX.S:1876
   return                           ; GRAFIX.S:1877
 :silent:
   a = #0x00                  ; GRAFIX.S:1879
@@ -1531,10 +1531,10 @@ getparam:
   c = 0                            ; GRAFIX.S:2092
   ??? xce             ; GRAFIX.S:2093
   ??? rep $30            ; GRAFIX.S:2094
-  ??? pha             ; GRAFIX.S:2095
+  push a                           ; GRAFIX.S:2095
   ??? phy             ; GRAFIX.S:2096
   x = #0x03                  ; GRAFIX.S:2097
-  ??? pla             ; GRAFIX.S:2099
+  a = pop                          ; GRAFIX.S:2099
   c = 1                            ; GRAFIX.S:2100
   ??? xce             ; GRAFIX.S:2101
   y = a                            ; GRAFIX.S:2102
@@ -1549,10 +1549,10 @@ fn getparam {
   c = 0                            ; GRAFIX.S:2092
   ??? xce             ; GRAFIX.S:2093
   ??? rep $30            ; GRAFIX.S:2094
-  ??? pha             ; GRAFIX.S:2095
+  push a                           ; GRAFIX.S:2095
   ??? phy             ; GRAFIX.S:2096
   x = #0x03                  ; GRAFIX.S:2097
-  ??? pla             ; GRAFIX.S:2099
+  a = pop                          ; GRAFIX.S:2099
   c = 1                            ; GRAFIX.S:2100
   ??? xce             ; GRAFIX.S:2101
   y = a                            ; GRAFIX.S:2102
@@ -1566,7 +1566,7 @@ fn setparam {
   ??? xce             ; GRAFIX.S:2114
   ??? rep $30            ; GRAFIX.S:2115
   a = a & #0xff              ; GRAFIX.S:2116
-  ??? pha             ; GRAFIX.S:2117
+  push a                           ; GRAFIX.S:2117
   ??? phy             ; GRAFIX.S:2118
   x = #0x03                  ; GRAFIX.S:2119
   c = 1                            ; GRAFIX.S:2121

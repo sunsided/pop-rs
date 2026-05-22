@@ -46,30 +46,30 @@ fn ADDTORCHES {
   cmp a, #0x13              ; SUBS.S:153
   if ne goto :c1       ; SUBS.S:154
   a = y                            ; SUBS.S:155
-  ??? pha             ; SUBS.S:156
+  push a                           ; SUBS.S:156
   a = *VisScrn@0x00cb        ; SUBS.S:157
   call trigtorch                  ; SUBS.S:158
-  ??? pla             ; SUBS.S:159
+  a = pop                          ; SUBS.S:159
   y = a                            ; SUBS.S:160
   if pl goto :cont       ; SUBS.S:161
 :c1:
   cmp a, #0x0a              ; SUBS.S:163
   if ne goto :c2       ; SUBS.S:164
   a = y                            ; SUBS.S:165
-  ??? pha             ; SUBS.S:166
+  push a                           ; SUBS.S:166
   a = *VisScrn@0x00cb        ; SUBS.S:167
   call trigflask                  ; SUBS.S:168
-  ??? pla             ; SUBS.S:169
+  a = pop                          ; SUBS.S:169
   y = a                            ; SUBS.S:170
   if pl goto :cont       ; SUBS.S:171
 :c2:
   cmp a, #0x16              ; SUBS.S:173
   if ne goto :cont       ; SUBS.S:174
   a = y                            ; SUBS.S:175
-  ??? pha             ; SUBS.S:176
+  push a                           ; SUBS.S:176
   a = *VisScrn@0x00cb        ; SUBS.S:177
   call trigsword                  ; SUBS.S:178
-  ??? pla             ; SUBS.S:179
+  a = pop                          ; SUBS.S:179
   y = a                            ; SUBS.S:180
 :cont:
   y -= 1                         ; SUBS.S:181
@@ -79,12 +79,12 @@ fn ADDTORCHES {
 }
 
 fn PAUSE  (aka :outer) {
-  ??? pha             ; SUBS.S:192
+  push a                           ; SUBS.S:192
   x = #0x00                  ; SUBS.S:193
 :loop:
   x -= 1                         ; SUBS.S:194
   if ne goto :loop       ; SUBS.S:195
-  ??? pla             ; SUBS.S:196
+  a = pop                          ; SUBS.S:196
   c = 1                            ; SUBS.S:197
   a = a - #0x01 - (1 - c)        ; SUBS.S:198
   if ne goto :outer       ; SUBS.S:199
@@ -216,9 +216,9 @@ fn pstars {
   ??? dec pstarcount,x            ; SUBS.S:364
   if ne goto :ok       ; SUBS.S:365
   a = x                            ; SUBS.S:366
-  ??? pha             ; SUBS.S:367
+  push a                           ; SUBS.S:367
   call twinkle                  ; SUBS.S:368
-  ??? pla             ; SUBS.S:369
+  a = pop                          ; SUBS.S:369
   x = a                            ; SUBS.S:370
 :ok:
   x -= 1                         ; SUBS.S:371
@@ -230,12 +230,12 @@ fn pstars {
   a = a & #0x03              ; SUBS.S:380
   c = 0                            ; SUBS.S:381
   a = a + #0x05 + c              ; SUBS.S:382
-  ??? pha             ; SUBS.S:383
+  push a                           ; SUBS.S:383
   call rnd                  ; SUBS.S:384
   call rnd                  ; SUBS.S:385
   a = a & #0x03              ; SUBS.S:386
   x = a                            ; SUBS.S:387
-  ??? pla             ; SUBS.S:388
+  a = pop                          ; SUBS.S:388
   ??? sta pstarcount,x            ; SUBS.S:389
   tail_call twinkle                ; SUBS.S:390
 ]rts:
@@ -268,9 +268,9 @@ fn PAGEFLIP {
 }
 
 fn PLAYCUT {
-  ??? pha             ; SUBS.S:435
+  push a                           ; SUBS.S:435
   call initit                  ; SUBS.S:436
-  ??? pla             ; SUBS.S:437
+  a = pop                          ; SUBS.S:437
   x = a                            ; SUBS.S:438
   tail_call PlayCut4                ; SUBS.S:441
   ??? lda AddrL,x            ; SUBS.S:444
@@ -830,17 +830,17 @@ fn DoFast {
 }
 
 fn pjumpseq {
-  ??? pha             ; SUBS.S:1020
+  push a                           ; SUBS.S:1020
   call LoadShad                  ; SUBS.S:1021
-  ??? pla             ; SUBS.S:1022
+  a = pop                          ; SUBS.S:1022
   call jumpseq                  ; SUBS.S:1023
   tail_call SaveShad                ; SUBS.S:1024
 }
 
 fn kjumpseq  (aka mjumpseq, vjumpseq) {
-  ??? pha             ; SUBS.S:1029
+  push a                           ; SUBS.S:1029
   call LoadKid                  ; SUBS.S:1030
-  ??? pla             ; SUBS.S:1031
+  a = pop                          ; SUBS.S:1031
   call jumpseq                  ; SUBS.S:1032
   tail_call SaveKid                ; SUBS.S:1033
 }

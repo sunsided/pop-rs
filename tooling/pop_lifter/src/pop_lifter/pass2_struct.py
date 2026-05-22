@@ -102,6 +102,8 @@ from .ir1 import (
     LoadIndirect,
     Lsr,
     ModuleIR1,
+    Pha,
+    Pla,
     Return,
     Routine,
     SbcAbs,
@@ -169,6 +171,12 @@ def _affected_register(item: Item):
         # so a subsequent `beq`/`bne`/`bpl`/`bmi` reads Z/N of A.
         from .ir1 import Reg
         return Reg.A
+    if isinstance(item, Pla):
+        # PLA sets Z/N from the popped value (which lands in A).
+        # `pla ; beq L` is the canonical "did the saved A end up
+        # zero?" idiom — fuses cleanly into `if a == 0 goto L`.
+        from .ir1 import Reg
+        return Reg.A
     # `Bit` is excluded on purpose. Its Z reflects `A & operand`, not
     # A's own value, and our Compare form has no masked-equality
     # variant — fusing `bit ; beq` would silently rewrite to
@@ -225,6 +233,7 @@ def _defines_flags(item: Item) -> bool:
             CmpImm, CmpAbs, LoadImm, LoadAbs, LoadIndexed, LoadIndirect,
             IncTarget, DecTarget, Transfer, Bitwise,
             SbcImm, SbcAbs, Lsr, Bit,
+            Pla,
         ),
     )
 
@@ -472,6 +481,18 @@ def _backward_sweep(
             # dead.
             live -= {"Z", "N"}
             continue
+
+        if isinstance(item, Pla):
+            # PLA writes Z/N from the popped value, mutates A, AND
+            # pops a byte off the value stack — never elidable, even
+            # if the resulting flags are dead.
+            live -= {"Z", "N"}
+            continue
+
+        # Pha is a pure store (push) — no flag effect, side-effecting
+        # on the value stack. The walker treats it like StoreAbs:
+        # falls through to leave `live` unchanged and avoid adding it
+        # to `drop`.
 
         if isinstance(item, (IncTarget, DecTarget, Transfer, Bitwise)):
             # Pass-1 long-tail ops: all write Z/N from their result and

@@ -1526,16 +1526,16 @@ fn INVERTY {
   y = #0x00                  ; HIRES.S:2100
 :loop:
   a = *(YLO@0xe000 + x)   ; HIRES.S:2104
-  ??? pha             ; HIRES.S:2105
+  push a                           ; HIRES.S:2105
   a = *(YLO@0xe000 + y)   ; HIRES.S:2106
   *(YLO@0xe000 + x) = a   ; HIRES.S:2107
-  ??? pla             ; HIRES.S:2108
+  a = pop                          ; HIRES.S:2108
   *(YLO@0xe000 + y) = a   ; HIRES.S:2109
   a = *(YHI@0xe0c0 + x)   ; HIRES.S:2111
-  ??? pha             ; HIRES.S:2112
+  push a                           ; HIRES.S:2112
   a = *(YHI@0xe0c0 + y)   ; HIRES.S:2113
   *(YHI@0xe0c0 + x) = a   ; HIRES.S:2114
-  ??? pla             ; HIRES.S:2115
+  a = pop                          ; HIRES.S:2115
   *(YHI@0xe0c0 + y) = a   ; HIRES.S:2116
   x -= 1                         ; HIRES.S:2120
   y += 1                         ; HIRES.S:2121

@@ -225,13 +225,13 @@ LoadNext1:
 :cut1:
   a = #0x01                  ; TOPCTRL.S:473
 ]pcut:
-  ??? pha             ; TOPCTRL.S:474
+  push a                           ; TOPCTRL.S:474
 :repeat:
   call cutprincess                  ; TOPCTRL.S:475
   call setrecheck0                  ; TOPCTRL.S:476
   call recheckyel                  ; TOPCTRL.S:477
   if ne goto :repeat       ; TOPCTRL.S:478
-  ??? pla             ; TOPCTRL.S:479
+  a = pop                          ; TOPCTRL.S:479
   call playcut                  ; TOPCTRL.S:480
   goto :cont                ; TOPCTRL.S:481
 :cut2:
@@ -365,13 +365,13 @@ fn LoadNext1 {
 :cut1:
   a = #0x01                  ; TOPCTRL.S:473
 ]pcut:
-  ??? pha             ; TOPCTRL.S:474
+  push a                           ; TOPCTRL.S:474
 :repeat:
   call cutprincess                  ; TOPCTRL.S:475
   call setrecheck0                  ; TOPCTRL.S:476
   call recheckyel                  ; TOPCTRL.S:477
   if ne goto :repeat       ; TOPCTRL.S:478
-  ??? pla             ; TOPCTRL.S:479
+  a = pop                          ; TOPCTRL.S:479
   call playcut                  ; TOPCTRL.S:480
   goto :cont                ; TOPCTRL.S:481
 :cut2:

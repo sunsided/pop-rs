@@ -439,7 +439,7 @@ fn BONESRISE {
   x = #0x05                  ; MISC.S:617
   y = #0x01                  ; MISC.S:618
   call rdblock                  ; MISC.S:619
-  ??? pha             ; MISC.S:620
+  push a                           ; MISC.S:620
   a = #0x01                  ; MISC.S:621
   *(BlueType@0x0024)[y] = a   ; MISC.S:622
   a = #0x18                  ; MISC.S:623
@@ -450,7 +450,7 @@ fn BONESRISE {
   y += 1                         ; MISC.S:628
   call markred                  ; MISC.S:629
   call markwipe                  ; MISC.S:630
-  ??? pla             ; MISC.S:631
+  a = pop                          ; MISC.S:631
   cmp a, #0x15              ; MISC.S:632
   if ne goto ]rts       ; MISC.S:633
   a = *VisScrn@0x00cb        ; MISC.S:637
@@ -617,11 +617,11 @@ fn LOADLEVELX {
   ??? lda bluepREGlst,x            ; MISC.S:798
   *bluepREG@0x03f1 = a            ; MISC.S:799
   ??? lda bgset1,x            ; MISC.S:801
-  ??? pha             ; MISC.S:802
+  push a                           ; MISC.S:802
   ??? lda bgset2,x            ; MISC.S:803
   ??? ldy chset,x            ; MISC.S:804
   x = a                            ; MISC.S:805
-  ??? pla             ; MISC.S:806
+  a = pop                          ; MISC.S:806
   tail_call loadlevel                ; MISC.S:808
 ]rts:
   return                           ; MISC.S:809
