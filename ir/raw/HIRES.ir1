@@ -131,7 +131,7 @@ fn setimage {
   a = *IMAGE@0x0004        ; HIRES.S:264
   a = a << 1                       ; HIRES.S:265
   c = 1                            ; HIRES.S:266
-  ??? sbc #1            ; HIRES.S:267
+  a = a - #0x01 - (1 - c)        ; HIRES.S:267
   y = a                            ; HIRES.S:269
   a = *(TABLE@0x0007)[y]   ; HIRES.S:270
   *IMAGE@0x0004 = a            ; HIRES.S:271
@@ -190,12 +190,12 @@ fn CROP {
   cmp a, *BOTCUT@0x0013    ; HIRES.S:380
   if cs goto :botoff       ; HIRES.S:381
   c = 1                            ; HIRES.S:385
-  ??? sbc HEIGHT            ; HIRES.S:386
+  a = a - *HEIGHT@0x00f7 - (1 - c) ; HIRES.S:386
   cmp a, #0xbf              ; HIRES.S:387
   if cc goto :topok       ; HIRES.S:388
   a = *TOPCUT@0x000f        ; HIRES.S:390
   c = 1                            ; HIRES.S:391
-  ??? sbc #1            ; HIRES.S:392
+  a = a - #0x01 - (1 - c)        ; HIRES.S:392
   *TOPEDGE@0x00f8 = a            ; HIRES.S:393
   goto :done                ; HIRES.S:394
 :topok:
@@ -203,20 +203,20 @@ fn CROP {
   a = *TOPCUT@0x000f        ; HIRES.S:398
   if eq goto :done       ; HIRES.S:399
   c = 1                            ; HIRES.S:401
-  ??? sbc #1            ; HIRES.S:402
+  a = a - #0x01 - (1 - c)        ; HIRES.S:402
   cmp a, *TOPEDGE@0x00f8    ; HIRES.S:403
   if cc goto :done       ; HIRES.S:404
   *TOPEDGE@0x00f8 = a            ; HIRES.S:406
   if cs goto :done       ; HIRES.S:407
 :botoff:
   c = 1                            ; HIRES.S:412
-  ??? sbc HEIGHT            ; HIRES.S:413
+  a = a - *HEIGHT@0x00f7 - (1 - c) ; HIRES.S:413
   c = 0                            ; HIRES.S:414
   a = a + #0x01 + c              ; HIRES.S:415
   cmp a, *BOTCUT@0x0013    ; HIRES.S:416
   if cs goto :cancel       ; HIRES.S:417
   c = 1                            ; HIRES.S:418
-  ??? sbc #1            ; HIRES.S:419
+  a = a - #0x01 - (1 - c)        ; HIRES.S:419
   *TOPEDGE@0x00f8 = a            ; HIRES.S:420
   x = *YCO@0x0002        ; HIRES.S:422
 :loop:
@@ -239,11 +239,11 @@ fn CROP {
 :leftoff:
   a = *LEFTCUT@0x0010        ; HIRES.S:448
   c = 1                            ; HIRES.S:449
-  ??? sbc XCO            ; HIRES.S:450
+  a = a - *XCO@0x0001 - (1 - c) ; HIRES.S:450
   *OFFLEFT@0x00f9 = a            ; HIRES.S:451
   a = *WIDTH@0x00f6        ; HIRES.S:453
   c = 1                            ; HIRES.S:454
-  ??? sbc OFFLEFT            ; HIRES.S:455
+  a = a - *OFFLEFT@0x00f9 - (1 - c) ; HIRES.S:455
   if mi goto :cancel       ; HIRES.S:456
   *VISWIDTH@0x001a = a            ; HIRES.S:457
   a = *LEFTCUT@0x0010        ; HIRES.S:459
@@ -260,14 +260,14 @@ fn CROP {
   cmp a, *RIGHTCUT@0x0011    ; HIRES.S:477
   if cc goto :bothok       ; HIRES.S:478
   c = 1                            ; HIRES.S:480
-  ??? sbc RIGHTCUT            ; HIRES.S:481
+  a = a - *RIGHTCUT@0x0011 - (1 - c) ; HIRES.S:481
   *RMOST@0x001b = a            ; HIRES.S:482
   c = 0                            ; HIRES.S:484
   a = a + #0x01 + c              ; HIRES.S:485
   *OFFRIGHT@0x00fa = a            ; HIRES.S:486
   a = *RIGHTCUT@0x0011        ; HIRES.S:488
   c = 1                            ; HIRES.S:489
-  ??? sbc XCO            ; HIRES.S:490
+  a = a - *XCO@0x0001 - (1 - c) ; HIRES.S:490
   *VISWIDTH@0x001a = a            ; HIRES.S:491
   a = #0x00                  ; HIRES.S:493
   *OFFLEFT@0x00f9 = a            ; HIRES.S:494
@@ -303,7 +303,7 @@ fn LAYRSAVE {
   if pl goto :normal       ; HIRES.S:546
   a = *XCO@0x0001        ; HIRES.S:548
   c = 1                            ; HIRES.S:549
-  ??? sbc WIDTH            ; HIRES.S:550
+  a = a - *WIDTH@0x00f6 - (1 - c) ; HIRES.S:550
   *XCO@0x0001 = a            ; HIRES.S:551
 :normal:
   *WIDTH@0x00f6 += 1                         ; HIRES.S:554
@@ -326,13 +326,13 @@ fn LAYRSAVE {
   *(PEELBUF@0x0009)[y] = a   ; HIRES.S:578
   ??? sta :smWIDTH+1            ; HIRES.S:579
   c = 1                            ; HIRES.S:581
-  ??? sbc #1            ; HIRES.S:582
+  a = a - #0x01 - (1 - c)        ; HIRES.S:582
   ??? sta :smSTART+1            ; HIRES.S:583
 :cont:
   y += 1                         ; HIRES.S:587
   a = *YCO@0x0002        ; HIRES.S:589
   c = 1                            ; HIRES.S:590
-  ??? sbc TOPEDGE            ; HIRES.S:591
+  a = a - *TOPEDGE@0x00f8 - (1 - c) ; HIRES.S:591
   *(PEELBUF@0x0009)[y] = a   ; HIRES.S:592
   a = *PEELBUF@0x0009        ; HIRES.S:594
   c = 0                            ; HIRES.S:595
@@ -798,7 +798,7 @@ fn MLayGen {
   call PREPREP                  ; HIRES.S:1203
   a = *XCO@0x0001        ; HIRES.S:1205
   c = 1                            ; HIRES.S:1206
-  ??? sbc WIDTH            ; HIRES.S:1207
+  a = a - *WIDTH@0x00f6 - (1 - c) ; HIRES.S:1207
   *XCO@0x0001 = a            ; HIRES.S:1208
   call CROP                  ; HIRES.S:1210
   if pl goto :cont       ; HIRES.S:1211
@@ -919,7 +919,7 @@ fn MLayMask {
   call PREPREP                  ; HIRES.S:1362
   a = *XCO@0x0001        ; HIRES.S:1364
   c = 1                            ; HIRES.S:1365
-  ??? sbc WIDTH            ; HIRES.S:1366
+  a = a - *WIDTH@0x00f6 - (1 - c) ; HIRES.S:1366
   *XCO@0x0001 = a            ; HIRES.S:1367
   call CROP                  ; HIRES.S:1369
   if pl goto :cont       ; HIRES.S:1370
@@ -1057,7 +1057,7 @@ fn MLayXOR {
   call PREPREP                  ; HIRES.S:1542
   a = *XCO@0x0001        ; HIRES.S:1544
   c = 1                            ; HIRES.S:1545
-  ??? sbc WIDTH            ; HIRES.S:1546
+  a = a - *WIDTH@0x00f6 - (1 - c) ; HIRES.S:1546
   *XCO@0x0001 = a            ; HIRES.S:1547
   call CROP                  ; HIRES.S:1549
   if pl goto :cont       ; HIRES.S:1550
@@ -1213,7 +1213,7 @@ fn FASTLAY {
   a = *(IMAGE@0x0004)[y]   ; HIRES.S:1760
   ??? sta :smWIDTH+1            ; HIRES.S:1761
   c = 1                            ; HIRES.S:1763
-  ??? sbc #1            ; HIRES.S:1764
+  a = a - #0x01 - (1 - c)        ; HIRES.S:1764
   ??? sta :smSTART+1            ; HIRES.S:1765
   a = *YCO@0x0002        ; HIRES.S:1767
   x = a                            ; HIRES.S:1768
@@ -1275,7 +1275,7 @@ fn fastlaySTA {
   a = *(IMAGE@0x0004)[y]   ; HIRES.S:1833
   ??? sta :smWIDTH+1            ; HIRES.S:1834
   c = 1                            ; HIRES.S:1836
-  ??? sbc #1            ; HIRES.S:1837
+  a = a - #0x01 - (1 - c)        ; HIRES.S:1837
   ??? sta :smSTART+1            ; HIRES.S:1838
   a = *YCO@0x0002        ; HIRES.S:1840
   x = a                            ; HIRES.S:1841
@@ -1337,7 +1337,7 @@ fn FASTMASK {
   a = *(IMAGE@0x0004)[y]   ; HIRES.S:1905
   ??? sta :smWIDTH+1            ; HIRES.S:1906
   c = 1                            ; HIRES.S:1908
-  ??? sbc #1            ; HIRES.S:1909
+  a = a - #0x01 - (1 - c)        ; HIRES.S:1909
   ??? sta :smSTART+1            ; HIRES.S:1910
   a = *YCO@0x0002        ; HIRES.S:1912
   x = a                            ; HIRES.S:1913
@@ -1416,11 +1416,11 @@ FASTBLACK:
   ??? sta :smXCO+1            ; HIRES.S:2013
   a = *width@0x0005        ; HIRES.S:2015
   c = 1                            ; HIRES.S:2016
-  ??? sbc #1            ; HIRES.S:2017
+  a = a - #0x01 - (1 - c)        ; HIRES.S:2017
   ??? sta :smSTART+1            ; HIRES.S:2018
   a = *YCO@0x0002        ; HIRES.S:2020
   x = a                            ; HIRES.S:2021
-  ??? sbc height            ; HIRES.S:2022
+  a = a - *height@0x0004 - (1 - c) ; HIRES.S:2022
   ??? sta :smTOP+1            ; HIRES.S:2023
 :outloop:
   a = *(YLO@0xe000 + x)   ; HIRES.S:2026
@@ -1457,11 +1457,11 @@ fn FASTBLACK {
   ??? sta :smXCO+1            ; HIRES.S:2013
   a = *width@0x0005        ; HIRES.S:2015
   c = 1                            ; HIRES.S:2016
-  ??? sbc #1            ; HIRES.S:2017
+  a = a - #0x01 - (1 - c)        ; HIRES.S:2017
   ??? sta :smSTART+1            ; HIRES.S:2018
   a = *YCO@0x0002        ; HIRES.S:2020
   x = a                            ; HIRES.S:2021
-  ??? sbc height            ; HIRES.S:2022
+  a = a - *height@0x0004 - (1 - c) ; HIRES.S:2022
   ??? sta :smTOP+1            ; HIRES.S:2023
 :outloop:
   a = *(YLO@0xe000 + x)   ; HIRES.S:2026

@@ -42,6 +42,7 @@ from .ir1 import (
     AdcAbs,
     AdcImm,
     Asl,
+    Bit,
     Bitwise,
     Branch,
     Call,
@@ -59,10 +60,13 @@ from .ir1 import (
     LoadImm,
     LoadIndexed,
     LoadIndirect,
+    Lsr,
     ModuleIR1,
     Reg,
     Return,
     Routine,
+    SbcAbs,
+    SbcImm,
     Sec,
     SourceRef,
     StoreAbs,
@@ -349,6 +353,42 @@ def _lift_instr(
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return AdcAbs(source=addr, src=src)
+        return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
+
+    # `sbc` mirrors `adc` — same operand shape, opposite arithmetic
+    # direction. We don't try to lift `sbc (zp),y` here because the
+    # indirect-indexed form pairs with the `(zp),y` slice that hasn't
+    # extended SbcAbs into an `Sbc + IndirectY` shape yet.
+    if mnemonic == "sbc":
+        if line.operand is None:
+            return Unsupported(mnemonic=mnemonic, operand=None, src=src)
+        imm = _parse_immediate(line.operand, equates)
+        if imm is not None:
+            return SbcImm(imm=imm, src=src)
+        addr = _parse_absolute(line.operand, equates)
+        if addr is not None:
+            return SbcAbs(source=addr, src=src)
+        return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
+
+    if mnemonic == "lsr":
+        # Accumulator-only form. `lsr <addr>` (memory shift) lands in
+        # a later slice once a routine actually needs it.
+        op = (line.operand or "").strip().lower()
+        if op in ("", "a"):
+            return Lsr(src=src)
+        return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
+
+    if mnemonic == "bit":
+        # `bit` accepts both `#imm` (rare; some assemblers don't even
+        # accept it) and absolute. We try both.
+        if line.operand is None:
+            return Unsupported(mnemonic=mnemonic, operand=None, src=src)
+        imm = _parse_immediate(line.operand, equates)
+        if imm is not None:
+            return Bit(source=imm, src=src)
+        addr = _parse_absolute(line.operand, equates)
+        if addr is not None:
+            return Bit(source=addr, src=src)
         return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
 
     # Index-register inc/dec — single-byte opcodes, no operand.

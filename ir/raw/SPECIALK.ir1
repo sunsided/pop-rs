@@ -63,7 +63,7 @@ KEYS2:
   c = 0                            ; SPECIALK.S:190
   a = a + *keypress@0x020f + c    ; SPECIALK.S:191
   c = 1                            ; SPECIALK.S:192
-  ??? sbc #"0"            ; SPECIALK.S:193
+  a = a - #0x30 - (1 - c)        ; SPECIALK.S:193
   cmp a, #0x04              ; SPECIALK.S:195
   if cc goto ]rts       ; SPECIALK.S:196
   cmp a, #0x0d              ; SPECIALK.S:197
@@ -133,7 +133,7 @@ fn KEYS2 {
   c = 0                            ; SPECIALK.S:190
   a = a + *keypress@0x020f + c    ; SPECIALK.S:191
   c = 1                            ; SPECIALK.S:192
-  ??? sbc #"0"            ; SPECIALK.S:193
+  a = a - #0x30 - (1 - c)        ; SPECIALK.S:193
   cmp a, #0x04              ; SPECIALK.S:195
   if cc goto ]rts       ; SPECIALK.S:196
   cmp a, #0x0d              ; SPECIALK.S:197
@@ -1127,7 +1127,7 @@ fn KREAD {
 fn FACEJSTK {
   a = #0x00                  ; SPECIALK.S:789
   c = 1                            ; SPECIALK.S:790
-  ??? sbc JSTKX            ; SPECIALK.S:791
+  a = a - *JSTKX@0x0018 - (1 - c) ; SPECIALK.S:791
   *JSTKX@0x0018 = a            ; SPECIALK.S:792
   x = *clrF@0x00d4        ; SPECIALK.S:794
   a = *clrB@0x00d5        ; SPECIALK.S:795
@@ -1347,7 +1347,7 @@ fn LISTTORCHES {
   y = a                            ; SPECIALK.S:1090
   a = *(BlockBot+1@0x127a + y)   ; SPECIALK.S:1091
   c = 1                            ; SPECIALK.S:1092
-  ??? sbc #3            ; SPECIALK.S:1093
+  a = a - #0x03 - (1 - c)        ; SPECIALK.S:1093
   ??? sta torchy,x            ; SPECIALK.S:1094
   a = *BOTCUT@0x0013        ; SPECIALK.S:1095
   ??? sta torchclip,x            ; SPECIALK.S:1096
@@ -1401,7 +1401,7 @@ fn BURN {
   *OFFSET@0x0003 = a            ; SPECIALK.S:1157
   a = *YCO@0x0002        ; SPECIALK.S:1158
   c = 1                            ; SPECIALK.S:1159
-  ??? sbc #4            ; SPECIALK.S:1160
+  a = a - #0x04 - (1 - c)        ; SPECIALK.S:1160
   *BOTCUT@0x0013 = a            ; SPECIALK.S:1161
   tail_call lay                ; SPECIALK.S:1162
 }
@@ -1452,7 +1452,7 @@ fn GETMINLEFT {
   ??? sed             ; SPECIALK.S:1222
   a = y                            ; SPECIALK.S:1223
   c = 1                            ; SPECIALK.S:1224
-  ??? sbc #1            ; SPECIALK.S:1225
+  a = a - #0x01 - (1 - c)        ; SPECIALK.S:1225
   ??? cld             ; SPECIALK.S:1226
   y = a                            ; SPECIALK.S:1227
   if pl goto :loop       ; SPECIALK.S:1228
@@ -1577,7 +1577,7 @@ fn TempDevel {
   cmp a, #0x3a              ; SPECIALK.S:436
   if cs goto :non       ; SPECIALK.S:437
   c = 1                            ; SPECIALK.S:438
-  ??? sbc #"0"            ; SPECIALK.S:439
+  a = a - #0x30 - (1 - c)        ; SPECIALK.S:439
   *guardprog@0x00dd = a            ; SPECIALK.S:440
 ]sk1:
   tail_call gtone                ; SPECIALK.S:441
@@ -1596,7 +1596,7 @@ fn TempDevel {
   cmp a, #0x05              ; SPECIALK.S:458
   if cc goto :12       ; SPECIALK.S:459
   c = 1                            ; SPECIALK.S:460
-  ??? sbc #4            ; SPECIALK.S:461
+  a = a - #0x04 - (1 - c)        ; SPECIALK.S:461
   *SPEED@0x030c = a            ; SPECIALK.S:462
   goto ]sk1                ; SPECIALK.S:463
 :12:
@@ -1623,7 +1623,7 @@ fn TempDevel {
   if ne goto :19       ; SPECIALK.S:485
   a = *KidY@0x0052        ; SPECIALK.S:486
   c = 1                            ; SPECIALK.S:487
-  ??? sbc #63            ; SPECIALK.S:488
+  a = a - #0x3f - (1 - c)        ; SPECIALK.S:488
   *KidY@0x0052 = a            ; SPECIALK.S:489
   *KidBlockY@0x0055 -= 1                         ; SPECIALK.S:490
   return                           ; SPECIALK.S:491
@@ -1702,7 +1702,7 @@ fn checkcodes {
   if ne goto :3       ; SPECIALK.S:608
   a = #0x00                  ; SPECIALK.S:610
   c = 1                            ; SPECIALK.S:611
-  ??? sbc OppStrength            ; SPECIALK.S:612
+  a = a - *OppStrength@0x00cc - (1 - c) ; SPECIALK.S:612
   *ChgOppStr@0x00d2 = a            ; SPECIALK.S:613
   return                           ; SPECIALK.S:614
 :3:
@@ -1712,7 +1712,7 @@ fn checkcodes {
   if ne goto :4       ; SPECIALK.S:619
   a = #0x01                  ; SPECIALK.S:621
   c = 1                            ; SPECIALK.S:622
-  ??? sbc OppStrength            ; SPECIALK.S:623
+  a = a - *OppStrength@0x00cc - (1 - c) ; SPECIALK.S:623
   *ChgOppStr@0x00d2 = a            ; SPECIALK.S:624
   return                           ; SPECIALK.S:625
 :4:
@@ -1780,7 +1780,7 @@ fn :sub {
   ??? sed             ; SPECIALK.S:1222
   a = y                            ; SPECIALK.S:1223
   c = 1                            ; SPECIALK.S:1224
-  ??? sbc #1            ; SPECIALK.S:1225
+  a = a - #0x01 - (1 - c)        ; SPECIALK.S:1225
   ??? cld             ; SPECIALK.S:1226
   y = a                            ; SPECIALK.S:1227
   if pl goto :loop       ; SPECIALK.S:1228

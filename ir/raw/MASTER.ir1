@@ -59,8 +59,8 @@ fn driveon {
 driveon1:
   ??? sta :delay            ; MASTER.S:302
   call setaux                  ; MASTER.S:304
-  ??? bit RWBANK1            ; MASTER.S:308
-  ??? bit RWBANK1            ; MASTER.S:309
+  bit *RWBANK1@0xc08b                ; MASTER.S:308
+  bit *RWBANK1@0xc08b                ; MASTER.S:309
   a = *BBundID@0x03f5        ; MASTER.S:313
   ??? sta :IDbyte            ; MASTER.S:314
   call rw18                  ; MASTER.S:316
@@ -71,8 +71,8 @@ driveon1:
 fn driveon1 {
   ??? sta :delay            ; MASTER.S:302
   call setaux                  ; MASTER.S:304
-  ??? bit RWBANK1            ; MASTER.S:308
-  ??? bit RWBANK1            ; MASTER.S:309
+  bit *RWBANK1@0xc08b                ; MASTER.S:308
+  bit *RWBANK1@0xc08b                ; MASTER.S:309
   a = *BBundID@0x03f5        ; MASTER.S:313
   ??? sta :IDbyte            ; MASTER.S:314
   call rw18                  ; MASTER.S:316
@@ -82,8 +82,8 @@ fn driveon1 {
 
 fn driveoff {
   call rw18                  ; MASTER.S:333
-  ??? bit RWBANK2            ; MASTER.S:338
-  ??? bit RWBANK2            ; MASTER.S:339
+  bit *RWBANK2@0xc083                ; MASTER.S:338
+  bit *RWBANK2@0xc083                ; MASTER.S:339
   *$c010@0xc010 = a            ; MASTER.S:341
   tail_call setaux                ; MASTER.S:343
 }
@@ -548,7 +548,7 @@ fn pauseNI  (aka :loop) {
   if ne goto :loop1       ; MASTER.S:983
   a = *pausetemp@0x03f7        ; MASTER.S:985
   c = 1                            ; MASTER.S:986
-  ??? sbc #1            ; MASTER.S:987
+  a = a - #0x01 - (1 - c)        ; MASTER.S:987
   if ne goto :loop       ; MASTER.S:988
 ]rts:
   return                           ; MASTER.S:989
@@ -874,7 +874,7 @@ tpause:
   if ne goto :loop1       ; MASTER.S:1421
   a = *pausetemp@0x03f7        ; MASTER.S:1423
   c = 1                            ; MASTER.S:1424
-  ??? sbc #1            ; MASTER.S:1425
+  a = a - #0x01 - (1 - c)        ; MASTER.S:1425
   if ne goto :loop       ; MASTER.S:1426
 ]rts:
   return                           ; MASTER.S:1427
@@ -893,7 +893,7 @@ fn tpause  (aka :loop) {
   if ne goto :loop1       ; MASTER.S:1421
   a = *pausetemp@0x03f7        ; MASTER.S:1423
   c = 1                            ; MASTER.S:1424
-  ??? sbc #1            ; MASTER.S:1425
+  a = a - #0x01 - (1 - c)        ; MASTER.S:1425
   if ne goto :loop       ; MASTER.S:1426
 ]rts:
   return                           ; MASTER.S:1427

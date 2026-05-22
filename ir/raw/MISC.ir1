@@ -7,7 +7,7 @@ fn VANISHCHAR {
   *CharAction@0x0046 = a            ; MISC.S:76
   *CharLife@0x004f = a            ; MISC.S:77
   c = 1                            ; MISC.S:78
-  ??? sbc OppStrength            ; MISC.S:79
+  a = a - *OppStrength@0x00cc - (1 - c) ; MISC.S:79
   *ChgOppStr@0x00d2 = a            ; MISC.S:80
 ]rts:
   return                           ; MISC.S:81
@@ -54,8 +54,8 @@ fn MOVEMEM {
 }
 
 fn MOVEMUSIC {
-  ??? bit RWBANK1            ; MISC.S:126
-  ??? bit RWBANK1            ; MISC.S:127
+  bit *RWBANK1@0xc08b                ; MISC.S:126
+  bit *RWBANK1@0xc08b                ; MISC.S:127
   *RAMRDmain@0xc002 = a            ; MISC.S:128
   a = #0xd0                  ; MISC.S:130
   x = #0x50                  ; MISC.S:131
@@ -68,14 +68,14 @@ fn MOVEMUSIC {
 
 fn MOVEAUXLC {
   *ALTZPon@0xc009 = a            ; MISC.S:153
-  ??? bit RWBANK2            ; MISC.S:154
-  ??? bit RWBANK2            ; MISC.S:155
+  bit *RWBANK2@0xc083                ; MISC.S:154
+  bit *RWBANK2@0xc083                ; MISC.S:155
   a = #0xd0                  ; MISC.S:157
   x = #0x20                  ; MISC.S:158
   y = #0x50                  ; MISC.S:159
   call Tmovemem                  ; MISC.S:160
-  ??? bit RWBANK1            ; MISC.S:162
-  ??? bit RWBANK1            ; MISC.S:163
+  bit *RWBANK1@0xc08b                ; MISC.S:162
+  bit *RWBANK1@0xc08b                ; MISC.S:163
   a = #0xd0                  ; MISC.S:165
   x = #0x50                  ; MISC.S:166
   y = #0x60                  ; MISC.S:167
@@ -303,7 +303,7 @@ fn STABCHAR {
   cmp a, #0x04              ; MISC.S:408
   if cc goto :onground       ; MISC.S:409
   c = 1                            ; MISC.S:411
-  ??? sbc #14            ; MISC.S:412
+  a = a - #0x0e - (1 - c)        ; MISC.S:412
   call addcharx                  ; MISC.S:413
   *CharX@0x0041 = a            ; MISC.S:414
   *CharBlockY@0x0045 += 1                         ; MISC.S:415
@@ -522,12 +522,12 @@ fn getreflect {
   a = a + #0x0e + c              ; MISC.S:542
 :left:
   c = 1                            ; MISC.S:544
-  ??? sbc #2            ; MISC.S:545
+  a = a - #0x02 - (1 - c)        ; MISC.S:545
   *dmirr@0x00b1 = a            ; MISC.S:546
   a = *mirrx@0x00b0        ; MISC.S:548
   a = a << 1                       ; MISC.S:549
   c = 1                            ; MISC.S:550
-  ??? sbc CharX            ; MISC.S:551
+  a = a - *CharX@0x0041 - (1 - c) ; MISC.S:551
   *CharX@0x0041 = a            ; MISC.S:552
   a = *CharFace@0x0043        ; MISC.S:554
   a = a ^ #0xff              ; MISC.S:555
@@ -576,7 +576,7 @@ fn DECSTR {
 fn killkid {
   a = #0x00                  ; MISC.S:719
   c = 1                            ; MISC.S:720
-  ??? sbc KidStrength            ; MISC.S:721
+  a = a - *KidStrength@0x00ce - (1 - c) ; MISC.S:721
   *ChgKidStr@0x00cf = a            ; MISC.S:722
   a = #0x00                  ; MISC.S:724
 ]rts:
@@ -586,7 +586,7 @@ fn killkid {
 fn killopp {
   a = #0x00                  ; MISC.S:729
   c = 1                            ; MISC.S:730
-  ??? sbc OppStrength            ; MISC.S:731
+  a = a - *OppStrength@0x00cc - (1 - c) ; MISC.S:731
   *ChgOppStr@0x00d2 = a            ; MISC.S:732
   a = #0x00                  ; MISC.S:734
 ]rts:
@@ -699,7 +699,7 @@ fn CHECKALERT {
   if ne goto :20       ; MISC.S:914
   a = *]Xend@0x00f1        ; MISC.S:915
   c = 1                            ; MISC.S:916
-  ??? sbc #14            ; MISC.S:917
+  a = a - #0x0e - (1 - c)        ; MISC.S:917
   *]Xend@0x00f1 = a            ; MISC.S:918
 :20:
   a = *]Xend@0x00f1        ; MISC.S:920

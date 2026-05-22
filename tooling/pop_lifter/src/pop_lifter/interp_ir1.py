@@ -40,6 +40,7 @@ from .ir1 import (
     AdcAbs,
     AdcImm,
     Asl,
+    Bit,
     Bitwise,
     Branch,
     Call,
@@ -59,10 +60,13 @@ from .ir1 import (
     LoadImm,
     LoadIndexed,
     LoadIndirect,
+    Lsr,
     ModuleIR1,
     Reg,
     Return,
     Routine,
+    SbcAbs,
+    SbcImm,
     Sec,
     StoreAbs,
     StoreIndexed,
@@ -300,6 +304,46 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         trace.a = total & 0xff
         trace.c = 1 if total > 0xff else 0
         _set_zn(trace, trace.a)
+        return True
+    if isinstance(item, (SbcImm, SbcAbs)):
+        # 6502 SBC = A + ~operand + C. C=1 going in means "no borrow"
+        # so the chain starts fresh; C=0 propagates a borrow from a
+        # previous SBC. Going out, C=1 means "no borrow occurred"
+        # (i.e. A >= operand + (1-C_in)).
+        operand = (
+            item.imm.value & 0xff if isinstance(item, SbcImm)
+            else ram[item.source.addr & 0xffff]
+        )
+        total = (trace.a & 0xff) + ((operand ^ 0xff) & 0xff) + trace.c
+        trace.a = total & 0xff
+        trace.c = 1 if total > 0xff else 0
+        _set_zn(trace, trace.a)
+        return True
+    if isinstance(item, Lsr):
+        old = trace.a & 0xff
+        new = old >> 1
+        trace.a = new
+        trace.c = old & 1
+        # `lsr` shifts in 0 from the top, so N is always 0; Z follows
+        # the result. Re-using _set_zn would set N from the high bit
+        # of `new`, which is correct because bit 7 of (>>1 result) is
+        # always 0 anyway — but we spell it out for clarity.
+        trace.n = 0
+        trace.z = 1 if new == 0 else 0
+        return True
+    if isinstance(item, Bit):
+        operand = (
+            item.source.value & 0xff if isinstance(item.source, Imm)
+            else ram[item.source.addr & 0xffff]
+        )
+        # Z reflects (A AND operand). N and V come from bits 7 and 6
+        # of the operand itself, NOT of the AND result — this is the
+        # quirk that makes `bit` useful for status-register probes.
+        # A is unchanged.
+        trace.z = 1 if (trace.a & operand) == 0 else 0
+        trace.n = (operand >> 7) & 1
+        # V isn't tracked in Trace yet; nothing reads it. If a future
+        # branch consumes V we'll plumb it through.
         return True
     if isinstance(item, (CmpImm, CmpAbs)):
         reg_val = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]

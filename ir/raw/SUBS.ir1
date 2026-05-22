@@ -86,7 +86,7 @@ fn PAUSE  (aka :outer) {
   if ne goto :loop       ; SUBS.S:195
   ??? pla             ; SUBS.S:196
   c = 1                            ; SUBS.S:197
-  ??? sbc #1            ; SUBS.S:198
+  a = a - #0x01 - (1 - c)        ; SUBS.S:198
   if ne goto :outer       ; SUBS.S:199
 ]rts:
   return                           ; SUBS.S:200
@@ -160,7 +160,7 @@ fn ADDSLICERS {
 fn getnextstate {
   a = *tempstate@0x00f2        ; SUBS.S:291
   c = 1                            ; SUBS.S:292
-  ??? sbc #slicersync            ; SUBS.S:293
+  a = a - #0x03 - (1 - c)        ; SUBS.S:293
   cmp a, #0x06              ; SUBS.S:294
   if cs goto :ok       ; SUBS.S:295
   c = 0                            ; SUBS.S:296
@@ -1093,7 +1093,7 @@ fn SHOWTIME {
 }
 
 fn ADDLOWERSOUND {
-  ??? lsr             ; SUBS.S:1374
+  a = a >> 1                       ; SUBS.S:1374
   if cc goto ]rts       ; SUBS.S:1375
   a = *level@0x03f4        ; SUBS.S:1377
   cmp a, #0x03              ; SUBS.S:1378
@@ -1148,7 +1148,7 @@ fn REMOVEOBJ {
 fn SETINITIALS {
   a = *INFO@0xbf00        ; SUBS.S:1442
   c = 1                            ; SUBS.S:1443
-  ??? sbc #1            ; SUBS.S:1444
+  a = a - #0x01 - (1 - c)        ; SUBS.S:1444
   *SCRNUM@0x0023 = a            ; SUBS.S:1445
 :loop:
   call DoScrn                  ; SUBS.S:1447

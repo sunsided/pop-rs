@@ -379,7 +379,7 @@ fn SNGPEEL {
   call peel                  ; GRAFIX.S:664
   ??? pla             ; GRAFIX.S:666
   c = 1                            ; GRAFIX.S:667
-  ??? sbc #1            ; GRAFIX.S:668
+  a = a - #0x01 - (1 - c)        ; GRAFIX.S:668
   if ne goto :loop       ; GRAFIX.S:669
 ]rts:
   return                           ; GRAFIX.S:670
@@ -542,10 +542,10 @@ CVTX:
   *]temp@0x00f0 = a            ; GRAFIX.S:920
   a = *]XL@0x0001        ; GRAFIX.S:922
   c = 1                            ; GRAFIX.S:923
-  ??? sbc #range            ; GRAFIX.S:924
+  a = a - #0xfc - (1 - c)        ; GRAFIX.S:924
   *]XL@0x0001 = a            ; GRAFIX.S:925
   a = *]XH@0x0003        ; GRAFIX.S:927
-  ??? sbc #0            ; GRAFIX.S:928
+  a = a - #0x00 - (1 - c)        ; GRAFIX.S:928
   *]XH@0x0003 = a            ; GRAFIX.S:929
   if ne goto :loop       ; GRAFIX.S:931
 :ok:
@@ -560,7 +560,7 @@ CVTX:
 :negative:
   a = *]temp@0x00f0        ; GRAFIX.S:944
   c = 1                            ; GRAFIX.S:945
-  ??? sbc #36            ; GRAFIX.S:946
+  a = a - #0x24 - (1 - c)        ; GRAFIX.S:946
   *]temp@0x00f0 = a            ; GRAFIX.S:947
   a = *]XL@0x0001        ; GRAFIX.S:949
   c = 0                            ; GRAFIX.S:950
@@ -588,10 +588,10 @@ fn CVTX {
   *]temp@0x00f0 = a            ; GRAFIX.S:920
   a = *]XL@0x0001        ; GRAFIX.S:922
   c = 1                            ; GRAFIX.S:923
-  ??? sbc #range            ; GRAFIX.S:924
+  a = a - #0xfc - (1 - c)        ; GRAFIX.S:924
   *]XL@0x0001 = a            ; GRAFIX.S:925
   a = *]XH@0x0003        ; GRAFIX.S:927
-  ??? sbc #0            ; GRAFIX.S:928
+  a = a - #0x00 - (1 - c)        ; GRAFIX.S:928
   *]XH@0x0003 = a            ; GRAFIX.S:929
   if ne goto :loop       ; GRAFIX.S:931
 :ok:
@@ -606,7 +606,7 @@ fn CVTX {
 :negative:
   a = *]temp@0x00f0        ; GRAFIX.S:944
   c = 1                            ; GRAFIX.S:945
-  ??? sbc #36            ; GRAFIX.S:946
+  a = a - #0x24 - (1 - c)        ; GRAFIX.S:946
   *]temp@0x00f0 = a            ; GRAFIX.S:947
   a = *]XL@0x0001        ; GRAFIX.S:949
   c = 0                            ; GRAFIX.S:950
@@ -747,14 +747,14 @@ fn JREAD {
   if eq goto :1       ; GRAFIX.S:1099
   a = #0x00                  ; GRAFIX.S:1101
   c = 1                            ; GRAFIX.S:1102
-  ??? sbc joyY            ; GRAFIX.S:1103
+  a = a - *joyY@0x003c - (1 - c) ; GRAFIX.S:1103
   *joyY@0x003c = a            ; GRAFIX.S:1104
 :1:
   a = *jhoriz@0x020b        ; GRAFIX.S:1108
   if eq goto ]rts       ; GRAFIX.S:1109
   a = #0x00                  ; GRAFIX.S:1111
   c = 1                            ; GRAFIX.S:1112
-  ??? sbc joyX            ; GRAFIX.S:1113
+  a = a - *joyX@0x003b - (1 - c) ; GRAFIX.S:1113
   *joyX@0x003b = a            ; GRAFIX.S:1114
 ]rts:
   return                           ; GRAFIX.S:1115
@@ -833,7 +833,7 @@ SETCENTER:
   if mi goto :nojoy       ; GRAFIX.S:1247
   a = *joyX@0x003b        ; GRAFIX.S:1249
   c = 1                            ; GRAFIX.S:1250
-  ??? sbc #cwidthx            ; GRAFIX.S:1251
+  a = a - #0x0a - (1 - c)        ; GRAFIX.S:1251
   *jthres1x@0x0206 = a            ; GRAFIX.S:1252
   a = *joyX@0x003b        ; GRAFIX.S:1253
   c = 0                            ; GRAFIX.S:1254
@@ -841,7 +841,7 @@ SETCENTER:
   *jthres2x@0x0208 = a            ; GRAFIX.S:1256
   a = *joyY@0x003c        ; GRAFIX.S:1258
   c = 1                            ; GRAFIX.S:1259
-  ??? sbc #cwidthy            ; GRAFIX.S:1260
+  a = a - #0x0f - (1 - c)        ; GRAFIX.S:1260
   *jthres1y@0x0207 = a            ; GRAFIX.S:1261
   a = *joyY@0x003c        ; GRAFIX.S:1262
   c = 0                            ; GRAFIX.S:1263
@@ -869,7 +869,7 @@ fn SETCENTER {
   if mi goto :nojoy       ; GRAFIX.S:1247
   a = *joyX@0x003b        ; GRAFIX.S:1249
   c = 1                            ; GRAFIX.S:1250
-  ??? sbc #cwidthx            ; GRAFIX.S:1251
+  a = a - #0x0a - (1 - c)        ; GRAFIX.S:1251
   *jthres1x@0x0206 = a            ; GRAFIX.S:1252
   a = *joyX@0x003b        ; GRAFIX.S:1253
   c = 0                            ; GRAFIX.S:1254
@@ -877,7 +877,7 @@ fn SETCENTER {
   *jthres2x@0x0208 = a            ; GRAFIX.S:1256
   a = *joyY@0x003c        ; GRAFIX.S:1258
   c = 1                            ; GRAFIX.S:1259
-  ??? sbc #cwidthy            ; GRAFIX.S:1260
+  a = a - #0x0f - (1 - c)        ; GRAFIX.S:1260
   *jthres1y@0x0207 = a            ; GRAFIX.S:1261
   a = *joyY@0x003c        ; GRAFIX.S:1262
   c = 0                            ; GRAFIX.S:1263
@@ -923,10 +923,10 @@ fn WHOOP {
   y = #0x00                  ; GRAFIX.S:1325
 :1:
   a = y                            ; GRAFIX.S:1326
-  ??? bit $c030            ; GRAFIX.S:1327
+  bit *$c030@0xc030                ; GRAFIX.S:1327
 :2:
   c = 1                            ; GRAFIX.S:1328
-  ??? sbc #1            ; GRAFIX.S:1329
+  a = a - #0x01 - (1 - c)        ; GRAFIX.S:1329
   if ne goto :2       ; GRAFIX.S:1330
   y -= 1                         ; GRAFIX.S:1331
   if ne goto :1       ; GRAFIX.S:1332
@@ -938,7 +938,7 @@ fn tone {
   ??? sty :pitch            ; GRAFIX.S:1344
   ??? stx :pitch+1            ; GRAFIX.S:1345
 :outloop:
-  ??? bit $c030            ; GRAFIX.S:1346
+  bit *$c030@0xc030                ; GRAFIX.S:1346
   x = #0x00                  ; GRAFIX.S:1347
 :midloop:
   y = #0x00                  ; GRAFIX.S:1348
@@ -950,7 +950,7 @@ fn tone {
   ??? cpx :pitch+1            ; GRAFIX.S:1353
   if cc goto :midloop       ; GRAFIX.S:1354
   c = 1                            ; GRAFIX.S:1355
-  ??? sbc #1            ; GRAFIX.S:1356
+  a = a - #0x01 - (1 - c)        ; GRAFIX.S:1356
   if ne goto :outloop       ; GRAFIX.S:1357
   return                           ; GRAFIX.S:1358
 COPYSCRN:
@@ -1190,8 +1190,8 @@ fn INVERTY {
   *ALTZPon@0xc009 = a            ; GRAFIX.S:1604
   return                           ; GRAFIX.S:1605
 ]bank1in:
-  ??? bit RWBANK1            ; GRAFIX.S:1613
-  ??? bit RWBANK1            ; GRAFIX.S:1614
+  bit *RWBANK1@0xc08b                ; GRAFIX.S:1613
+  bit *RWBANK1@0xc08b                ; GRAFIX.S:1614
   return                           ; GRAFIX.S:1615
 }
 
@@ -1199,8 +1199,8 @@ fn MINIT {
   call ]bank1in                  ; GRAFIX.S:1617
   call CALLMINIT                  ; GRAFIX.S:1618
 ]bank2in:
-  ??? bit RWBANK2            ; GRAFIX.S:1619
-  ??? bit RWBANK2            ; GRAFIX.S:1620
+  bit *RWBANK2@0xc083                ; GRAFIX.S:1619
+  bit *RWBANK2@0xc083                ; GRAFIX.S:1620
   return                           ; GRAFIX.S:1621
 }
 
@@ -1315,7 +1315,7 @@ fn CALCBLUE {
   cmp a, #0x00              ; GRAFIX.S:1758
   if eq goto calcmenu       ; GRAFIX.S:1759
   c = 1                            ; GRAFIX.S:1761
-  ??? sbc #1            ; GRAFIX.S:1762
+  a = a - #0x01 - (1 - c)        ; GRAFIX.S:1762
   a = a << 1                       ; GRAFIX.S:1763
   x = a                            ; GRAFIX.S:1764
   a = *(Mult30@0x1220 + x)   ; GRAFIX.S:1766
@@ -1479,7 +1479,7 @@ fn VBLANKIIc {
 }
 
 fn VBLI {
-  ??? bit $c019            ; GRAFIX.S:1972
+  bit *$c019@0xc019                ; GRAFIX.S:1972
   *$c079@0xc079 = a            ; GRAFIX.S:1973
   *$c05b@0xc05b = a            ; GRAFIX.S:1974
   *$c078@0xc078 = a            ; GRAFIX.S:1975
@@ -1590,7 +1590,7 @@ fn :setaddl {
 }
 
 fn ]bank1in {
-  ??? bit RWBANK1            ; GRAFIX.S:1613
-  ??? bit RWBANK1            ; GRAFIX.S:1614
+  bit *RWBANK1@0xc08b                ; GRAFIX.S:1613
+  bit *RWBANK1@0xc08b                ; GRAFIX.S:1614
   return                           ; GRAFIX.S:1615
 }

@@ -22,7 +22,7 @@ fn SNGEXPAND {
 :0:
   a = *V2@0x0004        ; UNPACK.S:137
   c = 1                            ; UNPACK.S:138
-  ??? sbc #$28            ; UNPACK.S:139
+  a = a - #0x28 - (1 - c)        ; UNPACK.S:139
   *V2@0x0004 = a            ; UNPACK.S:140
   if cs goto :1       ; UNPACK.S:141
   *V3@0x0005 -= 1                         ; UNPACK.S:142
@@ -36,7 +36,7 @@ fn SNGEXPAND {
 :2:
   a = *V4@0x0006        ; UNPACK.S:149
   c = 1                            ; UNPACK.S:150
-  ??? sbc #$80            ; UNPACK.S:151
+  a = a - #0x80 - (1 - c)        ; UNPACK.S:151
   *V4@0x0006 = a            ; UNPACK.S:152
   if cs goto :3       ; UNPACK.S:153
   *V5@0x0007 -= 1                         ; UNPACK.S:154
@@ -50,7 +50,7 @@ fn SNGEXPAND {
 :5:
   a = *PIC+1@0x0003        ; UNPACK.S:161
   c = 1                            ; UNPACK.S:162
-  ??? sbc #4            ; UNPACK.S:163
+  a = a - #0x04 - (1 - c)        ; UNPACK.S:163
   *PIC+1@0x0003 = a            ; UNPACK.S:164
   c = 0                            ; UNPACK.S:165
   if cc goto :6       ; UNPACK.S:166
@@ -70,7 +70,7 @@ fn SNGEXPAND {
   if pl goto :4       ; UNPACK.S:179
   return                           ; UNPACK.S:180
 :6:
-  ??? bit VA            ; UNPACK.S:181
+  bit *VA@0x000a                ; UNPACK.S:181
   if mi goto :11       ; UNPACK.S:182
   x = #0x00                  ; UNPACK.S:183
   ??? lda (PAC,X)            ; UNPACK.S:184
@@ -293,7 +293,7 @@ fn PutScrByte {
   a = a | #0x20              ; UNPACK.S:487
   *ScrBasPtr+1@0x00f7 = a            ; UNPACK.S:488
   a = x                            ; UNPACK.S:490
-  ??? lsr             ; UNPACK.S:491
+  a = a >> 1                       ; UNPACK.S:491
   y = a                            ; UNPACK.S:492
   if cs goto NoAuxSet       ; UNPACK.S:493
   *RAMWRTaux@0xc005 = a            ; UNPACK.S:495
@@ -447,8 +447,8 @@ fn PROMPT {
 }
 
 fn CLR {
-  ??? bit RWBANK2            ; UNPACK.S:614
-  ??? bit RWBANK2            ; UNPACK.S:615
+  bit *RWBANK2@0xc083                ; UNPACK.S:614
+  bit *RWBANK2@0xc083                ; UNPACK.S:615
   *$c010@0xc010 = a            ; UNPACK.S:617
   a = #0x20                  ; UNPACK.S:619
   tail_call _lrcls                ; UNPACK.S:620
@@ -481,12 +481,12 @@ fn SETDHIRES {
   *RAMWRTaux@0xc005 = a            ; UNPACK.S:642
   call vblank                  ; UNPACK.S:643
   *ADCOLon@0xc00d = a            ; UNPACK.S:644
-  ??? bit HIRESon            ; UNPACK.S:645
-  ??? bit DHIRESon            ; UNPACK.S:647
-  ??? bit DHIRESoff            ; UNPACK.S:648
-  ??? bit DHIRESon            ; UNPACK.S:649
-  ??? bit DHIRESoff            ; UNPACK.S:650
-  ??? bit DHIRESon            ; UNPACK.S:651
+  bit *HIRESon@0xc057                ; UNPACK.S:645
+  bit *DHIRESon@0xc05e                ; UNPACK.S:647
+  bit *DHIRESoff@0xc05f                ; UNPACK.S:648
+  bit *DHIRESon@0xc05e                ; UNPACK.S:649
+  bit *DHIRESoff@0xc05f                ; UNPACK.S:650
+  bit *DHIRESon@0xc05e                ; UNPACK.S:651
   *TEXToff@0xc050 = a            ; UNPACK.S:653
   return                           ; UNPACK.S:654
   ??? da ]2            ; UNPACK.S:664
