@@ -197,6 +197,104 @@ def _resolve(
     return None
 
 
+def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
+    """Execute a single non-control-flow IR1 atom against the supplied
+    trace/RAM state. Returns True if the item was handled, False if
+    it's a control-flow node the caller should dispatch itself.
+
+    Used by both the IR1 interpreter loop below (via inlined dispatch
+    — kept duplicated for hot-path clarity) and by the IR3 interpreter
+    in `interp_ir3`, which only needs per-atom semantics and runs its
+    own structured control flow.
+    """
+    if isinstance(item, Label):
+        return True
+    if isinstance(item, LoadImm):
+        value = item.imm.value & 0xff
+        if item.reg is Reg.A:
+            trace.a = value
+        elif item.reg is Reg.X:
+            trace.x = value
+        else:
+            trace.y = value
+        _set_zn(trace, value)
+        return True
+    if isinstance(item, LoadAbs):
+        value = ram[item.source.addr & 0xffff]
+        if item.reg is Reg.A:
+            trace.a = value
+        elif item.reg is Reg.X:
+            trace.x = value
+        else:
+            trace.y = value
+        _set_zn(trace, value)
+        return True
+    if isinstance(item, LoadIndexed):
+        idx_val = trace.x if item.index is Reg.X else trace.y
+        addr = (item.base.addr + idx_val) & 0xffff
+        value = ram[addr]
+        if item.reg is Reg.A:
+            trace.a = value
+        elif item.reg is Reg.X:
+            trace.x = value
+        else:
+            trace.y = value
+        _set_zn(trace, value)
+        return True
+    if isinstance(item, StoreAbs):
+        value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
+        addr = item.target.addr & 0xffff
+        ram[addr] = value
+        trace.writes[addr] = value
+        return True
+    if isinstance(item, StoreIndexed):
+        value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
+        idx_val = trace.x if item.index is Reg.X else trace.y
+        addr = (item.base.addr + idx_val) & 0xffff
+        ram[addr] = value
+        trace.writes[addr] = value
+        return True
+    if isinstance(item, Asl):
+        old = trace.a & 0xff
+        new = (old << 1) & 0xff
+        trace.a = new
+        trace.c = (old >> 7) & 1
+        _set_zn(trace, new)
+        return True
+    if isinstance(item, Clc):
+        trace.c = 0
+        return True
+    if isinstance(item, Sec):
+        trace.c = 1
+        return True
+    if isinstance(item, AdcImm):
+        total = (trace.a & 0xff) + (item.imm.value & 0xff) + trace.c
+        trace.a = total & 0xff
+        trace.c = 1 if total > 0xff else 0
+        _set_zn(trace, trace.a)
+        return True
+    if isinstance(item, AdcAbs):
+        total = (trace.a & 0xff) + ram[item.source.addr & 0xffff] + trace.c
+        trace.a = total & 0xff
+        trace.c = 1 if total > 0xff else 0
+        _set_zn(trace, trace.a)
+        return True
+    if isinstance(item, (CmpImm, CmpAbs)):
+        reg_val = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
+        rhs = item.imm.value & 0xff if isinstance(item, CmpImm) \
+            else ram[item.source.addr & 0xffff]
+        diff = (reg_val - rhs) & 0xff
+        trace.c = 1 if reg_val >= rhs else 0
+        _set_zn(trace, diff)
+        return True
+    if isinstance(item, Unsupported):
+        raise InterpError(
+            f"refusing to execute unsupported opcode "
+            f"{item.mnemonic!r} at {item.src.short()} ({item.src.raw!r})"
+        )
+    return False
+
+
 def run(
     module: ModuleIR1 | list[ModuleIR1],
     entry: str,

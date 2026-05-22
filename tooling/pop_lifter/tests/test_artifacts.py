@@ -21,6 +21,7 @@ IR_PILOT = REPO_ROOT / "ir" / "pilot" / "auto_combat.ir1"
 IR_PILOT_RNDP = REPO_ROOT / "ir" / "pilot" / "rndp.ir1"
 IR_PILOT_CHECKFLOOR = REPO_ROOT / "ir" / "pilot" / "checkfloor.ir1"
 IR_PILOT_CHECKFLOOR_IR2 = REPO_ROOT / "ir" / "pilot" / "checkfloor.ir2"
+IR_PILOT_CHECKFLOOR_IR3 = REPO_ROOT / "ir" / "pilot" / "checkfloor.ir3"
 IR_RAW = REPO_ROOT / "ir" / "raw"
 
 PILOT_ENTRIES = [
@@ -184,6 +185,41 @@ def test_pass2_checkfloor_ir2_artifact_matches(source_dir):
         f"regenerate with:\n"
         f"  pop-lifter struct CTRL.S --entry CHECKFLOOR "
         f"--out {IR_PILOT_CHECKFLOOR_IR2.relative_to(REPO_ROOT)}"
+    )
+
+
+def _regen_checkfloor_ir3(source_dir: Path) -> str:
+    from pop_lifter.pass2_reloop import reloop_module
+    from pop_lifter.pass2_struct import structure_module
+    from pop_lifter import ir3 as ir3_mod
+    ast = parse_files(
+        [
+            source_dir / "EQ.S",
+            source_dir / "GAMEEQ.S",
+            source_dir / "CTRL.S",
+        ],
+        search_paths=[source_dir],
+    )
+    ctrl = next(f for f in ast.files if Path(f.path).name == "CTRL.S")
+    ir1_module = lift_file(ctrl, ast.equates, ["CHECKFLOOR"]).module
+    ir3_module = reloop_module(structure_module(ir1_module))
+    return ir3_mod.format_module(ir3_module)
+
+
+def test_pass2_checkfloor_ir3_artifact_matches(source_dir):
+    if not IR_PILOT_CHECKFLOOR_IR3.exists():
+        raise AssertionError(
+            f"missing artifact {IR_PILOT_CHECKFLOOR_IR3}. regenerate with:\n"
+            f"  pop-lifter reloop CTRL.S --entry CHECKFLOOR "
+            f"--out {IR_PILOT_CHECKFLOOR_IR3.relative_to(REPO_ROOT)}"
+        )
+    expected = IR_PILOT_CHECKFLOOR_IR3.read_text(encoding="utf-8")
+    actual = _regen_checkfloor_ir3(source_dir)
+    assert actual == expected, (
+        f"{IR_PILOT_CHECKFLOOR_IR3.relative_to(REPO_ROOT)} is stale. "
+        f"regenerate with:\n"
+        f"  pop-lifter reloop CTRL.S --entry CHECKFLOOR "
+        f"--out {IR_PILOT_CHECKFLOOR_IR3.relative_to(REPO_ROOT)}"
     )
 
 
