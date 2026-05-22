@@ -276,6 +276,40 @@ class Bit:
     src: SourceRef
 
 
+@dataclass(frozen=True)
+class Pha:
+    """`pha` — push A onto the 6502 stack. The interpreter models
+    the stack as a Python list (`Trace.value_stack`) rather than as
+    bytes at `$0100..$01ff`. PHA pushes `A`; PLA pops the most
+    recently pushed byte back into A.
+
+    The two-stack design — `Trace.value_stack` for PHA/PLA bytes,
+    plus a separate `stack` local in `interp_ir1.run` for JSR/RTS
+    continuation tuples — is sound when:
+
+    1. Every callee balances its own PHA/PLA over each control path,
+       so a routine's PHA bytes don't leak into its caller's frame
+       — true for POP's source.
+    2. No code uses the `pha; rts` "computed jump via the stack"
+       idiom — true for POP's source (we grepped to confirm).
+
+    If a future input violates either assumption we'd need full
+    byte-level stack emulation with a stack pointer and the actual
+    `$0100..$01ff` page in `Trace.ram`. Documented here so the
+    limitation is visible at the IR1-type level, not just buried in
+    the interpreter."""
+
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class Pla:
+    """`pla` — pop the top of the stack into A. Sets Z/N on the
+    popped value. Same two-stack caveat as `Pha`."""
+
+    src: SourceRef
+
+
 # ---------------------------------------------------------------- indirect addressing
 
 
@@ -525,6 +559,7 @@ Instr = (
     | IncTarget | DecTarget | Transfer | Bitwise
     | LoadIndirect | StoreIndirect | CmpIndirect
     | SbcImm | SbcAbs | Lsr | Bit
+    | Pha | Pla
     | Unsupported
 )
 Item = Label | Instr
@@ -625,6 +660,10 @@ def format_item(item: Item) -> str:
     if isinstance(item, Bit):
         rhs = _fmt_imm(item.source) if isinstance(item.source, Imm) else f"*{_fmt_abs(item.source)}"
         return f"  bit {rhs}                ; {item.src.short()}"
+    if isinstance(item, Pha):
+        return f"  push a                           ; {item.src.short()}"
+    if isinstance(item, Pla):
+        return f"  a = pop                          ; {item.src.short()}"
     if isinstance(item, LoadIndexed):
         return (
             f"  {item.reg} = *({_fmt_abs(item.base)} + {item.index})"

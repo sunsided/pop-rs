@@ -740,10 +740,10 @@ fn ANIMCHAR  (aka :next) {
   if ne goto :no4       ; COLL.S:1033
 :goto:
   call getseq                  ; COLL.S:1035
-  ??? pha             ; COLL.S:1036
+  push a                           ; COLL.S:1036
   call getseq                  ; COLL.S:1038
   *CharSeq+1@0x004a = a            ; COLL.S:1040
-  ??? pla             ; COLL.S:1041
+  a = pop                          ; COLL.S:1041
   *CharSeq@0x0049 = a            ; COLL.S:1042
   goto :next                ; COLL.S:1044
 :no4:

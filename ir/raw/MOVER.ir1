@@ -749,9 +749,9 @@ fn animplate {
   call gettimer                  ; MOVER.S:933
   c = 1                            ; MOVER.S:934
   a = a - #0x01 - (1 - c)        ; MOVER.S:935
-  ??? pha             ; MOVER.S:936
+  push a                           ; MOVER.S:936
   call chgtimer                  ; MOVER.S:937
-  ??? pla             ; MOVER.S:938
+  a = pop                          ; MOVER.S:938
   cmp a, #0x02              ; MOVER.S:939
   if cs goto ]rts       ; MOVER.S:940
   a = #0x01                  ; MOVER.S:942
@@ -1650,14 +1650,14 @@ SHAKEM1:
   x = #0x09                  ; MOVER.S:2131
 :loop:
   a = x                            ; MOVER.S:2132
-  ??? pha             ; MOVER.S:2133
+  push a                           ; MOVER.S:2133
   *tempblockx@0x0091 = a            ; MOVER.S:2134
   call rdblock1                  ; MOVER.S:2136
   cmp a, #0x0b              ; MOVER.S:2137
   if ne goto :cont       ; MOVER.S:2138
   call shakeit                  ; MOVER.S:2140
 :cont:
-  ??? pla             ; MOVER.S:2142
+  a = pop                          ; MOVER.S:2142
   x = a                            ; MOVER.S:2143
   x -= 1                         ; MOVER.S:2144
   if pl goto :loop       ; MOVER.S:2145
@@ -1669,14 +1669,14 @@ fn SHAKEM1 {
   x = #0x09                  ; MOVER.S:2131
 :loop:
   a = x                            ; MOVER.S:2132
-  ??? pha             ; MOVER.S:2133
+  push a                           ; MOVER.S:2133
   *tempblockx@0x0091 = a            ; MOVER.S:2134
   call rdblock1                  ; MOVER.S:2136
   cmp a, #0x0b              ; MOVER.S:2137
   if ne goto :cont       ; MOVER.S:2138
   call shakeit                  ; MOVER.S:2140
 :cont:
-  ??? pla             ; MOVER.S:2142
+  a = pop                          ; MOVER.S:2142
   x = a                            ; MOVER.S:2143
   x -= 1                         ; MOVER.S:2144
   if pl goto :loop       ; MOVER.S:2145

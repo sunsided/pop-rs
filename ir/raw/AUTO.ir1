@@ -1155,9 +1155,9 @@ fn cutchar {
 :no6:
   a = #0x03                  ; AUTO.S:1575
 :cut:
-  ??? pha             ; AUTO.S:1576
+  push a                           ; AUTO.S:1576
   call cut                  ; AUTO.S:1577
-  ??? pla             ; AUTO.S:1578
+  a = pop                          ; AUTO.S:1578
 ]rts:
   return                           ; AUTO.S:1579
 }

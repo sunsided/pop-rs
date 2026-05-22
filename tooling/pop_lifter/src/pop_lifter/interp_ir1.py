@@ -62,6 +62,8 @@ from .ir1 import (
     LoadIndirect,
     Lsr,
     ModuleIR1,
+    Pha,
+    Pla,
     Reg,
     Return,
     Routine,
@@ -104,6 +106,15 @@ class Trace:
     writes: dict[int, int] = field(default_factory=dict)  # addr -> last value
     steps: int = 0
     max_stack_depth: int = 0
+    # PHA/PLA byte stack — see `ir1.Pha` for the two-stack design
+    # rationale. Kept distinct from the JSR/RTS call-stack tracking
+    # (a local `stack` list inside `run()`) so each routine's pushed
+    # bytes can interleave correctly with the call/return frames
+    # around them. The call stack isn't a Trace field because it
+    # only matters mid-execution; we expose its peak depth as
+    # `max_stack_depth` for observability.
+    value_stack: list[int] = field(default_factory=list)
+    max_value_stack_depth: int = 0
 
     def diff_against(self, initial: bytes) -> dict[int, int]:
         """Return only the addresses whose byte differs from `initial`.
@@ -344,6 +355,20 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         trace.n = (operand >> 7) & 1
         # V isn't tracked in Trace yet; nothing reads it. If a future
         # branch consumes V we'll plumb it through.
+        return True
+    if isinstance(item, Pha):
+        trace.value_stack.append(trace.a & 0xff)
+        if len(trace.value_stack) > trace.max_value_stack_depth:
+            trace.max_value_stack_depth = len(trace.value_stack)
+        return True
+    if isinstance(item, Pla):
+        if not trace.value_stack:
+            raise InterpError(
+                f"pla on empty value stack at {item.src.short()} "
+                f"({item.src.raw!r}) — unbalanced pha/pla?"
+            )
+        trace.a = trace.value_stack.pop()
+        _set_zn(trace, trace.a)
         return True
     if isinstance(item, (CmpImm, CmpAbs)):
         reg_val = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]

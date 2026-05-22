@@ -44,6 +44,8 @@ from .ir1 import (
     Asl,
     Bit,
     Bitwise,
+    Pha,
+    Pla,
     Branch,
     Call,
     Clc,
@@ -390,6 +392,15 @@ def _lift_instr(
         if addr is not None:
             return Bit(source=addr, src=src)
         return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
+
+    # Stack push/pop. Single-byte opcodes — no operand. Modelled
+    # against `Trace.value_stack` rather than the actual hardware
+    # stack at `$0100..$01ff`; see the `Pha` docstring for the
+    # caveats this implies for POP's source.
+    if mnemonic == "pha":
+        return Pha(src=src)
+    if mnemonic == "pla":
+        return Pla(src=src)
 
     # Index-register inc/dec — single-byte opcodes, no operand.
     if mnemonic in ("inx", "iny"):
