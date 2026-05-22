@@ -1,30 +1,71 @@
 """Pass 2: structured-IR (IR2) lowering.
 
 Pass 2 takes the opcode-for-opcode IR1 produced by `pass1_lift` and
-folds the most common `Cmp + Branch` idioms into a single structured
-`If` node. The result still lives in the same `Routine` / `ModuleIR1`
-types — the only IR2-specific node is `ir1.If`. That keeps the
-interpreter, the dump format, and the cross-module call resolution
-all on a single code path; pass-3 / pass-4 will fork the types when
-they need to.
+performs two transformations:
 
-What this slice covers:
+1. **Cmp + Branch fusion**. The most common 6502 idiom for a
+   structured conditional —
 
-* Cmp + Branch fusion for the eq / ne / cc / cs conditions, which are
-  the four "value comparison" forms used in CHECKFLOOR and the
-  surrounding combat/physics code.
+      cmp #k
+      beq target
+
+   — becomes a single `If(Compare(reg, op, k), target)` node. The
+   resulting `If` is self-contained: the interpreter can evaluate it
+   without consulting Z/C from prior state. Pass 4's Rust emitter
+   gets to write `if a == k { ... }` straight off the IR.
+
+2. **Flag-liveness elision**. After fusion the original `cmp`
+   instructions usually have *no* downstream readers — the `If`
+   consumed the flags, and nothing else on the linear path between
+   that `cmp` and the next flag-setter reads Z/N/C. A backward
+   sweep finds those pure flag-defining instructions (`CmpImm`,
+   `CmpAbs`, `Clc`, `Sec`) and drops them.
+
+   Routine boundaries are handled by an explicit call-graph fixed
+   point: ``flag_demand[R]`` is the set of flags some caller of R
+   observes after R returns. At a `Return` site the liveness sweep
+   uses `flag_demand[R]` as the live set; at a `tail_call X` site
+   we propagate `flag_demand[X] ⊇ flag_demand[R]`; at a non-tail
+   `call X` site we propagate `flag_demand[X] ⊇ live-OUT[call]`.
+   The iteration starts with every routine's demand at `∅` and
+   only grows monotonically, bounded by `{Z,N,C,V}`, so it
+   terminates after a handful of rounds for any module.
+
+   Cross-module call targets are treated optimistically: the
+   propagation simply has no effect on a `flag_demand` entry that
+   doesn't exist. Once those callees are themselves lifted into a
+   later pass-2 run the same iteration will pick up their demands.
+   Pass 2 still assumes callees don't *read* flag inputs (no
+   `clc;jsr` carry-passing convention in POP) — that part is the
+   one remaining hand-waved assumption.
+
+   Backward branches (loops) defeat the single-pass per-routine
+   sweep, so the routine bails out of elision in that case rather
+   than risk an unsound delete. Unsupported items are treated as
+   read-everything, write-everything.
+
+Both transformations produce IR that lives in the same `Routine` /
+`ModuleIR1` types — the only IR2-specific node is `ir1.If`. That
+keeps the interpreter, the dump format, and the cross-module call
+resolution all on a single code path; pass-3 / pass-4 will fork the
+types when they need to.
+
+What's already covered:
+
+* Cmp + Branch fusion for eq / ne / cc / cs (the four CHECKFLOOR
+  shapes).
 * `lda <abs>; beq/bne/bpl/bmi` ⇒ `if a == 0 / a != 0 / a >= 0 / a < 0
-  goto target`. These don't have an explicit `cmp` because `lda` itself
-  defines Z and N — but the structured form makes the intent obvious.
+  goto target`. These don't have an explicit `cmp` because `lda`
+  itself defines Z and N.
+* Flag-liveness elision for the four pure flag-writers.
 
-Out of scope for this slice (called out by the plan, still pending):
+Out of scope (called out by the plan, still pending):
 
 * The relooper — reconstructing `if`/`while`/`for` from arbitrary
   CFGs. We still emit unstructured `goto`s; pass 2 just makes their
   conditions self-describing.
 * 16-bit add/sub pattern folding.
 * Parallel-array fusion (`mob[x].{x,y,scrn,...}`).
-* Flag-liveness analysis that elides dead Z/N updates.
 
 Pass 2 is intentionally conservative: any sequence it doesn't
 recognise passes through unchanged, so the structurer is always
@@ -37,18 +78,28 @@ from __future__ import annotations
 from dataclasses import replace
 
 from .ir1 import (
+    AdcAbs,
+    AdcImm,
+    Asl,
     Branch,
+    Call,
+    Clc,
     CmpAbs,
     CmpImm,
     Compare,
+    Goto,
     If,
     Imm,
     Item,
+    Label,
     LoadAbs,
     LoadImm,
     LoadIndexed,
     ModuleIR1,
+    Return,
     Routine,
+    Sec,
+    Unsupported,
 )
 
 
@@ -149,14 +200,317 @@ def structure_routine(routine: Routine) -> Routine:
     return replace(routine, body=new_body)
 
 
+# ----------------------------------------------------------------------
+# Flag-liveness elision.
+#
+# After fusion, a `cmp`'s only consumer is usually the `If` that
+# replaced its old `Branch` partner — and `If` doesn't read flags. So
+# the `cmp` is dead. The same applies to standalone `clc` / `sec`
+# whose carry never reaches an `adc` or `bcs/bcc`.
+#
+# The analysis is a single backward sweep over the routine body. Each
+# IR1 node is classified by what flags it reads and what flags it
+# defines:
+#
+#   reader               : `Branch` (cond-specific), `AdcImm`/`AdcAbs`
+#                          (reads C). `If` does NOT read flags.
+#   writer (whole set)   : `CmpImm`/`CmpAbs` ⇒ {Z,N,C}.
+#                          `Clc`/`Sec`       ⇒ {C}.
+#                          `LoadImm`/`LoadAbs`/`LoadIndexed` ⇒ {Z,N}.
+#                          `AdcImm`/`AdcAbs`/`Asl` ⇒ {Z,N,C}.
+#   neutral              : `If`, `Goto`, `Return`, `StoreAbs`,
+#                          `StoreIndexed`, `Label`.
+#   barrier              : `Call` (clobbers all flags via the callee,
+#                          and JSR doesn't consume flag arguments).
+#                          `Goto kind=tail_call` and `Return`
+#                          (control leaves the routine).
+#                          `Unsupported` (assume reads-all,
+#                          writes-all — safe).
+#
+# Elision rule: drop a writer iff none of the flags it defines are
+# live at its exit AND the instruction has no other side-effect.
+# That's true only for pure writers: `Cmp{Imm,Abs}`, `Clc`, `Sec`.
+# `Lda*` is never elided here even when Z/N are dead — it still
+# updates the register.
+#
+# Forward local branches contribute their target's live-IN to the
+# branch site's live-OUT. Backward local branches (loops) defeat the
+# single-pass analysis: when one is detected, the routine is left
+# untouched. CHECKFLOOR has no loops; combat/physics will need the
+# fixed-point analysis later.
+
+
+_UNIVERSE = frozenset({"Z", "N", "C", "V"})
+
+
+_COND_READS: dict[str, frozenset[str]] = {
+    "eq": frozenset({"Z"}),
+    "ne": frozenset({"Z"}),
+    "cs": frozenset({"C"}),
+    "cc": frozenset({"C"}),
+    "pl": frozenset({"N"}),
+    "mi": frozenset({"N"}),
+    "vs": frozenset({"V"}),
+    "vc": frozenset({"V"}),
+}
+
+
+def _has_backward_local_jump(body: list[Item]) -> bool:
+    """Return True if any local branch / goto / if targets a label at
+    or before the source instruction's index. A `True` answer disables
+    elision for the routine — we can't soundly fold flag liveness
+    without iterating to a fixed point.
+    """
+    label_idx: dict[str, int] = {
+        item.name: i for i, item in enumerate(body) if isinstance(item, Label)
+    }
+    for i, item in enumerate(body):
+        target: str | None = None
+        if isinstance(item, Branch):
+            target = item.target
+        elif isinstance(item, If):
+            target = item.target
+        elif isinstance(item, Goto) and item.kind == "local":
+            target = item.target
+        if target is None:
+            continue
+        ti = label_idx.get(target)
+        if ti is not None and ti <= i:
+            return True
+    return False
+
+
+def _backward_sweep(
+    routine: Routine,
+    flag_demand: dict[str, frozenset[str]],
+) -> tuple[set[int], list[tuple[str, frozenset[str]]]]:
+    """Run the backward liveness sweep over `routine.body` and return:
+
+    * the set of body indices eligible for elision (pure flag-writers
+      whose flags are all dead at their exit), and
+    * a list of `(callee_name, demanded_flags)` propagations the
+      fixed-point loop should fold into the global `flag_demand`.
+
+    `flag_demand[R]` carries each in-module routine's currently-known
+    return-flag liveness. Routines not present in the map are treated
+    as cross-module — propagations to them are still emitted, the
+    fixed-point loop just drops them.
+
+    The sweep bails entirely (returns `(set(), [])`) when the routine
+    contains a backward local jump, since the single-pass analysis
+    can't soundly reason across loop back-edges yet.
+    """
+    body = routine.body
+    if _has_backward_local_jump(body):
+        return set(), []
+
+    label_idx = {
+        item.name: i for i, item in enumerate(body) if isinstance(item, Label)
+    }
+    label_live_in: dict[str, frozenset[str]] = {}
+
+    # `Return` and `tail_call` leave the routine — the flags arriving
+    # there are observed by whoever wants R's output. That's exactly
+    # `flag_demand[R]`.
+    exit_live = flag_demand.get(routine.name, frozenset())
+
+    live: set[str] = set()
+    drop: set[int] = set()
+    propagations: list[tuple[str, frozenset[str]]] = []
+
+    for i in range(len(body) - 1, -1, -1):
+        item = body[i]
+
+        if isinstance(item, Return):
+            live = set(exit_live)
+            continue
+
+        if isinstance(item, Goto):
+            if item.kind == "tail_call":
+                # Executing `R` via tail_call to X delivers X's return
+                # flags to R's caller, so X inherits R's demand.
+                propagations.append((item.target, frozenset(exit_live)))
+                # Live IN at the tail_call site: assume X doesn't read
+                # flag inputs (POP convention), so ∅ — see module doc.
+                live = set()
+                continue
+            # kind == "local"
+            ti = label_idx.get(item.target)
+            if ti is not None and ti > i:
+                live = set(label_live_in.get(item.target, _UNIVERSE))
+            else:
+                live = set(_UNIVERSE)
+            continue
+
+        if isinstance(item, Branch):
+            ti = label_idx.get(item.target)
+            if ti is not None and ti > i:
+                taken = set(label_live_in.get(item.target, _UNIVERSE))
+            else:
+                # Cross-routine conditional tail call — same shape as
+                # a tail_call on the taken edge.
+                propagations.append((item.target, frozenset(exit_live)))
+                taken = set()
+            live = live | taken
+            live |= _COND_READS.get(item.cond, _UNIVERSE)
+            continue
+
+        if isinstance(item, If):
+            ti = label_idx.get(item.target)
+            if ti is not None and ti > i:
+                taken = set(label_live_in.get(item.target, _UNIVERSE))
+            else:
+                # Cross-module conditional tail call.
+                propagations.append((item.target, frozenset(exit_live)))
+                taken = set()
+            live = live | taken
+            # `If` itself does NOT read flags — its Compare is
+            # self-contained.
+            continue
+
+        if isinstance(item, Call):
+            # The callee delivers `live` (live-OUT at the call) to us,
+            # so it inherits that demand. Then the callee clobbers all
+            # flags and (by POP convention) reads none — live IN at
+            # the call site is `∅`.
+            propagations.append((item.target, frozenset(live)))
+            live = set()
+            continue
+
+        if isinstance(item, Unsupported):
+            # Treat as read-all, write-all — safe.
+            live = set(_UNIVERSE)
+            continue
+
+        if isinstance(item, (CmpImm, CmpAbs)):
+            defines = {"Z", "N", "C"}
+            if not (live & defines):
+                drop.add(i)
+            else:
+                live -= defines
+            continue
+
+        if isinstance(item, Clc):
+            if "C" not in live:
+                drop.add(i)
+            else:
+                live.discard("C")
+            continue
+
+        if isinstance(item, Sec):
+            if "C" not in live:
+                drop.add(i)
+            else:
+                live.discard("C")
+            continue
+
+        if isinstance(item, (LoadImm, LoadAbs, LoadIndexed)):
+            # Lda* writes Z/N; the load itself has a side-effect (the
+            # register update) so we can't drop it even when Z/N are
+            # dead.
+            live -= {"Z", "N"}
+            continue
+
+        if isinstance(item, (AdcImm, AdcAbs)):
+            # Adc writes Z,N,C and reads C.
+            live -= {"Z", "N", "C"}
+            live.add("C")
+            continue
+
+        if isinstance(item, Asl):
+            live -= {"Z", "N", "C"}
+            continue
+
+        if isinstance(item, Label):
+            label_live_in[item.name] = frozenset(live)
+            continue
+
+        # StoreAbs, StoreIndexed: neutral.
+
+    return drop, propagations
+
+
+def _solve_flag_demand(
+    routines: list[Routine],
+) -> dict[str, frozenset[str]]:
+    """Iterate the per-routine backward sweep until `flag_demand`
+    reaches a fixed point. Each iteration only grows demands
+    monotonically (bounded by `{Z,N,C,V}`), so convergence is
+    guaranteed in O(|routines| × |flags|) rounds.
+
+    Returns the final `flag_demand` mapping, including entries only
+    for routines visible in this module. Entries for cross-module
+    callees referenced by `call`/`tail_call`/conditional-tail edges
+    aren't tracked here — propagations to them are silently dropped,
+    matching the optimistic "external callers don't observe flags"
+    assumption documented at module top.
+    """
+    in_module = {r.name for r in routines}
+    flag_demand: dict[str, frozenset[str]] = {
+        name: frozenset() for name in in_module
+    }
+
+    while True:
+        new_demand = dict(flag_demand)
+        for r in routines:
+            _, propagations = _backward_sweep(r, flag_demand)
+            for callee, demanded in propagations:
+                if callee in new_demand:
+                    new_demand[callee] = new_demand[callee] | demanded
+        if new_demand == flag_demand:
+            return flag_demand
+        flag_demand = new_demand
+
+
+def _eliminate_dead_flags(
+    routine: Routine,
+    flag_demand: dict[str, frozenset[str]],
+) -> Routine:
+    drop, _ = _backward_sweep(routine, flag_demand)
+    if not drop:
+        return routine
+    new_body = [it for i, it in enumerate(routine.body) if i not in drop]
+    return replace(routine, body=new_body)
+
+
 def structure_module(module: ModuleIR1) -> ModuleIR1:
-    """Apply `structure_routine` to every routine in `module`. Returns
-    a new `ModuleIR1`; the input is not mutated."""
-    return ModuleIR1(
-        name=module.name,
-        file=module.file,
-        routines=[structure_routine(r) for r in module.routines],
-    )
+    """Apply fusion and flag-liveness elision to every routine in
+    `module`. Returns a new `ModuleIR1`; the input is not mutated.
+
+    Sequencing per module:
+
+    1. Fuse `cmp + branch` pairs (so the `If` consumers are visible
+       to the liveness sweep).
+    2. Solve the call-graph fixed-point for `flag_demand[R]` — which
+       flags each routine must deliver to its callers.
+    3. Run the elision sweep with that demand map, dropping any pure
+       flag-writer whose flags are dead at its exit.
+
+    Entry routines (no in-module callers) have `flag_demand[R] = ∅`,
+    matching the optimistic stance that external callers don't
+    observe returned flag state. Routines whose callers in the same
+    module read return flags (e.g. `cmpspace`'s `Z` consumed by an
+    `if ne goto ...` immediately after a `call cmpspace`) get the
+    appropriate demand propagated in and keep their terminal cmps.
+    """
+    fused = [structure_routine(r) for r in module.routines]
+    flag_demand = _solve_flag_demand(fused)
+    final = [_eliminate_dead_flags(r, flag_demand) for r in fused]
+    return ModuleIR1(name=module.name, file=module.file, routines=final)
+
+
+def elision_stats(module: ModuleIR1) -> tuple[int, int]:
+    """Return (remaining_cmp_count, remaining_setcarry_count). Used by
+    the CLI to summarise how aggressive the elision pass was."""
+    cmp = 0
+    setc = 0
+    for r in module.routines:
+        for item in r.body:
+            if isinstance(item, (CmpImm, CmpAbs)):
+                cmp += 1
+            elif isinstance(item, (Clc, Sec)):
+                setc += 1
+    return cmp, setc
 
 
 def fusion_stats(module: ModuleIR1) -> tuple[int, int]:

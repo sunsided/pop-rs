@@ -3,6 +3,7 @@ equivalence with pass 1, and the CHECKFLOOR pilot end-to-end."""
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from pop_lifter.ir1 import (
@@ -265,3 +266,319 @@ def test_pass2_fusion_count_matches_expected(source_dir):
     # require updating this test on every push.
     assert 50 <= fused <= 70, f"unexpected fused-If count: {fused}"
     assert unfused <= 20, f"too many unfused Branches: {unfused}"
+
+
+# ---- flag-liveness elision
+
+
+def test_elision_drops_every_cmp_in_checkfloor(source_dir):
+    """Every `cmp` in CHECKFLOOR proper feeds a fused `If` (no flag
+    readers between them and the next overwrite), so all 14 of them
+    should be dropped by the liveness sweep. The callees onground /
+    fallon / etc. still have unfused branches (their `and` predecessors
+    aren't lifted yet) so those keep their cmps — but CHECKFLOOR
+    itself should end up cmp-free."""
+    from pop_lifter.ir1 import CmpAbs, CmpImm
+
+    ir2 = structure_module(_ir1_module(source_dir, "CTRL.S", ["CHECKFLOOR"]))
+    cf = ir2.find("CHECKFLOOR")
+    cmps_left = [
+        item for item in cf.body if isinstance(item, (CmpImm, CmpAbs))
+    ]
+    assert cmps_left == [], (
+        f"expected CHECKFLOOR to have zero cmp left after elision, got "
+        f"{[(c.imm.value if hasattr(c, 'imm') else c.source.name) for c in cmps_left]}"
+    )
+
+
+def test_elision_keeps_cmp_before_unfused_branch():
+    """When an opaque op sits between the `cmp` and the next branch,
+    the sweep treats the opaque op as read-all/write-all — so the
+    `cmp`'s Z/N/C might be consumed by it before being overwritten.
+    Shape: `cmp #N ; <opaque> ; bne L`. The cmp must NOT be elided.
+
+    (The trailing `Branch` here is incidental — even if it were
+    removed the Unsupported's read-all alone keeps the cmp alive.)
+    """
+    from pop_lifter.ir1 import (
+        Branch,
+        CmpImm,
+        Imm,
+        Reg,
+        Return,
+        Routine,
+        SourceRef,
+        Unsupported,
+    )
+
+    src = SourceRef(file="synthetic", line=0, raw="")
+    r = Routine(
+        name="f",
+        body=[
+            CmpImm(reg=Reg.A, imm=Imm(value=5, text="#5"), src=src),
+            Unsupported(mnemonic="???", operand="and #1", src=src),
+            Branch(cond="ne", target="]rts", src=src),
+            Return(src=src),
+            # synthetic local target so the Branch resolves locally
+            # (we won't actually reach it).
+        ],
+    )
+    # We need a ]rts label for the Branch to be "local". Add one.
+    from pop_lifter.ir1 import Label
+    r = replace(r, body=[*r.body, Label(name="]rts", src=src), Return(src=src)])
+
+    from pop_lifter.pass2_struct import _eliminate_dead_flags
+    out = _eliminate_dead_flags(r, flag_demand={r.name: frozenset()})
+    assert any(isinstance(item, CmpImm) for item in out.body), (
+        "cmp before an opaque flag-reader must NOT be elided — its "
+        "flags are still live"
+    )
+
+
+def test_elision_keeps_clc_before_adc():
+    """`clc; adc #1` — the clc is alive because adc reads C. Without
+    it, adc would inherit whatever C the caller set."""
+    from pop_lifter.ir1 import (
+        AdcImm,
+        Clc,
+        Imm,
+        Return,
+        Routine,
+        SourceRef,
+    )
+
+    src = SourceRef(file="synthetic", line=0, raw="")
+    r = Routine(
+        name="f",
+        body=[
+            Clc(src=src),
+            AdcImm(imm=Imm(value=1, text="#1"), src=src),
+            Return(src=src),
+        ],
+    )
+    from pop_lifter.pass2_struct import _eliminate_dead_flags
+    out = _eliminate_dead_flags(r, flag_demand={r.name: frozenset()})
+    assert any(isinstance(item, Clc) for item in out.body), (
+        "clc feeding adc must not be elided"
+    )
+
+
+def test_elision_drops_clc_with_no_adc():
+    """A bare `clc` with no carry-reader downstream is dead."""
+    from pop_lifter.ir1 import Clc, Return, Routine, SourceRef
+
+    src = SourceRef(file="synthetic", line=0, raw="")
+    r = Routine(
+        name="f",
+        body=[Clc(src=src), Return(src=src)],
+    )
+    from pop_lifter.pass2_struct import _eliminate_dead_flags
+    out = _eliminate_dead_flags(r, flag_demand={r.name: frozenset()})
+    assert not any(isinstance(item, Clc) for item in out.body)
+
+
+def test_elision_bails_on_backward_branch():
+    """If a routine contains a backward local jump (loop), elision
+    bails — the single-pass liveness sweep isn't fixed-point and
+    might drop a flag-setter that's still live across the back-edge.
+    Verify the cmp survives."""
+    from pop_lifter.ir1 import (
+        Branch,
+        CmpImm,
+        Imm,
+        Label,
+        Reg,
+        Return,
+        Routine,
+        SourceRef,
+    )
+
+    src = SourceRef(file="synthetic", line=0, raw="")
+    # do { ... cmp; bne loop } — backward branch from bne to :loop
+    r = Routine(
+        name="f",
+        body=[
+            Label(name=":loop", src=src),
+            CmpImm(reg=Reg.A, imm=Imm(value=0, text="#0"), src=src),
+            Branch(cond="ne", target=":loop", src=src),
+            Return(src=src),
+        ],
+    )
+    from pop_lifter.pass2_struct import _eliminate_dead_flags
+    out = _eliminate_dead_flags(r, flag_demand={r.name: frozenset()})
+    assert any(isinstance(item, CmpImm) for item in out.body), (
+        "elision should bail on a loop and keep the cmp"
+    )
+
+
+def test_call_graph_keeps_callee_return_flag_setter():
+    """Soundness gate for the call-graph fixed point: a callee whose
+    Z is read by the caller (the `cmpspace` idiom: `call X ; if ne
+    goto ...`) must retain its terminal `cmp`, even though the
+    `cmp`'s flags appear locally dead going into Return.
+
+    Two routines in the same module:
+
+      fn caller {
+        call X
+        if a != #0 goto ]rts     ; reads Z from X's terminal cmp
+        return
+      :rts: return                ; (loose ]rts shape — synthetic)
+      }
+      fn X {
+        cmp a, #0x14              ; sets Z; this is X's "return value"
+        return
+      }
+
+    Without call-graph propagation, X's cmp would be elided
+    (flag_demand[X] = ∅) and the caller's `if ne` would read stale Z.
+    With propagation, the caller's live-OUT at `call X` includes Z,
+    flag_demand[X] becomes {Z}, and the cmp survives.
+    """
+    from pop_lifter.ir1 import (
+        Branch,
+        Call,
+        CmpImm,
+        If,
+        Imm,
+        Label,
+        ModuleIR1,
+        Reg,
+        Return,
+        Routine,
+        SourceRef,
+    )
+
+    src = SourceRef(file="synthetic", line=0, raw="")
+    rts_label = Label(name="]rts", src=src)
+
+    caller = Routine(
+        name="caller",
+        body=[
+            Call(target="X", src=src),
+            Branch(cond="ne", target="]rts", src=src),
+            rts_label,
+            Return(src=src),
+        ],
+    )
+    callee = Routine(
+        name="X",
+        body=[
+            CmpImm(reg=Reg.A, imm=Imm(value=0x14, text="#$14"), src=src),
+            Return(src=src),
+        ],
+    )
+
+    m = ModuleIR1(
+        name="syn", file="synthetic", routines=[caller, callee]
+    )
+    out = structure_module(m)
+    out_callee = out.find("X")
+    assert any(isinstance(item, CmpImm) for item in out_callee.body), (
+        "callee's terminal cmp must survive — its Z is read by caller"
+    )
+
+
+def test_call_graph_drops_callee_cmp_when_caller_ignores_flags():
+    """Mirror of the previous test: same callee shape but the caller
+    doesn't read the return Z. flag_demand[X] stays ∅ so X's cmp
+    drops."""
+    from pop_lifter.ir1 import (
+        Call,
+        CmpImm,
+        Imm,
+        ModuleIR1,
+        Reg,
+        Return,
+        Routine,
+        SourceRef,
+    )
+
+    src = SourceRef(file="synthetic", line=0, raw="")
+    caller = Routine(
+        name="caller",
+        body=[Call(target="X", src=src), Return(src=src)],
+    )
+    callee = Routine(
+        name="X",
+        body=[
+            CmpImm(reg=Reg.A, imm=Imm(value=0x14, text="#$14"), src=src),
+            Return(src=src),
+        ],
+    )
+
+    m = ModuleIR1(name="syn", file="synthetic", routines=[caller, callee])
+    out = structure_module(m)
+    assert not any(
+        isinstance(item, CmpImm) for item in out.find("X").body
+    ), "callee cmp must drop when no caller reads return flags"
+
+
+def test_call_graph_propagates_through_tail_call():
+    """`tail_call X` from R inherits R's flag_demand to X. If R's
+    callers read Z, X must keep its terminal cmp."""
+    from pop_lifter.ir1 import (
+        Branch,
+        Call,
+        CmpImm,
+        Goto,
+        Imm,
+        Label,
+        ModuleIR1,
+        Reg,
+        Return,
+        Routine,
+        SourceRef,
+    )
+
+    src = SourceRef(file="synthetic", line=0, raw="")
+    # outer calls R; reads Z afterward.
+    outer = Routine(
+        name="outer",
+        body=[
+            Call(target="R", src=src),
+            Branch(cond="ne", target="]rts", src=src),
+            Label(name="]rts", src=src),
+            Return(src=src),
+        ],
+    )
+    # R tail-calls X — so outer's Z-demand should flow through R to X.
+    r = Routine(
+        name="R",
+        body=[Goto(target="X", kind="tail_call", src=src)],
+    )
+    x = Routine(
+        name="X",
+        body=[
+            CmpImm(reg=Reg.A, imm=Imm(value=0x14, text="#$14"), src=src),
+            Return(src=src),
+        ],
+    )
+    m = ModuleIR1(name="syn", file="synthetic", routines=[outer, r, x])
+    out = structure_module(m)
+    assert any(isinstance(item, CmpImm) for item in out.find("X").body), (
+        "demand should propagate outer → R → X via the tail_call edge"
+    )
+
+
+def test_elision_preserves_behavioural_equivalence(source_dir):
+    """Combined fusion + elision must still produce identical sentinel-
+    touch sets across every CHECKFLOOR path — the strongest end-to-end
+    check that the rewrite is sound."""
+    ir1, ir2, stubs = _checkfloor_modules(source_dir)
+    for action, posn, expected in _PATHS:
+        ram1 = bytearray(0x10000)
+        ram1[CHAR_ACTION] = action
+        ram1[CHAR_POSN] = posn
+        run([ir1, stubs], "CHECKFLOOR", ram=ram1)
+        touched1 = {a for a in (0x200, 0x201, 0x202) if ram1[a] != 0}
+
+        ram2 = bytearray(0x10000)
+        ram2[CHAR_ACTION] = action
+        ram2[CHAR_POSN] = posn
+        run([ir2, stubs], "CHECKFLOOR", ram=ram2)
+        touched2 = {a for a in (0x200, 0x201, 0x202) if ram2[a] != 0}
+        assert touched2 == touched1 == expected, (
+            f"divergence for action={action} posn={posn}: "
+            f"pass1={touched1} pass2={touched2} expected={expected}"
+        )
