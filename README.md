@@ -10,7 +10,27 @@ The original 6502 source is vendored as a git submodule at
 
 ## Status
 
-Scaffold only. Nothing here builds a playable game yet.
+Pass 0 (Merlin lex/parse) and a first slice of Pass 1 (mechanical lift to IR1
+plus a Python interpreter for differential testing) are working on the AUTO.S
+combat-button pilot. Pass 2/3/4 not started.
+
+Inspectable intermediate artifacts:
+
+| Path                          | What it is                                                                                |
+|-------------------------------|-------------------------------------------------------------------------------------------|
+| `ir/pass0/equates.json`       | Pass-0 AST: every named address from `EQ.S` + `GAMEEQ.S`, plus the `dum`/`dend` overlays. |
+| `ir/pilot/auto_combat.ir1`    | Pass-1 IR1: the combat-button routines from `AUTO.S` lifted opcode-for-opcode.            |
+
+Regenerate after lifter changes:
+
+```sh
+pop-lifter dump-ast --out ir/pass0/equates.json
+pop-lifter lift AUTO.S --entry DoStrike --entry DoBlock --entry DoTurn \
+    --entry DoStandup --entry DoEngarde --entry DoRelBtn --entry DoRelease \
+    --out ir/pilot/auto_combat.ir1
+```
+
+`tests/test_artifacts.py` re-generates them in-memory and fails CI on drift.
 
 ## Layout
 

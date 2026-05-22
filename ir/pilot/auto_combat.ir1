@@ -1,0 +1,70 @@
+; module AUTO from 01 POP Source/Source/AUTO.S
+
+fn DoStrike  (aka DoPress) {
+  a = #0xff                  ; AUTO.S:880
+  *clrbtn@0x00d8 = a            ; AUTO.S:881
+  *btn@0x003d = a            ; AUTO.S:882
+  return                           ; AUTO.S:883
+}
+
+fn DoBlock  (aka DoUp) {
+  a = #0xff                  ; AUTO.S:850
+  *clrU@0x00d6 = a            ; AUTO.S:851
+  *JSTKY@0x0019 = a            ; AUTO.S:852
+  return                           ; AUTO.S:853
+}
+
+fn DoTurn  (aka DoDown) {
+  a = #0xff                  ; AUTO.S:856
+  *clrD@0x00d7 = a            ; AUTO.S:857
+  a = #0x01                  ; AUTO.S:858
+  *JSTKY@0x0019 = a            ; AUTO.S:859
+  return                           ; AUTO.S:860
+}
+
+fn DoStandup {
+  a = #0xff                  ; AUTO.S:863
+  *clrU@0x00d6 = a            ; AUTO.S:864
+  tail_call DoBack                ; AUTO.S:865
+}
+
+fn DoEngarde {
+  a = #0xff                  ; AUTO.S:874
+  *clrD@0x00d7 = a            ; AUTO.S:875
+  tail_call DoFwd                ; AUTO.S:876
+}
+
+fn DoRelBtn {
+  a = #0x00                  ; AUTO.S:886
+  *btn@0x003d = a            ; AUTO.S:887
+]rts:
+  return                           ; AUTO.S:888
+}
+
+fn DoRelease {
+  a = #0x00                  ; AUTO.S:823
+  *clrF@0x00d4 = a            ; AUTO.S:824
+  *clrB@0x00d5 = a            ; AUTO.S:825
+  *clrU@0x00d6 = a            ; AUTO.S:826
+  *clrD@0x00d7 = a            ; AUTO.S:827
+  *clrbtn@0x00d8 = a            ; AUTO.S:828
+  *JSTKX@0x0018 = a            ; AUTO.S:829
+  *JSTKY@0x0019 = a            ; AUTO.S:830
+  *btn@0x003d = a            ; AUTO.S:831
+  return                           ; AUTO.S:832
+}
+
+fn DoRetreat  (aka DoBack) {
+  a = #0xff                  ; AUTO.S:843
+  *clrB@0x00d5 = a            ; AUTO.S:844
+  a = #0x01                  ; AUTO.S:845
+  *JSTKX@0x0018 = a            ; AUTO.S:846
+  return                           ; AUTO.S:847
+}
+
+fn DoAdvance  (aka DoFwd) {
+  a = #0xff                  ; AUTO.S:836
+  *clrF@0x00d4 = a            ; AUTO.S:837
+  *JSTKX@0x0018 = a            ; AUTO.S:838
+  return                           ; AUTO.S:839
+}
