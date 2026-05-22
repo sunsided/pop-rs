@@ -1,0 +1,891 @@
+; module CTRL from 01 POP Source/Source/CTRL.S
+
+fn falling {
+  ??? lda CharY            ; CTRL.S:77
+  ??? ldx CharBlockY            ; CTRL.S:79
+  ??? inx             ; CTRL.S:80
+  ??? cmp FloorY,x            ; CTRL.S:81
+  ??? bcs :1            ; CTRL.S:82
+  tail_call fallon                ; CTRL.S:84
+}
+
+fn CHECKFLOOR {
+  ??? lda CharAction            ; CTRL.S:107
+  ??? cmp #6            ; CTRL.S:108
+  ??? beq ]rts            ; CTRL.S:109
+  ??? cmp #5            ; CTRL.S:111
+  ??? bne :2            ; CTRL.S:112
+  ??? lda CharPosn            ; CTRL.S:113
+  ??? cmp #109            ; CTRL.S:114
+  ??? beq :ong            ; CTRL.S:115
+  ??? cmp #185            ; CTRL.S:116
+  ??? bne ]rts            ; CTRL.S:117
+:ong:
+  tail_call onground                ; CTRL.S:118
+}
+
+fn hitflr {
+  ??? ldx CharBlockY            ; CTRL.S:141
+  ??? inx             ; CTRL.S:142
+  ??? lda FloorY,x            ; CTRL.S:143
+  *CharY@0x0042 = a            ; CTRL.S:144
+  ??? jsr getunderft            ; CTRL.S:146
+  ??? cmp #spikes            ; CTRL.S:147
+  ??? beq :hitspikes            ; CTRL.S:148
+  ??? jsr getinfront            ; CTRL.S:152
+  ??? jsr cmpspace            ; CTRL.S:153
+  ??? bne :cont            ; CTRL.S:154
+  ??? jsr getdist            ; CTRL.S:156
+  ??? cmp #4            ; CTRL.S:157
+  ??? bcs :cont            ; CTRL.S:158
+  a = #0xfd                  ; CTRL.S:160
+  ??? jsr addcharx            ; CTRL.S:161
+  *CharX@0x0041 = a            ; CTRL.S:162
+:cont:
+  ??? jsr addslicers            ; CTRL.S:164
+  ??? lda CharLife            ; CTRL.S:166
+  ??? bpl :hardland            ; CTRL.S:167
+  ??? jsr getdist            ; CTRL.S:169
+  ??? cmp #12            ; CTRL.S:170
+  ??? bcc :nc            ; CTRL.S:171
+  ??? jsr getbehind            ; CTRL.S:172
+  ??? cmp #spikes            ; CTRL.S:173
+  ??? beq :hitspikes            ; CTRL.S:174
+:nc:
+  ??? jsr getunderft            ; CTRL.S:176
+  ??? cmp #spikes            ; CTRL.S:177
+  ??? bne :notspikes            ; CTRL.S:178
+:hitspikes:
+  ??? jsr getspikes            ; CTRL.S:181
+  ??? bne :impale            ; CTRL.S:182
+:notspikes:
+  ??? lda CharYVel            ; CTRL.S:185
+  ??? cmp #OofVelocity            ; CTRL.S:186
+  ??? bcc :softland            ; CTRL.S:187
+  ??? cmp #DeathVelocity            ; CTRL.S:189
+  ??? bcc :medland            ; CTRL.S:190
+:hardland:
+  a = #0x64                  ; CTRL.S:193
+  ??? jsr decstr            ; CTRL.S:194
+:hdland1:
+  a = #0x05                  ; CTRL.S:196
+  ??? jsr addsound            ; CTRL.S:197
+  a = #0x16                  ; CTRL.S:199
+  ??? bne :doland            ; CTRL.S:200
+:medland:
+  ??? lda CharID            ; CTRL.S:203
+  ??? cmp #1            ; CTRL.S:204
+  ??? beq :softland            ; CTRL.S:205
+  ??? cmp #2            ; CTRL.S:206
+  ??? bcs :hardland            ; CTRL.S:207
+  a = #0x01                  ; CTRL.S:209
+  ??? jsr decstr            ; CTRL.S:210
+  ??? beq :hdland1            ; CTRL.S:211
+  a = #0x05                  ; CTRL.S:213
+  ??? jsr addsound            ; CTRL.S:214
+  a = #0x14                  ; CTRL.S:216
+  ??? bne :doland            ; CTRL.S:217
+:softland:
+  ??? lda CharID            ; CTRL.S:220
+  ??? cmp #2            ; CTRL.S:221
+  ??? bcs :gd            ; CTRL.S:222
+  ??? lda CharSword            ; CTRL.S:223
+  ??? cmp #2            ; CTRL.S:224
+  ??? bne :1            ; CTRL.S:225
+:gd:
+  a = #0x02                  ; CTRL.S:226
+  *CharSword@0x004e = a            ; CTRL.S:227
+  a = #0x3f                  ; CTRL.S:228
+  ??? bne :doland            ; CTRL.S:229
+:1:
+  a = #0x11                  ; CTRL.S:231
+  ??? bne :doland            ; CTRL.S:232
+:impale:
+  tail_call DoImpale                ; CTRL.S:234
+}
+
+fn fallon {
+  ??? lda btn            ; CTRL.S:249
+  ??? and CharLife            ; CTRL.S:250
+  ??? bpl ]rts            ; CTRL.S:251
+  ??? lda CharYVel            ; CTRL.S:253
+  ??? cmp #grabspeed            ; CTRL.S:254
+  ??? bcs ]rts            ; CTRL.S:255
+  ??? lda CharY            ; CTRL.S:257
+  ??? clc             ; CTRL.S:258
+  ??? adc #grablead            ; CTRL.S:259
+  ??? ldx CharBlockY            ; CTRL.S:260
+  ??? inx             ; CTRL.S:261
+  ??? cmp FloorY,x            ; CTRL.S:262
+  ??? bcc ]rts            ; CTRL.S:263
+  ??? lda CharX            ; CTRL.S:268
+  *savekidx@0x00af = a            ; CTRL.S:269
+  a = #0xf8                  ; CTRL.S:270
+  ??? jsr addcharx            ; CTRL.S:271
+  *CharX@0x0041 = a            ; CTRL.S:272
+  ??? jsr rereadblocks            ; CTRL.S:273
+  ??? jsr :test            ; CTRL.S:275
+  ??? bne :ok            ; CTRL.S:276
+  ??? lda savekidx            ; CTRL.S:277
+  *CharX@0x0041 = a            ; CTRL.S:278
+  tail_call rereadblocks                ; CTRL.S:279
+}
+
+fn onground {
+  ??? lda Fcheck            ; CTRL.S:314
+  ??? and #fcheckmark            ; CTRL.S:315
+  ??? beq ]rts            ; CTRL.S:316
+  ??? jsr getunderft            ; CTRL.S:318
+  ??? cmp #block            ; CTRL.S:319
+  ??? bne :1            ; CTRL.S:320
+  ??? jsr InsideBlock            ; CTRL.S:321
+:1:
+  ??? jsr cmpspace            ; CTRL.S:323
+  ??? bne ]rts            ; CTRL.S:324
+  ??? lda level            ; CTRL.S:328
+  ??? cmp #12            ; CTRL.S:329
+  ??? bne :no            ; CTRL.S:330
+  ??? lda mergetimer            ; CTRL.S:331
+  ??? bpl :no            ; CTRL.S:332
+  ??? lda CharBlockY            ; CTRL.S:333
+  ??? bne :no            ; CTRL.S:334
+  ??? lda CharScrn            ; CTRL.S:335
+  ??? cmp #2            ; CTRL.S:336
+  ??? beq :yes            ; CTRL.S:337
+  ??? cmp #13            ; CTRL.S:338
+  ??? bne :no            ; CTRL.S:339
+  ??? lda tempblockx            ; CTRL.S:340
+  ??? cmp #6            ; CTRL.S:341
+  ??? bcc :no            ; CTRL.S:342
+:yes:
+  a = #0x01                  ; CTRL.S:344
+  ??? sta (BlueType),y            ; CTRL.S:345
+  ??? jsr indexblock            ; CTRL.S:346
+  a = #0x02                  ; CTRL.S:347
+  ??? jsr :sub            ; CTRL.S:348
+  ??? iny             ; CTRL.S:349
+:sub:
+  ??? jsr markwipe            ; CTRL.S:350
+  tail_call markred                ; CTRL.S:351
+}
+
+fn :no  (aka startfall) {
+  a = #0x00                  ; CTRL.S:357
+  *rjumpflag@0x023a = a            ; CTRL.S:358
+  *CharSword@0x004e = a            ; CTRL.S:359
+  ??? inc CharBlockY            ; CTRL.S:361
+  ??? jsr addslicers            ; CTRL.S:362
+  ??? lda CharPosn            ; CTRL.S:364
+  *rjumpflag@0x023a = a            ; CTRL.S:367
+  ??? cmp #9            ; CTRL.S:369
+  ??? beq :stepfall            ; CTRL.S:370
+  ??? cmp #13            ; CTRL.S:371
+  ??? beq :stepfall2            ; CTRL.S:372
+  ??? cmp #26            ; CTRL.S:373
+  ??? beq :jumpfall            ; CTRL.S:374
+  ??? cmp #44            ; CTRL.S:375
+  ??? beq :rjumpfall            ; CTRL.S:376
+  ??? cmp #81            ; CTRL.S:377
+  ??? bcc :2            ; CTRL.S:378
+  ??? cmp #86            ; CTRL.S:379
+  ??? bcc :hdropfall            ; CTRL.S:380
+:2:
+  ??? cmp #150            ; CTRL.S:381
+  ??? bcc :1            ; CTRL.S:382
+  ??? cmp #180            ; CTRL.S:383
+  ??? bcc :fightfall            ; CTRL.S:384
+:1:
+:stepfall:
+  a = #0x07                  ; CTRL.S:387
+  ??? bne :doit            ; CTRL.S:388
+:stepfall2:
+  a = #0x13                  ; CTRL.S:390
+  ??? bne :doit            ; CTRL.S:391
+:jumpfall:
+  a = #0x12                  ; CTRL.S:393
+  ??? bne :doit            ; CTRL.S:394
+:rjumpfall:
+  a = #0x15                  ; CTRL.S:396
+  ??? bne :doit            ; CTRL.S:397
+:hdropfall:
+  a = #0x05                  ; CTRL.S:400
+  ??? jsr addcharx            ; CTRL.S:401
+  *CharX@0x0041 = a            ; CTRL.S:402
+  ??? jsr rereadblocks            ; CTRL.S:403
+  goto :stepfall2                ; CTRL.S:404
+}
+
+fn CDpatch {
+  ??? lda rjumpflag            ; CTRL.S:439
+  ??? cmp #44            ; CTRL.S:440
+  ??? bne :patchX            ; CTRL.S:441
+  ??? jsr getdist            ; CTRL.S:443
+  ??? cmp #6            ; CTRL.S:444
+  ??? bcs :patchX            ; CTRL.S:445
+  a = #0x68                  ; CTRL.S:447
+  ??? jsr jumpseq            ; CTRL.S:448
+  ??? jsr animchar            ; CTRL.S:449
+  tail_call rereadblocks                ; CTRL.S:450
+}
+
+fn InsideBlock {
+  ??? jsr getdist            ; CTRL.S:466
+  ??? cmp #8            ; CTRL.S:467
+  ??? bcs :bumpback            ; CTRL.S:468
+:bumpfwd:
+  ??? jsr getinfront            ; CTRL.S:471
+  ??? cmp #block            ; CTRL.S:472
+  ??? beq :bumpback            ; CTRL.S:473
+  ??? jsr getdist            ; CTRL.S:475
+  ??? clc             ; CTRL.S:476
+  ??? adc #4            ; CTRL.S:477
+:reland:
+  ??? jsr addcharx            ; CTRL.S:479
+  *CharX@0x0041 = a            ; CTRL.S:480
+  ??? jsr rereadblocks            ; CTRL.S:481
+  tail_call getunderft                ; CTRL.S:482
+}
+
+fn SHADCTRL {
+  ??? lda CharID            ; CTRL.S:510
+  ??? cmp #24            ; CTRL.S:511
+  ??? bne :1            ; CTRL.S:512
+  tail_call AutoCtrl                ; CTRL.S:513
+}
+
+fn PLAYERCTRL {
+  ??? lda CharLife            ; CTRL.S:555
+  ??? bpl :cont1            ; CTRL.S:556
+  ??? lda KidStrength            ; CTRL.S:557
+  ??? bne :cont1            ; CTRL.S:558
+  a = #0x00                  ; CTRL.S:559
+  *CharLife@0x004f = a            ; CTRL.S:560
+:cont1:
+  ??? lda stunned            ; CTRL.S:562
+  ??? beq :cont            ; CTRL.S:563
+  ??? dec stunned            ; CTRL.S:564
+:cont:
+  ??? lda level            ; CTRL.S:566
+  ??? bne :game            ; CTRL.S:567
+:demo:
+  ??? jsr DemoCtrl            ; CTRL.S:568
+  tail_call GenCtrl                ; CTRL.S:569
+}
+
+fn DemoCtrl {
+  ??? lda milestone            ; CTRL.S:588
+  ??? bne :finish            ; CTRL.S:589
+  ??? lda CharSword            ; CTRL.S:590
+  ??? beq :preprog            ; CTRL.S:591
+  a = #0x0a                  ; CTRL.S:593
+  *guardprog@0x00dd = a            ; CTRL.S:594
+  ??? jsr AutoCtrl            ; CTRL.S:595
+  a = #0x0b                  ; CTRL.S:596
+  *guardprog@0x00dd = a            ; CTRL.S:597
+  return                           ; CTRL.S:598
+}
+
+fn UserCtrl {
+  ??? lda CharFace            ; CTRL.S:611
+  ??? bpl :faceL            ; CTRL.S:612
+  tail_call GenCtrl                ; CTRL.S:614
+}
+
+fn clrall {
+  a = #0x00                  ; CTRL.S:626
+  *clrB@0x00d5 = a            ; CTRL.S:627
+  *clrF@0x00d4 = a            ; CTRL.S:628
+  *clrU@0x00d6 = a            ; CTRL.S:629
+  *clrD@0x00d7 = a            ; CTRL.S:630
+  a = #0x01                  ; CTRL.S:631
+]rts:
+  return                           ; CTRL.S:632
+}
+
+fn GENCTRL {
+  ??? lda CharLife            ; CTRL.S:649
+  ??? bmi :alive            ; CTRL.S:650
+:dead:
+  ??? lda CharPosn            ; CTRL.S:654
+  ??? cmp #15            ; CTRL.S:655
+  ??? beq :drop            ; CTRL.S:656
+  ??? cmp #166            ; CTRL.S:657
+  ??? beq :drop            ; CTRL.S:658
+  ??? cmp #158            ; CTRL.S:659
+  ??? beq :drop            ; CTRL.S:660
+  ??? cmp #171            ; CTRL.S:661
+  ??? bne ]rts            ; CTRL.S:662
+:drop:
+  a = #0x47                  ; CTRL.S:663
+  tail_call jumpseq                ; CTRL.S:664
+}
+
+fn GuardCtrl {
+  ??? ldx CharPosn            ; CTRL.S:737
+  ??? cpx #166            ; CTRL.S:738
+  ??? beq :alert            ; CTRL.S:739
+]rts:
+  return                           ; CTRL.S:740
+}
+
+fn FightCtrl {
+  ??? lda CharAction            ; CTRL.S:760
+  ??? cmp #2            ; CTRL.S:761
+  ??? bcs ]rts            ; CTRL.S:762
+  ??? jsr getunderft            ; CTRL.S:766
+  ??? cmp #loose            ; CTRL.S:767
+  ??? beq :skip            ; CTRL.S:768
+  ??? lda EnemyAlert            ; CTRL.S:770
+  ??? cmp #2            ; CTRL.S:771
+  ??? bcc :dropgd            ; CTRL.S:772
+:skip:
+  ??? jsr getopdist            ; CTRL.S:776
+  ??? cmp #swordthres            ; CTRL.S:777
+  ??? bcc :onalert            ; CTRL.S:778
+  ??? cmp #128            ; CTRL.S:779
+  ??? bcc :dropgd            ; CTRL.S:780
+  ??? cmp #-4            ; CTRL.S:781
+  ??? bcs :onalert            ; CTRL.S:782
+  tail_call DoTurnEng                ; CTRL.S:783
+}
+
+fn DoTurnEng {
+  a = #0x3c                  ; CTRL.S:892
+  tail_call jumpseq                ; CTRL.S:893
+}
+
+fn DoBlock {
+  ??? ldx CharPosn            ; CTRL.S:897
+  ??? cpx #158            ; CTRL.S:898
+  ??? beq :2            ; CTRL.S:899
+  ??? cpx #170            ; CTRL.S:900
+  ??? beq :2            ; CTRL.S:901
+  ??? cpx #171            ; CTRL.S:902
+  ??? beq :2            ; CTRL.S:903
+  ??? cpx #168            ; CTRL.S:904
+  ??? beq :2            ; CTRL.S:905
+  ??? cpx #165            ; CTRL.S:907
+  ??? beq :2            ; CTRL.S:908
+  ??? cpx #167            ; CTRL.S:909
+  ??? beq :3            ; CTRL.S:910
+]rts:
+  return                           ; CTRL.S:912
+}
+
+fn DoStrike {
+  ??? cpx #157            ; CTRL.S:959
+  ??? beq :1            ; CTRL.S:960
+  ??? cpx #158            ; CTRL.S:961
+  ??? beq :1            ; CTRL.S:962
+  ??? cpx #170            ; CTRL.S:963
+  ??? beq :1            ; CTRL.S:964
+  ??? cpx #171            ; CTRL.S:965
+  ??? beq :1            ; CTRL.S:966
+  ??? cpx #165            ; CTRL.S:967
+  ??? beq :1            ; CTRL.S:968
+  ??? cpx #150            ; CTRL.S:969
+  ??? beq :2            ; CTRL.S:970
+  ??? cpx #161            ; CTRL.S:971
+  ??? beq :2            ; CTRL.S:972
+]rts:
+  return                           ; CTRL.S:974
+}
+
+fn DoRetreat {
+  ??? ldx CharPosn            ; CTRL.S:992
+  ??? cpx #158            ; CTRL.S:993
+  ??? beq :1            ; CTRL.S:994
+  ??? cpx #170            ; CTRL.S:995
+  ??? beq :1            ; CTRL.S:996
+  ??? cpx #171            ; CTRL.S:997
+  ??? beq :1            ; CTRL.S:998
+]rts:
+  return                           ; CTRL.S:999
+}
+
+fn DoAdvance {
+  ??? ldx CharPosn            ; CTRL.S:1008
+  ??? cpx #158            ; CTRL.S:1009
+  ??? beq :1            ; CTRL.S:1010
+  ??? cpx #170            ; CTRL.S:1011
+  ??? beq :1            ; CTRL.S:1012
+  ??? cpx #171            ; CTRL.S:1013
+  ??? beq :1            ; CTRL.S:1014
+]rts:
+  return                           ; CTRL.S:1015
+}
+
+fn standing {
+  ??? lda clrbtn            ; CTRL.S:1035
+  ??? bpl :noclick            ; CTRL.S:1036
+  ??? lda btn            ; CTRL.S:1037
+  ??? bpl :noclick            ; CTRL.S:1038
+  ??? jsr TryPickup            ; CTRL.S:1039
+  ??? bne ]rts            ; CTRL.S:1040
+:noclick:
+  ??? lda CharID            ; CTRL.S:1045
+  ??? beq :kid            ; CTRL.S:1046
+  ??? lda clrD            ; CTRL.S:1047
+  ??? bpl :1            ; CTRL.S:1048
+  ??? lda clrF            ; CTRL.S:1049
+  ??? bpl :1            ; CTRL.S:1050
+  tail_call DoEngarde                ; CTRL.S:1051
+}
+
+fn Stairs {
+  ??? lda tempblockx            ; CTRL.S:1250
+  ??? jsr getblockej            ; CTRL.S:1251
+  ??? clc             ; CTRL.S:1252
+  ??? adc #10            ; CTRL.S:1253
+  *CharX@0x0041 = a            ; CTRL.S:1254
+  a = #0xff                  ; CTRL.S:1255
+  *CharFace@0x0043 = a            ; CTRL.S:1256
+  a = #0x46                  ; CTRL.S:1258
+  tail_call jumpseq                ; CTRL.S:1259
+}
+
+fn crouching {
+  ??? lda clrbtn            ; CTRL.S:1272
+  ??? bpl :noclick            ; CTRL.S:1273
+  ??? jsr TryPickup            ; CTRL.S:1275
+  ??? bne ]rts            ; CTRL.S:1276
+:noclick:
+  ??? lda JSTKY            ; CTRL.S:1281
+  ??? cmp #1            ; CTRL.S:1282
+  ??? beq :1            ; CTRL.S:1283
+  a = #0x31                  ; CTRL.S:1284
+  tail_call jumpseq                ; CTRL.S:1285
+}
+
+fn starting {
+  ??? lda JSTKY            ; CTRL.S:1302
+  ??? bmi :jump            ; CTRL.S:1303
+]rts:
+  return                           ; CTRL.S:1304
+}
+
+fn stjumpup {
+  ??? lda JSTKX            ; CTRL.S:1316
+  ??? bmi :fwd            ; CTRL.S:1317
+  ??? lda clrF            ; CTRL.S:1318
+  ??? bmi :fwd            ; CTRL.S:1319
+]rts:
+  return                           ; CTRL.S:1320
+}
+
+fn turning {
+  ??? lda btn            ; CTRL.S:1329
+  ??? bmi ]rts            ; CTRL.S:1330
+  ??? lda JSTKX            ; CTRL.S:1332
+  ??? bpl ]rts            ; CTRL.S:1333
+  ??? lda JSTKY            ; CTRL.S:1335
+  ??? bmi ]rts            ; CTRL.S:1336
+  a = #0x2b                  ; CTRL.S:1340
+  tail_call jumpseq                ; CTRL.S:1341
+}
+
+fn arunning {
+  ??? lda JSTKX            ; CTRL.S:1349
+  ??? beq :runstop            ; CTRL.S:1350
+  ??? bpl :runturn            ; CTRL.S:1351
+  ??? lda JSTKY            ; CTRL.S:1356
+  ??? bmi :runjump            ; CTRL.S:1357
+  ??? lda clrD            ; CTRL.S:1359
+  ??? bmi :diveroll            ; CTRL.S:1360
+]rts:
+  return                           ; CTRL.S:1362
+}
+
+fn hanging {
+  ??? lda stunned            ; CTRL.S:1409
+  ??? bne :9            ; CTRL.S:1410
+  ??? lda JSTKY            ; CTRL.S:1412
+  ??? bmi :climbup            ; CTRL.S:1413
+:9:
+  ??? lda btn            ; CTRL.S:1415
+  ??? bpl :drop            ; CTRL.S:1416
+  ??? lda CharAction            ; CTRL.S:1422
+  ??? cmp #6            ; CTRL.S:1423
+  ??? beq :cont            ; CTRL.S:1424
+  ??? jsr getunderft            ; CTRL.S:1426
+  ??? cmp #block            ; CTRL.S:1427
+  ??? beq :hangstrt            ; CTRL.S:1428
+  ??? ldx CharFace            ; CTRL.S:1430
+  ??? cpx #-1            ; CTRL.S:1431
+  ??? bne :cont            ; CTRL.S:1432
+  ??? cmp #panelwif            ; CTRL.S:1434
+  ??? beq :hangstrt            ; CTRL.S:1435
+  ??? cmp #panelwof            ; CTRL.S:1436
+  ??? beq :hangstrt            ; CTRL.S:1437
+:cont:
+  ??? jsr getabove            ; CTRL.S:1442
+  ??? jsr cmpspace            ; CTRL.S:1444
+  ??? beq :drop            ; CTRL.S:1445
+:rts:
+]rts:
+  return                           ; CTRL.S:1450
+}
+
+fn DoStartrun {
+  ??? jsr getfwddist            ; CTRL.S:1542
+  ??? cpx #1            ; CTRL.S:1543
+  ??? bne :startrun            ; CTRL.S:1544
+  ??? cpy #slicer            ; CTRL.S:1546
+  ??? beq :startrun            ; CTRL.S:1547
+:solidbarr:
+  ??? jsr getfwddist            ; CTRL.S:1550
+  ??? cmp #8            ; CTRL.S:1551
+  ??? bcs :startrun            ; CTRL.S:1552
+  ??? lda clrF            ; CTRL.S:1554
+  ??? bpl ]rts            ; CTRL.S:1555
+  tail_call DoStepfwd                ; CTRL.S:1557
+}
+
+fn DoTurn {
+  ??? jsr ]clr            ; CTRL.S:1563
+  *clrB@0x00d5 = a            ; CTRL.S:1564
+  ??? lda gotsword            ; CTRL.S:1566
+  ??? beq :1            ; CTRL.S:1567
+  ??? lda EnemyAlert            ; CTRL.S:1568
+  ??? cmp #2            ; CTRL.S:1569
+  ??? bcc :1            ; CTRL.S:1570
+  ??? jsr getopdist            ; CTRL.S:1571
+  ??? bpl :1            ; CTRL.S:1572
+  ??? jsr getdist            ; CTRL.S:1573
+  ??? cmp #2            ; CTRL.S:1574
+  ??? bcc :1            ; CTRL.S:1575
+  a = #0x02                  ; CTRL.S:1577
+  *CharSword@0x004e = a            ; CTRL.S:1578
+  a = #0x00                  ; CTRL.S:1579
+  *offguard@0x008a = a            ; CTRL.S:1580
+  a = #0x59                  ; CTRL.S:1581
+  ??? bne :2            ; CTRL.S:1582
+:1:
+  a = #0x05                  ; CTRL.S:1583
+:2:
+  tail_call jumpseq                ; CTRL.S:1584
+}
+
+fn DoStandjump {
+  a = #0x01                  ; CTRL.S:1586
+  *clrU@0x00d6 = a            ; CTRL.S:1587
+  *clrF@0x00d4 = a            ; CTRL.S:1588
+  a = #0x03                  ; CTRL.S:1590
+  tail_call jumpseq                ; CTRL.S:1591
+}
+
+fn DoSdiveroll {
+  a = #0x01                  ; CTRL.S:1593
+  *clrD@0x00d7 = a            ; CTRL.S:1594
+  a = #0x1b                  ; CTRL.S:1596
+  tail_call jumpseq                ; CTRL.S:1597
+}
+
+fn DoCrouch {
+  a = #0x32                  ; CTRL.S:1600
+  ??? jsr jumpseq            ; CTRL.S:1601
+  ??? jsr ]clr            ; CTRL.S:1603
+  *clrD@0x00d7 = a            ; CTRL.S:1604
+  return                           ; CTRL.S:1605
+}
+
+fn DoEngarde {
+  ??? jsr ]clr            ; CTRL.S:1608
+  *clrF@0x00d4 = a            ; CTRL.S:1609
+  *clrbtn@0x00d8 = a            ; CTRL.S:1610
+  a = #0x02                  ; CTRL.S:1612
+  *CharSword@0x004e = a            ; CTRL.S:1613
+  ??? lda CharID            ; CTRL.S:1615
+  ??? beq :1            ; CTRL.S:1616
+  ??? cmp #1            ; CTRL.S:1617
+  ??? beq :3            ; CTRL.S:1618
+  a = #0x5a                  ; CTRL.S:1619
+  ??? bne :2            ; CTRL.S:1620
+:1:
+  a = #0x00                  ; CTRL.S:1621
+  *offguard@0x008a = a            ; CTRL.S:1622
+:3:
+  a = #0x37                  ; CTRL.S:1623
+:2:
+  tail_call jumpseq                ; CTRL.S:1624
+}
+
+fn DoJumpup {
+  ??? jsr ]clr            ; CTRL.S:1634
+  *clrU@0x00d6 = a            ; CTRL.S:1635
+  ??? jsr getabove            ; CTRL.S:1637
+  *blockid@0x008b = a            ; CTRL.S:1638
+  ??? jsr getaboveinf            ; CTRL.S:1640
+  ??? jsr checkledge            ; CTRL.S:1642
+  ??? bne DoJumphang            ; CTRL.S:1644
+  ??? jsr getabovebeh            ; CTRL.S:1646
+  *blockid@0x008b = a            ; CTRL.S:1647
+  ??? jsr getabove            ; CTRL.S:1649
+  ??? jsr checkledge            ; CTRL.S:1651
+  ??? bne :jumpback            ; CTRL.S:1652
+:jumphi:
+  tail_call DoJumphigh                ; CTRL.S:1654
+}
+
+fn DoJumpedge {
+  ??? jsr getabove            ; CTRL.S:1684
+  ??? jsr getdist            ; CTRL.S:1688
+  ??? sec             ; CTRL.S:1689
+  ??? sbc #10            ; CTRL.S:1690
+  ??? jsr addcharx            ; CTRL.S:1692
+  *CharX@0x0041 = a            ; CTRL.S:1693
+  a = #0x10                  ; CTRL.S:1697
+  tail_call jumpseq                ; CTRL.S:1698
+}
+
+fn DoJumphang {
+  ??? jsr getaboveinf            ; CTRL.S:1702
+  ??? jsr getdist            ; CTRL.S:1708
+  *atemp@0x00f4 = a            ; CTRL.S:1709
+  ??? cmp #4            ; CTRL.S:1711
+  ??? bcc :Med            ; CTRL.S:1712
+:Long:
+  ??? lda atemp            ; CTRL.S:1714
+  ??? sec             ; CTRL.S:1715
+  ??? sbc #4            ; CTRL.S:1716
+  ??? jsr addcharx            ; CTRL.S:1717
+  *CharX@0x0041 = a            ; CTRL.S:1718
+  a = #0x18                  ; CTRL.S:1720
+  tail_call jumpseq                ; CTRL.S:1721
+}
+
+fn DoRunjump {
+  ??? lda CharPosn            ; CTRL.S:1753
+  ??? cmp #7            ; CTRL.S:1754
+  ??? bcc ]rts            ; CTRL.S:1755
+  a = #0x00                  ; CTRL.S:1760
+  *bufindex@0x00c1 = a            ; CTRL.S:1761
+  a = #0x04                  ; CTRL.S:1763
+  ??? jsr addcharx            ; CTRL.S:1764
+  *ztemp@0x00e9 = a            ; CTRL.S:1765
+  ??? jsr getblockxp            ; CTRL.S:1767
+  *blockx@0x008c = a            ; CTRL.S:1768
+:loop:
+  ??? lda blockx            ; CTRL.S:1770
+  ??? ldx CharFace            ; CTRL.S:1771
+  ??? inx             ; CTRL.S:1772
+  ??? clc             ; CTRL.S:1773
+  ??? adc plus1,x            ; CTRL.S:1774
+  *blockx@0x008c = a            ; CTRL.S:1775
+  ??? tax             ; CTRL.S:1777
+  ??? ldy CharBlockY            ; CTRL.S:1778
+  ??? lda CharScrn            ; CTRL.S:1779
+  ??? jsr rdblock            ; CTRL.S:1780
+  ??? cmp #spikes            ; CTRL.S:1782
+  ??? beq :done            ; CTRL.S:1783
+  ??? jsr cmpspace            ; CTRL.S:1785
+  ??? beq :done            ; CTRL.S:1786
+  ??? inc bufindex            ; CTRL.S:1788
+  ??? lda bufindex            ; CTRL.S:1790
+  ??? cmp #RJLookahead+1            ; CTRL.S:1791
+  ??? bcc :loop            ; CTRL.S:1792
+  ??? bcs :noedge            ; CTRL.S:1793
+:done:
+  ??? lda ztemp            ; CTRL.S:1798
+  ??? jsr getdist1            ; CTRL.S:1799
+  ??? ldx bufindex            ; CTRL.S:1801
+  ??? clc             ; CTRL.S:1802
+  ??? adc Mult7,x            ; CTRL.S:1803
+  ??? clc             ; CTRL.S:1804
+  ??? adc Mult7,x            ; CTRL.S:1805
+  ??? sec             ; CTRL.S:1807
+  ??? sbc #RJLeadDist            ; CTRL.S:1808
+  ??? cmp #-RJMaxFujBak            ; CTRL.S:1811
+  ??? bcs :ok            ; CTRL.S:1812
+  ??? cmp #RJMaxFujFwd            ; CTRL.S:1814
+  ??? bcc :ok            ; CTRL.S:1815
+  ??? cmp #$80            ; CTRL.S:1817
+  ??? bcc ]rts            ; CTRL.S:1818
+  a = #0xfd                  ; CTRL.S:1820
+:ok:
+  ??? clc             ; CTRL.S:1822
+  ??? adc #RJChange            ; CTRL.S:1823
+  ??? jsr addcharx            ; CTRL.S:1825
+  *CharX@0x0041 = a            ; CTRL.S:1826
+:noedge:
+  ??? jsr ]clr            ; CTRL.S:1831
+  *clrU@0x00d6 = a            ; CTRL.S:1832
+  a = #0x04                  ; CTRL.S:1834
+  tail_call jumpseq                ; CTRL.S:1835
+}
+
+fn DoStepfwd {
+  a = #0x01                  ; CTRL.S:1846
+  *clrF@0x00d4 = a            ; CTRL.S:1847
+  *clrbtn@0x00d8 = a            ; CTRL.S:1848
+  ??? jsr getfwddist            ; CTRL.S:1850
+  ??? cmp #0            ; CTRL.S:1852
+  ??? beq :1            ; CTRL.S:1853
+:2:
+  *CharRepeat@0x004c = a            ; CTRL.S:1855
+  ??? clc             ; CTRL.S:1857
+  ??? adc #stepfwd1-1            ; CTRL.S:1858
+  tail_call jumpseq                ; CTRL.S:1859
+}
+
+fn DoJumphigh {
+  ??? jsr ]clr            ; CTRL.S:1881
+  *clrU@0x00d6 = a            ; CTRL.S:1882
+  ??? jsr getfwddist            ; CTRL.S:1884
+  ??? cmp #4            ; CTRL.S:1885
+  ??? bcs :ok            ; CTRL.S:1886
+  ??? cpx #1            ; CTRL.S:1887
+  ??? bne :ok            ; CTRL.S:1888
+  ??? sec             ; CTRL.S:1890
+  ??? sbc #3            ; CTRL.S:1891
+  ??? jsr addcharx            ; CTRL.S:1892
+  *CharX@0x0041 = a            ; CTRL.S:1893
+:ok:
+  a = #0x00                  ; CTRL.S:1895
+  ??? jsr facedx            ; CTRL.S:1896
+  *ztemp@0x00e9 = a            ; CTRL.S:1897
+  ??? jsr getbasex            ; CTRL.S:1899
+  ??? clc             ; CTRL.S:1900
+  ??? adc #jumpupangle            ; CTRL.S:1901
+  ??? clc             ; CTRL.S:1902
+  ??? adc ztemp            ; CTRL.S:1903
+  ??? jsr getblockx            ; CTRL.S:1905
+  ??? tax             ; CTRL.S:1906
+  ??? ldy CharBlockY            ; CTRL.S:1908
+  ??? dey             ; CTRL.S:1909
+  ??? lda CharScrn            ; CTRL.S:1911
+  ??? jsr rdblock            ; CTRL.S:1912
+  ??? cmp #block            ; CTRL.S:1914
+  ??? beq :jumpup            ; CTRL.S:1915
+  ??? jsr cmpspace            ; CTRL.S:1916
+  ??? bne :jumpup            ; CTRL.S:1917
+  a = #0x1c                  ; CTRL.S:1919
+  tail_call jumpseq                ; CTRL.S:1920
+}
+
+fn REREADBLOCKS {
+  ??? jsr GetFrameInfo            ; CTRL.S:1930
+  tail_call GetBaseBlock                ; CTRL.S:1931
+}
+
+fn CHECKPRESS {
+  ??? lda CharPosn            ; CTRL.S:1940
+  ??? cmp #87            ; CTRL.S:1941
+  ??? bcc :1            ; CTRL.S:1942
+  ??? cmp #100            ; CTRL.S:1943
+  ??? bcc :hanging            ; CTRL.S:1944
+  ??? cmp #135            ; CTRL.S:1945
+  ??? bcc :1            ; CTRL.S:1946
+  ??? cmp #141            ; CTRL.S:1947
+  ??? bcc :hanging            ; CTRL.S:1948
+:1:
+  ??? lda CharAction            ; CTRL.S:1950
+  ??? cmp #7            ; CTRL.S:1951
+  ??? beq :ground            ; CTRL.S:1952
+  ??? cmp #5            ; CTRL.S:1953
+  ??? beq :ground            ; CTRL.S:1954
+  ??? cmp #2            ; CTRL.S:1955
+  ??? bcs ]rts            ; CTRL.S:1956
+:ground:
+  ??? lda CharPosn            ; CTRL.S:1961
+  ??? cmp #79            ; CTRL.S:1962
+  ??? beq :touchceil            ; CTRL.S:1963
+  ??? lda Fcheck            ; CTRL.S:1965
+  ??? and #fcheckmark            ; CTRL.S:1966
+  ??? beq ]rts            ; CTRL.S:1967
+  ??? jsr getunderft            ; CTRL.S:1971
+:checkit:
+  ??? cmp #upressplate            ; CTRL.S:1973
+  ??? beq :PP            ; CTRL.S:1974
+  ??? cmp #pressplate            ; CTRL.S:1975
+  ??? bne :notPP            ; CTRL.S:1976
+:PP:
+  ??? lda CharLife            ; CTRL.S:1978
+  ??? bmi :push            ; CTRL.S:1979
+  tail_call jampp                ; CTRL.S:1980
+}
+
+fn CHECKIMPALE {
+  ??? ldx CharBlockX            ; CTRL.S:2017
+  ??? ldy CharBlockY            ; CTRL.S:2018
+  ??? lda CharScrn            ; CTRL.S:2019
+  ??? jsr rdblock            ; CTRL.S:2020
+  ??? cmp #spikes            ; CTRL.S:2021
+  ??? bne ]rts            ; CTRL.S:2022
+  ??? ldx CharPosn            ; CTRL.S:2024
+  ??? cpx #7            ; CTRL.S:2026
+  ??? bcc ]rts            ; CTRL.S:2027
+  ??? cpx #15            ; CTRL.S:2029
+  ??? bcs :2            ; CTRL.S:2030
+  goto :running                ; CTRL.S:2031
+}
+
+fn DOIMPALE {
+  ??? jsr jamspikes            ; CTRL.S:2059
+  ??? ldx CharBlockY            ; CTRL.S:2061
+  ??? inx             ; CTRL.S:2062
+  ??? lda FloorY,x            ; CTRL.S:2063
+  *CharY@0x0042 = a            ; CTRL.S:2064
+  ??? lda tempblockx            ; CTRL.S:2066
+  ??? jsr getblockej            ; CTRL.S:2067
+  ??? clc             ; CTRL.S:2068
+  ??? adc #10            ; CTRL.S:2069
+  *CharX@0x0041 = a            ; CTRL.S:2070
+  a = #0x08                  ; CTRL.S:2071
+  ??? jsr addcharx            ; CTRL.S:2072
+  *CharX@0x0041 = a            ; CTRL.S:2073
+  a = #0x00                  ; CTRL.S:2075
+  *CharYVel@0x0048 = a            ; CTRL.S:2076
+  a = #0x0e                  ; CTRL.S:2078
+  ??? jsr addsound            ; CTRL.S:2079
+  a = #0x64                  ; CTRL.S:2081
+  ??? jsr decstr            ; CTRL.S:2082
+  a = #0x33                  ; CTRL.S:2084
+  ??? jsr jumpseq            ; CTRL.S:2085
+  tail_call animchar                ; CTRL.S:2086
+}
+
+fn TryPickup {
+  ??? jsr getunderft            ; CTRL.S:2095
+  ??? cmp #flask            ; CTRL.S:2096
+  ??? beq :2            ; CTRL.S:2097
+  ??? cmp #sword            ; CTRL.S:2098
+  ??? bne :1            ; CTRL.S:2099
+:2:
+  ??? jsr getbehind            ; CTRL.S:2100
+  ??? jsr cmpspace            ; CTRL.S:2101
+  ??? beq :no            ; CTRL.S:2102
+  ??? lda CharX            ; CTRL.S:2103
+  a = #0xf2                  ; CTRL.S:2104
+  ??? jsr addcharx            ; CTRL.S:2105
+  *CharX@0x0041 = a            ; CTRL.S:2106
+  ??? jsr rereadblocks            ; CTRL.S:2107
+:1:
+  ??? jsr getinfront            ; CTRL.S:2108
+  ??? cmp #flask            ; CTRL.S:2109
+  ??? beq :pickup            ; CTRL.S:2110
+  ??? cmp #sword            ; CTRL.S:2111
+  ??? beq :pickup            ; CTRL.S:2112
+:no:
+  a = #0x00                  ; CTRL.S:2113
+  return                           ; CTRL.S:2114
+}
+
+fn PickItUp {
+  ??? ldx CharPosn            ; CTRL.S:2128
+  ??? cpx #109            ; CTRL.S:2129
+  ??? beq :ok            ; CTRL.S:2130
+  ??? jsr getfwddist            ; CTRL.S:2131
+  ??? cpx #2            ; CTRL.S:2132
+  ??? beq :0            ; CTRL.S:2133
+  ??? jsr addcharx            ; CTRL.S:2134
+  *CharX@0x0041 = a            ; CTRL.S:2135
+:0:
+  ??? lda CharFace            ; CTRL.S:2136
+  ??? bmi :1            ; CTRL.S:2137
+  a = #0xfe                  ; CTRL.S:2138
+  ??? jsr addcharx            ; CTRL.S:2139
+  *CharX@0x0041 = a            ; CTRL.S:2140
+:1:
+  tail_call DoCrouch                ; CTRL.S:2141
+}

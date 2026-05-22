@@ -1,0 +1,1127 @@
+; module SUBS from 01 POP Source/Source/SUBS.S
+
+fn CRUMBLE {
+  ??? lda level            ; SUBS.S:109
+  ??? cmp #13            ; SUBS.S:110
+  ??? bne ]rts            ; SUBS.S:111
+  ??? lda VisScrn            ; SUBS.S:112
+  ??? cmp #23            ; SUBS.S:113
+  ??? beq :1            ; SUBS.S:114
+  ??? cmp #16            ; SUBS.S:115
+  ??? bne ]rts            ; SUBS.S:116
+:1:
+  ??? lda scrnAbove            ; SUBS.S:118
+  *tempscrn@0x0093 = a            ; SUBS.S:119
+  a = #0x02                  ; SUBS.S:120
+  *tempblocky@0x0092 = a            ; SUBS.S:121
+  x = #0x07                  ; SUBS.S:122
+:loop:
+  *tempblockx@0x0091 = x            ; SUBS.S:123
+  ??? jsr :trigloose            ; SUBS.S:124
+  ??? ldx tempblockx            ; SUBS.S:125
+  ??? dex             ; SUBS.S:126
+  ??? cpx #2            ; SUBS.S:127
+  ??? bcs :loop            ; SUBS.S:128
+]rts:
+  return                           ; SUBS.S:129
+}
+
+fn ADDTORCHES {
+  ??? lda VisScrn            ; SUBS.S:147
+  ??? jsr calcblue            ; SUBS.S:148
+  y = #0x1d                  ; SUBS.S:150
+:loop:
+  ??? lda (BlueType),y            ; SUBS.S:151
+  ??? and #idmask            ; SUBS.S:152
+  ??? cmp #torch            ; SUBS.S:153
+  ??? bne :c1            ; SUBS.S:154
+  ??? tya             ; SUBS.S:155
+  ??? pha             ; SUBS.S:156
+  ??? lda VisScrn            ; SUBS.S:157
+  ??? jsr trigtorch            ; SUBS.S:158
+  ??? pla             ; SUBS.S:159
+  ??? tay             ; SUBS.S:160
+  ??? bpl :cont            ; SUBS.S:161
+:c1:
+  ??? cmp #flask            ; SUBS.S:163
+  ??? bne :c2            ; SUBS.S:164
+  ??? tya             ; SUBS.S:165
+  ??? pha             ; SUBS.S:166
+  ??? lda VisScrn            ; SUBS.S:167
+  ??? jsr trigflask            ; SUBS.S:168
+  ??? pla             ; SUBS.S:169
+  ??? tay             ; SUBS.S:170
+  ??? bpl :cont            ; SUBS.S:171
+:c2:
+  ??? cmp #sword            ; SUBS.S:173
+  ??? bne :cont            ; SUBS.S:174
+  ??? tya             ; SUBS.S:175
+  ??? pha             ; SUBS.S:176
+  ??? lda VisScrn            ; SUBS.S:177
+  ??? jsr trigsword            ; SUBS.S:178
+  ??? pla             ; SUBS.S:179
+  ??? tay             ; SUBS.S:180
+:cont:
+  ??? dey             ; SUBS.S:181
+  ??? bpl :loop            ; SUBS.S:182
+]rts:
+  return                           ; SUBS.S:184
+}
+
+fn PAUSE  (aka :outer) {
+  ??? pha             ; SUBS.S:192
+  x = #0x00                  ; SUBS.S:193
+:loop:
+  ??? dex             ; SUBS.S:194
+  ??? bne :loop            ; SUBS.S:195
+  ??? pla             ; SUBS.S:196
+  ??? sec             ; SUBS.S:197
+  ??? sbc #1            ; SUBS.S:198
+  ??? bne :outer            ; SUBS.S:199
+]rts:
+  return                           ; SUBS.S:200
+}
+
+fn DOFLASHON {
+  ??? jsr lrclse            ; SUBS.S:211
+  ??? jsr vblank            ; SUBS.S:213
+  ??? lda $c054            ; SUBS.S:215
+  ??? lda $c056            ; SUBS.S:216
+  return                           ; SUBS.S:217
+}
+
+fn DOFLASHOFF {
+  ??? jsr vblank            ; SUBS.S:221
+  ??? lda PAGE            ; SUBS.S:223
+  ??? bne :1            ; SUBS.S:224
+  ??? lda $c055            ; SUBS.S:226
+:1:
+  ??? lda $c057            ; SUBS.S:227
+  return                           ; SUBS.S:229
+}
+
+fn LRCLSE {
+  ??? cmp scrncolor            ; SUBS.S:239
+  ??? beq ]rts            ; SUBS.S:240
+  tail_call lrcls                ; SUBS.S:242
+}
+
+fn ADDSLICERS {
+  a = #0x0f                  ; SUBS.S:251
+  *tempstate@0x00f2 = a            ; SUBS.S:252
+  ??? lda CharScrn            ; SUBS.S:254
+  ??? jsr calcblue            ; SUBS.S:255
+  ??? ldy CharBlockY            ; SUBS.S:257
+  ??? cpy #3            ; SUBS.S:258
+  ??? bcs ]rts            ; SUBS.S:259
+  ??? lda Mult10,y            ; SUBS.S:261
+  ??? tay             ; SUBS.S:262
+  ??? clc             ; SUBS.S:263
+  ??? adc #10            ; SUBS.S:264
+  ??? sta :sm+1            ; SUBS.S:265
+:loop:
+  ??? lda (BlueType),y            ; SUBS.S:267
+  ??? and #idmask            ; SUBS.S:268
+  ??? cmp #slicer            ; SUBS.S:269
+  ??? bne :cont            ; SUBS.S:270
+  ??? lda (BlueSpec),y            ; SUBS.S:272
+  ??? tax             ; SUBS.S:273
+  ??? and #$7f            ; SUBS.S:274
+  ??? beq :ok            ; SUBS.S:275
+  ??? cmp #slicerRet            ; SUBS.S:276
+  ??? bcc :cont            ; SUBS.S:277
+:ok:
+  ??? txa             ; SUBS.S:278
+  ??? and #$80            ; SUBS.S:279
+  ??? ora tempstate            ; SUBS.S:280
+  ??? jsr trigslicer            ; SUBS.S:281
+  ??? jsr getnextstate            ; SUBS.S:282
+:cont:
+  ??? iny             ; SUBS.S:284
+:sm:
+  ??? cpy #0            ; SUBS.S:285
+  ??? bcc :loop            ; SUBS.S:286
+]rts:
+  return                           ; SUBS.S:288
+}
+
+fn getnextstate {
+  ??? lda tempstate            ; SUBS.S:291
+  ??? sec             ; SUBS.S:292
+  ??? sbc #slicersync            ; SUBS.S:293
+  ??? cmp #slicerRet            ; SUBS.S:294
+  ??? bcs :ok            ; SUBS.S:295
+  ??? clc             ; SUBS.S:296
+  ??? adc #slicetimer+1-slicerRet            ; SUBS.S:297
+:ok:
+  *tempstate@0x00f2 = a            ; SUBS.S:298
+]rts:
+  return                           ; SUBS.S:299
+}
+
+fn pburn {
+  ??? ldx ptorchcount            ; SUBS.S:320
+  ??? inx             ; SUBS.S:321
+  ??? lda ptorchx,x            ; SUBS.S:322
+  ??? bpl :ok            ; SUBS.S:323
+  x = #0x00                  ; SUBS.S:324
+:ok:
+  ??? stx ptorchcount            ; SUBS.S:325
+  ??? lda ptorchx,x            ; SUBS.S:326
+  *XCO@0x0001 = a            ; SUBS.S:327
+  ??? lda ptorchoff,x            ; SUBS.S:328
+  *OFFSET@0x0003 = a            ; SUBS.S:329
+  ??? lda ptorchy,x            ; SUBS.S:330
+  *YCO@0x0002 = a            ; SUBS.S:331
+  ??? lda ptorchstate,x            ; SUBS.S:332
+  ??? jsr getflameframe            ; SUBS.S:333
+  ??? sta ptorchstate,x            ; SUBS.S:334
+  ??? tax             ; SUBS.S:335
+  ??? jsr psetupflame            ; SUBS.S:336
+  tail_call lay                ; SUBS.S:337
+}
+
+fn pflow {
+  ??? ldx psandcount            ; SUBS.S:345
+  ??? bmi ]rts            ; SUBS.S:346
+  ??? inx             ; SUBS.S:347
+  ??? cpx #3            ; SUBS.S:348
+  ??? bcc :ok            ; SUBS.S:349
+  x = #0x00                  ; SUBS.S:350
+:ok:
+  ??? stx psandcount            ; SUBS.S:351
+  ??? ldy GlassState            ; SUBS.S:352
+  tail_call flow                ; SUBS.S:353
+}
+
+fn pstars {
+  x = #0x03                  ; SUBS.S:361
+:loop:
+  ??? lda pstarcount,x            ; SUBS.S:362
+  ??? beq :ok            ; SUBS.S:363
+  ??? dec pstarcount,x            ; SUBS.S:364
+  ??? bne :ok            ; SUBS.S:365
+  ??? txa             ; SUBS.S:366
+  ??? pha             ; SUBS.S:367
+  ??? jsr twinkle            ; SUBS.S:368
+  ??? pla             ; SUBS.S:369
+  ??? tax             ; SUBS.S:370
+:ok:
+  ??? dex             ; SUBS.S:371
+  ??? bpl :loop            ; SUBS.S:372
+  ??? jsr rnd            ; SUBS.S:376
+  ??? cmp #10            ; SUBS.S:377
+  ??? bcs ]rts            ; SUBS.S:378
+  ??? jsr rnd            ; SUBS.S:379
+  ??? and #3            ; SUBS.S:380
+  ??? clc             ; SUBS.S:381
+  ??? adc #5            ; SUBS.S:382
+  ??? pha             ; SUBS.S:383
+  ??? jsr rnd            ; SUBS.S:384
+  ??? jsr rnd            ; SUBS.S:385
+  ??? and #3            ; SUBS.S:386
+  ??? tax             ; SUBS.S:387
+  ??? pla             ; SUBS.S:388
+  ??? sta pstarcount,x            ; SUBS.S:389
+  tail_call twinkle                ; SUBS.S:390
+}
+
+fn PAGEFLIP {
+  ??? jsr normspeed            ; SUBS.S:398
+  ??? lda PAGE            ; SUBS.S:399
+  ??? bne :1            ; SUBS.S:400
+  a = #0x20                  ; SUBS.S:402
+  *PAGE@0x0000 = a            ; SUBS.S:403
+  ??? lda $C054            ; SUBS.S:404
+:3:
+  ??? lda $C057            ; SUBS.S:406
+  ??? lda $C050            ; SUBS.S:407
+  ??? lda vibes            ; SUBS.S:408
+  ??? beq :rts            ; SUBS.S:409
+  ??? lda $c05e            ; SUBS.S:410
+]rts:
+  return                           ; SUBS.S:411
+}
+
+fn PLAYCUT {
+  ??? pha             ; SUBS.S:435
+  ??? jsr initit            ; SUBS.S:436
+  ??? pla             ; SUBS.S:437
+  ??? tax             ; SUBS.S:438
+  tail_call PlayCut4                ; SUBS.S:441
+}
+
+fn PlayCut8 {
+  ??? jsr getglass            ; SUBS.S:465
+  ??? jsr addglass            ; SUBS.S:466
+  ??? jsr startP8            ; SUBS.S:468
+  ??? jsr SaveShad            ; SUBS.S:469
+  ??? jsr startM8            ; SUBS.S:470
+  ??? jsr SaveKid            ; SUBS.S:471
+  a = #0x14                  ; SUBS.S:473
+  ??? jsr play            ; SUBS.S:474
+  a = #0x6b                  ; SUBS.S:476
+  ??? jsr mjumpseq            ; SUBS.S:477
+  a = #0x14                  ; SUBS.S:478
+  ??? jsr play            ; SUBS.S:479
+  a = #0x6f                  ; SUBS.S:481
+  ??? jsr pjumpseq            ; SUBS.S:482
+  a = #0x14                  ; SUBS.S:484
+  ??? jsr play            ; SUBS.S:485
+  a = #0x00                  ; SUBS.S:487
+  *KidPosn@0x0050 = a            ; SUBS.S:488
+  x = #0x32                  ; SUBS.S:489
+  a = #0x10                  ; SUBS.S:490
+  tail_call PlaySongX                ; SUBS.S:491
+}
+
+fn PlayCut4 {
+  ??? jsr getglass            ; SUBS.S:497
+  ??? jsr addglass            ; SUBS.S:498
+  ??? jsr startP4            ; SUBS.S:500
+  ??? jsr SaveShad            ; SUBS.S:501
+  ??? jsr startM4            ; SUBS.S:502
+  ??? jsr SaveKid            ; SUBS.S:503
+  a = #0x05                  ; SUBS.S:504
+  ??? jsr play            ; SUBS.S:505
+  a = #0x70                  ; SUBS.S:507
+  ??? jsr pjumpseq            ; SUBS.S:508
+  a = #0x09                  ; SUBS.S:509
+  ??? jsr play            ; SUBS.S:510
+  a = #0x72                  ; SUBS.S:512
+  ??? jsr mjumpseq            ; SUBS.S:513
+  a = #0x3a                  ; SUBS.S:515
+  tail_call play                ; SUBS.S:516
+}
+
+fn PlayCut7 {
+  a = #0x08                  ; SUBS.S:522
+  *SPEED@0x030c = a            ; SUBS.S:523
+  a = #0x01                  ; SUBS.S:525
+  *soundon@0x0203 = a            ; SUBS.S:526
+  *musicon@0x031a = a            ; SUBS.S:527
+  ??? jsr startP7            ; SUBS.S:529
+  ??? jsr SaveShad            ; SUBS.S:530
+  a = #0x08                  ; SUBS.S:531
+  ??? jsr play            ; SUBS.S:532
+  ??? jsr startK7            ; SUBS.S:534
+  ??? jsr SaveKid            ; SUBS.S:535
+  a = #0x08                  ; SUBS.S:536
+  ??? jsr play            ; SUBS.S:537
+  a = #0x6c                  ; SUBS.S:539
+  ??? jsr pjumpseq            ; SUBS.S:540
+  a = #0x05                  ; SUBS.S:541
+  ??? jsr play            ; SUBS.S:542
+  a = #0x0d                  ; SUBS.S:544
+  ??? jsr vjumpseq            ; SUBS.S:545
+  a = #0x02                  ; SUBS.S:546
+  ??? jsr play            ; SUBS.S:547
+  a = #0x00                  ; SUBS.S:549
+  *KidPosn@0x0050 = a            ; SUBS.S:550
+  a = #0x09                  ; SUBS.S:552
+  ??? jsr play            ; SUBS.S:553
+  a = #0x0f                  ; SUBS.S:555
+  ??? jsr PlaySong            ; SUBS.S:556
+  ??? jsr startM7            ; SUBS.S:558
+  ??? jsr SaveKid            ; SUBS.S:559
+  a = #0x0c                  ; SUBS.S:561
+  ??? jsr play            ; SUBS.S:562
+  a = #0x65                  ; SUBS.S:564
+  ??? jsr mjumpseq            ; SUBS.S:565
+  a = #0x1e                  ; SUBS.S:567
+  tail_call play                ; SUBS.S:568
+}
+
+fn PlayCut6 {
+  a = #0x16                  ; SUBS.S:576
+  *SPEED@0x030c = a            ; SUBS.S:577
+  x = #0x08                  ; SUBS.S:578
+  ??? jsr addglass            ; SUBS.S:579
+  a = #0x02                  ; SUBS.S:580
+  ??? jsr play            ; SUBS.S:581
+  a = #0x0e                  ; SUBS.S:582
+  ??? jsr PlaySong            ; SUBS.S:583
+  a = #0x64                  ; SUBS.S:584
+  tail_call play                ; SUBS.S:585
+}
+
+fn PlayCut5 {
+  ??? jsr getglass            ; SUBS.S:591
+  ??? cpx #7            ; SUBS.S:592
+  ??? bcs Ominous            ; SUBS.S:593
+  tail_call PlayCut1                ; SUBS.S:594
+}
+
+fn Ominous {
+  ??? jsr getglass            ; SUBS.S:597
+  ??? jsr addglass            ; SUBS.S:598
+  ??? jsr startP5            ; SUBS.S:600
+  ??? jsr SaveShad            ; SUBS.S:601
+  a = #0x02                  ; SUBS.S:603
+  ??? jsr play            ; SUBS.S:604
+  x = #0x32                  ; SUBS.S:606
+  a = #0x10                  ; SUBS.S:607
+  ??? jsr PlaySongX            ; SUBS.S:608
+  a = #0x62                  ; SUBS.S:610
+  ??? jsr pjumpseq            ; SUBS.S:611
+  a = #0x0c                  ; SUBS.S:612
+  ??? jsr play            ; SUBS.S:613
+  x = #0x14                  ; SUBS.S:615
+  a = #0x03                  ; SUBS.S:616
+  tail_call PlaySongX                ; SUBS.S:617
+}
+
+fn PlayCut2 {
+  ??? jsr getglass            ; SUBS.S:623
+  ??? jsr addglass            ; SUBS.S:624
+  ??? jsr startP2            ; SUBS.S:626
+  ??? jsr SaveShad            ; SUBS.S:627
+  a = #0x02                  ; SUBS.S:629
+  ??? jsr play            ; SUBS.S:630
+  x = #0x32                  ; SUBS.S:632
+  a = #0x10                  ; SUBS.S:633
+  ??? jsr PlaySongX            ; SUBS.S:634
+]rts:
+  return                           ; SUBS.S:635
+}
+
+fn PlayCut1  (aka PlayCut3) {
+  ??? jsr getglass            ; SUBS.S:642
+  ??? jsr addglass            ; SUBS.S:643
+  ??? jsr startP1            ; SUBS.S:645
+  ??? jsr SaveShad            ; SUBS.S:646
+  a = #0x02                  ; SUBS.S:648
+  ??? jsr play            ; SUBS.S:649
+  x = #0x32                  ; SUBS.S:651
+  a = #0x0d                  ; SUBS.S:652
+  tail_call PlaySongX                ; SUBS.S:653
+}
+
+fn PlayCut0 {
+  ??? jsr startV0            ; SUBS.S:659
+  ??? jsr SaveKid            ; SUBS.S:660
+  ??? jsr startP0            ; SUBS.S:661
+  ??? jsr SaveShad            ; SUBS.S:662
+  a = #0x02                  ; SUBS.S:664
+  ??? jsr play            ; SUBS.S:665
+  a = #0x07                  ; SUBS.S:667
+  x = #0x08                  ; SUBS.S:668
+  ??? jsr PlaySongI            ; SUBS.S:669
+  a = #0x05                  ; SUBS.S:671
+  ??? jsr play            ; SUBS.S:672
+  a = #0x62                  ; SUBS.S:674
+  ??? jsr pjumpseq            ; SUBS.S:675
+  a = #0x09                  ; SUBS.S:676
+  ??? jsr play            ; SUBS.S:677
+  a = #0x08                  ; SUBS.S:678
+  x = #0x00                  ; SUBS.S:679
+  ??? jsr PlaySongI            ; SUBS.S:680
+  a = #0x07                  ; SUBS.S:682
+  *SPEED@0x030c = a            ; SUBS.S:683
+  a = #0x05                  ; SUBS.S:685
+  ??? jsr play            ; SUBS.S:686
+  a = #0x60                  ; SUBS.S:687
+  ??? jsr vjumpseq            ; SUBS.S:688
+  a = #0x06                  ; SUBS.S:689
+  ??? jsr play            ; SUBS.S:690
+  a = #0x61                  ; SUBS.S:691
+  ??? jsr vjumpseq            ; SUBS.S:692
+  a = #0x04                  ; SUBS.S:693
+  ??? jsr play            ; SUBS.S:694
+  a = #0x09                  ; SUBS.S:695
+  x = #0x0c                  ; SUBS.S:696
+  ??? jsr PlaySongI            ; SUBS.S:697
+  a = #0x04                  ; SUBS.S:698
+  ??? jsr play            ; SUBS.S:699
+  a = #0x60                  ; SUBS.S:701
+  ??? jsr vjumpseq            ; SUBS.S:702
+  a = #0x1e                  ; SUBS.S:703
+  ??? jsr play            ; SUBS.S:704
+  a = #0x61                  ; SUBS.S:705
+  ??? jsr vjumpseq            ; SUBS.S:706
+  a = #0x04                  ; SUBS.S:707
+  ??? jsr play            ; SUBS.S:708
+  a = #0x0a                  ; SUBS.S:709
+  x = #0x19                  ; SUBS.S:710
+  ??? jsr PlaySongI            ; SUBS.S:711
+  a = #0x66                  ; SUBS.S:713
+  ??? jsr vjumpseq            ; SUBS.S:714
+  a = #0x01                  ; SUBS.S:715
+  ??? jsr play            ; SUBS.S:716
+  a = #0x63                  ; SUBS.S:717
+  ??? jsr pjumpseq            ; SUBS.S:718
+  a = #0x0d                  ; SUBS.S:719
+  ??? jsr play            ; SUBS.S:720
+  x = #0x00                  ; SUBS.S:721
+  ??? jsr addglass1            ; SUBS.S:722
+  a = #0x05                  ; SUBS.S:723
+  *lightning@0x0088 = a            ; SUBS.S:724
+  a = #0xff                  ; SUBS.S:725
+  *lightcolor@0x0089 = a            ; SUBS.S:726
+  a = #0x0c                  ; SUBS.S:728
+  *SPEED@0x030c = a            ; SUBS.S:729
+  a = #0x05                  ; SUBS.S:730
+  ??? jsr play            ; SUBS.S:731
+  a = #0x00                  ; SUBS.S:732
+  ??? sta psandcount            ; SUBS.S:733
+  a = #0x0b                  ; SUBS.S:734
+  x = #0x08                  ; SUBS.S:735
+  ??? jsr PlaySongI            ; SUBS.S:736
+  a = #0x07                  ; SUBS.S:738
+  *SPEED@0x030c = a            ; SUBS.S:739
+  a = #0x64                  ; SUBS.S:740
+  ??? jsr vjumpseq            ; SUBS.S:741
+  a = #0x11                  ; SUBS.S:742
+  ??? jsr play            ; SUBS.S:743
+  x = #0x01                  ; SUBS.S:744
+  ??? jsr addglass1            ; SUBS.S:745
+  a = #0x0c                  ; SUBS.S:746
+  ??? jsr play            ; SUBS.S:747
+  a = #0x71                  ; SUBS.S:748
+  ??? jsr pjumpseq            ; SUBS.S:749
+  a = #0x1c                  ; SUBS.S:750
+  ??? jsr play            ; SUBS.S:751
+  a = #0x0c                  ; SUBS.S:753
+  *SPEED@0x030c = a            ; SUBS.S:754
+  a = #0x0c                  ; SUBS.S:755
+  x = #0x14                  ; SUBS.S:756
+  tail_call PlaySongI                ; SUBS.S:757
+}
+
+fn addglass {
+  a = #0x00                  ; SUBS.S:764
+  ??? sta psandcount            ; SUBS.S:765
+addglass1:
+  *GlassState@0x0213 = x            ; SUBS.S:767
+  a = #0x02                  ; SUBS.S:768
+  *redrawglass@0x0214 = a            ; SUBS.S:769
+]rts:
+  return                           ; SUBS.S:770
+}
+
+fn addglass1 {
+  *GlassState@0x0213 = x            ; SUBS.S:767
+  a = #0x02                  ; SUBS.S:768
+  *redrawglass@0x0214 = a            ; SUBS.S:769
+]rts:
+  return                           ; SUBS.S:770
+}
+
+fn PlaySongX {
+  ??? tay             ; SUBS.S:777
+  ??? lda soundon            ; SUBS.S:778
+  ??? and musicon            ; SUBS.S:779
+  ??? bne :1            ; SUBS.S:780
+  ??? txa             ; SUBS.S:781
+  tail_call play                ; SUBS.S:782
+}
+
+fn PlaySong {
+  ??? jsr minit            ; SUBS.S:795
+  ??? jsr swpage            ; SUBS.S:796
+:loop:
+  a = #0x01                  ; SUBS.S:797
+  ??? jsr strobe            ; SUBS.S:798
+  ??? lda $c061            ; SUBS.S:799
+  ??? ora $c062            ; SUBS.S:800
+  ??? ora keypress            ; SUBS.S:801
+  ??? bmi :interrupt            ; SUBS.S:802
+  ??? jsr pburn            ; SUBS.S:803
+  ??? jsr pstars            ; SUBS.S:804
+  ??? jsr pflow            ; SUBS.S:805
+  ??? jsr mplay            ; SUBS.S:806
+  ??? cmp #0            ; SUBS.S:807
+  ??? bne :loop            ; SUBS.S:808
+:interrupt:
+  tail_call swpage                ; SUBS.S:810
+}
+
+fn PlaySongI {
+  ??? tay             ; SUBS.S:823
+  ??? lda soundon            ; SUBS.S:824
+  ??? and musicon            ; SUBS.S:825
+  ??? bne :1            ; SUBS.S:826
+  ??? txa             ; SUBS.S:827
+  ??? beq ]rts            ; SUBS.S:828
+  tail_call play                ; SUBS.S:829
+}
+
+fn swpage {
+  ??? lda PAGE            ; SUBS.S:851
+  ??? eor #$20            ; SUBS.S:852
+  *PAGE@0x0000 = a            ; SUBS.S:853
+]rts:
+  return                           ; SUBS.S:854
+}
+
+fn flashon {
+  ??? lda lightning            ; SUBS.S:858
+  ??? beq ]rts            ; SUBS.S:859
+  ??? lda lightcolor            ; SUBS.S:860
+  tail_call doflashon                ; SUBS.S:861
+}
+
+fn flashoff {
+  ??? lda lightning            ; SUBS.S:864
+  ??? beq ]rts            ; SUBS.S:865
+  ??? dec lightning            ; SUBS.S:866
+  tail_call doflashoff                ; SUBS.S:867
+}
+
+fn play {
+  ??? sta SceneCount            ; SUBS.S:877
+playloop:
+  ??? jsr rnd            ; SUBS.S:879
+  ??? lda SPEED            ; SUBS.S:881
+  ??? jsr pause            ; SUBS.S:882
+  ??? jsr strobe            ; SUBS.S:884
+  ??? lda level            ; SUBS.S:886
+  ??? bne :notdemo            ; SUBS.S:887
+  ??? jsr demokeys            ; SUBS.S:888
+  ??? bpl :cont            ; SUBS.S:889
+  a = #0x01                  ; SUBS.S:890
+  tail_call dostartgame                ; SUBS.S:891
+}
+
+fn playloop {
+  ??? jsr rnd            ; SUBS.S:879
+  ??? lda SPEED            ; SUBS.S:881
+  ??? jsr pause            ; SUBS.S:882
+  ??? jsr strobe            ; SUBS.S:884
+  ??? lda level            ; SUBS.S:886
+  ??? bne :notdemo            ; SUBS.S:887
+  ??? jsr demokeys            ; SUBS.S:888
+  ??? bpl :cont            ; SUBS.S:889
+  a = #0x01                  ; SUBS.S:890
+  tail_call dostartgame                ; SUBS.S:891
+}
+
+fn NextFrame {
+  ??? jsr DoKid            ; SUBS.S:919
+  ??? jsr DoShad            ; SUBS.S:921
+]rts:
+  return                           ; SUBS.S:923
+}
+
+fn FrameAdv {
+  ??? jsr DoFast            ; SUBS.S:927
+  ??? jsr vblank            ; SUBS.S:929
+  tail_call PageFlip                ; SUBS.S:931
+}
+
+fn DoKid {
+  ??? jsr LoadKid            ; SUBS.S:935
+  ??? lda CharPosn            ; SUBS.S:936
+  ??? beq ]rts            ; SUBS.S:937
+  ??? jsr ctrlkidchar            ; SUBS.S:939
+  ??? jsr animchar            ; SUBS.S:941
+  ??? jsr SaveKid            ; SUBS.S:943
+]rts:
+  return                           ; SUBS.S:945
+}
+
+fn DoShad {
+  ??? jsr LoadShadwOp            ; SUBS.S:949
+  ??? lda CharPosn            ; SUBS.S:950
+  ??? beq ]rts            ; SUBS.S:951
+  ??? jsr ctrlshadchar            ; SUBS.S:953
+  ??? jsr animchar            ; SUBS.S:955
+  tail_call SaveShad                ; SUBS.S:957
+}
+
+fn ctrlkidchar {
+  return                           ; SUBS.S:961
+}
+
+fn ctrlshadchar {
+  return                           ; SUBS.S:964
+}
+
+fn DoFast {
+  ??? jsr zerolsts            ; SUBS.S:971
+  ??? lda redrawglass            ; SUBS.S:973
+  ??? beq :3            ; SUBS.S:974
+  ??? dec redrawglass            ; SUBS.S:975
+  ??? ldx GlassState            ; SUBS.S:976
+  ??? jsr drawglass            ; SUBS.S:977
+:3:
+  ??? jsr LoadKid            ; SUBS.S:979
+  ??? lda CharPosn            ; SUBS.S:980
+  ??? beq :1            ; SUBS.S:981
+  ??? jsr setupchar            ; SUBS.S:982
+  a = #0x1e                  ; SUBS.S:983
+  *FCharIndex@0x0075 = a            ; SUBS.S:984
+  ??? jsr addkidobj            ; SUBS.S:985
+:1:
+  ??? jsr LoadShad            ; SUBS.S:987
+  ??? lda CharPosn            ; SUBS.S:988
+  ??? beq :2            ; SUBS.S:989
+  ??? jsr setupchar            ; SUBS.S:990
+  a = #0x1e                  ; SUBS.S:991
+  *FCharIndex@0x0075 = a            ; SUBS.S:992
+  ??? jsr addkidobj            ; SUBS.S:993
+  ??? jsr pmask            ; SUBS.S:994
+:2:
+  ??? jsr fast            ; SUBS.S:996
+  ??? jsr drawpost            ; SUBS.S:998
+  ??? jsr pburn            ; SUBS.S:1002
+  ??? jsr pburn            ; SUBS.S:1003
+  ??? jsr pstars            ; SUBS.S:1004
+  ??? jsr drawall            ; SUBS.S:1006
+  tail_call pflow                ; SUBS.S:1008
+}
+
+fn pjumpseq {
+  ??? pha             ; SUBS.S:1020
+  ??? jsr LoadShad            ; SUBS.S:1021
+  ??? pla             ; SUBS.S:1022
+  ??? jsr jumpseq            ; SUBS.S:1023
+  tail_call SaveShad                ; SUBS.S:1024
+}
+
+fn kjumpseq  (aka mjumpseq, vjumpseq) {
+  ??? pha             ; SUBS.S:1029
+  ??? jsr LoadKid            ; SUBS.S:1030
+  ??? pla             ; SUBS.S:1031
+  ??? jsr jumpseq            ; SUBS.S:1032
+  tail_call SaveKid                ; SUBS.S:1033
+}
+
+fn startM8 {
+  ??? jsr startM4            ; SUBS.S:1045
+  a = #0x90                  ; SUBS.S:1046
+  *CharX@0x0041 = a            ; SUBS.S:1047
+  a = #0x6a                  ; SUBS.S:1048
+  ??? jsr jumpseq            ; SUBS.S:1049
+  tail_call animchar                ; SUBS.S:1050
+}
+
+fn startM4 {
+  a = #0x18                  ; SUBS.S:1053
+  *CharID@0x004d = a            ; SUBS.S:1054
+  a = #0xc7                  ; SUBS.S:1055
+  *CharX@0x0041 = a            ; SUBS.S:1056
+  a = #0x98                  ; SUBS.S:1057
+  *CharY@0x0042 = a            ; SUBS.S:1058
+  a = #0xff                  ; SUBS.S:1059
+  *CharFace@0x0043 = a            ; SUBS.S:1060
+  a = #0x69                  ; SUBS.S:1062
+  ??? jsr jumpseq            ; SUBS.S:1063
+  tail_call animchar                ; SUBS.S:1064
+}
+
+fn startP8 {
+  ??? jsr startP0            ; SUBS.S:1069
+  a = #0x82                  ; SUBS.S:1070
+  *CharX@0x0041 = a            ; SUBS.S:1071
+  a = #0x9a                  ; SUBS.S:1072
+  *CharY@0x0042 = a            ; SUBS.S:1073
+  a = #0x6e                  ; SUBS.S:1074
+  ??? jsr jumpseq            ; SUBS.S:1075
+  tail_call animchar                ; SUBS.S:1076
+}
+
+fn startP4 {
+  ??? jsr startP1            ; SUBS.S:1079
+  a = #0x8e                  ; SUBS.S:1080
+  *CharX@0x0041 = a            ; SUBS.S:1081
+  a = #0x9a                  ; SUBS.S:1082
+  *CharY@0x0042 = a            ; SUBS.S:1083
+  a = #0x5e                  ; SUBS.S:1084
+  ??? jsr jumpseq            ; SUBS.S:1085
+  tail_call animchar                ; SUBS.S:1086
+}
+
+fn startP5 {
+  ??? jsr startP0            ; SUBS.S:1089
+  a = #0xa0                  ; SUBS.S:1090
+  *CharX@0x0041 = a            ; SUBS.S:1091
+  return                           ; SUBS.S:1092
+}
+
+fn startP2 {
+  ??? jsr startP0            ; SUBS.S:1095
+  a = #0x59                  ; SUBS.S:1096
+  *CharX@0x0041 = a            ; SUBS.S:1097
+  a = #0x97                  ; SUBS.S:1098
+  *CharY@0x0042 = a            ; SUBS.S:1099
+  a = #0x67                  ; SUBS.S:1101
+  ??? jsr jumpseq            ; SUBS.S:1102
+  tail_call animchar                ; SUBS.S:1103
+}
+
+fn startP1 {
+  ??? jsr startP0            ; SUBS.S:1106
+  a = #0x00                  ; SUBS.S:1107
+  *CharFace@0x0043 = a            ; SUBS.S:1108
+  return                           ; SUBS.S:1109
+}
+
+fn startP7 {
+  ??? jsr startP0            ; SUBS.S:1112
+  a = #0x88                  ; SUBS.S:1113
+  *CharX@0x0041 = a            ; SUBS.S:1114
+  a = #0x95                  ; SUBS.S:1115
+  *CharY@0x0042 = a            ; SUBS.S:1116
+  a = #0x6d                  ; SUBS.S:1117
+  x = #0x01                  ; SUBS.S:1118
+  ??? cpx purpleflag            ; SUBS.S:1119
+  ??? beq :ok            ; SUBS.S:1120
+  a = #0x78                  ; SUBS.S:1121
+:ok:
+  ??? jsr jumpseq            ; SUBS.S:1122
+  tail_call animchar                ; SUBS.S:1123
+}
+
+fn startM7 {
+  ??? jsr startM4            ; SUBS.S:1126
+  a = #0x95                  ; SUBS.S:1127
+  *CharY@0x0042 = a            ; SUBS.S:1128
+  return                           ; SUBS.S:1129
+}
+
+fn startP0 {
+  a = #0x05                  ; SUBS.S:1132
+  *CharID@0x004d = a            ; SUBS.S:1133
+  a = #0x78                  ; SUBS.S:1135
+  *CharX@0x0041 = a            ; SUBS.S:1136
+  a = #0x97                  ; SUBS.S:1137
+  *CharY@0x0042 = a            ; SUBS.S:1138
+  a = #0xff                  ; SUBS.S:1140
+  *CharFace@0x0043 = a            ; SUBS.S:1141
+  a = #0x5e                  ; SUBS.S:1143
+  ??? jsr jumpseq            ; SUBS.S:1144
+  tail_call animchar                ; SUBS.S:1145
+}
+
+fn startV0 {
+  a = #0x06                  ; SUBS.S:1148
+  *CharID@0x004d = a            ; SUBS.S:1149
+  a = #0xc5                  ; SUBS.S:1151
+  *CharX@0x0041 = a            ; SUBS.S:1152
+  a = #0x97                  ; SUBS.S:1153
+  *CharY@0x0042 = a            ; SUBS.S:1154
+  a = #0xff                  ; SUBS.S:1156
+  *CharFace@0x0043 = a            ; SUBS.S:1157
+  a = #0x5f                  ; SUBS.S:1159
+  ??? jsr jumpseq            ; SUBS.S:1160
+  tail_call animchar                ; SUBS.S:1161
+}
+
+fn startK7 {
+  a = #0x00                  ; SUBS.S:1164
+  *CharID@0x004d = a            ; SUBS.S:1165
+  a = #0xc6                  ; SUBS.S:1167
+  *CharX@0x0041 = a            ; SUBS.S:1168
+  a = #0x95                  ; SUBS.S:1169
+  *CharY@0x0042 = a            ; SUBS.S:1170
+  a = #0xff                  ; SUBS.S:1172
+  *CharFace@0x0043 = a            ; SUBS.S:1173
+  a = #0x01                  ; SUBS.S:1175
+  ??? jsr jumpseq            ; SUBS.S:1176
+  tail_call animchar                ; SUBS.S:1177
+}
+
+fn DEMO {
+  ??? lda #DemoProg1            ; SUBS.S:1234
+  ??? ldx #>DemoProg1            ; SUBS.S:1235
+  tail_call AutoPlayback                ; SUBS.S:1236
+}
+
+fn initit {
+  a = #0x20                  ; SUBS.S:1244
+  *scrncolor@0x031d = a            ; SUBS.S:1245
+  a = #0x00                  ; SUBS.S:1246
+  *vibes@0x0318 = a            ; SUBS.S:1247
+  *redrawglass@0x0214 = a            ; SUBS.S:1248
+  *KidPosn@0x0050 = a            ; SUBS.S:1249
+  *ShadPosn@0x0060 = a            ; SUBS.S:1250
+  ??? sta ptorchcount            ; SUBS.S:1251
+  x = #0x03                  ; SUBS.S:1252
+:loop:
+  ??? sta pstarcount,x            ; SUBS.S:1253
+  ??? dex             ; SUBS.S:1254
+  ??? bpl :loop            ; SUBS.S:1255
+  a = #0xff                  ; SUBS.S:1257
+  ??? sta psandcount            ; SUBS.S:1258
+  a = #0x0c                  ; SUBS.S:1260
+  *SPEED@0x030c = a            ; SUBS.S:1261
+  ??? jsr zeropeels            ; SUBS.S:1263
+  ??? jsr zerored            ; SUBS.S:1264
+  ??? jsr zerosound            ; SUBS.S:1265
+]rts:
+  return                           ; SUBS.S:1266
+}
+
+fn getglass {
+  ??? jsr getminleft            ; SUBS.S:1277
+  x = #0x07                  ; SUBS.S:1278
+  ??? lda MinLeft            ; SUBS.S:1279
+  ??? cmp #6            ; SUBS.S:1280
+  ??? bcc :got            ; SUBS.S:1281
+  ??? dex             ; SUBS.S:1282
+  ??? cmp #$11            ; SUBS.S:1283
+  ??? bcc :got            ; SUBS.S:1284
+  ??? dex             ; SUBS.S:1285
+  ??? cmp #$21            ; SUBS.S:1286
+  ??? bcc :got            ; SUBS.S:1287
+  ??? dex             ; SUBS.S:1288
+  ??? cmp #$41            ; SUBS.S:1289
+  ??? bcc :got            ; SUBS.S:1290
+  ??? dex             ; SUBS.S:1291
+:got:
+]rts:
+  return                           ; SUBS.S:1293
+}
+
+fn SHOWTIME {
+  ??? lda timerequest            ; SUBS.S:1305
+  ??? beq ]rts            ; SUBS.S:1306
+  ??? lda KidLife            ; SUBS.S:1307
+  ??? bpl ]rts            ; SUBS.S:1308
+  ??? jsr getminleft            ; SUBS.S:1310
+  ??? lda MinLeft            ; SUBS.S:1312
+  ??? cmp #2            ; SUBS.S:1313
+  ??? bcs :normal            ; SUBS.S:1314
+  ??? lda SecLeft            ; SUBS.S:1315
+  ??? beq :timeup            ; SUBS.S:1316
+  ??? lda level            ; SUBS.S:1320
+  ??? cmp #14            ; SUBS.S:1321
+  ??? bcs :normal            ; SUBS.S:1322
+  ??? bcc :showsec            ; SUBS.S:1323
+:timeup:
+  ??? lda timerequest            ; SUBS.S:1326
+  ??? cmp #3            ; SUBS.S:1327
+  ??? bcc ]rts            ; SUBS.S:1328
+:normal:
+  ??? lda msgtimer            ; SUBS.S:1331
+  ??? bne ]rts            ; SUBS.S:1332
+  a = #0x03                  ; SUBS.S:1334
+  *message@0x030b = a            ; SUBS.S:1335
+  a = #0x14                  ; SUBS.S:1336
+  ??? ldx timerequest            ; SUBS.S:1337
+  ??? cpx #4            ; SUBS.S:1338
+  ??? bcc :norm            ; SUBS.S:1339
+:delay:
+  a = #0x19                  ; SUBS.S:1340
+:norm:
+  *msgtimer@0x00db = a            ; SUBS.S:1341
+  a = #0x00                  ; SUBS.S:1343
+  *timerequest@0x031f = a            ; SUBS.S:1344
+]rts:
+  return                           ; SUBS.S:1345
+}
+
+fn ADDLOWERSOUND {
+  ??? lsr             ; SUBS.S:1374
+  ??? bcc ]rts            ; SUBS.S:1375
+  ??? lda level            ; SUBS.S:1377
+  ??? cmp #3            ; SUBS.S:1378
+  ??? bne :n            ; SUBS.S:1379
+  ??? lda trscrn            ; SUBS.S:1380
+  ??? cmp #2            ; SUBS.S:1381
+  ??? beq :y            ; SUBS.S:1382
+:n:
+  ??? lda trscrn            ; SUBS.S:1383
+  ??? cmp scrnLeft            ; SUBS.S:1384
+  ??? bne :1            ; SUBS.S:1385
+  ??? ldy trloc            ; SUBS.S:1386
+  ??? cpy #9            ; SUBS.S:1387
+  ??? beq :y            ; SUBS.S:1388
+  ??? cpy #19            ; SUBS.S:1389
+  ??? beq :y            ; SUBS.S:1390
+  ??? cpy #29            ; SUBS.S:1391
+  ??? beq :y            ; SUBS.S:1392
+]rts:
+  return                           ; SUBS.S:1393
+}
+
+fn REMOVEOBJ {
+  *lastpotion@0x00e0 = a            ; SUBS.S:1416
+  x = #0x01                  ; SUBS.S:1418
+  *clrbtn@0x00d8 = x            ; SUBS.S:1419
+  a = #0x01                  ; SUBS.S:1421
+  ??? sta (BlueType),y            ; SUBS.S:1422
+  a = #0x00                  ; SUBS.S:1423
+  ??? sta (BlueSpec),y            ; SUBS.S:1424
+  a = #0x23                  ; SUBS.S:1426
+  *height@0x0004 = a            ; SUBS.S:1427
+  a = #0x02                  ; SUBS.S:1429
+  ??? clc             ; SUBS.S:1430
+  ??? jsr markwipe            ; SUBS.S:1431
+  tail_call markred                ; SUBS.S:1432
+}
+
+fn SETINITIALS {
+  ??? lda INFO            ; SUBS.S:1442
+  ??? sec             ; SUBS.S:1443
+  ??? sbc #1            ; SUBS.S:1444
+  *SCRNUM@0x0023 = a            ; SUBS.S:1445
+:loop:
+  ??? jsr DoScrn            ; SUBS.S:1447
+  ??? dec SCRNUM            ; SUBS.S:1449
+  ??? bne :loop            ; SUBS.S:1450
+  return                           ; SUBS.S:1451
+}
+
+fn DoScrn {
+  ??? lda SCRNUM            ; SUBS.S:1455
+  ??? jsr calcblue            ; SUBS.S:1456
+  y = #0x1d                  ; SUBS.S:1458
+:loop:
+  ??? jsr getinitobj            ; SUBS.S:1460
+  ??? bcc :skip            ; SUBS.S:1461
+  ??? sta (BlueSpec),y            ; SUBS.S:1462
+:skip:
+  ??? dey             ; SUBS.S:1464
+  ??? bpl :loop            ; SUBS.S:1465
+  return                           ; SUBS.S:1467
+}
+
+fn STARTKID {
+  ??? lda level            ; SUBS.S:1477
+  ??? cmp #3            ; SUBS.S:1478
+  ??? bne :nomile            ; SUBS.S:1479
+:special3:
+  ??? lda milestone            ; SUBS.S:1484
+  ??? beq :nomile            ; SUBS.S:1485
+  a = #0xff                  ; SUBS.S:1486
+  *KidStartFace@0xbf42 = a            ; SUBS.S:1487
+  a = #0x02                  ; SUBS.S:1488
+  *KidStartScrn@0xbf40 = a            ; SUBS.S:1489
+  a = #0x06                  ; SUBS.S:1490
+  *KidStartBlock@0xbf41 = a            ; SUBS.S:1491
+  a = #0x07                  ; SUBS.S:1493
+  x = #0x04                  ; SUBS.S:1494
+  y = #0x00                  ; SUBS.S:1495
+  ??? jsr rdblock            ; SUBS.S:1496
+  a = #0x00                  ; SUBS.S:1497
+  ??? sta (BlueType),y            ; SUBS.S:1498
+:nomile:
+  ??? lda KidStartScrn            ; SUBS.S:1501
+  *CharScrn@0x004b = a            ; SUBS.S:1502
+  ??? lda KidStartBlock            ; SUBS.S:1504
+  ??? jsr unindex            ; SUBS.S:1505
+  *CharBlockX@0x0044 = a            ; SUBS.S:1507
+  *CharBlockY@0x0045 = x            ; SUBS.S:1508
+  ??? lda CharBlockX            ; SUBS.S:1510
+  ??? jsr getblockej            ; SUBS.S:1511
+  ??? clc             ; SUBS.S:1512
+  ??? adc #angle+7            ; SUBS.S:1513
+  *CharX@0x0041 = a            ; SUBS.S:1514
+  ??? lda KidStartFace            ; SUBS.S:1516
+  ??? eor #$ff            ; SUBS.S:1517
+  *CharFace@0x0043 = a            ; SUBS.S:1518
+  ??? lda origstrength            ; SUBS.S:1520
+  ??? ldx level            ; SUBS.S:1521
+  ??? bne :notdemo            ; SUBS.S:1522
+  a = #0x04                  ; SUBS.S:1523
+:notdemo:
+  *MaxKidStr@0x00d0 = a            ; SUBS.S:1524
+  *KidStrength@0x00ce = a            ; SUBS.S:1525
+  goto :normal                ; SUBS.S:1528
+}
+
+fn STARTKID1 {
+  ??? ldx CharBlockY            ; SUBS.S:1564
+  ??? lda FloorY+1,x            ; SUBS.S:1565
+  *CharY@0x0042 = a            ; SUBS.S:1566
+  a = #0xff                  ; SUBS.S:1568
+  *CharLife@0x004f = a            ; SUBS.S:1569
+  a = #0x00                  ; SUBS.S:1571
+  *CharID@0x004d = a            ; SUBS.S:1572
+  a = #0x00                  ; SUBS.S:1574
+  *CharXVel@0x0047 = a            ; SUBS.S:1575
+  *CharYVel@0x0048 = a            ; SUBS.S:1576
+  *waitingtojump@0x00a7 = a            ; SUBS.S:1577
+  *weightless@0x00c5 = a            ; SUBS.S:1578
+  *invert@0x009f = a            ; SUBS.S:1579
+  *jarabove@0x00cd = a            ; SUBS.S:1580
+  *droppedout@0x00e7 = a            ; SUBS.S:1581
+  *CharSword@0x004e = a            ; SUBS.S:1582
+  *offguard@0x008a = a            ; SUBS.S:1583
+:done:
+  ??? jsr animchar            ; SUBS.S:1585
+  ??? lda level            ; SUBS.S:1589
+  ??? cmp #7            ; SUBS.S:1590
+  ??? bne :notsp            ; SUBS.S:1591
+  ??? lda yellowflag            ; SUBS.S:1593
+  ??? bmi :yelok            ; SUBS.S:1594
+  a = #0x40                  ; SUBS.S:1595
+  *timebomb@0x007d = a            ; SUBS.S:1596
+:yelok:
+  ??? lda CharScrn            ; SUBS.S:1598
+  ??? cmp #17            ; SUBS.S:1599
+  ??? bne :notsp            ; SUBS.S:1600
+  a = #0x03                  ; SUBS.S:1601
+  ??? jsr cut            ; SUBS.S:1602
+:notsp:
+  tail_call SaveKid                ; SUBS.S:1604
+}
+
+fn GRAVITY {
+  ??? lda CharAction            ; SUBS.S:1619
+  ??? cmp #4            ; SUBS.S:1620
+  ??? bne ]rts            ; SUBS.S:1621
+  ??? lda weightless            ; SUBS.S:1623
+  ??? bne :wtless            ; SUBS.S:1624
+  ??? lda CharYVel            ; SUBS.S:1626
+  ??? clc             ; SUBS.S:1627
+  ??? adc #AccelGravity            ; SUBS.S:1628
+  ??? cmp #TermVelocity            ; SUBS.S:1630
+  ??? bcc :ok            ; SUBS.S:1631
+  a = #0x21                  ; SUBS.S:1632
+:ok:
+  *CharYVel@0x0048 = a            ; SUBS.S:1634
+]rts:
+  return                           ; SUBS.S:1635
+}
+
+fn ADDFALL {
+  ??? lda CharYVel            ; SUBS.S:1652
+  ??? clc             ; SUBS.S:1653
+  ??? adc CharY            ; SUBS.S:1654
+  *CharY@0x0042 = a            ; SUBS.S:1655
+  ??? lda CharAction            ; SUBS.S:1659
+  ??? cmp #4            ; SUBS.S:1660
+  ??? bne ]rts            ; SUBS.S:1661
+  ??? lda CharXVel            ; SUBS.S:1663
+  ??? jsr addcharx            ; SUBS.S:1664
+  *CharX@0x0041 = a            ; SUBS.S:1665
+  tail_call rereadblocks                ; SUBS.S:1667
+}
+
+fn INITIALGUARDS {
+  y = #0x18                  ; SUBS.S:1675
+:loop:
+  ??? lda GdStartBlock-1,y            ; SUBS.S:1677
+  ??? cmp #30            ; SUBS.S:1678
+  ??? bcs :nogd            ; SUBS.S:1679
+  ??? jsr unindex            ; SUBS.S:1680
+  ??? jsr getblockej            ; SUBS.S:1681
+  ??? clc             ; SUBS.S:1682
+  ??? adc #angle+7            ; SUBS.S:1683
+  ??? sta GdStartX-1,y            ; SUBS.S:1684
+  a = #0x00                  ; SUBS.S:1685
+  ??? sta GdStartSeqH-1,y            ; SUBS.S:1686
+:nogd:
+  ??? dey             ; SUBS.S:1688
+  ??? bne :loop            ; SUBS.S:1689
+]rts:
+  return                           ; SUBS.S:1690
+}
+
+fn DEADENEMY {
+  ??? lda level            ; SUBS.S:1700
+  ??? beq :demo            ; SUBS.S:1701
+  ??? cmp #13            ; SUBS.S:1702
+  ??? beq :wingame            ; SUBS.S:1703
+  ??? lda CharID            ; SUBS.S:1705
+  ??? cmp #1            ; SUBS.S:1706
+  ??? beq ]rts            ; SUBS.S:1707
+  a = #0x07                  ; SUBS.S:1708
+  x = #0x19                  ; SUBS.S:1709
+  ??? jsr cuesong            ; SUBS.S:1710
+]rts:
+  return                           ; SUBS.S:1711
+}
