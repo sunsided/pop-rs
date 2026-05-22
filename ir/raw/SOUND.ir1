@@ -9,7 +9,7 @@ fn ZEROSOUND  (aka lookup, endlook) {
 fn ADDSOUND {
   *savex@0x02f1 = x            ; SOUND.S:80
   x = *soundtable@0xb6c0        ; SOUND.S:82
-  cmp x, #0x20              ; SOUND.S:83
+  cmp x, #maxsfx              ; SOUND.S:83
   if cs goto :rts       ; SOUND.S:84
   x += 1                         ; SOUND.S:86
   *(soundtable@0xb6c0 + x) = a   ; SOUND.S:87
@@ -79,23 +79,23 @@ fn DoJawsClash {
 }
 
 fn DoSpecialKey1  (aka DoSwordClash1, DoSwordClash2) {
-  y = #0x0f                  ; SOUND.S:194
-  x = #0x00                  ; SOUND.S:195
-  a = #0x32                  ; SOUND.S:196
+  y = #SK1Pitch                  ; SOUND.S:194
+  x = #>SK1Pitch                  ; SOUND.S:195
+  a = #SK1Dur                  ; SOUND.S:196
   tail_call tone                ; SOUND.S:197
 }
 
 fn DoSpecialKey2 {
-  y = #0x28                  ; SOUND.S:200
-  x = #0x00                  ; SOUND.S:201
-  a = #0x32                  ; SOUND.S:202
+  y = #SK2Pitch                  ; SOUND.S:200
+  x = #>SK2Pitch                  ; SOUND.S:201
+  a = #SK2Dur                  ; SOUND.S:202
   tail_call tone                ; SOUND.S:203
 }
 
 fn DoSplat {
-  y = #0xe8                  ; SOUND.S:212
-  x = #0x03                  ; SOUND.S:213
-  a = #0x03                  ; SOUND.S:214
+  y = #SplatPitch                  ; SOUND.S:212
+  x = #>SplatPitch                  ; SOUND.S:213
+  a = #SplatDur                  ; SOUND.S:214
   tail_call tone                ; SOUND.S:215
 }
 
@@ -111,13 +111,13 @@ DoFlashMsg:
   a = #0x02                  ; SOUND.S:240
 :loop:
   push a                           ; SOUND.S:241
-  y = #0xf4                  ; SOUND.S:243
-  x = #0x01                  ; SOUND.S:244
-  a = #0x0f                  ; SOUND.S:245
+  y = #]LoPitch                  ; SOUND.S:243
+  x = #>]LoPitch                  ; SOUND.S:244
+  a = #]LoDur                  ; SOUND.S:245
   call tone                  ; SOUND.S:246
-  y = #0x64                  ; SOUND.S:248
-  x = #0x00                  ; SOUND.S:249
-  a = #0x19                  ; SOUND.S:250
+  y = #]HiPitch                  ; SOUND.S:248
+  x = #>]HiPitch                  ; SOUND.S:249
+  a = #]HiDur                  ; SOUND.S:250
   call tone                  ; SOUND.S:251
   a = pop                          ; SOUND.S:253
   c = 1                            ; SOUND.S:254
@@ -130,13 +130,13 @@ fn DoGotKey  (aka DoFlashMsg) {
   a = #0x02                  ; SOUND.S:240
 :loop:
   push a                           ; SOUND.S:241
-  y = #0xf4                  ; SOUND.S:243
-  x = #0x01                  ; SOUND.S:244
-  a = #0x0f                  ; SOUND.S:245
+  y = #]LoPitch                  ; SOUND.S:243
+  x = #>]LoPitch                  ; SOUND.S:244
+  a = #]LoDur                  ; SOUND.S:245
   call tone                  ; SOUND.S:246
-  y = #0x64                  ; SOUND.S:248
-  x = #0x00                  ; SOUND.S:249
-  a = #0x19                  ; SOUND.S:250
+  y = #]HiPitch                  ; SOUND.S:248
+  x = #>]HiPitch                  ; SOUND.S:249
+  a = #]HiDur                  ; SOUND.S:250
   call tone                  ; SOUND.S:251
   a = pop                          ; SOUND.S:253
   c = 1                            ; SOUND.S:254
@@ -174,9 +174,9 @@ fn DoLowerGate {
 }
 
 fn DoSmackWall {
-  y = #0xe8                  ; SOUND.S:303
-  x = #0x03                  ; SOUND.S:304
-  a = #0x03                  ; SOUND.S:305
+  y = #SWPitch                  ; SOUND.S:303
+  x = #>SWPitch                  ; SOUND.S:304
+  a = #SWDur                  ; SOUND.S:305
   tail_call tone                ; SOUND.S:306
 ]rts:
   return                           ; SOUND.S:308

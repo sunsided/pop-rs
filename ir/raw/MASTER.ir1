@@ -3,7 +3,7 @@
 fn FIRSTBOOT {
   a = *MIXEDoff@0xc052        ; MASTER.S:187
   call setaux                  ; MASTER.S:188
-  a = #0xa9                  ; MASTER.S:192
+  a = #POPside1                  ; MASTER.S:192
   *BBundID@0x03f5 = a            ; MASTER.S:193
   *RAMWRTmain@0xc004 = a            ; MASTER.S:197
   a = #0x02                  ; MASTER.S:198
@@ -113,7 +113,7 @@ fn setdemolevel {
 
 fn checkdisk {
   call setaux                  ; MASTER.S:370
-  x = #0xad                  ; MASTER.S:371
+  x = #POPside2                  ; MASTER.S:371
   *BBundID@0x03f5 = x            ; MASTER.S:372
   call driveon                  ; MASTER.S:374
 :loop:
@@ -192,10 +192,10 @@ fn setbluep {
 
 fn vidstuff {
   a = *BBundID@0x03f5        ; MASTER.S:492
-  cmp a, #0xad              ; MASTER.S:493
+  cmp a, #POPside2              ; MASTER.S:493
   if ne goto ]rts       ; MASTER.S:494
   a = *$c000@0xc000        ; MASTER.S:495
-  cmp a, #0x5e              ; MASTER.S:496
+  cmp a, #"^"              ; MASTER.S:496
   if ne goto ]rts       ; MASTER.S:497
   call setmain                  ; MASTER.S:499
   a = #0x0c                  ; MASTER.S:500
@@ -325,7 +325,7 @@ fn CUTPRINCESS {
   a = #0x01                  ; MASTER.S:646
 cutprincess1:
   call LoadStage2                  ; MASTER.S:648
-  a = #0x84                  ; MASTER.S:650
+  a = #pacProom                  ; MASTER.S:650
   call SngExpand                  ; MASTER.S:651
   a = #0x40                  ; MASTER.S:653
   *IMAGE+1@0x0005 = a            ; MASTER.S:654
@@ -336,7 +336,7 @@ cutprincess1:
 
 fn cutprincess1 {
   call LoadStage2                  ; MASTER.S:648
-  a = #0x84                  ; MASTER.S:650
+  a = #pacProom                  ; MASTER.S:650
   call SngExpand                  ; MASTER.S:651
   a = #0x40                  ; MASTER.S:653
   *IMAGE+1@0x0005 = a            ; MASTER.S:654
@@ -352,7 +352,7 @@ fn EPILOG {
   call blackout                  ; MASTER.S:668
   call LoadStage1B                  ; MASTER.S:669
   call Epilog                  ; MASTER.S:671
-  a = #0xa9                  ; MASTER.S:673
+  a = #POPside1                  ; MASTER.S:673
   *BBundID@0x03f5 = a            ; MASTER.S:674
   *$c010@0xc010 = a            ; MASTER.S:675
 :loop:
@@ -402,10 +402,10 @@ fn PubCredit {
   call copy1to2                  ; MASTER.S:743
   a = #0x2c                  ; MASTER.S:745
   call tpause                  ; MASTER.S:746
-  a = #0x70                  ; MASTER.S:750
+  a = #delPresents                  ; MASTER.S:750
   call DeltaExpPop                  ; MASTER.S:751
   x = #0x50                  ; MASTER.S:753
-  a = #0x01                  ; MASTER.S:754
+  a = #s_Presents                  ; MASTER.S:754
   call PlaySongI                  ; MASTER.S:755
   tail_call CleanScreen                ; MASTER.S:757
 }
@@ -421,10 +421,10 @@ fn CleanScreen {
 fn AuthorCredit {
   a = #0x2a                  ; MASTER.S:787
   call tpause                  ; MASTER.S:788
-  a = #0x72                  ; MASTER.S:792
+  a = #delByline                  ; MASTER.S:792
   call DeltaExpPop                  ; MASTER.S:793
   x = #0x50                  ; MASTER.S:795
-  a = #0x02                  ; MASTER.S:796
+  a = #s_Byline                  ; MASTER.S:796
   call PlaySongI                  ; MASTER.S:797
   tail_call CleanScreen                ; MASTER.S:801
 }
@@ -434,7 +434,7 @@ fn SilentTitle {
   call copy1to2                  ; MASTER.S:811
   a = #0x14                  ; MASTER.S:813
   call tpause                  ; MASTER.S:814
-  a = #0x74                  ; MASTER.S:816
+  a = #delTitle                  ; MASTER.S:816
   call DeltaExpPop                  ; MASTER.S:817
   a = #0xa0                  ; MASTER.S:819
   tail_call tpause                ; MASTER.S:820
@@ -443,20 +443,20 @@ fn SilentTitle {
 fn TitleScreen {
   a = #0x26                  ; MASTER.S:824
   call tpause                  ; MASTER.S:825
-  a = #0x74                  ; MASTER.S:829
+  a = #delTitle                  ; MASTER.S:829
   call DeltaExpPop                  ; MASTER.S:830
   x = #0x8c                  ; MASTER.S:832
-  a = #0x03                  ; MASTER.S:833
+  a = #s_Title                  ; MASTER.S:833
   call PlaySongI                  ; MASTER.S:834
   tail_call CleanScreen                ; MASTER.S:838
 }
 
 fn Prolog1 {
-  a = #0x7c                  ; MASTER.S:846
+  a = #pacProlog                  ; MASTER.S:846
   *RAMRDaux@0xc003 = a            ; MASTER.S:847
   call DblExpand                  ; MASTER.S:848
   x = #0xfa                  ; MASTER.S:850
-  a = #0x04                  ; MASTER.S:851
+  a = #s_Prolog                  ; MASTER.S:851
   tail_call PlaySongI                ; MASTER.S:852
 }
 
@@ -470,30 +470,30 @@ fn PrincessScene {
 }
 
 fn Prolog2 {
-  a = #0x60                  ; MASTER.S:876
+  a = #pacSumup                  ; MASTER.S:876
   *RAMRDmain@0xc002 = a            ; MASTER.S:877
   call DblExpand                  ; MASTER.S:878
   call setdhires                  ; MASTER.S:880
   x = #0xfa                  ; MASTER.S:882
-  a = #0x05                  ; MASTER.S:883
+  a = #s_Sumup                  ; MASTER.S:883
   tail_call PlaySongI                ; MASTER.S:884
 }
 
 fn Epilog {
   a = *IIGS@0x0211        ; MASTER.S:892
   if ne goto SuperEpilog       ; MASTER.S:893
-  a = #0x76                  ; MASTER.S:895
+  a = #pacEpilog                  ; MASTER.S:895
   *RAMRDaux@0xc003 = a            ; MASTER.S:896
   call DblExpand                  ; MASTER.S:897
   call setdhires                  ; MASTER.S:899
-  a = #0x01                  ; MASTER.S:901
+  a = #s_Epilog                  ; MASTER.S:901
   call PlaySongNI                  ; MASTER.S:902
   a = #0x0f                  ; MASTER.S:903
   call pauseNI                  ; MASTER.S:904
   call unpacksplash                  ; MASTER.S:905
   a = #0x4b                  ; MASTER.S:906
   call pauseNI                  ; MASTER.S:907
-  a = #0x02                  ; MASTER.S:909
+  a = #s_Curtain                  ; MASTER.S:909
   call PlaySongNI                  ; MASTER.S:910
   a = #0x3c                  ; MASTER.S:911
   call pauseNI                  ; MASTER.S:912
@@ -501,7 +501,7 @@ fn Epilog {
 }
 
 fn unpacksplash {
-  a = #0x40                  ; MASTER.S:917
+  a = #pacSplash                  ; MASTER.S:917
   *RAMRDaux@0xc003 = a            ; MASTER.S:918
   tail_call DblExpand                ; MASTER.S:919
 }
@@ -510,7 +510,7 @@ fn SuperEpilog {
   a = #0x01                  ; MASTER.S:927
   call fadein                  ; MASTER.S:928
   call setaux                  ; MASTER.S:929
-  a = #0x01                  ; MASTER.S:931
+  a = #s_Epilog                  ; MASTER.S:931
   call PlaySongNI                  ; MASTER.S:932
   call fadeout                  ; MASTER.S:934
   a = #0x00                  ; MASTER.S:935
@@ -518,7 +518,7 @@ fn SuperEpilog {
   call setaux                  ; MASTER.S:937
   a = #0x50                  ; MASTER.S:939
   call pauseNI                  ; MASTER.S:940
-  a = #0x02                  ; MASTER.S:942
+  a = #s_Curtain                  ; MASTER.S:942
   call PlaySongNI                  ; MASTER.S:943
   a = #0xff                  ; MASTER.S:945
   call pauseNI                  ; MASTER.S:946
@@ -558,15 +558,15 @@ fn StartGame? {
   call musickeys                  ; MASTER.S:997
   cmp a, #0x80              ; MASTER.S:998
   if cc goto ]rts       ; MASTER.S:999
-  cmp a, #0x04              ; MASTER.S:1003
+  cmp a, #kdemo              ; MASTER.S:1003
   if ne goto :1       ; MASTER.S:1004
   tail_call Demo                ; MASTER.S:1005
 :1:
-  cmp a, #0x10              ; MASTER.S:1006
+  cmp a, #kprincess              ; MASTER.S:1006
   if ne goto :2       ; MASTER.S:1007
   goto ]princess                ; MASTER.S:1008
 :2:
-  cmp a, #0x12              ; MASTER.S:1011
+  cmp a, #krestart              ; MASTER.S:1011
   if ne goto :3       ; MASTER.S:1012
   tail_call AttractLoop                ; MASTER.S:1013
 :3:
@@ -580,7 +580,7 @@ DOSTARTGAME:
   a = #0x01                  ; MASTER.S:1039
   *musicon@0x031a = a            ; MASTER.S:1040
   a = *keypress@0x020f        ; MASTER.S:1045
-  cmp a, #0x0c              ; MASTER.S:1046
+  cmp a, #kresume              ; MASTER.S:1046
   if ne goto :newgame       ; MASTER.S:1047
   a = #0x04                  ; MASTER.S:1051
   tail_call startresume                ; MASTER.S:1052
@@ -601,7 +601,7 @@ fn :3  (aka DOSTARTGAME) {
   a = #0x01                  ; MASTER.S:1039
   *musicon@0x031a = a            ; MASTER.S:1040
   a = *keypress@0x020f        ; MASTER.S:1045
-  cmp a, #0x0c              ; MASTER.S:1046
+  cmp a, #kresume              ; MASTER.S:1046
   if ne goto :newgame       ; MASTER.S:1047
   a = #0x04                  ; MASTER.S:1051
   tail_call startresume                ; MASTER.S:1052
@@ -701,7 +701,7 @@ fn ReloadStuff {
 
 fn LoadStage2 {
   x = *BBundID@0x03f5        ; MASTER.S:1246
-  cmp x, #0xad              ; MASTER.S:1247
+  cmp x, #POPside2              ; MASTER.S:1247
   if eq goto LoadStage2B       ; MASTER.S:1248
 LoadStage2A:
   call driveon                  ; MASTER.S:1251

@@ -615,8 +615,31 @@ class ModuleIR1:
 # rather than canonical IR — pass 2 will define its own dump format.
 
 
+_NUMERIC_IMM_RE = __import__("re").compile(
+    # `#$ff`, `#%01010101`, `#-1`, `#42` — anything that's just a
+    # number after the `#` (with optional `<`/`>` byte operator).
+    r"^#[<>]?[\s]*[-+]?(?:\$[0-9a-fA-F]+|%[01]+|\d+)\s*$"
+)
+
+
 def _fmt_imm(imm: Imm) -> str:
-    return f"#{imm.value & 0xff:#04x}"
+    """Render an immediate operand for the IR1 dump.
+
+    Pure-numeric Merlin sources (`#$06`, `#42`, `#-1`) get normalised
+    to the `#0x..` hex form so the dump stays consistent. But when the
+    text references a *symbol* (e.g. `#shadpos6a`, `#<MoreBytes`,
+    `#>jumptable+1`), preserving that name is more useful than showing
+    the synthetic-address byte that pass-0 happens to have assigned.
+    Reviewers can still see the resolved value via `imm.value` in the
+    object, but for visual scanning the symbol carries the engineering
+    intent — what code in 1989 called the address by its name, not by
+    its assembled offset.
+    """
+    if _NUMERIC_IMM_RE.match(imm.text or ""):
+        return f"#{imm.value & 0xff:#04x}"
+    # Preserve the original Merlin operand text verbatim. Strip a
+    # trailing comment fragment if the lexer left one in.
+    return imm.text.strip()
 
 
 def _fmt_abs(a: Abs) -> str:

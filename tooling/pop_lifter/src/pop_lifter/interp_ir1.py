@@ -267,12 +267,17 @@ def _resolve_indirect_y(ind: IndirectY, trace: Trace, ram: bytearray) -> int:
     `(addr + 1) & 0xffff` rather than the NMOS zero-page wrap, which
     matches POP's actual pointer layouts (never sitting at $ff).
     """
-    # `_real_addr` rejects synthetic-label sentinels — passing `None`
-    # for src degrades the error message slightly but `IndirectY`
-    # doesn't carry one, and synthetic pointers in zero page are an
-    # unlikely-but-loud failure mode either way.
-    lo = ram[_real_addr(ind.ptr.addr, None)]
-    hi = ram[_real_addr(ind.ptr.addr + 1, None)]
+    # Validate the base pointer is a real (non-synthetic) address
+    # first. The high-byte read at `base + 1` then uses ordinary
+    # 16-bit wrap (`0xffff + 1 == 0x0000`) — without this two-step
+    # the synthetic-check would falsely reject a `($ff),y` pair whose
+    # high byte legitimately lives at $0000. (NMOS would actually
+    # read $ff and $00 due to the famous page-wrap bug; we use the
+    # cleaner 16-bit wrap, but POP's pointers never sit at $ff so it
+    # doesn't matter for our inputs.)
+    base = _real_addr(ind.ptr.addr, None)
+    lo = ram[base]
+    hi = ram[(base + 1) & 0xffff]
     return (((hi << 8) | lo) + (trace.y & 0xff)) & 0xffff
 
 
@@ -310,7 +315,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         return True
     if isinstance(item, LoadIndexed):
         idx_val = trace.x if item.index is Reg.X else trace.y
-        addr = _real_addr(item.base.addr + idx_val, item.src)
+        addr = ((_real_addr(item.base.addr, item.src) + (idx_val & 0xff)) & 0xffff)
         value = ram[addr]
         if item.reg is Reg.A:
             trace.a = value
@@ -329,7 +334,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
     if isinstance(item, StoreIndexed):
         value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
         idx_val = trace.x if item.index is Reg.X else trace.y
-        addr = _real_addr(item.base.addr + idx_val, item.src)
+        addr = ((_real_addr(item.base.addr, item.src) + (idx_val & 0xff)) & 0xffff)
         ram[addr] = value
         trace.writes[addr] = value
         return True
@@ -591,7 +596,7 @@ def run(
 
         if isinstance(item, LoadIndexed):
             idx_val = trace.x if item.index is Reg.X else trace.y
-            addr = _real_addr(item.base.addr + idx_val, item.src)
+            addr = ((_real_addr(item.base.addr, item.src) + (idx_val & 0xff)) & 0xffff)
             value = ram[addr]
             if item.reg is Reg.A:
                 trace.a = value
@@ -622,7 +627,7 @@ def run(
                 Reg.Y: trace.y,
             }[item.reg]
             idx_val = trace.x if item.index is Reg.X else trace.y
-            addr = _real_addr(item.base.addr + idx_val, item.src)
+            addr = ((_real_addr(item.base.addr, item.src) + (idx_val & 0xff)) & 0xffff)
             ram[addr] = value
             trace.writes[addr] = value
             idx += 1

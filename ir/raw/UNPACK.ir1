@@ -387,11 +387,11 @@ fn INVERTY {
 ]rts:
   return                           ; UNPACK.S:566
 PROMPT:
-  a = #0x41                  ; UNPACK.S:583
+  a = #"A"                  ; UNPACK.S:583
   x = *BBundID@0x03f5        ; UNPACK.S:584
-  cmp x, #0xa9              ; UNPACK.S:585
+  cmp x, #POPside1              ; UNPACK.S:585
   if eq goto :1       ; UNPACK.S:586
-  a = #0x42                  ; UNPACK.S:587
+  a = #"B"                  ; UNPACK.S:587
 :1:
   *msg2@0x03c0 = a            ; UNPACK.S:588
   call blackout                  ; UNPACK.S:590
@@ -399,7 +399,7 @@ PROMPT:
   x = #0x00                  ; UNPACK.S:594
 :loop:
   a = *(msg1@0x03bf + x)   ; UNPACK.S:595
-  cmp a, #0x40              ; UNPACK.S:596
+  cmp a, #"@"              ; UNPACK.S:596
   if eq goto :done       ; UNPACK.S:597
   *($528+2@0x052a + x) = a   ; UNPACK.S:598
   x += 1                         ; UNPACK.S:599
@@ -417,11 +417,11 @@ PROMPT:
 }
 
 fn PROMPT {
-  a = #0x41                  ; UNPACK.S:583
+  a = #"A"                  ; UNPACK.S:583
   x = *BBundID@0x03f5        ; UNPACK.S:584
-  cmp x, #0xa9              ; UNPACK.S:585
+  cmp x, #POPside1              ; UNPACK.S:585
   if eq goto :1       ; UNPACK.S:586
-  a = #0x42                  ; UNPACK.S:587
+  a = #"B"                  ; UNPACK.S:587
 :1:
   *msg2@0x03c0 = a            ; UNPACK.S:588
   call blackout                  ; UNPACK.S:590
@@ -429,7 +429,7 @@ fn PROMPT {
   x = #0x00                  ; UNPACK.S:594
 :loop:
   a = *(msg1@0x03bf + x)   ; UNPACK.S:595
-  cmp a, #0x40              ; UNPACK.S:596
+  cmp a, #"@"              ; UNPACK.S:596
   if eq goto :done       ; UNPACK.S:597
   *($528+2@0x052a + x) = a   ; UNPACK.S:598
   x += 1                         ; UNPACK.S:599
@@ -450,7 +450,7 @@ fn CLR {
   bit *RWBANK2@0xc083                ; UNPACK.S:614
   bit *RWBANK2@0xc083                ; UNPACK.S:615
   *$c010@0xc010 = a            ; UNPACK.S:617
-  a = #0x20                  ; UNPACK.S:619
+  a = #" "                  ; UNPACK.S:619
   tail_call _lrcls                ; UNPACK.S:620
 }
 
@@ -512,7 +512,7 @@ FADEIN:
   if ne goto :scbclr       ; UNPACK.S:706
   x = #0x00                  ; UNPACK.S:710
   y = #0x00                  ; UNPACK.S:711
-  a = #0xff                  ; UNPACK.S:712
+  a = #32000-1                  ; UNPACK.S:712
   ??? phb             ; UNPACK.S:713
 :sm1:
   ??? mvn $E1,1            ; UNPACK.S:714
@@ -522,8 +522,8 @@ FADEIN:
   *$C029@0xc029 = a            ; UNPACK.S:721
   ??? rep $20            ; UNPACK.S:722
   x = #0x00                  ; UNPACK.S:726
-  y = #0xca                  ; UNPACK.S:727
-  a = #0x1f                  ; UNPACK.S:728
+  y = #new_palette                  ; UNPACK.S:727
+  a = #32-1                  ; UNPACK.S:728
   ??? phb             ; UNPACK.S:729
 :sm2:
   ??? mvn 0,1            ; UNPACK.S:730
@@ -552,7 +552,7 @@ fn FADEIN {
   if ne goto :scbclr       ; UNPACK.S:706
   x = #0x00                  ; UNPACK.S:710
   y = #0x00                  ; UNPACK.S:711
-  a = #0xff                  ; UNPACK.S:712
+  a = #32000-1                  ; UNPACK.S:712
   ??? phb             ; UNPACK.S:713
 :sm1:
   ??? mvn $E1,1            ; UNPACK.S:714
@@ -562,8 +562,8 @@ fn FADEIN {
   *$C029@0xc029 = a            ; UNPACK.S:721
   ??? rep $20            ; UNPACK.S:722
   x = #0x00                  ; UNPACK.S:726
-  y = #0xca                  ; UNPACK.S:727
-  a = #0x1f                  ; UNPACK.S:728
+  y = #new_palette                  ; UNPACK.S:727
+  a = #32-1                  ; UNPACK.S:728
   ??? phb             ; UNPACK.S:729
 :sm2:
   ??? mvn 0,1            ; UNPACK.S:730

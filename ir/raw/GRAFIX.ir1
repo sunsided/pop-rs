@@ -7,7 +7,7 @@ fn VBLvect {
 ADDBACK:
   x = *bgX@0xac01        ; GRAFIX.S:203
   x += 1                         ; GRAFIX.S:204
-  cmp x, #0xc8              ; GRAFIX.S:205
+  cmp x, #maxback              ; GRAFIX.S:205
   if cs goto :rts       ; GRAFIX.S:206
   a = *XCO@0x0001        ; GRAFIX.S:208
   *(bgX@0xac01 + x) = a   ; GRAFIX.S:209
@@ -28,7 +28,7 @@ ADDBACK:
 fn ADDBACK {
   x = *bgX@0xac01        ; GRAFIX.S:203
   x += 1                         ; GRAFIX.S:204
-  cmp x, #0xc8              ; GRAFIX.S:205
+  cmp x, #maxback              ; GRAFIX.S:205
   if cs goto :rts       ; GRAFIX.S:206
   a = *XCO@0x0001        ; GRAFIX.S:208
   *(bgX@0xac01 + x) = a   ; GRAFIX.S:209
@@ -49,7 +49,7 @@ fn ADDBACK {
 fn ADDFORE {
   x = *fgX@0xaf21        ; GRAFIX.S:235
   x += 1                         ; GRAFIX.S:236
-  cmp x, #0x64              ; GRAFIX.S:237
+  cmp x, #maxfore              ; GRAFIX.S:237
   if cs goto ]rts       ; GRAFIX.S:238
   a = *XCO@0x0001        ; GRAFIX.S:240
   *(fgX@0xaf21 + x) = a   ; GRAFIX.S:241
@@ -69,7 +69,7 @@ fn ADDFORE {
 fn ADDMSG {
   x = *msgX@0xb56f        ; GRAFIX.S:266
   x += 1                         ; GRAFIX.S:267
-  cmp x, #0x20              ; GRAFIX.S:268
+  cmp x, #maxmsg              ; GRAFIX.S:268
   if cs goto ]rts       ; GRAFIX.S:269
   a = *XCO@0x0001        ; GRAFIX.S:271
   *(msgX@0xb56f + x) = a   ; GRAFIX.S:272
@@ -89,7 +89,7 @@ fn ADDMSG {
 fn ADDWIPE {
   x = *wipeX@0xb0b1        ; GRAFIX.S:297
   x += 1                         ; GRAFIX.S:298
-  cmp x, #0x14              ; GRAFIX.S:299
+  cmp x, #maxwipe              ; GRAFIX.S:299
   if cs goto ]rts       ; GRAFIX.S:300
   *(wipeCOL@0xb101 + x) = a   ; GRAFIX.S:302
   a = *blackflag@0x0022        ; GRAFIX.S:303
@@ -113,7 +113,7 @@ fn ADDWIPE {
 fn ADDMID {
   x = *midX@0xb285        ; GRAFIX.S:341
   x += 1                         ; GRAFIX.S:342
-  cmp x, #0x2e              ; GRAFIX.S:343
+  cmp x, #maxmid              ; GRAFIX.S:343
   if cs goto ]rts       ; GRAFIX.S:344
   *(midTYP@0xb36b + x) = a   ; GRAFIX.S:346
   a = *XCO@0x0001        ; GRAFIX.S:348
@@ -150,7 +150,7 @@ fn ADDMIDEZ {
 ADDMIDEZO:
   x = *midX@0xb285        ; GRAFIX.S:393
   x += 1                         ; GRAFIX.S:394
-  cmp x, #0x2e              ; GRAFIX.S:395
+  cmp x, #maxmid              ; GRAFIX.S:395
   if cs goto ]rts       ; GRAFIX.S:396
   *(midTYP@0xb36b + x) = a   ; GRAFIX.S:398
   a = *XCO@0x0001        ; GRAFIX.S:400
@@ -180,7 +180,7 @@ ADDMIDEZO:
 fn ADDMIDEZO {
   x = *midX@0xb285        ; GRAFIX.S:393
   x += 1                         ; GRAFIX.S:394
-  cmp x, #0x2e              ; GRAFIX.S:395
+  cmp x, #maxmid              ; GRAFIX.S:395
   if cs goto ]rts       ; GRAFIX.S:396
   *(midTYP@0xb36b + x) = a   ; GRAFIX.S:398
   a = *XCO@0x0001        ; GRAFIX.S:400
@@ -214,14 +214,14 @@ fn ADDPEEL {
   if eq goto :1       ; GRAFIX.S:440
   x = *purpleflag@0x00da        ; GRAFIX.S:443
   a = *(dummy@0x019d + x)   ; GRAFIX.S:444
-  a = #0x2e                  ; GRAFIX.S:447
+  a = #maxpeel                  ; GRAFIX.S:447
 :1:
   ??? sta :sm+1            ; GRAFIX.S:450
   x = a                            ; GRAFIX.S:452
   a = *(peelX@0xb115 + x)   ; GRAFIX.S:453
   c = 0                            ; GRAFIX.S:454
   a = a + #0x01 + c              ; GRAFIX.S:455
-  cmp a, #0x2e              ; GRAFIX.S:456
+  cmp a, #maxpeel              ; GRAFIX.S:456
   if cs goto ]rts       ; GRAFIX.S:457
   *(peelX@0xb115 + x) = a   ; GRAFIX.S:458
   c = 0                            ; GRAFIX.S:459
@@ -335,7 +335,7 @@ fn DRAWFORE {
   a = *(fgY@0xaf85 + x)   ; GRAFIX.S:615
   *YCO@0x0002 = a            ; GRAFIX.S:616
   a = *(fgOP@0xb04d + x)   ; GRAFIX.S:618
-  cmp a, #0x04              ; GRAFIX.S:619
+  cmp a, #mask              ; GRAFIX.S:619
   if ne goto :1       ; GRAFIX.S:620
   call fastmask                  ; GRAFIX.S:621
   goto :cont                ; GRAFIX.S:622
@@ -355,7 +355,7 @@ fn DRAWFORE {
 fn SNGPEEL {
   x = *PAGE@0x0000        ; GRAFIX.S:642
   if eq goto :1       ; GRAFIX.S:643
-  x = #0x2e                  ; GRAFIX.S:644
+  x = #maxpeel                  ; GRAFIX.S:644
 :1:
   ??? stx :sm+1            ; GRAFIX.S:645
   a = *(peelX@0xb115 + x)   ; GRAFIX.S:646
@@ -374,7 +374,7 @@ fn SNGPEEL {
   *XCO@0x0001 = a            ; GRAFIX.S:659
   a = *(peelY@0xb171 + x)   ; GRAFIX.S:660
   *YCO@0x0002 = a            ; GRAFIX.S:661
-  a = #0x02                  ; GRAFIX.S:662
+  a = #sta                  ; GRAFIX.S:662
   *OPACITY@0x0006 = a            ; GRAFIX.S:663
   call peel                  ; GRAFIX.S:664
   a = pop                          ; GRAFIX.S:666
@@ -501,10 +501,10 @@ fn setbgimg {
   if pl goto :bg1       ; GRAFIX.S:829
   a = a & #0x7f              ; GRAFIX.S:831
   *IMAGE@0x0004 = a            ; GRAFIX.S:832
-  a = #0x84                  ; GRAFIX.S:834
+  a = #>bgtable2                  ; GRAFIX.S:834
   if ne goto :ok       ; GRAFIX.S:835
 :bg1:
-  a = #0x60                  ; GRAFIX.S:837
+  a = #>bgtable1                  ; GRAFIX.S:837
 :ok:
   *TABLE+1@0x0008 = a            ; GRAFIX.S:838
   a = y                            ; GRAFIX.S:840
@@ -542,7 +542,7 @@ CVTX:
   *]temp@0x00f0 = a            ; GRAFIX.S:920
   a = *]XL@0x0001        ; GRAFIX.S:922
   c = 1                            ; GRAFIX.S:923
-  a = a - #0xfc - (1 - c)        ; GRAFIX.S:924
+  a = a - #range - (1 - c)        ; GRAFIX.S:924
   *]XL@0x0001 = a            ; GRAFIX.S:925
   a = *]XH@0x0003        ; GRAFIX.S:927
   a = a - #0x00 - (1 - c)        ; GRAFIX.S:928
@@ -564,7 +564,7 @@ CVTX:
   *]temp@0x00f0 = a            ; GRAFIX.S:947
   a = *]XL@0x0001        ; GRAFIX.S:949
   c = 0                            ; GRAFIX.S:950
-  a = a + #0xfc + c              ; GRAFIX.S:951
+  a = a + #range + c              ; GRAFIX.S:951
   *]XL@0x0001 = a            ; GRAFIX.S:952
   a = *]XH@0x0003        ; GRAFIX.S:954
   a = a + #0x00 + c              ; GRAFIX.S:955
@@ -588,7 +588,7 @@ fn CVTX {
   *]temp@0x00f0 = a            ; GRAFIX.S:920
   a = *]XL@0x0001        ; GRAFIX.S:922
   c = 1                            ; GRAFIX.S:923
-  a = a - #0xfc - (1 - c)        ; GRAFIX.S:924
+  a = a - #range - (1 - c)        ; GRAFIX.S:924
   *]XL@0x0001 = a            ; GRAFIX.S:925
   a = *]XH@0x0003        ; GRAFIX.S:927
   a = a - #0x00 - (1 - c)        ; GRAFIX.S:928
@@ -610,7 +610,7 @@ fn CVTX {
   *]temp@0x00f0 = a            ; GRAFIX.S:947
   a = *]XL@0x0001        ; GRAFIX.S:949
   c = 0                            ; GRAFIX.S:950
-  a = a + #0xfc + c              ; GRAFIX.S:951
+  a = a + #range + c              ; GRAFIX.S:951
   *]XL@0x0001 = a            ; GRAFIX.S:952
   a = *]XH@0x0003        ; GRAFIX.S:954
   a = a + #0x00 + c              ; GRAFIX.S:955
@@ -647,16 +647,16 @@ fn ZEROPEEL {
   if eq goto :page1       ; GRAFIX.S:1002
 :page2:
   *peelX+maxpeel@0xb143 = a            ; GRAFIX.S:1003
-  a = #0x00                  ; GRAFIX.S:1004
+  a = #peelbuf2                  ; GRAFIX.S:1004
   *PEELBUF@0x0009 = a            ; GRAFIX.S:1005
-  a = #0xd6                  ; GRAFIX.S:1006
+  a = #>peelbuf2                  ; GRAFIX.S:1006
   *PEELBUF+1@0x000a = a            ; GRAFIX.S:1007
   return                           ; GRAFIX.S:1008
 :page1:
   *peelX@0xb115 = a            ; GRAFIX.S:1010
-  a = #0x00                  ; GRAFIX.S:1011
+  a = #peelbuf1                  ; GRAFIX.S:1011
   *PEELBUF@0x0009 = a            ; GRAFIX.S:1012
-  a = #0xd0                  ; GRAFIX.S:1013
+  a = #>peelbuf1                  ; GRAFIX.S:1013
   *PEELBUF+1@0x000a = a            ; GRAFIX.S:1014
   return                           ; GRAFIX.S:1015
 }
@@ -833,19 +833,19 @@ SETCENTER:
   if mi goto :nojoy       ; GRAFIX.S:1247
   a = *joyX@0x003b        ; GRAFIX.S:1249
   c = 1                            ; GRAFIX.S:1250
-  a = a - #0x0a - (1 - c)        ; GRAFIX.S:1251
+  a = a - #cwidthx - (1 - c)        ; GRAFIX.S:1251
   *jthres1x@0x0206 = a            ; GRAFIX.S:1252
   a = *joyX@0x003b        ; GRAFIX.S:1253
   c = 0                            ; GRAFIX.S:1254
-  a = a + #0x0a + c              ; GRAFIX.S:1255
+  a = a + #cwidthx + c              ; GRAFIX.S:1255
   *jthres2x@0x0208 = a            ; GRAFIX.S:1256
   a = *joyY@0x003c        ; GRAFIX.S:1258
   c = 1                            ; GRAFIX.S:1259
-  a = a - #0x0f - (1 - c)        ; GRAFIX.S:1260
+  a = a - #cwidthy - (1 - c)        ; GRAFIX.S:1260
   *jthres1y@0x0207 = a            ; GRAFIX.S:1261
   a = *joyY@0x003c        ; GRAFIX.S:1262
   c = 0                            ; GRAFIX.S:1263
-  a = a + #0x0f + c              ; GRAFIX.S:1264
+  a = a + #cwidthy + c              ; GRAFIX.S:1264
   *jthres2y@0x0209 = a            ; GRAFIX.S:1265
   return                           ; GRAFIX.S:1266
 :nojoy:
@@ -869,19 +869,19 @@ fn SETCENTER {
   if mi goto :nojoy       ; GRAFIX.S:1247
   a = *joyX@0x003b        ; GRAFIX.S:1249
   c = 1                            ; GRAFIX.S:1250
-  a = a - #0x0a - (1 - c)        ; GRAFIX.S:1251
+  a = a - #cwidthx - (1 - c)        ; GRAFIX.S:1251
   *jthres1x@0x0206 = a            ; GRAFIX.S:1252
   a = *joyX@0x003b        ; GRAFIX.S:1253
   c = 0                            ; GRAFIX.S:1254
-  a = a + #0x0a + c              ; GRAFIX.S:1255
+  a = a + #cwidthx + c              ; GRAFIX.S:1255
   *jthres2x@0x0208 = a            ; GRAFIX.S:1256
   a = *joyY@0x003c        ; GRAFIX.S:1258
   c = 1                            ; GRAFIX.S:1259
-  a = a - #0x0f - (1 - c)        ; GRAFIX.S:1260
+  a = a - #cwidthy - (1 - c)        ; GRAFIX.S:1260
   *jthres1y@0x0207 = a            ; GRAFIX.S:1261
   a = *joyY@0x003c        ; GRAFIX.S:1262
   c = 0                            ; GRAFIX.S:1263
-  a = a + #0x0f + c              ; GRAFIX.S:1264
+  a = a + #cwidthy + c              ; GRAFIX.S:1264
   *jthres2y@0x0209 = a            ; GRAFIX.S:1265
   return                           ; GRAFIX.S:1266
 :nojoy:
@@ -913,9 +913,9 @@ fn MOVEMEM {
 }
 
 fn GTONE {
-  y = #0x0f                  ; GRAFIX.S:1314
-  x = #0x00                  ; GRAFIX.S:1315
-  a = #0x32                  ; GRAFIX.S:1316
+  y = #SK1Pitch                  ; GRAFIX.S:1314
+  x = #>SK1Pitch                  ; GRAFIX.S:1315
+  a = #SK1Dur                  ; GRAFIX.S:1316
   tail_call tone                ; GRAFIX.S:1317
 }
 
@@ -1275,7 +1275,7 @@ fn SAVEBLUE {
   call ]bank1in                  ; GRAFIX.S:1698
   a = #0xd7                  ; GRAFIX.S:1699
   x = #0xb7                  ; GRAFIX.S:1700
-  y = #0xc0                  ; GRAFIX.S:1701
+  y = #>$b700+$900                  ; GRAFIX.S:1701
   call movemem                  ; GRAFIX.S:1702
   goto ]bank2in                ; GRAFIX.S:1703
 }
@@ -1284,7 +1284,7 @@ fn SAVEBINFO {
   call ]bank1in                  ; GRAFIX.S:1706
   a = #0xd0                  ; GRAFIX.S:1707
   x = #0xa6                  ; GRAFIX.S:1708
-  y = #0xac                  ; GRAFIX.S:1709
+  y = #>$a600+$600                  ; GRAFIX.S:1709
   call movemem                  ; GRAFIX.S:1710
   goto ]bank2in                ; GRAFIX.S:1711
 }
@@ -1293,7 +1293,7 @@ fn RELOADBLUE {
   call ]bank1in                  ; GRAFIX.S:1719
   a = #0xb7                  ; GRAFIX.S:1720
   x = #0xd7                  ; GRAFIX.S:1721
-  y = #0xe0                  ; GRAFIX.S:1722
+  y = #>$d700+$900                  ; GRAFIX.S:1722
   call movemem                  ; GRAFIX.S:1723
   goto ]bank2in                ; GRAFIX.S:1724
 }
@@ -1302,7 +1302,7 @@ fn RELOADBINFO {
   call ]bank1in                  ; GRAFIX.S:1727
   a = #0xa6                  ; GRAFIX.S:1728
   x = #0xd0                  ; GRAFIX.S:1729
-  y = #0xd6                  ; GRAFIX.S:1730
+  y = #>$d000+$600                  ; GRAFIX.S:1730
   call movemem                  ; GRAFIX.S:1731
   goto ]bank2in                ; GRAFIX.S:1732
 }
@@ -1320,30 +1320,30 @@ fn CALCBLUE {
   x = a                            ; GRAFIX.S:1764
   a = *(Mult30@0x1220 + x)   ; GRAFIX.S:1766
   c = 0                            ; GRAFIX.S:1767
-  a = a + #0x00 + c              ; GRAFIX.S:1768
+  a = a + #blueprnt + c              ; GRAFIX.S:1768
   *BlueType@0x0024 = a            ; GRAFIX.S:1769
   a = *(Mult30+1@0x1221 + x)   ; GRAFIX.S:1771
-  a = a + #0xb7 + c              ; GRAFIX.S:1772
+  a = a + #>blueprnt + c              ; GRAFIX.S:1772
   *BlueType+1@0x0025 = a            ; GRAFIX.S:1773
   a = *BlueType@0x0024        ; GRAFIX.S:1775
   c = 0                            ; GRAFIX.S:1776
-  a = a + #0xd0 + c              ; GRAFIX.S:1777
+  a = a + #24*30 + c              ; GRAFIX.S:1777
   *BlueSpec@0x0026 = a            ; GRAFIX.S:1778
   a = *BlueType+1@0x0025        ; GRAFIX.S:1780
-  a = a + #0x02 + c              ; GRAFIX.S:1781
+  a = a + #>24*30 + c              ; GRAFIX.S:1781
   *BlueSpec+1@0x0027 = a            ; GRAFIX.S:1782
 ]rts:
   return                           ; GRAFIX.S:1784
 }
 
 fn calcmenu {
-  a = #0x0f                  ; GRAFIX.S:1787
+  a = #menutype                  ; GRAFIX.S:1787
   *BlueType@0x0024 = a            ; GRAFIX.S:1788
-  a = #0x96                  ; GRAFIX.S:1789
+  a = #>menutype                  ; GRAFIX.S:1789
   *BlueType+1@0x0025 = a            ; GRAFIX.S:1790
-  a = #0x2d                  ; GRAFIX.S:1792
+  a = #menuspec                  ; GRAFIX.S:1792
   *BlueSpec@0x0026 = a            ; GRAFIX.S:1793
-  a = #0x96                  ; GRAFIX.S:1794
+  a = #>menuspec                  ; GRAFIX.S:1794
   *BlueSpec+1@0x0027 = a            ; GRAFIX.S:1795
   return                           ; GRAFIX.S:1796
 }
@@ -1411,19 +1411,19 @@ fn MUSICKEYS {
   *keypress@0x020f = a            ; GRAFIX.S:1895
   if pl goto :nokey       ; GRAFIX.S:1896
   *$c010@0xc010 = a            ; GRAFIX.S:1897
-  cmp a, #0x9b              ; GRAFIX.S:1899
+  cmp a, #ESC              ; GRAFIX.S:1899
   if ne goto :cont       ; GRAFIX.S:1900
 :froze:
   a = *$c000@0xc000        ; GRAFIX.S:1901
   *keypress@0x020f = a            ; GRAFIX.S:1902
   if pl goto :froze       ; GRAFIX.S:1903
   *$c010@0xc010 = a            ; GRAFIX.S:1904
-  cmp a, #0x9b              ; GRAFIX.S:1905
+  cmp a, #ESC              ; GRAFIX.S:1905
   if ne goto :cont       ; GRAFIX.S:1906
   a = a & #0x7f              ; GRAFIX.S:1907
   return                           ; GRAFIX.S:1908
 :cont:
-  cmp a, #0x13              ; GRAFIX.S:1910
+  cmp a, #ksound              ; GRAFIX.S:1910
   if ne goto :3       ; GRAFIX.S:1911
   a = *soundon@0x0203        ; GRAFIX.S:1912
   a = a ^ #0x01              ; GRAFIX.S:1913
@@ -1435,7 +1435,7 @@ fn MUSICKEYS {
   a = #0x00                  ; GRAFIX.S:1917
   return                           ; GRAFIX.S:1918
 :3:
-  cmp a, #0x0e              ; GRAFIX.S:1920
+  cmp a, #kmusic              ; GRAFIX.S:1920
   if ne goto :1       ; GRAFIX.S:1921
   a = *musicon@0x031a        ; GRAFIX.S:1922
   a = a ^ #0x01              ; GRAFIX.S:1923
@@ -1493,9 +1493,9 @@ fn InitVBLANK {
   a = *$FBC0@0xfbc0        ; GRAFIX.S:1987
   if ne goto ]rts       ; GRAFIX.S:1988
   *RAMWRTaux@0xc005 = a            ; GRAFIX.S:1990
-  a = #0xfd                  ; GRAFIX.S:1992
+  a = #VBLANKIIc                  ; GRAFIX.S:1992
   *VBLvect+1@0x019b = a            ; GRAFIX.S:1993
-  a = #0x01                  ; GRAFIX.S:1994
+  a = #>VBLANKIIc                  ; GRAFIX.S:1994
   *VBLvect+2@0x019c = a            ; GRAFIX.S:1995
   ??? sei             ; GRAFIX.S:1997
   *$c079@0xc079 = a            ; GRAFIX.S:1998

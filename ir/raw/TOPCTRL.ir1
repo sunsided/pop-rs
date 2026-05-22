@@ -35,11 +35,11 @@ fn StartGame {
   *NextLevel@0x031c = a            ; TOPCTRL.S:151
   cmp a, #0x01              ; TOPCTRL.S:153
   if ne goto :notfirst       ; TOPCTRL.S:154
-  a = #0x03                  ; TOPCTRL.S:155
+  a = #s_Danger                  ; TOPCTRL.S:155
   x = #0x19                  ; TOPCTRL.S:156
   call cuesong                  ; TOPCTRL.S:157
 :notfirst:
-  a = #0x03                  ; TOPCTRL.S:160
+  a = #initmaxstr                  ; TOPCTRL.S:160
   *origstrength@0x00e1 = a            ; TOPCTRL.S:161
   tail_call initgame                ; TOPCTRL.S:163
 }
@@ -72,7 +72,7 @@ fn RESTART {
   *ALTZPon@0xc009 = a            ; TOPCTRL.S:257
   *$c010@0xc010 = a            ; TOPCTRL.S:258
   call reloadblue                  ; TOPCTRL.S:261
-  a = #0x20                  ; TOPCTRL.S:264
+  a = #" "                  ; TOPCTRL.S:264
   call lrcls                  ; TOPCTRL.S:265
   call vblank                  ; TOPCTRL.S:266
   a = *PAGE2off@0xc054        ; TOPCTRL.S:267
@@ -101,7 +101,7 @@ fn RESTART {
   *PreRecPtr@0x0309 = a            ; TOPCTRL.S:297
   *PlayCount@0x00a0 = a            ; TOPCTRL.S:298
   x = *SongCue@0x0319        ; TOPCTRL.S:300
-  cmp x, #0x03              ; TOPCTRL.S:301
+  cmp x, #s_Danger              ; TOPCTRL.S:301
   if eq goto :1st       ; TOPCTRL.S:302
   *SongCue@0x0319 = a            ; TOPCTRL.S:303
 :1st:
@@ -136,9 +136,9 @@ fn RESTART {
   *skipmessage@0x0218 = a            ; TOPCTRL.S:347
   if eq goto :nomsg       ; TOPCTRL.S:348
 :1:
-  a = #0x01                  ; TOPCTRL.S:349
+  a = #LevelMsg                  ; TOPCTRL.S:349
   *message@0x030b = a            ; TOPCTRL.S:350
-  a = #0x14                  ; TOPCTRL.S:351
+  a = #leveltimer                  ; TOPCTRL.S:351
   *msgtimer@0x00db = a            ; TOPCTRL.S:352
 :nomsg:
   call entrance                  ; TOPCTRL.S:355
@@ -187,7 +187,7 @@ LoadNext1:
   *NextLevel@0x031c = a            ; TOPCTRL.S:428
   tail_call RESTART                ; TOPCTRL.S:429
   a = *NextLevel@0x031c        ; TOPCTRL.S:434
-  cmp a, #0x0f              ; TOPCTRL.S:435
+  cmp a, #LastSideB+1              ; TOPCTRL.S:435
   if cs goto :illegal       ; TOPCTRL.S:436
   cmp a, #0x01              ; TOPCTRL.S:437
   if cs goto :2       ; TOPCTRL.S:438
@@ -196,10 +196,10 @@ LoadNext1:
   *NextLevel@0x031c = a            ; TOPCTRL.S:440
   tail_call RESTART                ; TOPCTRL.S:441
 :2:
-  x = #0xad                  ; TOPCTRL.S:445
-  cmp a, #0x03              ; TOPCTRL.S:446
+  x = #POPside2                  ; TOPCTRL.S:445
+  cmp a, #FirstSideB              ; TOPCTRL.S:446
   if cs goto :1       ; TOPCTRL.S:447
-  x = #0xa9                  ; TOPCTRL.S:448
+  x = #POPside1                  ; TOPCTRL.S:448
 :1:
   cmp x, *BBundID@0x03f5    ; TOPCTRL.S:449
   if eq goto :ok       ; TOPCTRL.S:450
@@ -327,7 +327,7 @@ fn LoadNext1 {
   *NextLevel@0x031c = a            ; TOPCTRL.S:428
   tail_call RESTART                ; TOPCTRL.S:429
   a = *NextLevel@0x031c        ; TOPCTRL.S:434
-  cmp a, #0x0f              ; TOPCTRL.S:435
+  cmp a, #LastSideB+1              ; TOPCTRL.S:435
   if cs goto :illegal       ; TOPCTRL.S:436
   cmp a, #0x01              ; TOPCTRL.S:437
   if cs goto :2       ; TOPCTRL.S:438
@@ -336,10 +336,10 @@ fn LoadNext1 {
   *NextLevel@0x031c = a            ; TOPCTRL.S:440
   tail_call RESTART                ; TOPCTRL.S:441
 :2:
-  x = #0xad                  ; TOPCTRL.S:445
-  cmp a, #0x03              ; TOPCTRL.S:446
+  x = #POPside2                  ; TOPCTRL.S:445
+  cmp a, #FirstSideB              ; TOPCTRL.S:446
   if cs goto :1       ; TOPCTRL.S:447
-  x = #0xa9                  ; TOPCTRL.S:448
+  x = #POPside1                  ; TOPCTRL.S:448
 :1:
   cmp x, *BBundID@0x03f5    ; TOPCTRL.S:449
   if eq goto :ok       ; TOPCTRL.S:450
@@ -597,9 +597,9 @@ fn DoShad {
   if ne goto :os       ; TOPCTRL.S:715
   call animchar                  ; TOPCTRL.S:717
   a = *CharX@0x0041        ; TOPCTRL.S:719
-  cmp a, #0x2c              ; TOPCTRL.S:720
+  cmp a, #ScrnLeft-14              ; TOPCTRL.S:720
   if cc goto :os       ; TOPCTRL.S:721
-  cmp a, #0xd3              ; TOPCTRL.S:722
+  cmp a, #ScrnRight+14              ; TOPCTRL.S:722
   if cs goto :os       ; TOPCTRL.S:723
   call gravity                  ; TOPCTRL.S:725
   call addfall                  ; TOPCTRL.S:726
@@ -685,12 +685,12 @@ fn setupshad {
   cmp a, #0x01              ; TOPCTRL.S:844
   if ne goto :1       ; TOPCTRL.S:845
   a = *level@0x03f4        ; TOPCTRL.S:846
-  cmp a, #0x04              ; TOPCTRL.S:847
+  cmp a, #mirlevel              ; TOPCTRL.S:847
   if ne goto :2       ; TOPCTRL.S:848
   a = *CharScrn@0x004b        ; TOPCTRL.S:849
-  cmp a, #0x04              ; TOPCTRL.S:850
+  cmp a, #mirscrn              ; TOPCTRL.S:850
   if ne goto :2       ; TOPCTRL.S:851
-  a = #0x04                  ; TOPCTRL.S:852
+  a = #mirx                  ; TOPCTRL.S:852
   a = a << 1                       ; TOPCTRL.S:853
   a = a << 1                       ; TOPCTRL.S:854
   c = 0                            ; TOPCTRL.S:855
@@ -728,7 +728,7 @@ drawbg:
   *cutplan@0x00a3 = a            ; TOPCTRL.S:920
   a = #0x02                  ; TOPCTRL.S:922
   *CUTTIMER@0x0028 = a            ; TOPCTRL.S:923
-  a = #0x20                  ; TOPCTRL.S:925
+  a = #" "                  ; TOPCTRL.S:925
   call lrclse                  ; TOPCTRL.S:926
   call vblank                  ; TOPCTRL.S:927
   a = *PAGE2off@0xc054        ; TOPCTRL.S:928
@@ -753,7 +753,7 @@ drawbg:
   *cutplan@0x00a3 = a            ; TOPCTRL.S:920
   a = #0x02                  ; TOPCTRL.S:922
   *CUTTIMER@0x0028 = a            ; TOPCTRL.S:923
-  a = #0x20                  ; TOPCTRL.S:925
+  a = #" "                  ; TOPCTRL.S:925
   call lrclse                  ; TOPCTRL.S:926
   call vblank                  ; TOPCTRL.S:927
   a = *PAGE2off@0xc054        ; TOPCTRL.S:928
@@ -767,7 +767,7 @@ fn drawbg {
   *cutplan@0x00a3 = a            ; TOPCTRL.S:920
   a = #0x02                  ; TOPCTRL.S:922
   *CUTTIMER@0x0028 = a            ; TOPCTRL.S:923
-  a = #0x20                  ; TOPCTRL.S:925
+  a = #" "                  ; TOPCTRL.S:925
   call lrclse                  ; TOPCTRL.S:926
   call vblank                  ; TOPCTRL.S:927
   a = *PAGE2off@0xc054        ; TOPCTRL.S:928
@@ -899,7 +899,7 @@ fn ctrlplayer {
   call deathsong                  ; TOPCTRL.S:1112
 :inc:
   a = *CharLife@0x004f        ; TOPCTRL.S:1114
-  cmp a, #0x04              ; TOPCTRL.S:1115
+  cmp a, #deadenough              ; TOPCTRL.S:1115
   if cs goto :deadenough       ; TOPCTRL.S:1116
   *CharLife@0x004f += 1                         ; TOPCTRL.S:1117
 ]rts:
@@ -915,12 +915,12 @@ fn ctrlplayer {
   tail_call YouLose                ; TOPCTRL.S:1130
 :timeleft:
   a = *message@0x030b        ; TOPCTRL.S:1135
-  cmp a, #0x02              ; TOPCTRL.S:1136
+  cmp a, #ContMsg              ; TOPCTRL.S:1136
   if ne goto :1       ; TOPCTRL.S:1137
   a = *msgtimer@0x00db        ; TOPCTRL.S:1138
   if ne goto :ok       ; TOPCTRL.S:1139
 :1:
-  a = #0x02                  ; TOPCTRL.S:1141
+  a = #ContMsg                  ; TOPCTRL.S:1141
   *message@0x030b = a            ; TOPCTRL.S:1142
   a = #0xff                  ; TOPCTRL.S:1143
   *msgtimer@0x00db = a            ; TOPCTRL.S:1144
@@ -930,7 +930,7 @@ fn ctrlplayer {
   a = *develment@0x020e        ; TOPCTRL.S:1152
   if eq goto :nodevel       ; TOPCTRL.S:1153
   a = *keypress@0x020f        ; TOPCTRL.S:1154
-  cmp a, #0x52              ; TOPCTRL.S:1155
+  cmp a, #kresurrect              ; TOPCTRL.S:1155
   if eq goto :raise       ; TOPCTRL.S:1156
 :nodevel:
   a = *BTN0@0x001a        ; TOPCTRL.S:1160
@@ -944,12 +944,12 @@ fn ctrlplayer {
   a = #0x00                  ; TOPCTRL.S:1177
   *msgtimer@0x00db = a            ; TOPCTRL.S:1178
   *SongCue@0x0319 = a            ; TOPCTRL.S:1179
-  a = #0x14                  ; TOPCTRL.S:1181
+  a = #BTLtimer                  ; TOPCTRL.S:1181
   *backtolife@0x00a2 = a            ; TOPCTRL.S:1182
   call LoadKid                  ; TOPCTRL.S:1184
   a = *MaxKidStr@0x00d0        ; TOPCTRL.S:1186
   *ChgKidStr@0x00cf = a            ; TOPCTRL.S:1187
-  a = #0x02                  ; TOPCTRL.S:1189
+  a = #stand                  ; TOPCTRL.S:1189
   call jumpseq                  ; TOPCTRL.S:1190
   tail_call startkid1                ; TOPCTRL.S:1191
 deathsong:
@@ -958,13 +958,13 @@ deathsong:
   if eq goto :shad       ; TOPCTRL.S:1203
   a = *heroic@0x00d3        ; TOPCTRL.S:1204
   if ne goto :1       ; TOPCTRL.S:1205
-  a = #0x01                  ; TOPCTRL.S:1206
+  a = #s_Accid                  ; TOPCTRL.S:1206
   if ne goto :2       ; TOPCTRL.S:1207
 :shad:
-  a = #0x06                  ; TOPCTRL.S:1208
+  a = #s_Shadow                  ; TOPCTRL.S:1208
   if ne goto :2       ; TOPCTRL.S:1209
 :1:
-  a = #0x02                  ; TOPCTRL.S:1210
+  a = #s_Heroic                  ; TOPCTRL.S:1210
 :2:
   x = #0xff                  ; TOPCTRL.S:1211
   tail_call cuesong                ; TOPCTRL.S:1212
@@ -978,13 +978,13 @@ fn deathsong {
   if eq goto :shad       ; TOPCTRL.S:1203
   a = *heroic@0x00d3        ; TOPCTRL.S:1204
   if ne goto :1       ; TOPCTRL.S:1205
-  a = #0x01                  ; TOPCTRL.S:1206
+  a = #s_Accid                  ; TOPCTRL.S:1206
   if ne goto :2       ; TOPCTRL.S:1207
 :shad:
-  a = #0x06                  ; TOPCTRL.S:1208
+  a = #s_Shadow                  ; TOPCTRL.S:1208
   if ne goto :2       ; TOPCTRL.S:1209
 :1:
-  a = #0x02                  ; TOPCTRL.S:1210
+  a = #s_Heroic                  ; TOPCTRL.S:1210
 :2:
   x = #0xff                  ; TOPCTRL.S:1211
   tail_call cuesong                ; TOPCTRL.S:1212
@@ -997,7 +997,7 @@ fn kill0 {
   if pl goto ]rts       ; TOPCTRL.S:1222
   a = *CharScrn@0x004b        ; TOPCTRL.S:1223
   if ne goto ]rts       ; TOPCTRL.S:1224
-  a = #0x05                  ; TOPCTRL.S:1225
+  a = #Splat                  ; TOPCTRL.S:1225
   call addsound                  ; TOPCTRL.S:1226
   a = #0x64                  ; TOPCTRL.S:1227
   call decstr                  ; TOPCTRL.S:1228
@@ -1086,8 +1086,8 @@ fn entrance {
   y = #0x1d                  ; TOPCTRL.S:1365
 :loop:
   a = *(BlueType@0x0024)[y]   ; TOPCTRL.S:1367
-  a = a & #0x1f              ; TOPCTRL.S:1368
-  cmp a, #0x10              ; TOPCTRL.S:1369
+  a = a & #idmask              ; TOPCTRL.S:1368
+  cmp a, #exit              ; TOPCTRL.S:1369
   if ne goto :cont       ; TOPCTRL.S:1370
   a = *KidScrn@0x005b        ; TOPCTRL.S:1372
   tail_call closeexit                ; TOPCTRL.S:1373
@@ -1102,12 +1102,12 @@ fn addsfx {
   a = #0xa7                  ; TOPCTRL.S:1477
   cmp a, *KidPosn@0x0050    ; TOPCTRL.S:1478
   if ne goto :1       ; TOPCTRL.S:1479
-  a = #0x11                  ; TOPCTRL.S:1480
+  a = #SwordClash1                  ; TOPCTRL.S:1480
   if ne goto :clash       ; TOPCTRL.S:1481
 :1:
   cmp a, *ShadPosn@0x0060    ; TOPCTRL.S:1482
   if ne goto :2       ; TOPCTRL.S:1483
-  a = #0x12                  ; TOPCTRL.S:1484
+  a = #SwordClash2                  ; TOPCTRL.S:1484
 :clash:
   tail_call addsound                ; TOPCTRL.S:1485
 :2:
@@ -1122,9 +1122,9 @@ fn dispmsg {
   a = *KidLife@0x005f        ; TOPCTRL.S:1500
   if mi goto :alive       ; TOPCTRL.S:1501
   a = *msgtimer@0x00db        ; TOPCTRL.S:1505
-  cmp a, #0x0f              ; TOPCTRL.S:1506
+  cmp a, #contoff              ; TOPCTRL.S:1506
   if cc goto ]rts       ; TOPCTRL.S:1507
-  cmp a, #0x5f              ; TOPCTRL.S:1509
+  cmp a, #contflash              ; TOPCTRL.S:1509
   if cs goto :steady       ; TOPCTRL.S:1510
   a = a & #0x07              ; TOPCTRL.S:1512
   cmp a, #0x03              ; TOPCTRL.S:1513
@@ -1135,20 +1135,20 @@ fn dispmsg {
   if ne goto :2       ; TOPCTRL.S:1519
   call gtone                  ; TOPCTRL.S:1520
 :2:
-  a = #0x10                  ; TOPCTRL.S:1521
+  a = #FlashMsg                  ; TOPCTRL.S:1521
   call addsound                  ; TOPCTRL.S:1522
 :steady:
   tail_call continuemsg                ; TOPCTRL.S:1524
 :alive:
   a = *msgtimer@0x00db        ; TOPCTRL.S:1528
-  cmp a, #0x12              ; TOPCTRL.S:1529
+  cmp a, #leveltimer-2              ; TOPCTRL.S:1529
   if cs goto ]rts       ; TOPCTRL.S:1530
   a = *message@0x030b        ; TOPCTRL.S:1532
-  cmp a, #0x01              ; TOPCTRL.S:1533
+  cmp a, #LevelMsg              ; TOPCTRL.S:1533
   if ne goto :1       ; TOPCTRL.S:1534
   tail_call printlevel                ; TOPCTRL.S:1535
 :1:
-  cmp a, #0x03              ; TOPCTRL.S:1537
+  cmp a, #TimeMsg              ; TOPCTRL.S:1537
   if ne goto ]rts       ; TOPCTRL.S:1538
   tail_call timeleftmsg                ; TOPCTRL.S:1539
 ]rts:
@@ -1232,7 +1232,7 @@ fn misctimers {
   if ne goto :12       ; TOPCTRL.S:1669
   a = *exitopen@0x0086        ; TOPCTRL.S:1670
   if eq goto :12       ; TOPCTRL.S:1671
-  cmp a, #0x96              ; TOPCTRL.S:1672
+  cmp a, #mousetimer              ; TOPCTRL.S:1672
   if cc goto :11       ; TOPCTRL.S:1673
   if ne goto :12       ; TOPCTRL.S:1674
 :10:
@@ -1253,7 +1253,7 @@ fn wtlessflash {
   *weightless@0x00c5 = a            ; TOPCTRL.S:1691
   if eq goto :3       ; TOPCTRL.S:1692
   x = #0xff                  ; TOPCTRL.S:1693
-  cmp a, #0x0f              ; TOPCTRL.S:1694
+  cmp a, #wtlflash              ; TOPCTRL.S:1694
   if cs goto :3       ; TOPCTRL.S:1695
   a = *vibes@0x0318        ; TOPCTRL.S:1696
   a = a ^ #0xff              ; TOPCTRL.S:1697
@@ -1277,14 +1277,14 @@ fn yellowcheck {
 fn ResumeGame {
   return                           ; TOPCTRL.S:172
   call flipdisk                  ; TOPCTRL.S:175
-  a = #0xad                  ; TOPCTRL.S:176
+  a = #POPside2                  ; TOPCTRL.S:176
   *BBundID@0x03f5 = a            ; TOPCTRL.S:177
 :cont:
   call loadgame                  ; TOPCTRL.S:179
   a = *SavLevel@0xb6f0        ; TOPCTRL.S:181
   if pl goto :ok       ; TOPCTRL.S:182
   call flipdisk                  ; TOPCTRL.S:186
-  a = #0xa9                  ; TOPCTRL.S:187
+  a = #POPside1                  ; TOPCTRL.S:187
   *BBundID@0x03f5 = a            ; TOPCTRL.S:188
   a = #0x01                  ; TOPCTRL.S:190
   *level@0x03f4 = a            ; TOPCTRL.S:191
@@ -1407,13 +1407,13 @@ fn flipdisk {
   tail_call GOATTRACT                ; TOPCTRL.S:1554
   a = *redherring@0x023b        ; TOPCTRL.S:1559
   a = a ^ *redherring2@0x03f6              ; TOPCTRL.S:1560
-  cmp a, #0xa9              ; TOPCTRL.S:1561
+  cmp a, #POPside1              ; TOPCTRL.S:1561
   if eq goto :1       ; TOPCTRL.S:1562
-  a = #0xa9                  ; TOPCTRL.S:1563
+  a = #POPside1                  ; TOPCTRL.S:1563
   *BBundID@0x03f5 = a            ; TOPCTRL.S:1564
   tail_call attractmode                ; TOPCTRL.S:1565
 :1:
-  a = #0x20                  ; TOPCTRL.S:1569
+  a = #" "                  ; TOPCTRL.S:1569
   call lrcls                  ; TOPCTRL.S:1570
   call zerolsts                  ; TOPCTRL.S:1572
   call zeropeels                  ; TOPCTRL.S:1573
@@ -1439,7 +1439,7 @@ showtext:
 
 fn GOATTRACT {
   a = *BBundID@0x03f5        ; TOPCTRL.S:1245
-  cmp a, #0xa9              ; TOPCTRL.S:1246
+  cmp a, #POPside1              ; TOPCTRL.S:1246
   if eq goto :ok       ; TOPCTRL.S:1247
   a = *BGset1@0x0303        ; TOPCTRL.S:1251
   if pl goto :flip       ; TOPCTRL.S:1252
@@ -1447,7 +1447,7 @@ fn GOATTRACT {
   call LoadLevelX                  ; TOPCTRL.S:1254
 :flip:
   call flipdisk                  ; TOPCTRL.S:1257
-  a = #0xa9                  ; TOPCTRL.S:1261
+  a = #POPside1                  ; TOPCTRL.S:1261
   *BBundID@0x03f5 = a            ; TOPCTRL.S:1262
 :ok:
   tail_call attractmode                ; TOPCTRL.S:1264

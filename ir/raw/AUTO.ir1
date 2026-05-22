@@ -48,7 +48,7 @@ fn MouseProg {
   a = *CharX@0x0041        ; AUTO.S:204
   cmp a, #0xa6              ; AUTO.S:205
   if cs goto ]rts       ; AUTO.S:206
-  a = #0x6b                  ; AUTO.S:207
+  a = #Mleave                  ; AUTO.S:207
   call jumpseq                  ; AUTO.S:208
   tail_call animchar                ; AUTO.S:209
 :1:
@@ -138,7 +138,7 @@ fn Shad6a {
 
 fn ShadLevel5 {
   a = *CharScrn@0x004b        ; AUTO.S:273
-  cmp a, #0x18              ; AUTO.S:274
+  cmp a, #flaskscrn              ; AUTO.S:274
   if eq goto Shad5       ; AUTO.S:275
 ]rts:
   return                           ; AUTO.S:276
@@ -147,7 +147,7 @@ fn ShadLevel5 {
 fn Shad5 {
   a = *PlayCount@0x00a0        ; AUTO.S:282
   if ne goto :1       ; AUTO.S:283
-  a = #0x18                  ; AUTO.S:285
+  a = #flaskscrn                  ; AUTO.S:285
   x = #0x01                  ; AUTO.S:286
   y = #0x00                  ; AUTO.S:287
   call rdblock                  ; AUTO.S:288
@@ -157,8 +157,8 @@ fn Shad5 {
   a = #0x00                  ; AUTO.S:293
   *PreRecPtr@0x0309 = a            ; AUTO.S:294
 :1:
-  a = #0x3a                  ; AUTO.S:296
-  x = #0x00                  ; AUTO.S:297
+  a = #ShadProg5                  ; AUTO.S:296
+  x = #>ShadProg5                  ; AUTO.S:297
   call AutoPlayback                  ; AUTO.S:298
   a = *CharX@0x0041        ; AUTO.S:300
   cmp a, #0x0f              ; AUTO.S:301
@@ -184,7 +184,7 @@ fn ShadLevel4 {
 
 fn FinalShad {
   a = *CharScrn@0x004b        ; AUTO.S:325
-  cmp a, #0x0f              ; AUTO.S:326
+  cmp a, #swordscrn              ; AUTO.S:326
   if ne goto :cont       ; AUTO.S:327
   a = *shadowaction@0x0217        ; AUTO.S:328
   if ne goto :cont       ; AUTO.S:329
@@ -195,8 +195,8 @@ fn FinalShad {
   *shadowaction@0x0217 = a            ; AUTO.S:335
   if ne goto :cont       ; AUTO.S:336
 :hold:
-  a = #0x39                  ; AUTO.S:338
-  x = #0x00                  ; AUTO.S:339
+  a = #shadpos12                  ; AUTO.S:338
+  x = #>shadpos12                  ; AUTO.S:339
   tail_call csps                ; AUTO.S:340
 ]rts:
   return                           ; AUTO.S:341
@@ -214,7 +214,7 @@ fn FinalShad {
   cmp a, #0x02              ; AUTO.S:355
   if cc goto :2       ; AUTO.S:356
   call getopdist                  ; AUTO.S:357
-  cmp a, #0x5a              ; AUTO.S:358
+  cmp a, #swordthres              ; AUTO.S:358
   if cs goto :2       ; AUTO.S:359
   a = *CharPosn@0x0040        ; AUTO.S:361
   cmp a, #0x0f              ; AUTO.S:362
@@ -255,7 +255,7 @@ fn FinalShad {
   a = #0x0a                  ; AUTO.S:411
   *lightning@0x0088 = a            ; AUTO.S:412
   call boostmeter                  ; AUTO.S:414
-  a = #0x05                  ; AUTO.S:416
+  a = #s_Rejoin                  ; AUTO.S:416
   x = #0x55                  ; AUTO.S:417
   call cuesong                  ; AUTO.S:418
   a = #0x2a                  ; AUTO.S:420
@@ -353,16 +353,16 @@ fn EnGarde {
   if eq goto ]rts       ; AUTO.S:555
 :norec:
   call getopdist                  ; AUTO.S:560
-  cmp a, #0x23              ; AUTO.S:561
+  cmp a, #toofar              ; AUTO.S:561
   if cs goto :outofrange       ; AUTO.S:562
   x = *CharSword@0x004e        ; AUTO.S:564
   cmp x, #0x02              ; AUTO.S:565
   if cc goto :offg       ; AUTO.S:566
-  cmp a, #0x0c              ; AUTO.S:568
+  cmp a, #tooclose              ; AUTO.S:568
   if cc goto :tooclose       ; AUTO.S:569
   tail_call InRange                ; AUTO.S:570
 :offg:
-  cmp a, #0x08              ; AUTO.S:572
+  cmp a, #offguardthres              ; AUTO.S:572
   if cc goto :tooclose       ; AUTO.S:573
   tail_call InRange                ; AUTO.S:574
 ]rts:
@@ -396,12 +396,12 @@ fn EnGarde {
   tail_call DoAdvance                ; AUTO.S:606
 :jumpwait:
   call getopdist                  ; AUTO.S:611
-  cmp a, #0x32              ; AUTO.S:612
+  cmp a, #jumpthres              ; AUTO.S:612
   if cs goto ]rts       ; AUTO.S:613
   tail_call DoStrike                ; AUTO.S:614
 :runwait:
   call getopdist                  ; AUTO.S:617
-  cmp a, #0x28              ; AUTO.S:618
+  cmp a, #runthres              ; AUTO.S:618
   if cs goto ]rts       ; AUTO.S:619
 :strike:
   tail_call DoStrike                ; AUTO.S:620
@@ -433,9 +433,9 @@ fn FollowKid {
   *tempblocky@0x0092 += 1                         ; AUTO.S:660
   call rdblock1                  ; AUTO.S:661
   *ztemp@0x00e9 = a            ; AUTO.S:662
-  cmp a, #0x02              ; AUTO.S:663
+  cmp a, #spikes              ; AUTO.S:663
   if eq goto :stopped       ; AUTO.S:664
-  cmp a, #0x0b              ; AUTO.S:665
+  cmp a, #loose              ; AUTO.S:665
   if eq goto :stopped       ; AUTO.S:666
   call cmpbarr                  ; AUTO.S:667
   if ne goto :stopped       ; AUTO.S:668
@@ -464,7 +464,7 @@ fn InRange {
   a = *refract@0x00a1        ; AUTO.S:701
   if ne goto ]rts       ; AUTO.S:702
   call getopdist                  ; AUTO.S:704
-  cmp a, #0x1d              ; AUTO.S:705
+  cmp a, #strikethres2              ; AUTO.S:705
   if cc goto :1       ; AUTO.S:706
   tail_call DoAdvance                ; AUTO.S:707
 :1:
@@ -477,17 +477,17 @@ fn InRange {
 
 fn GenFight {
   call getopdist                  ; AUTO.S:724
-  cmp a, #0x0a              ; AUTO.S:725
+  cmp a, #blockthres1              ; AUTO.S:725
   if cc goto :outofrange       ; AUTO.S:726
-  cmp a, #0x1d              ; AUTO.S:727
+  cmp a, #blockthres2              ; AUTO.S:727
   if cs goto :outofrange       ; AUTO.S:728
   call MaybeBlock                  ; AUTO.S:730
   a = *refract@0x00a1        ; AUTO.S:732
   if ne goto ]rts       ; AUTO.S:733
   call getopdist                  ; AUTO.S:735
-  cmp a, #0x0c              ; AUTO.S:736
+  cmp a, #strikethres1              ; AUTO.S:736
   if cc goto :outofrange       ; AUTO.S:737
-  cmp a, #0x1d              ; AUTO.S:738
+  cmp a, #strikethres2              ; AUTO.S:738
   if cs goto :outofrange       ; AUTO.S:739
   tail_call MaybeStrike                ; AUTO.S:741
 :outofrange:
@@ -670,9 +670,9 @@ fn TestStrike {
   if ne goto ]rts       ; AUTO.S:949
 :test:
   call getopdist                  ; AUTO.S:954
-  cmp a, #0x00              ; AUTO.S:955
+  cmp a, #blockrange1              ; AUTO.S:955
   if cc goto :nobloc       ; AUTO.S:956
-  cmp a, #0x1d              ; AUTO.S:958
+  cmp a, #blockrange2              ; AUTO.S:958
   if cs goto :nobloc       ; AUTO.S:959
   a = *OpPosn@0x039c        ; AUTO.S:961
   cmp a, #0xa1              ; AUTO.S:962
@@ -685,10 +685,10 @@ fn TestStrike {
 :11:
   a = *CharID@0x004d        ; AUTO.S:972
   if eq goto :12       ; AUTO.S:973
-  a = #0x04                  ; AUTO.S:974
+  a = #blocktime                  ; AUTO.S:974
   *justblocked@0x007e = a            ; AUTO.S:975
 :12:
-  a = #0x45                  ; AUTO.S:977
+  a = #blockedstrike                  ; AUTO.S:977
   call jumpseq                  ; AUTO.S:978
   tail_call animchar                ; AUTO.S:979
 :nobloc:
@@ -699,14 +699,14 @@ fn TestStrike {
   x = *OpSword@0x03aa        ; AUTO.S:990
   cmp x, #0x02              ; AUTO.S:991
   if cs goto :ong       ; AUTO.S:992
-  cmp a, #0x08              ; AUTO.S:993
+  cmp a, #offguardthres              ; AUTO.S:993
   if cs goto :cont1       ; AUTO.S:994
   return                           ; AUTO.S:995
 :ong:
-  cmp a, #0x0c              ; AUTO.S:996
+  cmp a, #strikerange1              ; AUTO.S:996
   if cc goto ]rts       ; AUTO.S:997
 :cont1:
-  cmp a, #0x1d              ; AUTO.S:999
+  cmp a, #strikerange2              ; AUTO.S:999
   if cs goto ]rts       ; AUTO.S:1000
   ??? lda #99 "stabbed"            ; AUTO.S:1002
   *OpAction@0x03a2 = a            ; AUTO.S:1003
@@ -766,7 +766,7 @@ fn csps {
   call chgshadposn                  ; AUTO.S:1069
   a = #0x03                  ; AUTO.S:1071
   *guardprog@0x00dd = a            ; AUTO.S:1072
-  a = #0x04                  ; AUTO.S:1074
+  a = #shadstrength                  ; AUTO.S:1074
   *MaxOppStr@0x00dc = a            ; AUTO.S:1075
   *OppStrength@0x00cc = a            ; AUTO.S:1076
   tail_call SaveShad                ; AUTO.S:1078
@@ -881,12 +881,12 @@ CUTCHECK:
   if pl goto :update       ; AUTO.S:1295
 :right:
   a = *ShadX@0x0061        ; AUTO.S:1297
-  cmp a, #0xa5              ; AUTO.S:1298
+  cmp a, #ScrnWidth+25              ; AUTO.S:1298
   if cc goto :update       ; AUTO.S:1299
   if cs goto :transfer       ; AUTO.S:1300
 :left:
   a = *ShadX@0x0061        ; AUTO.S:1302
-  cmp a, #0x5b              ; AUTO.S:1303
+  cmp a, #256-ScrnWidth-25              ; AUTO.S:1303
   if cs goto :update       ; AUTO.S:1304
 :transfer:
   tail_call transferguard                ; AUTO.S:1308
@@ -942,12 +942,12 @@ fn :endpb  (aka CUTCHECK) {
   if pl goto :update       ; AUTO.S:1295
 :right:
   a = *ShadX@0x0061        ; AUTO.S:1297
-  cmp a, #0xa5              ; AUTO.S:1298
+  cmp a, #ScrnWidth+25              ; AUTO.S:1298
   if cc goto :update       ; AUTO.S:1299
   if cs goto :transfer       ; AUTO.S:1300
 :left:
   a = *ShadX@0x0061        ; AUTO.S:1302
-  cmp a, #0x5b              ; AUTO.S:1303
+  cmp a, #256-ScrnWidth-25              ; AUTO.S:1303
   if cs goto :update       ; AUTO.S:1304
 :transfer:
   tail_call transferguard                ; AUTO.S:1308
@@ -1017,7 +1017,7 @@ fn CUTGUARD {
   cmp a, #0x56              ; AUTO.S:1399
   if eq goto ]rts       ; AUTO.S:1400
   a = *ShadY@0x0062        ; AUTO.S:1402
-  cmp a, #0xd7              ; AUTO.S:1403
+  cmp a, #BotCutEdge              ; AUTO.S:1403
   if cc goto ]rts       ; AUTO.S:1404
   a = *ShadID@0x006d        ; AUTO.S:1408
   cmp a, #0x04              ; AUTO.S:1409
@@ -1050,7 +1050,7 @@ fn CUTGUARD {
   *ShadScrn@0x006b = a            ; AUTO.S:1441
   cmp a, #0x03              ; AUTO.S:1442
   if ne goto ]RemoveGd       ; AUTO.S:1443
-  a = #0x05                  ; AUTO.S:1447
+  a = #Splat                  ; AUTO.S:1447
   call addsound                  ; AUTO.S:1448
   a = #0x85                  ; AUTO.S:1449
   *ShadX@0x0061 = a            ; AUTO.S:1450
@@ -1072,12 +1072,12 @@ fn cutchar {
   if eq goto :notup       ; AUTO.S:1477
   cmp x, #0x03              ; AUTO.S:1478
   if eq goto :notup       ; AUTO.S:1479
-  cmp a, #0x0a              ; AUTO.S:1483
+  cmp a, #TopCutEdgePl              ; AUTO.S:1483
   if cc goto :CUTUP       ; AUTO.S:1484
-  cmp a, #0xf0              ; AUTO.S:1486
+  cmp a, #TopCutEdgeMi              ; AUTO.S:1486
   if cs goto :CUTUP       ; AUTO.S:1487
 :notup:
-  cmp a, #0xd7              ; AUTO.S:1489
+  cmp a, #BotCutEdge              ; AUTO.S:1489
   if cs goto :CUTDOWN       ; AUTO.S:1490
   x = *CharPosn@0x0040        ; AUTO.S:1494
   cmp x, #0x87              ; AUTO.S:1495
@@ -1105,10 +1105,10 @@ fn cutchar {
   x = *CharFace@0x0043        ; AUTO.S:1515
   if eq goto :faceR       ; AUTO.S:1516
   a = *leftej@0x00b7        ; AUTO.S:1518
-  cmp a, #0x36              ; AUTO.S:1519
+  cmp a, #LeftCutEdge              ; AUTO.S:1519
   if cc goto :CUTLEFT       ; AUTO.S:1520
   if eq goto :CUTLEFT       ; AUTO.S:1521
-  cmp a, #0xc6              ; AUTO.S:1523
+  cmp a, #ScrnRight+1              ; AUTO.S:1523
   if cs goto :CUTRIGHT       ; AUTO.S:1524
   if cc goto :nocut       ; AUTO.S:1525
 :faceR:
@@ -1116,16 +1116,16 @@ fn cutchar {
   x = #0x09                  ; AUTO.S:1529
   y = *CharBlockY@0x0045        ; AUTO.S:1530
   call rdblock                  ; AUTO.S:1531
-  cmp a, #0x07              ; AUTO.S:1533
+  cmp a, #panelwif              ; AUTO.S:1533
   if eq goto :nocutr       ; AUTO.S:1534
-  cmp a, #0x0c              ; AUTO.S:1535
+  cmp a, #panelwof              ; AUTO.S:1535
   if eq goto :nocutr       ; AUTO.S:1536
   a = *rightej@0x00b8        ; AUTO.S:1538
-  cmp a, #0xc9              ; AUTO.S:1539
+  cmp a, #RightCutEdge              ; AUTO.S:1539
   if cs goto :CUTRIGHT       ; AUTO.S:1540
 :nocutr:
   a = *rightej@0x00b8        ; AUTO.S:1542
-  cmp a, #0x39              ; AUTO.S:1543
+  cmp a, #ScrnLeft-1              ; AUTO.S:1543
   if cc goto :CUTLEFT       ; AUTO.S:1544
   if eq goto :CUTLEFT       ; AUTO.S:1545
 :nocut:
@@ -1190,11 +1190,11 @@ fn stealsword {
   a = *CharScrn@0x004b        ; AUTO.S:1609
   cmp a, #0x12              ; AUTO.S:1610
   if ne goto ]rts       ; AUTO.S:1611
-  a = #0x0f                  ; AUTO.S:1612
-  x = #0x01                  ; AUTO.S:1613
-  y = #0x00                  ; AUTO.S:1614
+  a = #swordscrn                  ; AUTO.S:1612
+  x = #swordx                  ; AUTO.S:1613
+  y = #swordy                  ; AUTO.S:1614
   call rdblock                  ; AUTO.S:1615
-  a = #0x01                  ; AUTO.S:1616
+  a = #floor                  ; AUTO.S:1616
   *(BlueType@0x0024)[y] = a   ; AUTO.S:1617
   return                           ; AUTO.S:1618
 ]rts:
@@ -1210,7 +1210,7 @@ fn jaffmusic {
   a = *CharScrn@0x004b        ; AUTO.S:1629
   cmp a, #0x03              ; AUTO.S:1630
   if ne goto ]rts       ; AUTO.S:1631
-  a = #0x0a                  ; AUTO.S:1632
+  a = #s_Jaffar                  ; AUTO.S:1632
   x = #0x19                  ; AUTO.S:1633
   tail_call cuesong                ; AUTO.S:1634
 ]rts:
@@ -1226,12 +1226,12 @@ fn mirrmusic {
   cmp a, #0x04              ; AUTO.S:1645
   if ne goto :no4       ; AUTO.S:1646
   a = *CharBlockY@0x0045        ; AUTO.S:1647
-  cmp a, #0x00              ; AUTO.S:1648
+  cmp a, #miry              ; AUTO.S:1648
   if ne goto :no4       ; AUTO.S:1649
   a = *CharScrn@0x004b        ; AUTO.S:1650
   cmp a, #0x0b              ; AUTO.S:1651
   if ne goto :no4       ; AUTO.S:1652
-  a = #0x03                  ; AUTO.S:1653
+  a = #s_Danger                  ; AUTO.S:1653
   x = #0x32                  ; AUTO.S:1654
   call cuesong                  ; AUTO.S:1655
   a = #0x4d                  ; AUTO.S:1656
@@ -1328,21 +1328,21 @@ fn ADDGUARD {
   a = *mergetimer@0x00df        ; AUTO.S:1761
   if ne goto :1       ; AUTO.S:1762
   a = *VisScrn@0x00cb        ; AUTO.S:1763
-  cmp a, #0x0f              ; AUTO.S:1764
+  cmp a, #swordscrn              ; AUTO.S:1764
 :1:
   if ne goto ]rts       ; AUTO.S:1765
   *CharScrn@0x004b = a            ; AUTO.S:1766
-  x = #0x01                  ; AUTO.S:1768
-  y = #0x00                  ; AUTO.S:1769
+  x = #swordx                  ; AUTO.S:1768
+  y = #swordy                  ; AUTO.S:1769
   call rdblock                  ; AUTO.S:1770
-  cmp a, #0x16              ; AUTO.S:1771
+  cmp a, #sword              ; AUTO.S:1771
   if eq goto ]rts       ; AUTO.S:1772
   a = #0x00                  ; AUTO.S:1773
   *shadowaction@0x0217 = a            ; AUTO.S:1774
   a = #0x01                  ; AUTO.S:1775
   *exitopen@0x0086 = a            ; AUTO.S:1776
-  a = #0x39                  ; AUTO.S:1777
-  x = #0x00                  ; AUTO.S:1778
+  a = #shadpos12                  ; AUTO.S:1777
+  x = #>shadpos12                  ; AUTO.S:1778
   tail_call csps                ; AUTO.S:1779
 :not12:
   a = *level@0x03f4        ; AUTO.S:1784
@@ -1355,14 +1355,14 @@ fn ADDGUARD {
   a = *exitopen@0x0086        ; AUTO.S:1793
   cmp a, #0x4d              ; AUTO.S:1794
   if eq goto :norepeat       ; AUTO.S:1795
-  a = #0x03                  ; AUTO.S:1796
+  a = #s_Danger                  ; AUTO.S:1796
   x = #0x32                  ; AUTO.S:1797
   call cuesong                  ; AUTO.S:1798
   a = #0x4d                  ; AUTO.S:1799
   *exitopen@0x0086 = a            ; AUTO.S:1800
 :norepeat:
-  a = #0x37                  ; AUTO.S:1802
-  x = #0x00                  ; AUTO.S:1803
+  a = #shadpos6a                  ; AUTO.S:1802
+  x = #>shadpos6a                  ; AUTO.S:1803
   tail_call csps                ; AUTO.S:1804
 :not6:
   a = *level@0x03f4        ; AUTO.S:1808
@@ -1370,15 +1370,15 @@ fn ADDGUARD {
   if ne goto :not5       ; AUTO.S:1810
   a = *VisScrn@0x00cb        ; AUTO.S:1812
   *CharScrn@0x004b = a            ; AUTO.S:1813
-  cmp a, #0x18              ; AUTO.S:1814
+  cmp a, #flaskscrn              ; AUTO.S:1814
   if ne goto AddNormalGd       ; AUTO.S:1815
-  x = #0x03                  ; AUTO.S:1817
-  y = #0x00                  ; AUTO.S:1818
+  x = #flaskx                  ; AUTO.S:1817
+  y = #flasky                  ; AUTO.S:1818
   call rdblock                  ; AUTO.S:1819
-  cmp a, #0x0a              ; AUTO.S:1820
+  cmp a, #flask              ; AUTO.S:1820
   if ne goto ]rts       ; AUTO.S:1821
-  a = #0x38                  ; AUTO.S:1823
-  x = #0x00                  ; AUTO.S:1824
+  a = #shadpos5                  ; AUTO.S:1823
+  x = #>shadpos5                  ; AUTO.S:1824
   tail_call csps                ; AUTO.S:1825
 ]rts:
   return                           ; AUTO.S:1826
@@ -1417,12 +1417,12 @@ AddNormalGd:
   if ne goto :5       ; AUTO.S:1870
   a = #0x02                  ; AUTO.S:1871
   *CharSword@0x004e = a            ; AUTO.S:1872
-  a = #0x3f                  ; AUTO.S:1873
+  a = #landengarde                  ; AUTO.S:1873
   if ne goto :6       ; AUTO.S:1874
 :5:
   a = #0x00                  ; AUTO.S:1875
   *CharSword@0x004e = a            ; AUTO.S:1876
-  a = #0x4d                  ; AUTO.S:1877
+  a = #alertstand                  ; AUTO.S:1877
 :6:
   call jumpseq                  ; AUTO.S:1878
   goto :2                ; AUTO.S:1879
@@ -1460,7 +1460,7 @@ AddNormalGd:
   *CharAction@0x0046 = a            ; AUTO.S:1921
   x = *VisScrn@0x00cb        ; AUTO.S:1923
   a = *(GdStartProg-1@0xbfa6 + x)   ; AUTO.S:1924
-  cmp a, #0x0c              ; AUTO.S:1925
+  cmp a, #numprogs              ; AUTO.S:1925
   if cc goto :ok       ; AUTO.S:1926
   a = #0x03                  ; AUTO.S:1927
 :ok:
@@ -1507,12 +1507,12 @@ fn :not5  (aka AddNormalGd) {
   if ne goto :5       ; AUTO.S:1870
   a = #0x02                  ; AUTO.S:1871
   *CharSword@0x004e = a            ; AUTO.S:1872
-  a = #0x3f                  ; AUTO.S:1873
+  a = #landengarde                  ; AUTO.S:1873
   if ne goto :6       ; AUTO.S:1874
 :5:
   a = #0x00                  ; AUTO.S:1875
   *CharSword@0x004e = a            ; AUTO.S:1876
-  a = #0x4d                  ; AUTO.S:1877
+  a = #alertstand                  ; AUTO.S:1877
 :6:
   call jumpseq                  ; AUTO.S:1878
   goto :2                ; AUTO.S:1879
@@ -1550,7 +1550,7 @@ fn :not5  (aka AddNormalGd) {
   *CharAction@0x0046 = a            ; AUTO.S:1921
   x = *VisScrn@0x00cb        ; AUTO.S:1923
   a = *(GdStartProg-1@0xbfa6 + x)   ; AUTO.S:1924
-  cmp a, #0x0c              ; AUTO.S:1925
+  cmp a, #numprogs              ; AUTO.S:1925
   if cc goto :ok       ; AUTO.S:1926
   a = #0x03                  ; AUTO.S:1927
 :ok:

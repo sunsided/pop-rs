@@ -28,22 +28,22 @@ fn CHECKBARR {
   *begrange@0x00c8 = x            ; COLL.S:112
   a = *BlockYthis@0x039a        ; COLL.S:119
   *blocky@0x008d = a            ; COLL.S:120
-  a = #0x60                  ; COLL.S:122
-  x = #0x20                  ; COLL.S:123
+  a = #SNthisframe                  ; COLL.S:122
+  x = #CDthisframe                  ; COLL.S:123
   call getCData                  ; COLL.S:124
   a = *BlockYthis@0x039a        ; COLL.S:128
   c = 0                            ; COLL.S:129
   a = a + #0x01 + c              ; COLL.S:130
   *blocky@0x008d = a            ; COLL.S:131
-  a = #0x80                  ; COLL.S:133
-  x = #0x40                  ; COLL.S:134
+  a = #SNbelow                  ; COLL.S:133
+  x = #CDbelow                  ; COLL.S:134
   call getCData                  ; COLL.S:135
   a = *BlockYthis@0x039a        ; COLL.S:139
   c = 1                            ; COLL.S:140
   a = a - #0x01 - (1 - c)        ; COLL.S:141
   *blocky@0x008d = a            ; COLL.S:142
-  a = #0x90                  ; COLL.S:144
-  x = #0x50                  ; COLL.S:145
+  a = #SNabove                  ; COLL.S:144
+  x = #CDabove                  ; COLL.S:145
   call getCData                  ; COLL.S:146
   x = #0x09                  ; COLL.S:151
 :loop2:
@@ -82,7 +82,7 @@ fn getCData {
   a = *begrange@0x00c8        ; COLL.S:198
   call getblockej                  ; COLL.S:199
   c = 0                            ; COLL.S:200
-  a = a + #0x07 + c              ; COLL.S:201
+  a = a + #angle + c              ; COLL.S:201
   *blockedge@0x00c2 = a            ; COLL.S:202
   x = *begrange@0x00c8        ; COLL.S:204
 :loop:
@@ -154,16 +154,16 @@ fn initCDbufs {
   cmp a, *BlockYlast@0x039b    ; COLL.S:291
   if eq goto :useabove       ; COLL.S:292
 :usebelow:
-  a = #0x80                  ; COLL.S:295
-  x = #0x40                  ; COLL.S:296
+  a = #SNbelow                  ; COLL.S:295
+  x = #CDbelow                  ; COLL.S:296
   goto :cont                ; COLL.S:297
 :useabove:
-  a = #0x90                  ; COLL.S:299
-  x = #0x50                  ; COLL.S:300
+  a = #SNabove                  ; COLL.S:299
+  x = #CDabove                  ; COLL.S:300
   goto :cont                ; COLL.S:301
 :usethis:
-  a = #0x60                  ; COLL.S:303
-  x = #0x20                  ; COLL.S:304
+  a = #SNthisframe                  ; COLL.S:303
+  x = #CDthisframe                  ; COLL.S:304
 :cont:
   ??? sta :smodSN+1            ; COLL.S:306
   ??? stx :smodCD+1            ; COLL.S:307
@@ -315,13 +315,13 @@ fn checkcoll1 {
 }
 
 fn CHECKCOLL {
-  cmp a, #0x0a              ; COLL.S:528
+  cmp a, #flask              ; COLL.S:528
   if eq goto :no       ; COLL.S:529
-  cmp a, #0x04              ; COLL.S:531
+  cmp a, #gate              ; COLL.S:531
   if eq goto :gate       ; COLL.S:532
-  cmp a, #0x12              ; COLL.S:534
+  cmp a, #slicer              ; COLL.S:534
   if eq goto :slicer       ; COLL.S:535
-  cmp a, #0x0d              ; COLL.S:537
+  cmp a, #mirror              ; COLL.S:537
   if eq goto :mirror       ; COLL.S:538
   if ne goto :c1       ; COLL.S:539
 :mirror:
@@ -341,7 +341,7 @@ fn CHECKCOLL {
   return                           ; COLL.S:560
 :slicer:
   a = *(BlueSpec@0x0026)[y]   ; COLL.S:564
-  cmp a, #0x02              ; COLL.S:565
+  cmp a, #slicerExt              ; COLL.S:565
   if ne goto :no       ; COLL.S:566
   if eq goto :c1       ; COLL.S:567
 :gate:
@@ -355,7 +355,7 @@ fn CHECKCOLL {
   call getblockej                  ; COLL.S:583
   call AdjustScrn                  ; COLL.S:584
   c = 0                            ; COLL.S:585
-  a = a + #0x07 + c              ; COLL.S:586
+  a = a + #angle + c              ; COLL.S:586
   *blockedge@0x00c2 = a            ; COLL.S:587
 :yes:
   c = 1                            ; COLL.S:588
@@ -378,11 +378,11 @@ fn AdjustScrn {
   return                           ; COLL.S:614
 :osR:
   c = 0                            ; COLL.S:615
-  a = a + #0x8c + c              ; COLL.S:616
+  a = a + #ScrnWidth + c              ; COLL.S:616
   return                           ; COLL.S:617
 :osL:
   c = 1                            ; COLL.S:618
-  a = a - #0x8c - (1 - c)        ; COLL.S:619
+  a = a - #ScrnWidth - (1 - c)        ; COLL.S:619
 ]rts:
   return                           ; COLL.S:620
 }
@@ -400,18 +400,18 @@ fn collide {
   call rdblock1                  ; COLL.S:647
   x = *CollFace@0x00f1        ; COLL.S:649
   if pl goto :faceL       ; COLL.S:650
-  cmp a, #0x14              ; COLL.S:652
+  cmp a, #block              ; COLL.S:652
   if eq goto :2       ; COLL.S:653
   if ne goto :1       ; COLL.S:654
 :2:
   *tempblockx@0x0091 -= 1                         ; COLL.S:656
   goto :3                ; COLL.S:657
 :faceL:
-  cmp a, #0x0c              ; COLL.S:659
+  cmp a, #panelwof              ; COLL.S:659
   if eq goto :4       ; COLL.S:660
-  cmp a, #0x07              ; COLL.S:661
+  cmp a, #panelwif              ; COLL.S:661
   if eq goto :4       ; COLL.S:662
-  cmp a, #0x14              ; COLL.S:663
+  cmp a, #block              ; COLL.S:663
   if ne goto :1       ; COLL.S:664
 :4:
   *tempblockx@0x0091 += 1                         ; COLL.S:666
@@ -440,14 +440,14 @@ AirBump:
   *CharXVel@0x0047 = a            ; COLL.S:695
   if eq goto :smackwall       ; COLL.S:696
 :3:
-  a = #0x2d                  ; COLL.S:698
+  a = #bumpfall                  ; COLL.S:698
   call jumpseq                  ; COLL.S:699
   call animchar                  ; COLL.S:700
 :smackwall:
 BumpSound:
   a = #0x01                  ; COLL.S:705
   *alertguard@0x00e4 = a            ; COLL.S:706
-  a = #0x0d                  ; COLL.S:707
+  a = #SmackWall                  ; COLL.S:707
   tail_call addsound                ; COLL.S:708
 ]rts:
   return                           ; COLL.S:620
@@ -464,21 +464,21 @@ fn AirBump {
   *CharXVel@0x0047 = a            ; COLL.S:695
   if eq goto :smackwall       ; COLL.S:696
 :3:
-  a = #0x2d                  ; COLL.S:698
+  a = #bumpfall                  ; COLL.S:698
   call jumpseq                  ; COLL.S:699
   call animchar                  ; COLL.S:700
 :smackwall:
 BumpSound:
   a = #0x01                  ; COLL.S:705
   *alertguard@0x00e4 = a            ; COLL.S:706
-  a = #0x0d                  ; COLL.S:707
+  a = #SmackWall                  ; COLL.S:707
   tail_call addsound                ; COLL.S:708
 }
 
 fn :smackwall  (aka BumpSound) {
   a = #0x01                  ; COLL.S:705
   *alertguard@0x00e4 = a            ; COLL.S:706
-  a = #0x0d                  ; COLL.S:707
+  a = #SmackWall                  ; COLL.S:707
   tail_call addsound                ; COLL.S:708
 }
 
@@ -496,7 +496,7 @@ fn GroundBump {
   a = *(FloorY+1@0x127f + x)   ; COLL.S:726
   *CharY@0x0042 = a            ; COLL.S:727
   a = *CharYVel@0x0048        ; COLL.S:729
-  cmp a, #0x16              ; COLL.S:730
+  cmp a, #OofVelocity              ; COLL.S:730
   if cc goto :okvel       ; COLL.S:731
   a = #0xfb                  ; COLL.S:732
   call addcharx                  ; COLL.S:733
@@ -527,12 +527,12 @@ fn GroundBump {
   if cc goto :hard       ; COLL.S:767
 :2:
 :soft:
-  a = #0x2f                  ; COLL.S:771
+  a = #bump                  ; COLL.S:771
   call jumpseq                  ; COLL.S:772
   call BumpSound                  ; COLL.S:773
   tail_call animchar                ; COLL.S:774
 :hard:
-  a = #0x2e                  ; COLL.S:776
+  a = #hardbump                  ; COLL.S:776
 :doit:
   call jumpseq                  ; COLL.S:777
   call animchar                  ; COLL.S:778
@@ -544,10 +544,10 @@ fn GroundBump {
   a = *CollFace@0x00f1        ; COLL.S:791
   cmp a, *CharFace@0x0043    ; COLL.S:792
   if eq goto :collback       ; COLL.S:793
-  a = #0x40                  ; COLL.S:795
+  a = #bumpengfwd                  ; COLL.S:795
   if ne goto :doit       ; COLL.S:796
 :collback:
-  a = #0x41                  ; COLL.S:801
+  a = #bumpengback                  ; COLL.S:801
   call jumpseq                  ; COLL.S:802
   call animchar                  ; COLL.S:803
   a = #0x01                  ; COLL.S:805
@@ -572,7 +572,7 @@ fn GETFWDDIST {
 :nextb:
   call getinfront                  ; COLL.S:847
   *tempobjid@0x00f2 = a            ; COLL.S:848
-  cmp a, #0x0c              ; COLL.S:849
+  cmp a, #panelwof              ; COLL.S:849
   if ne goto :99       ; COLL.S:850
   x = *CharFace@0x0043        ; COLL.S:851
   if pl goto :toEOB       ; COLL.S:852
@@ -587,13 +587,13 @@ fn GETFWDDIST {
 :nobarr:
   call getinfront                  ; COLL.S:867
   *tempobjid@0x00f2 = a            ; COLL.S:868
-  cmp a, #0x0b              ; COLL.S:870
+  cmp a, #loose              ; COLL.S:870
   if eq goto :toEOB       ; COLL.S:871
-  cmp a, #0x06              ; COLL.S:873
+  cmp a, #pressplate              ; COLL.S:873
   if eq goto :toEOB1       ; COLL.S:874
-  cmp a, #0x16              ; COLL.S:876
+  cmp a, #sword              ; COLL.S:876
   if eq goto :toEOB1       ; COLL.S:877
-  cmp a, #0x0a              ; COLL.S:878
+  cmp a, #flask              ; COLL.S:878
   if eq goto :toEOB1       ; COLL.S:879
   call cmpspace                  ; COLL.S:881
   if eq goto :toEOB       ; COLL.S:882
@@ -620,7 +620,7 @@ fn GETFWDDIST {
   if ne goto :done       ; COLL.S:914
 DBarr:
   a = *tempobjid@0x00f2        ; COLL.S:926
-  cmp a, #0x04              ; COLL.S:927
+  cmp a, #gate              ; COLL.S:927
   if ne goto :ok       ; COLL.S:928
   call gatebarr?                  ; COLL.S:930
   if cs goto :clr       ; COLL.S:931
@@ -628,7 +628,7 @@ DBarr:
   a = *tempblockx@0x0091        ; COLL.S:933
   call getblockej                  ; COLL.S:934
   c = 0                            ; COLL.S:935
-  a = a + #0x07 + c              ; COLL.S:936
+  a = a + #angle + c              ; COLL.S:936
   *blockedge@0x00c2 = a            ; COLL.S:937
   a = *CharFace@0x0043        ; COLL.S:939
   if mi goto :checkL       ; COLL.S:940
@@ -667,7 +667,7 @@ DBarr:
 
 fn DBarr {
   a = *tempobjid@0x00f2        ; COLL.S:926
-  cmp a, #0x04              ; COLL.S:927
+  cmp a, #gate              ; COLL.S:927
   if ne goto :ok       ; COLL.S:928
   call gatebarr?                  ; COLL.S:930
   if cs goto :clr       ; COLL.S:931
@@ -675,7 +675,7 @@ fn DBarr {
   a = *tempblockx@0x0091        ; COLL.S:933
   call getblockej                  ; COLL.S:934
   c = 0                            ; COLL.S:935
-  a = a + #0x07 + c              ; COLL.S:936
+  a = a + #angle + c              ; COLL.S:936
   *blockedge@0x00c2 = a            ; COLL.S:937
   a = *CharFace@0x0043        ; COLL.S:939
   if mi goto :checkL       ; COLL.S:940
@@ -714,14 +714,14 @@ fn DBarr {
 
 fn ANIMCHAR  (aka :next) {
   call getseq                  ; COLL.S:996
-  cmp a, #0xfb              ; COLL.S:999
+  cmp a, #chx              ; COLL.S:999
   if ne goto :no1       ; COLL.S:1000
   call getseq                  ; COLL.S:1002
   call addcharx                  ; COLL.S:1004
   *CharX@0x0041 = a            ; COLL.S:1005
   goto :next                ; COLL.S:1007
 :no1:
-  cmp a, #0xfa              ; COLL.S:1010
+  cmp a, #chy              ; COLL.S:1010
   if ne goto :no2       ; COLL.S:1011
   call getseq                  ; COLL.S:1013
   c = 0                            ; COLL.S:1015
@@ -729,14 +729,14 @@ fn ANIMCHAR  (aka :next) {
   *CharY@0x0042 = a            ; COLL.S:1017
   goto :next                ; COLL.S:1019
 :no2:
-  cmp a, #0xfe              ; COLL.S:1022
+  cmp a, #aboutface              ; COLL.S:1022
   if ne goto :no3       ; COLL.S:1023
   a = *CharFace@0x0043        ; COLL.S:1025
   a = a ^ #0xff              ; COLL.S:1026
   *CharFace@0x0043 = a            ; COLL.S:1027
   goto :next                ; COLL.S:1029
 :no3:
-  cmp a, #0xff              ; COLL.S:1032
+  cmp a, #goto              ; COLL.S:1032
   if ne goto :no4       ; COLL.S:1033
 :goto:
   call getseq                  ; COLL.S:1035
@@ -747,25 +747,25 @@ fn ANIMCHAR  (aka :next) {
   *CharSeq@0x0049 = a            ; COLL.S:1042
   goto :next                ; COLL.S:1044
 :no4:
-  cmp a, #0xfd              ; COLL.S:1047
+  cmp a, #up              ; COLL.S:1047
   if ne goto :no5       ; COLL.S:1048
   *CharBlockY@0x0045 -= 1                         ; COLL.S:1050
   call addslicers                  ; COLL.S:1052
   goto :next                ; COLL.S:1054
 :no5:
-  cmp a, #0xfc              ; COLL.S:1057
+  cmp a, #down              ; COLL.S:1057
   if ne goto :no6       ; COLL.S:1058
   *CharBlockY@0x0045 += 1                         ; COLL.S:1060
   call addslicers                  ; COLL.S:1062
   goto :next                ; COLL.S:1064
 :no6:
-  cmp a, #0xf9              ; COLL.S:1067
+  cmp a, #act              ; COLL.S:1067
   if ne goto :no7       ; COLL.S:1068
   call getseq                  ; COLL.S:1070
   *CharAction@0x0046 = a            ; COLL.S:1071
   goto :next                ; COLL.S:1073
 :no7:
-  cmp a, #0xf8              ; COLL.S:1075
+  cmp a, #setfall              ; COLL.S:1075
   if ne goto :no8       ; COLL.S:1076
   call getseq                  ; COLL.S:1078
   *CharXVel@0x0047 = a            ; COLL.S:1079
@@ -773,7 +773,7 @@ fn ANIMCHAR  (aka :next) {
   *CharYVel@0x0048 = a            ; COLL.S:1082
   goto :next                ; COLL.S:1084
 :no8:
-  cmp a, #0xf7              ; COLL.S:1086
+  cmp a, #ifwtless              ; COLL.S:1086
   if ne goto :no9       ; COLL.S:1087
   a = *weightless@0x00c5        ; COLL.S:1089
   if ne goto :goto       ; COLL.S:1090
@@ -781,30 +781,30 @@ fn ANIMCHAR  (aka :next) {
   call getseq                  ; COLL.S:1093
   goto :next                ; COLL.S:1094
 :no9:
-  cmp a, #0xf6              ; COLL.S:1096
+  cmp a, #die              ; COLL.S:1096
   if ne goto :no10       ; COLL.S:1097
   goto :next                ; COLL.S:1098
 :no10:
-  cmp a, #0xf5              ; COLL.S:1100
+  cmp a, #jaru              ; COLL.S:1100
   if ne goto :no11       ; COLL.S:1101
   a = #0x01                  ; COLL.S:1103
   *jarabove@0x00cd = a            ; COLL.S:1104
   goto :next                ; COLL.S:1105
 :no11:
-  cmp a, #0xf4              ; COLL.S:1107
+  cmp a, #jard              ; COLL.S:1107
   if ne goto :no12       ; COLL.S:1108
   a = #0xff                  ; COLL.S:1110
   *jarabove@0x00cd = a            ; COLL.S:1111
   goto :next                ; COLL.S:1112
 :no12:
-  cmp a, #0xf2              ; COLL.S:1115
+  cmp a, #tap              ; COLL.S:1115
   if ne goto :no13       ; COLL.S:1116
   call getseq                  ; COLL.S:1118
   cmp a, #0x00              ; COLL.S:1119
   if eq goto :0       ; COLL.S:1120
   cmp a, #0x01              ; COLL.S:1122
   if ne goto :1       ; COLL.S:1123
-  a = #0x09                  ; COLL.S:1124
+  a = #Footstep                  ; COLL.S:1124
 :tap:
   call addsound                  ; COLL.S:1125
 :0:
@@ -814,17 +814,17 @@ fn ANIMCHAR  (aka :next) {
 :1:
   cmp a, #0x02              ; COLL.S:1130
   if ne goto :2       ; COLL.S:1131
-  a = #0x0d                  ; COLL.S:1132
+  a = #SmackWall                  ; COLL.S:1132
   if ne goto :tap       ; COLL.S:1133
 :2:
   goto :next                ; COLL.S:1134
 :no13:
-  cmp a, #0xf1              ; COLL.S:1136
+  cmp a, #nextlevel              ; COLL.S:1136
   if ne goto :no14       ; COLL.S:1137
   call GoneUpstairs                  ; COLL.S:1139
   goto :next                ; COLL.S:1140
 :no14:
-  cmp a, #0xf3              ; COLL.S:1142
+  cmp a, #effect              ; COLL.S:1142
   if ne goto :no15       ; COLL.S:1143
   call getseq                  ; COLL.S:1145
   cmp a, #0x01              ; COLL.S:1146
@@ -845,10 +845,10 @@ fn GoneUpstairs {
   cmp a, #0x04              ; COLL.S:1166
   if ne goto :1       ; COLL.S:1167
 :3:
-  a = #0x06                  ; COLL.S:1168
+  a = #s_Shadow                  ; COLL.S:1168
   if ne goto :2       ; COLL.S:1169
 :1:
-  a = #0x09                  ; COLL.S:1171
+  a = #s_Upstairs                  ; COLL.S:1171
 :2:
   x = #0x19                  ; COLL.S:1172
   call cuesong                  ; COLL.S:1173
@@ -869,11 +869,11 @@ fn CHECKSLICE {
   a = *(SNthisframe@0x0360 + x)   ; COLL.S:1200
   *tempscrn@0x0093 = a            ; COLL.S:1201
   call rdblock1                  ; COLL.S:1203
-  cmp a, #0x12              ; COLL.S:1204
+  cmp a, #slicer              ; COLL.S:1204
   if ne goto :ok       ; COLL.S:1205
   a = *(BlueSpec@0x0026)[y]   ; COLL.S:1207
   a = a & #0x7f              ; COLL.S:1208
-  cmp a, #0x02              ; COLL.S:1209
+  cmp a, #slicerExt              ; COLL.S:1209
   if eq goto :slice       ; COLL.S:1210
 :ok:
   x = *tempblockx@0x0091        ; COLL.S:1214
@@ -904,9 +904,9 @@ fn CHECKSLICE {
   *CharY@0x0042 = a            ; COLL.S:1245
   a = #0x64                  ; COLL.S:1247
   call decstr                  ; COLL.S:1248
-  a = #0x05                  ; COLL.S:1250
+  a = #Splat                  ; COLL.S:1250
   call addsound                  ; COLL.S:1251
-  a = #0x36                  ; COLL.S:1253
+  a = #halve                  ; COLL.S:1253
   call jumpseq                  ; COLL.S:1254
   tail_call animchar                ; COLL.S:1255
 }
@@ -918,16 +918,16 @@ fn CHECKSLICE2 {
   *tempblockx@0x0091 += 1                         ; COLL.S:1271
   call rdblock1                  ; COLL.S:1272
 :slice?:
-  cmp a, #0x12              ; COLL.S:1275
+  cmp a, #slicer              ; COLL.S:1275
   if ne goto :safe       ; COLL.S:1276
   a = *(BlueSpec@0x0026)[y]   ; COLL.S:1277
   a = a & #0x7f              ; COLL.S:1278
-  cmp a, #0x02              ; COLL.S:1279
+  cmp a, #slicerExt              ; COLL.S:1279
   if ne goto :safe       ; COLL.S:1280
   a = *tempblockx@0x0091        ; COLL.S:1282
   call getblockej                  ; COLL.S:1283
   c = 0                            ; COLL.S:1284
-  a = a + #0x07 + c              ; COLL.S:1285
+  a = a + #angle + c              ; COLL.S:1285
   *blockedge@0x00c2 = a            ; COLL.S:1286
   a = *tempscrn@0x0093        ; COLL.S:1288
   x = *tempblockx@0x0091        ; COLL.S:1289
@@ -965,11 +965,11 @@ fn CHECKGATE {
   if cs goto ]rts       ; COLL.S:1329
 :1:
   call getunderft                  ; COLL.S:1331
-  cmp a, #0x04              ; COLL.S:1332
+  cmp a, #gate              ; COLL.S:1332
   if eq goto :check       ; COLL.S:1333
   *tempblockx@0x0091 -= 1                         ; COLL.S:1335
   call rdblock1                  ; COLL.S:1336
-  cmp a, #0x04              ; COLL.S:1337
+  cmp a, #gate              ; COLL.S:1337
   if ne goto ]rts       ; COLL.S:1338
 :check:
   x = *tempblockx@0x0091        ; COLL.S:1340
@@ -1005,7 +1005,7 @@ fn gatebarr? {
   a = a >> 1                       ; COLL.S:1376
   a = a >> 1                       ; COLL.S:1377
   c = 0                            ; COLL.S:1378
-  a = a + #0x06 + c              ; COLL.S:1379
+  a = a + #gatemargin + c              ; COLL.S:1379
   cmp a, *imheight@0x00b5    ; COLL.S:1380
 ]rts:
   return                           ; COLL.S:1381
@@ -1023,11 +1023,11 @@ fn ENEMYCOLL {
   cmp a, #0x02              ; COLL.S:1399
   if cc goto ]rts       ; COLL.S:1400
   call getunderft                  ; COLL.S:1402
-  cmp a, #0x14              ; COLL.S:1403
+  cmp a, #block              ; COLL.S:1403
   if eq goto :collide       ; COLL.S:1404
-  cmp a, #0x07              ; COLL.S:1405
+  cmp a, #panelwif              ; COLL.S:1405
   if eq goto :collide       ; COLL.S:1406
-  cmp a, #0x04              ; COLL.S:1407
+  cmp a, #gate              ; COLL.S:1407
   if ne goto :1       ; COLL.S:1408
   call gatebarr?                  ; COLL.S:1409
   if cc goto :collide       ; COLL.S:1410
@@ -1036,9 +1036,9 @@ fn ENEMYCOLL {
   if mi goto ]rts       ; COLL.S:1415
   *tempblockx@0x0091 -= 1                         ; COLL.S:1416
   call rdblock1                  ; COLL.S:1417
-  cmp a, #0x07              ; COLL.S:1418
+  cmp a, #panelwif              ; COLL.S:1418
   if eq goto :collide       ; COLL.S:1419
-  cmp a, #0x04              ; COLL.S:1420
+  cmp a, #gate              ; COLL.S:1420
   if ne goto ]rts       ; COLL.S:1421
   call gatebarr?                  ; COLL.S:1422
   if cc goto :collide       ; COLL.S:1423
@@ -1062,7 +1062,7 @@ fn ENEMYCOLL {
   a = a + #0x01 + c              ; COLL.S:1446
   call addcharx                  ; COLL.S:1447
   *CharX@0x0041 = a            ; COLL.S:1448
-  a = #0x41                  ; COLL.S:1450
+  a = #bumpengback                  ; COLL.S:1450
   call jumpseq                  ; COLL.S:1451
   call animchar                  ; COLL.S:1452
   tail_call rereadblocks                ; COLL.S:1453
@@ -1106,16 +1106,16 @@ fn DBarr2 {
 }
 
 fn :slice? {
-  cmp a, #0x12              ; COLL.S:1275
+  cmp a, #slicer              ; COLL.S:1275
   if ne goto :safe       ; COLL.S:1276
   a = *(BlueSpec@0x0026)[y]   ; COLL.S:1277
   a = a & #0x7f              ; COLL.S:1278
-  cmp a, #0x02              ; COLL.S:1279
+  cmp a, #slicerExt              ; COLL.S:1279
   if ne goto :safe       ; COLL.S:1280
   a = *tempblockx@0x0091        ; COLL.S:1282
   call getblockej                  ; COLL.S:1283
   c = 0                            ; COLL.S:1284
-  a = a + #0x07 + c              ; COLL.S:1285
+  a = a + #angle + c              ; COLL.S:1285
   *blockedge@0x00c2 = a            ; COLL.S:1286
   a = *tempscrn@0x0093        ; COLL.S:1288
   x = *tempblockx@0x0091        ; COLL.S:1289
@@ -1162,9 +1162,9 @@ fn :slice  (aka ]slice) {
   *CharY@0x0042 = a            ; COLL.S:1245
   a = #0x64                  ; COLL.S:1247
   call decstr                  ; COLL.S:1248
-  a = #0x05                  ; COLL.S:1250
+  a = #Splat                  ; COLL.S:1250
   call addsound                  ; COLL.S:1251
-  a = #0x36                  ; COLL.S:1253
+  a = #halve                  ; COLL.S:1253
   call jumpseq                  ; COLL.S:1254
   tail_call animchar                ; COLL.S:1255
 ]rts:

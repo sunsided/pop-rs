@@ -386,11 +386,11 @@ fn LAY {
   *OPACITY@0x0006 = a            ; HIRES.S:663
   tail_call MLAY                ; HIRES.S:664
 :notmirr:
-  cmp a, #0x03              ; HIRES.S:666
+  cmp a, #eor              ; HIRES.S:666
   if ne goto :1       ; HIRES.S:667
   tail_call LayXOR                ; HIRES.S:668
 :1:
-  cmp a, #0x04              ; HIRES.S:670
+  cmp a, #mask              ; HIRES.S:670
   if cc goto :2       ; HIRES.S:671
   tail_call LayMask                ; HIRES.S:672
 :2:
@@ -783,11 +783,11 @@ fn LayXOR {
 }
 
 fn MLAY {
-  cmp a, #0x03              ; HIRES.S:1187
+  cmp a, #eor              ; HIRES.S:1187
   if ne goto :1       ; HIRES.S:1188
   tail_call MLayXOR                ; HIRES.S:1189
 :1:
-  cmp a, #0x04              ; HIRES.S:1191
+  cmp a, #mask              ; HIRES.S:1191
   if cc goto :2       ; HIRES.S:1192
   tail_call MLayMask                ; HIRES.S:1193
 :2:
@@ -1201,7 +1201,7 @@ fn FASTLAY {
   *$c003@0xc003 = a            ; HIRES.S:1742
   call setimage                  ; HIRES.S:1744
   x = *OPACITY@0x0006        ; HIRES.S:1746
-  cmp x, #0x02              ; HIRES.S:1747
+  cmp x, #sta              ; HIRES.S:1747
   if eq goto fastlaySTA       ; HIRES.S:1748
   a = *(OPCODE@0xe9aa + x)   ; HIRES.S:1750
   ??? sta :smod            ; HIRES.S:1751

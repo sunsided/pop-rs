@@ -10,18 +10,18 @@ from pathlib import Path
 from pop_lifter.interp_ir1 import InterpError, Trace, _real_addr, exec_atom
 from pop_lifter.ir1 import (
     Abs,
-    Imm,
     LoadAbs,
+    LoadIndexed,
     Reg,
     SourceRef,
     StoreAbs,
 )
-from pop_lifter.pass0_lex import Line, lex_file
+from pop_lifter.pass0_lex import Line
 from pop_lifter.pass0_parse import (
     _LABEL_SENTINEL_BASE,
     parse_files,
 )
-from pop_lifter.pass1_lift import _lift_instr, _parse_immediate
+from pop_lifter.pass1_lift import _lift_instr
 
 
 def _line(mnemonic: str, operand: str | None = None) -> Line:
@@ -152,8 +152,12 @@ def test_immediate_with_low_byte_of_synthetic_label():
 
 
 def test_immediate_with_high_byte_of_synthetic_label():
-    """`ldx #>SyntheticLabel` — high byte (0x01 for 0x10042 — bit 16
-    is in the high byte calculation since `>` is `(v >> 8) & 0xff`)."""
+    """`ldx #>SyntheticLabel` — Merlin's `>` operator selects bits
+    8–15 only: `(0x10042 >> 8) & 0xff` = `0x100 & 0xff` = **0x00**.
+    Bit 16 (the `0x1` that distinguishes the synthetic range) is
+    masked off because `>` is a single-byte operator. So the lifted
+    immediate is 0x00 — same value the high byte of the underlying
+    address would carry once pass 4 emits a real-binary form."""
     instr = _lift_instr(
         _line("ldx", "#>Label"),
         {"Label": 0x10042},
@@ -167,10 +171,12 @@ def test_immediate_with_high_byte_of_synthetic_label():
 
 def test_real_addr_helper_passes_through_real_addresses():
     """Addresses below 0x10000 are masked to 16 bits and returned."""
-    assert _real_addr(0x80, None) == 0x80
-    assert _real_addr(0xffff, None) == 0xffff
-    # 0x0ffff is still real; 0x10000 is the cutoff.
-    assert _real_addr(0xffff, None) == 0xffff
+    assert _real_addr(0x00, None) == 0x00       # zero page start
+    assert _real_addr(0x80, None) == 0x80       # zero-page typical
+    assert _real_addr(0xc000, None) == 0xc000   # I/O page
+    assert _real_addr(0xffff, None) == 0xffff   # top of RAM — last
+                                                 # real address before
+                                                 # the synthetic cutoff
 
 
 def test_real_addr_helper_rejects_synthetic_addresses():
@@ -210,6 +216,81 @@ def test_store_through_synthetic_address_raises_interperror():
             StoreAbs(
                 reg=Reg.A,
                 target=Abs(name="Label", addr=0x10042),
+                src=src,
+            ),
+            t,
+            t.ram,
+        )
+
+
+# ---- 16-bit wraparound must still work with real bases
+
+
+def test_indexed_load_with_high_base_and_index_wraps_in_16_bits():
+    """`lda $fff0,x` with `x = 0x30` should read from `$0020`
+    (`0xfff0 + 0x30 = 0x10020` → wraps to `0x0020`). The synthetic-
+    address gate runs on the *base* (which is real) — the wrapped
+    effective address is computed afterwards. A naive check that
+    applied `_real_addr` to the sum would have falsely flagged
+    `0x10020` as synthetic."""
+    src = SourceRef(file="syn", line=0, raw="lda $fff0,x")
+    t = Trace(ram=bytearray(0x10000), a=0, x=0x30, y=0)
+    t.ram[0x0020] = 0xab
+    exec_atom(
+        LoadIndexed(
+            reg=Reg.A,
+            base=Abs(name="hi", addr=0xfff0),
+            index=Reg.X,
+            src=src,
+        ),
+        t,
+        t.ram,
+    )
+    assert t.a == 0xab, (
+        f"expected wraparound to read 0xab from $0020, got {t.a:#04x}"
+    )
+
+
+def test_indirect_y_pointer_at_top_of_ram_wraps_high_byte():
+    """`(ptr),y` where ptr = $ffff means the high byte of the
+    16-bit pointer lives at $0000 (16-bit wrap). The synthetic gate
+    validates the base ($ffff is real); the high-byte read at
+    base+1 then wraps cleanly to $0000.
+
+    Real NMOS chips have the page-wrap bug where ($ff),y reads the
+    high byte from $00 instead of $100. We use the cleaner
+    full-16-bit wrap (documented on `IndirectY`); the synthetic
+    gate must not block this either way."""
+    from pop_lifter.ir1 import IndirectY, LoadIndirect
+
+    src = SourceRef(file="syn", line=0, raw="lda ($ffff),y")
+    t = Trace(ram=bytearray(0x10000), a=0, x=0, y=0)
+    t.ram[0xffff] = 0x34   # low byte of effective pointer
+    t.ram[0x0000] = 0x12   # high byte at wrapped $0000
+    t.ram[0x1234] = 0x77
+    exec_atom(
+        LoadIndirect(
+            reg=Reg.A,
+            source=IndirectY(ptr=Abs(name="p", addr=0xffff)),
+            src=src,
+        ),
+        t,
+        t.ram,
+    )
+    assert t.a == 0x77
+
+
+def test_indexed_load_with_synthetic_base_still_rejected():
+    """The wrap fix must not weaken the synthetic-address gate —
+    a `LoadIndexed` whose *base* is synthetic still has to raise."""
+    src = SourceRef(file="syn", line=0, raw="lda Label,x")
+    t = Trace(ram=bytearray(0x10000), a=0, x=0, y=0)
+    with pytest.raises(InterpError, match="synthetic-label address"):
+        exec_atom(
+            LoadIndexed(
+                reg=Reg.A,
+                base=Abs(name="Label", addr=0x10042),
+                index=Reg.X,
                 src=src,
             ),
             t,

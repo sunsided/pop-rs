@@ -80,14 +80,14 @@ fn MOVEAUXLC {
   x = #0x50                  ; MISC.S:166
   y = #0x60                  ; MISC.S:167
   call Tmovemem                  ; MISC.S:168
-  a = #0xf0                  ; MISC.S:172
+  a = #vbli                  ; MISC.S:172
   *$FFFE@0xfffe = a            ; MISC.S:173
-  a = #0x04                  ; MISC.S:174
+  a = #>vbli                  ; MISC.S:174
   *$FFFF@0xffff = a            ; MISC.S:175
   *ALTZPoff@0xc008 = a            ; MISC.S:177
-  a = #0xf0                  ; MISC.S:179
+  a = #vbli                  ; MISC.S:179
   *$FFFE@0xfffe = a            ; MISC.S:180
-  a = #0x04                  ; MISC.S:181
+  a = #>vbli                  ; MISC.S:181
   *$FFFF@0xffff = a            ; MISC.S:182
   return                           ; MISC.S:184
 }
@@ -112,7 +112,7 @@ fn FIRSTGUARD {
   x = *CharBlockY@0x0045        ; MISC.S:213
   a = *(FloorY+1@0x127f + x)   ; MISC.S:214
   *CharY@0x0042 = a            ; MISC.S:215
-  a = #0x2f                  ; MISC.S:216
+  a = #bump                  ; MISC.S:216
   call jumpseq                  ; MISC.S:217
   tail_call animchar                ; MISC.S:218
 ]rts:
@@ -185,7 +185,7 @@ fn POTIONEFFECT {
   if pl goto :notswd       ; MISC.S:263
   a = #0x01                  ; MISC.S:267
   *gotsword@0x030a = a            ; MISC.S:268
-  a = #0x04                  ; MISC.S:269
+  a = #s_Sword                  ; MISC.S:269
   x = #0x19                  ; MISC.S:270
   call cuesong                  ; MISC.S:271
   a = #0xff                  ; MISC.S:272
@@ -203,7 +203,7 @@ fn POTIONEFFECT {
   *lightcolor@0x0089 = a            ; MISC.S:288
   a = #0x02                  ; MISC.S:289
   *lightning@0x0088 = a            ; MISC.S:290
-  a = #0x0c                  ; MISC.S:291
+  a = #s_ShortPot                  ; MISC.S:291
   x = #0x19                  ; MISC.S:292
   call cuesong                  ; MISC.S:293
   a = #0x01                  ; MISC.S:294
@@ -216,19 +216,19 @@ fn POTIONEFFECT {
   *lightcolor@0x0089 = a            ; MISC.S:303
   a = #0x05                  ; MISC.S:304
   *lightning@0x0088 = a            ; MISC.S:305
-  a = #0x0b                  ; MISC.S:306
+  a = #s_Potion                  ; MISC.S:306
   x = #0x19                  ; MISC.S:307
   call cuesong                  ; MISC.S:308
   tail_call boostmeter                ; MISC.S:309
 :3:
   cmp x, #0x03              ; MISC.S:313
   if ne goto :4       ; MISC.S:314
-  a = #0x0c                  ; MISC.S:315
+  a = #s_ShortPot                  ; MISC.S:315
   x = #0x19                  ; MISC.S:316
   call cuesong                  ; MISC.S:317
-  a = #0xc8                  ; MISC.S:318
+  a = #wtlesstimer                  ; MISC.S:318
   *weightless@0x00c5 = a            ; MISC.S:319
-  a = #0x03                  ; MISC.S:320
+  a = #vibetimer                  ; MISC.S:320
   *vibes@0x0318 = a            ; MISC.S:321
   return                           ; MISC.S:322
 :4:
@@ -243,7 +243,7 @@ fn POTIONEFFECT {
 :5:
   cmp x, #0x05              ; MISC.S:337
   if ne goto :6       ; MISC.S:338
-  a = #0x05                  ; MISC.S:339
+  a = #Splat                  ; MISC.S:339
   call addsound                  ; MISC.S:340
   a = #0xff                  ; MISC.S:341
   *ChgKidStr@0x00cf = a            ; MISC.S:342
@@ -268,7 +268,7 @@ fn MOUSERESCUE {
   *CharLife@0x004f = a            ; MISC.S:365
   a = #0x01                  ; MISC.S:366
   *OppStrength@0x00cc = a            ; MISC.S:367
-  a = #0x69                  ; MISC.S:369
+  a = #Mscurry                  ; MISC.S:369
   call jumpseq                  ; MISC.S:370
   call animchar                  ; MISC.S:371
   tail_call SaveShad                ; MISC.S:373
@@ -297,7 +297,7 @@ fn STABCHAR {
   return                           ; MISC.S:402
 :killed:
   call getbehind                  ; MISC.S:404
-  cmp a, #0x00              ; MISC.S:405
+  cmp a, #space              ; MISC.S:405
   if ne goto :onground       ; MISC.S:406
   call getdist                  ; MISC.S:407
   cmp a, #0x04              ; MISC.S:408
@@ -307,14 +307,14 @@ fn STABCHAR {
   call addcharx                  ; MISC.S:413
   *CharX@0x0041 = a            ; MISC.S:414
   *CharBlockY@0x0045 += 1                         ; MISC.S:415
-  a = #0x51                  ; MISC.S:416
+  a = #fightfall                  ; MISC.S:416
   call jumpseq                  ; MISC.S:417
   goto :3                ; MISC.S:418
 :onground:
-  a = #0x55                  ; MISC.S:420
+  a = #stabkill                  ; MISC.S:420
   if ne goto :2       ; MISC.S:421
 :wounded:
-  a = #0x4a                  ; MISC.S:423
+  a = #stabbed                  ; MISC.S:423
 :2:
   call jumpseq                  ; MISC.S:424
 :1:
@@ -324,13 +324,13 @@ fn STABCHAR {
   a = #0x00                  ; MISC.S:429
   *CharYVel@0x0048 = a            ; MISC.S:430
 :3:
-  a = #0x05                  ; MISC.S:432
+  a = #Splat                  ; MISC.S:432
   call addsound                  ; MISC.S:433
   tail_call animchar                ; MISC.S:435
 :DL:
   a = #0x64                  ; MISC.S:439
   call decstr                  ; MISC.S:440
-  a = #0x55                  ; MISC.S:442
+  a = #stabkill                  ; MISC.S:442
   goto :killed                ; MISC.S:443
 }
 
@@ -350,7 +350,7 @@ fn UNHOLY {
   *lightcolor@0x0089 = a            ; MISC.S:466
   a = #0x05                  ; MISC.S:467
   *lightning@0x0088 = a            ; MISC.S:468
-  a = #0x05                  ; MISC.S:469
+  a = #Splat                  ; MISC.S:469
   call addsound                  ; MISC.S:470
   a = #0x64                  ; MISC.S:471
   tail_call decstr                ; MISC.S:472
@@ -366,7 +366,7 @@ REFLECTION:
   cmp a, #0xff              ; MISC.S:491
   if eq goto CreateShad       ; MISC.S:492
   call getunderft                  ; MISC.S:494
-  cmp a, #0x0d              ; MISC.S:495
+  cmp a, #mirror              ; MISC.S:495
   if ne goto ]rts       ; MISC.S:496
   call getreflect                  ; MISC.S:498
   a = *dmirr@0x00b1        ; MISC.S:500
@@ -394,7 +394,7 @@ fn REFLECTION {
   cmp a, #0xff              ; MISC.S:491
   if eq goto CreateShad       ; MISC.S:492
   call getunderft                  ; MISC.S:494
-  cmp a, #0x0d              ; MISC.S:495
+  cmp a, #mirror              ; MISC.S:495
   if ne goto ]rts       ; MISC.S:496
   call getreflect                  ; MISC.S:498
   a = *dmirr@0x00b1        ; MISC.S:500
@@ -425,22 +425,22 @@ fn BONESRISE {
   cmp a, #0x56              ; MISC.S:601
   if ne goto ]rts       ; MISC.S:602
   a = *VisScrn@0x00cb        ; MISC.S:603
-  cmp a, #0x01              ; MISC.S:604
+  cmp a, #skelscrn              ; MISC.S:604
   if ne goto ]rts       ; MISC.S:605
   a = *exitopen@0x0086        ; MISC.S:606
   if eq goto ]rts       ; MISC.S:607
   a = *KidBlockX@0x0054        ; MISC.S:608
-  cmp a, #0x02              ; MISC.S:609
+  cmp a, #skeltrig              ; MISC.S:609
   if eq goto :trig       ; MISC.S:610
-  cmp a, #0x03              ; MISC.S:611
+  cmp a, #skeltrig+1              ; MISC.S:611
   if ne goto ]rts       ; MISC.S:612
 :trig:
   a = *VisScrn@0x00cb        ; MISC.S:616
-  x = #0x05                  ; MISC.S:617
-  y = #0x01                  ; MISC.S:618
+  x = #skelx                  ; MISC.S:617
+  y = #skely                  ; MISC.S:618
   call rdblock                  ; MISC.S:619
   push a                           ; MISC.S:620
-  a = #0x01                  ; MISC.S:621
+  a = #floor                  ; MISC.S:621
   *(BlueType@0x0024)[y] = a   ; MISC.S:622
   a = #0x18                  ; MISC.S:623
   *height@0x0004 = a            ; MISC.S:624
@@ -451,26 +451,26 @@ fn BONESRISE {
   call markred                  ; MISC.S:629
   call markwipe                  ; MISC.S:630
   a = pop                          ; MISC.S:631
-  cmp a, #0x15              ; MISC.S:632
+  cmp a, #bones              ; MISC.S:632
   if ne goto ]rts       ; MISC.S:633
   a = *VisScrn@0x00cb        ; MISC.S:637
   *CharScrn@0x004b = a            ; MISC.S:638
-  x = #0x01                  ; MISC.S:640
+  x = #skely                  ; MISC.S:640
   *CharBlockY@0x0045 = x            ; MISC.S:641
   a = *(FloorY+1@0x127f + x)   ; MISC.S:642
   *CharY@0x0042 = a            ; MISC.S:643
-  a = #0x05                  ; MISC.S:645
+  a = #skelx                  ; MISC.S:645
   *CharBlockX@0x0044 = a            ; MISC.S:646
   call getblockej                  ; MISC.S:647
   c = 0                            ; MISC.S:648
-  a = a + #0x0e + c              ; MISC.S:649
+  a = a + #angle+7 + c              ; MISC.S:649
   *CharX@0x0041 = a            ; MISC.S:650
   a = #0xff                  ; MISC.S:652
   *CharFace@0x0043 = a            ; MISC.S:653
-  a = #0x58                  ; MISC.S:655
+  a = #arise                  ; MISC.S:655
   call jumpseq                  ; MISC.S:656
   call animchar                  ; MISC.S:657
-  a = #0x02                  ; MISC.S:659
+  a = #skelprog                  ; MISC.S:659
   *guardprog@0x00dd = a            ; MISC.S:660
   a = #0xff                  ; MISC.S:662
   *CharLife@0x004f = a            ; MISC.S:663
@@ -512,7 +512,7 @@ fn getreflect {
   a = *CharBlockX@0x0044        ; MISC.S:529
   call getblockej                  ; MISC.S:530
   c = 0                            ; MISC.S:531
-  a = a + #0x0a + c              ; MISC.S:532
+  a = a + #angle+3 + c              ; MISC.S:532
   *mirrx@0x00b0 = a            ; MISC.S:533
   call getdist                  ; MISC.S:535
   x = *CharFace@0x0043        ; MISC.S:537
@@ -542,7 +542,7 @@ fn CreateShad {
   *createshad@0x00e5 = a            ; MISC.S:567
   a = #0x01                  ; MISC.S:569
   *CharID@0x004d = a            ; MISC.S:570
-  a = #0x06                  ; MISC.S:572
+  a = #MirrorCrack                  ; MISC.S:572
   call addsound                  ; MISC.S:573
   call SaveShad                  ; MISC.S:575
   a = *MaxKidStr@0x00d0        ; MISC.S:577
@@ -595,9 +595,9 @@ fn killopp {
 
 fn DOSAVEGAME {
   a = *level@0x03f4        ; MISC.S:744
-  cmp a, #0x03              ; MISC.S:745
+  cmp a, #FirstSideB              ; MISC.S:745
   if cs goto :doit       ; MISC.S:746
-  a = #0x05                  ; MISC.S:747
+  a = #Splat                  ; MISC.S:747
   tail_call addsound                ; MISC.S:748
 :doit:
   a = *origstrength@0x00e1        ; MISC.S:753
@@ -686,7 +686,7 @@ fn CHECKALERT {
 :cont:
   a = *]Xcount@0x00f0        ; MISC.S:900
   call :rdblock                  ; MISC.S:901
-  cmp a, #0x12              ; MISC.S:902
+  cmp a, #slicer              ; MISC.S:902
   if ne goto :1       ; MISC.S:903
   a = #0x0e                  ; MISC.S:904
   c = 0                            ; MISC.S:905
@@ -695,7 +695,7 @@ fn CHECKALERT {
 :1:
   a = *]Xend@0x00f1        ; MISC.S:911
   call :rdblock                  ; MISC.S:912
-  cmp a, #0x04              ; MISC.S:913
+  cmp a, #gate              ; MISC.S:913
   if ne goto :20       ; MISC.S:914
   a = *]Xend@0x00f1        ; MISC.S:915
   c = 1                            ; MISC.S:916
@@ -712,22 +712,22 @@ fn CHECKALERT {
   if cs goto :rts       ; MISC.S:929
 :9:
   call :rdblock                  ; MISC.S:931
-  cmp a, #0x14              ; MISC.S:933
+  cmp a, #block              ; MISC.S:933
   if eq goto :safe       ; MISC.S:934
-  cmp a, #0x07              ; MISC.S:935
+  cmp a, #panelwif              ; MISC.S:935
   if eq goto :safe       ; MISC.S:936
-  cmp a, #0x0c              ; MISC.S:937
+  cmp a, #panelwof              ; MISC.S:937
   if eq goto :safe       ; MISC.S:938
-  cmp a, #0x0b              ; MISC.S:940
+  cmp a, #loose              ; MISC.S:940
   if eq goto :view       ; MISC.S:941
-  cmp a, #0x04              ; MISC.S:942
+  cmp a, #gate              ; MISC.S:942
   if ne goto :2       ; MISC.S:943
   a = *(BlueSpec@0x0026)[y]   ; MISC.S:944
-  cmp a, #0x70              ; MISC.S:945
+  cmp a, #gfightthres              ; MISC.S:945
   if cs goto :clear       ; MISC.S:946
   if cc goto :view       ; MISC.S:947
 :2:
-  cmp a, #0x12              ; MISC.S:949
+  cmp a, #slicer              ; MISC.S:949
   if eq goto :view       ; MISC.S:950
   call cmpspace                  ; MISC.S:952
   if ne goto :clear       ; MISC.S:953
@@ -757,13 +757,13 @@ fn CHECKALERT {
 }
 
 fn DISPVERSION {
-  a = #0x20                  ; MISC.S:986
+  a = #" "                  ; MISC.S:986
   call lrcls                  ; MISC.S:987
   *RAMWRTmain@0xc004 = a            ; MISC.S:989
   x = #0x00                  ; MISC.S:991
 :loop:
   a = *(textline@0xdfd8 + x)   ; MISC.S:992
-  cmp a, #0x40              ; MISC.S:993
+  cmp a, #"@"              ; MISC.S:993
   if eq goto :done       ; MISC.S:994
   *($400@0x0400 + x) = a   ; MISC.S:995
   x += 1                         ; MISC.S:996
@@ -782,7 +782,7 @@ fn DISPVERSION {
   if ne goto :1       ; MISC.S:1012
   a = *$c055@0xc055        ; MISC.S:1013
 :1:
-  a = #0x20                  ; MISC.S:1015
+  a = #" "                  ; MISC.S:1015
   tail_call lrcls                ; MISC.S:1016
   ??? usr $a9,21,$b00,*-org            ; MISC.S:1021
 }
