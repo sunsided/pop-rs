@@ -23,12 +23,12 @@ MOVEMEM:
   a = *(]source@0x00f2)[y]   ; MISC.S:108
   *(]dest@0x00f0)[y] = a   ; MISC.S:109
   y += 1                         ; MISC.S:110
-  if ne goto :loop       ; MISC.S:111
+  if y != #0x00 goto :loop  ; MISC.S:111
   *]source+1@0x00f3 += 1                         ; MISC.S:113
   *]dest+1@0x00f1 += 1                         ; MISC.S:114
   a = *]source+1@0x00f3        ; MISC.S:115
   cmp a, *]endsourc+1@0x00f5    ; MISC.S:116
-  if ne goto :loop       ; MISC.S:117
+  if a != *]endsourc+1@0x00f5 goto :loop  ; MISC.S:117
   return                           ; MISC.S:118
 }
 
@@ -44,12 +44,12 @@ fn MOVEMEM {
   a = *(]source@0x00f2)[y]   ; MISC.S:108
   *(]dest@0x00f0)[y] = a   ; MISC.S:109
   y += 1                         ; MISC.S:110
-  if ne goto :loop       ; MISC.S:111
+  if y != #0x00 goto :loop  ; MISC.S:111
   *]source+1@0x00f3 += 1                         ; MISC.S:113
   *]dest+1@0x00f1 += 1                         ; MISC.S:114
   a = *]source+1@0x00f3        ; MISC.S:115
   cmp a, *]endsourc+1@0x00f5    ; MISC.S:116
-  if ne goto :loop       ; MISC.S:117
+  if a != *]endsourc+1@0x00f5 goto :loop  ; MISC.S:117
   return                           ; MISC.S:118
 }
 
@@ -94,21 +94,17 @@ fn MOVEAUXLC {
 
 fn FIRSTGUARD {
   a = *EnemyAlert@0x00d1        ; MISC.S:192
-  cmp a, #0x02              ; MISC.S:193
-  if cc goto ]rts       ; MISC.S:194
+  if a < #0x02 goto ]rts  ; MISC.S:194
   a = *CharSword@0x004e        ; MISC.S:195
-  if ne goto ]rts       ; MISC.S:196
+  if a != #0x00 goto ]rts  ; MISC.S:196
   a = *OpSword@0x03aa        ; MISC.S:197
-  if eq goto ]rts       ; MISC.S:198
+  if a == #0x00 goto ]rts  ; MISC.S:198
   a = *OpAction@0x03a2        ; MISC.S:199
-  cmp a, #0x02              ; MISC.S:200
-  if cs goto ]rts       ; MISC.S:201
+  if a >= #0x02 goto ]rts  ; MISC.S:201
   a = *CharFace@0x0043        ; MISC.S:203
-  cmp a, *OpFace@0x039f    ; MISC.S:204
-  if eq goto ]rts       ; MISC.S:205
+  if a == *OpFace@0x039f goto ]rts  ; MISC.S:205
   call getopdist                  ; MISC.S:207
-  cmp a, #0xf1              ; MISC.S:208
-  if cc goto ]rts       ; MISC.S:209
+  if a < #0xf1 goto ]rts  ; MISC.S:209
   x = *CharBlockY@0x0045        ; MISC.S:213
   a = *(FloorY+1@0x127f + x)   ; MISC.S:214
   *CharY@0x0042 = a            ; MISC.S:215
@@ -128,7 +124,6 @@ Mark2:
 Mark1:
   a = #0x04                  ; MISC.S:229
   *height@0x0004 = a            ; MISC.S:230
-  c = 0                            ; MISC.S:231
   a = #0x02                  ; MISC.S:232
   call markwipe                  ; MISC.S:233
   tail_call markred                ; MISC.S:234
@@ -140,7 +135,6 @@ fn Mark2 {
 Mark1:
   a = #0x04                  ; MISC.S:229
   *height@0x0004 = a            ; MISC.S:230
-  c = 0                            ; MISC.S:231
   a = #0x02                  ; MISC.S:232
   call markwipe                  ; MISC.S:233
   tail_call markred                ; MISC.S:234
@@ -149,7 +143,6 @@ Mark1:
 fn Mark1 {
   a = #0x04                  ; MISC.S:229
   *height@0x0004 = a            ; MISC.S:230
-  c = 0                            ; MISC.S:231
   a = #0x02                  ; MISC.S:232
   call markwipe                  ; MISC.S:233
   tail_call markred                ; MISC.S:234
@@ -162,26 +155,26 @@ fn MARKMETERS {
 
 fn MARKKIDMETER {
   y = #0x14                  ; MISC.S:241
-  if ne goto Mark3       ; MISC.S:242
+  if y != #0x00 goto Mark3  ; MISC.S:242
 MARKOPPMETER:
   y = #0x1c                  ; MISC.S:245
-  if ne goto Mark2       ; MISC.S:246
+  if y != #0x00 goto Mark2  ; MISC.S:246
 ]rts:
   return                           ; MISC.S:247
 }
 
 fn MARKOPPMETER {
   y = #0x1c                  ; MISC.S:245
-  if ne goto Mark2       ; MISC.S:246
+  if y != #0x00 goto Mark2  ; MISC.S:246
 ]rts:
   return                           ; MISC.S:247
 }
 
 fn POTIONEFFECT {
   a = *CharID@0x004d        ; MISC.S:258
-  if ne goto ]rts       ; MISC.S:259
+  if a != #0x00 goto ]rts  ; MISC.S:259
   x = *lastpotion@0x00e0        ; MISC.S:261
-  if eq goto ]rts       ; MISC.S:262
+  if x == #0x00 goto ]rts  ; MISC.S:262
   if pl goto :notswd       ; MISC.S:263
   a = #0x01                  ; MISC.S:267
   *gotsword@0x030a = a            ; MISC.S:268
@@ -194,11 +187,9 @@ fn POTIONEFFECT {
   *lightning@0x0088 = a            ; MISC.S:275
   return                           ; MISC.S:276
 :notswd:
-  cmp x, #0x01              ; MISC.S:280
-  if ne goto :2       ; MISC.S:281
+  if x != #0x01 goto :2  ; MISC.S:281
   a = *KidStrength@0x00ce        ; MISC.S:283
-  cmp a, *MaxKidStr@0x00d0    ; MISC.S:284
-  if eq goto ]rts       ; MISC.S:285
+  if a == *MaxKidStr@0x00d0 goto ]rts  ; MISC.S:285
   a = #0x99                  ; MISC.S:287
   *lightcolor@0x0089 = a            ; MISC.S:288
   a = #0x02                  ; MISC.S:289
@@ -210,8 +201,7 @@ fn POTIONEFFECT {
   *ChgKidStr@0x00cf = a            ; MISC.S:295
   return                           ; MISC.S:296
 :2:
-  cmp x, #0x02              ; MISC.S:300
-  if ne goto :3       ; MISC.S:301
+  if x != #0x02 goto :3  ; MISC.S:301
   a = #0x99                  ; MISC.S:302
   *lightcolor@0x0089 = a            ; MISC.S:303
   a = #0x05                  ; MISC.S:304
@@ -221,8 +211,7 @@ fn POTIONEFFECT {
   call cuesong                  ; MISC.S:308
   tail_call boostmeter                ; MISC.S:309
 :3:
-  cmp x, #0x03              ; MISC.S:313
-  if ne goto :4       ; MISC.S:314
+  if x != #0x03 goto :4  ; MISC.S:314
   a = #s_ShortPot                  ; MISC.S:315
   x = #0x19                  ; MISC.S:316
   call cuesong                  ; MISC.S:317
@@ -232,8 +221,7 @@ fn POTIONEFFECT {
   *vibes@0x0318 = a            ; MISC.S:321
   return                           ; MISC.S:322
 :4:
-  cmp x, #0x04              ; MISC.S:326
-  if ne goto :5       ; MISC.S:327
+  if x != #0x04 goto :5  ; MISC.S:327
   a = *invert@0x009f        ; MISC.S:328
   a = a ^ #0xff              ; MISC.S:329
   *invert@0x009f = a            ; MISC.S:330
@@ -241,8 +229,7 @@ fn POTIONEFFECT {
   *redrawflg@0x0097 = a            ; MISC.S:332
   tail_call inverty                ; MISC.S:333
 :5:
-  cmp x, #0x05              ; MISC.S:337
-  if ne goto :6       ; MISC.S:338
+  if x != #0x05 goto :6  ; MISC.S:338
   a = #Splat                  ; MISC.S:339
   call addsound                  ; MISC.S:340
   a = #0xff                  ; MISC.S:341
@@ -276,21 +263,21 @@ fn MOUSERESCUE {
 
 fn STABCHAR {
   a = *CharLife@0x004f        ; MISC.S:381
-  if pl goto ]rts       ; MISC.S:382
+  if a >=0 goto ]rts  ; MISC.S:382
   a = *CharSword@0x004e        ; MISC.S:383
   cmp a, #0x02              ; MISC.S:384
-  if ne goto :DL       ; MISC.S:385
+  if a != #0x02 goto :DL  ; MISC.S:385
   a = *CharID@0x004d        ; MISC.S:386
   cmp a, #0x04              ; MISC.S:387
-  if eq goto :wounded       ; MISC.S:388
+  if a == #0x04 goto :wounded  ; MISC.S:388
   a = #0x01                  ; MISC.S:390
   call decstr                  ; MISC.S:391
   if ne goto :wounded       ; MISC.S:392
   x = *CharID@0x004d        ; MISC.S:394
-  if eq goto :killed       ; MISC.S:395
+  if x == #0x00 goto :killed  ; MISC.S:395
   x = *CharID@0x004d        ; MISC.S:397
   cmp x, #0x04              ; MISC.S:398
-  if ne goto :killed       ; MISC.S:399
+  if x != #0x04 goto :killed  ; MISC.S:399
   a = #0x00                  ; MISC.S:400
   *ChgOppStr@0x00d2 = a            ; MISC.S:401
 ]rts:
@@ -298,10 +285,10 @@ fn STABCHAR {
 :killed:
   call getbehind                  ; MISC.S:404
   cmp a, #space              ; MISC.S:405
-  if ne goto :onground       ; MISC.S:406
+  if a != #space goto :onground  ; MISC.S:406
   call getdist                  ; MISC.S:407
   cmp a, #0x04              ; MISC.S:408
-  if cc goto :onground       ; MISC.S:409
+  if a < #0x04 goto :onground  ; MISC.S:409
   c = 1                            ; MISC.S:411
   a = a - #0x0e - (1 - c)        ; MISC.S:412
   call addcharx                  ; MISC.S:413
@@ -312,7 +299,7 @@ fn STABCHAR {
   goto :3                ; MISC.S:418
 :onground:
   a = #stabkill                  ; MISC.S:420
-  if ne goto :2       ; MISC.S:421
+  if a != #0x00 goto :2  ; MISC.S:421
 :wounded:
   a = #stabbed                  ; MISC.S:423
 :2:
@@ -337,15 +324,15 @@ fn STABCHAR {
 fn UNHOLY {
   a = *level@0x03f4        ; MISC.S:451
   cmp a, #0x0c              ; MISC.S:452
-  if ne goto ]rts       ; MISC.S:453
+  if a != #0x0c goto ]rts  ; MISC.S:453
   a = *OpID@0x03a9        ; MISC.S:455
   a = a | *CharID@0x004d              ; MISC.S:456
   cmp a, #0x01              ; MISC.S:457
-  if ne goto ]rts       ; MISC.S:458
+  if a != #0x01 goto ]rts  ; MISC.S:458
   a = *CharLife@0x004f        ; MISC.S:460
-  if pl goto ]rts       ; MISC.S:461
+  if a >=0 goto ]rts  ; MISC.S:461
   a = *OpLife@0x03ab        ; MISC.S:462
-  if mi goto ]rts       ; MISC.S:463
+  if a <0 goto ]rts  ; MISC.S:463
   a = #0xff                  ; MISC.S:465
   *lightcolor@0x0089 = a            ; MISC.S:466
   a = #0x05                  ; MISC.S:467
@@ -364,19 +351,19 @@ REFLECTION:
   call GetFrameInfo                  ; MISC.S:488
   a = *createshad@0x00e5        ; MISC.S:490
   cmp a, #0xff              ; MISC.S:491
-  if eq goto CreateShad       ; MISC.S:492
+  if a == #0xff goto CreateShad  ; MISC.S:492
   call getunderft                  ; MISC.S:494
   cmp a, #mirror              ; MISC.S:495
-  if ne goto ]rts       ; MISC.S:496
+  if a != #mirror goto ]rts  ; MISC.S:496
   call getreflect                  ; MISC.S:498
   a = *dmirr@0x00b1        ; MISC.S:500
-  if mi goto ]rts       ; MISC.S:501
+  if a <0 goto ]rts  ; MISC.S:501
   call setupchar                  ; MISC.S:505
   x = *CharBlockY@0x0045        ; MISC.S:509
   x += 1                         ; MISC.S:510
   a = *(BlockTop@0x1274 + x)   ; MISC.S:511
   cmp a, *FCharY@0x0073    ; MISC.S:512
-  if cs goto ]rts       ; MISC.S:513
+  if a >= *FCharY@0x0073 goto ]rts  ; MISC.S:513
   *FCharCU@0x0076 = a            ; MISC.S:514
   a = *CharBlockX@0x0044        ; MISC.S:516
   a = a << 1                       ; MISC.S:517
@@ -391,20 +378,17 @@ fn REFLECTION {
   call LoadKid                  ; MISC.S:487
   call GetFrameInfo                  ; MISC.S:488
   a = *createshad@0x00e5        ; MISC.S:490
-  cmp a, #0xff              ; MISC.S:491
-  if eq goto CreateShad       ; MISC.S:492
+  if a == #0xff goto CreateShad  ; MISC.S:492
   call getunderft                  ; MISC.S:494
-  cmp a, #mirror              ; MISC.S:495
-  if ne goto ]rts       ; MISC.S:496
+  if a != #mirror goto ]rts  ; MISC.S:496
   call getreflect                  ; MISC.S:498
   a = *dmirr@0x00b1        ; MISC.S:500
-  if mi goto ]rts       ; MISC.S:501
+  if a <0 goto ]rts  ; MISC.S:501
   call setupchar                  ; MISC.S:505
   x = *CharBlockY@0x0045        ; MISC.S:509
   x += 1                         ; MISC.S:510
   a = *(BlockTop@0x1274 + x)   ; MISC.S:511
-  cmp a, *FCharY@0x0073    ; MISC.S:512
-  if cs goto ]rts       ; MISC.S:513
+  if a >= *FCharY@0x0073 goto ]rts  ; MISC.S:513
   *FCharCU@0x0076 = a            ; MISC.S:514
   a = *CharBlockX@0x0044        ; MISC.S:516
   a = a << 1                       ; MISC.S:517
@@ -419,21 +403,16 @@ fn REFLECTION {
 
 fn BONESRISE {
   a = *level@0x03f4        ; MISC.S:596
-  cmp a, #0x03              ; MISC.S:597
-  if ne goto ]rts       ; MISC.S:598
+  if a != #0x03 goto ]rts  ; MISC.S:598
   a = *ShadFace@0x0063        ; MISC.S:600
-  cmp a, #0x56              ; MISC.S:601
-  if ne goto ]rts       ; MISC.S:602
+  if a != #0x56 goto ]rts  ; MISC.S:602
   a = *VisScrn@0x00cb        ; MISC.S:603
-  cmp a, #skelscrn              ; MISC.S:604
-  if ne goto ]rts       ; MISC.S:605
+  if a != #skelscrn goto ]rts  ; MISC.S:605
   a = *exitopen@0x0086        ; MISC.S:606
-  if eq goto ]rts       ; MISC.S:607
+  if a == #0x00 goto ]rts  ; MISC.S:607
   a = *KidBlockX@0x0054        ; MISC.S:608
-  cmp a, #skeltrig              ; MISC.S:609
-  if eq goto :trig       ; MISC.S:610
-  cmp a, #skeltrig+1              ; MISC.S:611
-  if ne goto ]rts       ; MISC.S:612
+  if a == #skeltrig goto :trig  ; MISC.S:610
+  if a != #skeltrig+1 goto ]rts  ; MISC.S:612
 :trig:
   a = *VisScrn@0x00cb        ; MISC.S:616
   x = #skelx                  ; MISC.S:617
@@ -451,8 +430,7 @@ fn BONESRISE {
   call markred                  ; MISC.S:629
   call markwipe                  ; MISC.S:630
   a = pop                          ; MISC.S:631
-  cmp a, #bones              ; MISC.S:632
-  if ne goto ]rts       ; MISC.S:633
+  if a != #bones goto ]rts  ; MISC.S:633
   a = *VisScrn@0x00cb        ; MISC.S:637
   *CharScrn@0x004b = a            ; MISC.S:638
   x = #skely                  ; MISC.S:640
@@ -488,17 +466,15 @@ fn BONESRISE {
   tail_call SaveShad                ; MISC.S:679
 DECSTR:
   x = *CharID@0x004d        ; MISC.S:692
-  if ne goto :enemy       ; MISC.S:693
-  cmp a, *KidStrength@0x00ce    ; MISC.S:695
-  if cs goto killkid       ; MISC.S:696
+  if x != #0x00 goto :enemy  ; MISC.S:693
+  if a >= *KidStrength@0x00ce goto killkid  ; MISC.S:696
   a = a ^ #0xff              ; MISC.S:698
   c = 0                            ; MISC.S:699
   a = a + #0x01 + c              ; MISC.S:700
   *ChgKidStr@0x00cf = a            ; MISC.S:701
   return                           ; MISC.S:702
 :enemy:
-  cmp a, *OppStrength@0x00cc    ; MISC.S:705
-  if cs goto killopp       ; MISC.S:706
+  if a >= *OppStrength@0x00cc goto killopp  ; MISC.S:706
   a = a ^ #0xff              ; MISC.S:708
   c = 0                            ; MISC.S:709
   a = a + #0x01 + c              ; MISC.S:710
@@ -516,7 +492,7 @@ fn getreflect {
   *mirrx@0x00b0 = a            ; MISC.S:533
   call getdist                  ; MISC.S:535
   x = *CharFace@0x0043        ; MISC.S:537
-  if mi goto :left       ; MISC.S:538
+  if x <0 goto :left  ; MISC.S:538
   a = a ^ #0xff              ; MISC.S:540
   c = 0                            ; MISC.S:541
   a = a + #0x0e + c              ; MISC.S:542
@@ -555,17 +531,15 @@ fn CreateShad {
 
 fn DECSTR {
   x = *CharID@0x004d        ; MISC.S:692
-  if ne goto :enemy       ; MISC.S:693
-  cmp a, *KidStrength@0x00ce    ; MISC.S:695
-  if cs goto killkid       ; MISC.S:696
+  if x != #0x00 goto :enemy  ; MISC.S:693
+  if a >= *KidStrength@0x00ce goto killkid  ; MISC.S:696
   a = a ^ #0xff              ; MISC.S:698
   c = 0                            ; MISC.S:699
   a = a + #0x01 + c              ; MISC.S:700
   *ChgKidStr@0x00cf = a            ; MISC.S:701
   return                           ; MISC.S:702
 :enemy:
-  cmp a, *OppStrength@0x00cc    ; MISC.S:705
-  if cs goto killopp       ; MISC.S:706
+  if a >= *OppStrength@0x00cc goto killopp  ; MISC.S:706
   a = a ^ #0xff              ; MISC.S:708
   c = 0                            ; MISC.S:709
   a = a + #0x01 + c              ; MISC.S:710
@@ -595,8 +569,7 @@ fn killopp {
 
 fn DOSAVEGAME {
   a = *level@0x03f4        ; MISC.S:744
-  cmp a, #FirstSideB              ; MISC.S:745
-  if cs goto :doit       ; MISC.S:746
+  if a >= #FirstSideB goto :doit  ; MISC.S:746
   a = #Splat                  ; MISC.S:747
   tail_call addsound                ; MISC.S:748
 :doit:
@@ -630,32 +603,32 @@ fn LOADLEVELX {
 fn CHECKALERT {
   a = *ShadID@0x006d        ; MISC.S:828
   cmp a, #0x18              ; MISC.S:829
-  if eq goto ]rts       ; MISC.S:830
+  if a == #0x18 goto ]rts  ; MISC.S:830
   cmp a, #0x01              ; MISC.S:831
-  if ne goto :notshad       ; MISC.S:832
+  if a != #0x01 goto :notshad  ; MISC.S:832
   a = *level@0x03f4        ; MISC.S:833
   cmp a, #0x0c              ; MISC.S:834
-  if ne goto ]safe       ; MISC.S:835
+  if a != #0x0c goto ]safe  ; MISC.S:835
 :notshad:
   a = *KidPosn@0x0050        ; MISC.S:838
-  if eq goto ]safe       ; MISC.S:839
+  if a == #0x00 goto ]safe  ; MISC.S:839
   cmp a, #0xdb              ; MISC.S:840
-  if cc goto :noclimb       ; MISC.S:841
+  if a < #0xdb goto :noclimb  ; MISC.S:841
   cmp a, #0xe5              ; MISC.S:842
-  if cc goto ]safe       ; MISC.S:843
+  if a < #0xe5 goto ]safe  ; MISC.S:843
 :noclimb:
   a = *ShadFace@0x0063        ; MISC.S:845
   cmp a, #0x56              ; MISC.S:846
-  if eq goto ]safe       ; MISC.S:847
+  if a == #0x56 goto ]safe  ; MISC.S:847
   a = *KidLife@0x005f        ; MISC.S:849
   a = a & *ShadLife@0x006f              ; MISC.S:850
-  if pl goto ]safe       ; MISC.S:851
+  if a >=0 goto ]safe  ; MISC.S:851
   a = *KidScrn@0x005b        ; MISC.S:853
   cmp a, *ShadScrn@0x006b    ; MISC.S:854
-  if ne goto ]safe       ; MISC.S:855
+  if a != *ShadScrn@0x006b goto ]safe  ; MISC.S:855
   a = *KidBlockY@0x0055        ; MISC.S:857
   cmp a, *ShadBlockY@0x0065    ; MISC.S:858
-  if ne goto ]safe       ; MISC.S:859
+  if a != *ShadBlockY@0x0065 goto ]safe  ; MISC.S:859
   a = #0x02                  ; MISC.S:861
   *EnemyAlert@0x00d1 = a            ; MISC.S:862
   a = *KidBlockX@0x0054        ; MISC.S:866
@@ -678,7 +651,7 @@ fn CHECKALERT {
   call showpage                  ; MISC.S:886
   a = *]Xend@0x00f1        ; MISC.S:889
   cmp a, *]Xcount@0x00f0    ; MISC.S:890
-  if cs goto :cont       ; MISC.S:891
+  if a >= *]Xcount@0x00f0 goto :cont  ; MISC.S:891
   x = a                            ; MISC.S:892
   a = *]Xcount@0x00f0        ; MISC.S:893
   *]Xend@0x00f1 = a            ; MISC.S:894
@@ -687,7 +660,7 @@ fn CHECKALERT {
   a = *]Xcount@0x00f0        ; MISC.S:900
   call :rdblock                  ; MISC.S:901
   cmp a, #slicer              ; MISC.S:902
-  if ne goto :1       ; MISC.S:903
+  if a != #slicer goto :1  ; MISC.S:903
   a = #0x0e                  ; MISC.S:904
   c = 0                            ; MISC.S:905
   a = a + *]Xcount@0x00f0 + c    ; MISC.S:906
@@ -696,7 +669,7 @@ fn CHECKALERT {
   a = *]Xend@0x00f1        ; MISC.S:911
   call :rdblock                  ; MISC.S:912
   cmp a, #gate              ; MISC.S:913
-  if ne goto :20       ; MISC.S:914
+  if a != #gate goto :20  ; MISC.S:914
   a = *]Xend@0x00f1        ; MISC.S:915
   c = 1                            ; MISC.S:916
   a = a - #0x0e - (1 - c)        ; MISC.S:917
@@ -704,31 +677,31 @@ fn CHECKALERT {
 :20:
   a = *]Xend@0x00f1        ; MISC.S:920
   cmp a, *]Xcount@0x00f0    ; MISC.S:921
-  if cc goto :rts       ; MISC.S:922
+  if a < *]Xcount@0x00f0 goto :rts  ; MISC.S:922
   a = *]Xcount@0x00f0        ; MISC.S:926
 :loop:
   cmp a, *]Xend@0x00f1    ; MISC.S:927
-  if eq goto :9       ; MISC.S:928
+  if a == *]Xend@0x00f1 goto :9  ; MISC.S:928
   if cs goto :rts       ; MISC.S:929
 :9:
   call :rdblock                  ; MISC.S:931
   cmp a, #block              ; MISC.S:933
-  if eq goto :safe       ; MISC.S:934
+  if a == #block goto :safe  ; MISC.S:934
   cmp a, #panelwif              ; MISC.S:935
-  if eq goto :safe       ; MISC.S:936
+  if a == #panelwif goto :safe  ; MISC.S:936
   cmp a, #panelwof              ; MISC.S:937
-  if eq goto :safe       ; MISC.S:938
+  if a == #panelwof goto :safe  ; MISC.S:938
   cmp a, #loose              ; MISC.S:940
-  if eq goto :view       ; MISC.S:941
+  if a == #loose goto :view  ; MISC.S:941
   cmp a, #gate              ; MISC.S:942
-  if ne goto :2       ; MISC.S:943
+  if a != #gate goto :2  ; MISC.S:943
   a = *(BlueSpec@0x0026)[y]   ; MISC.S:944
   cmp a, #gfightthres              ; MISC.S:945
-  if cs goto :clear       ; MISC.S:946
+  if a >= #gfightthres goto :clear  ; MISC.S:946
   if cc goto :view       ; MISC.S:947
 :2:
   cmp a, #slicer              ; MISC.S:949
-  if eq goto :view       ; MISC.S:950
+  if a == #slicer goto :view  ; MISC.S:950
   call cmpspace                  ; MISC.S:952
   if ne goto :clear       ; MISC.S:953
 :view:
@@ -764,22 +737,22 @@ fn DISPVERSION {
 :loop:
   a = *(textline@0xdfd8 + x)   ; MISC.S:992
   cmp a, #"@"              ; MISC.S:993
-  if eq goto :done       ; MISC.S:994
+  if a == #"@" goto :done  ; MISC.S:994
   *($400@0x0400 + x) = a   ; MISC.S:995
   x += 1                         ; MISC.S:996
-  if pl goto :loop       ; MISC.S:997
+  if x >=0 goto :loop  ; MISC.S:997
 :done:
   a = *RAMWRTaux@0xc005        ; MISC.S:999
   *$c054@0xc054 = a            ; MISC.S:1000
   *$c051@0xc051 = a            ; MISC.S:1001
 :wloop:
   a = *$c000@0xc000        ; MISC.S:1005
-  if pl goto :wloop       ; MISC.S:1006
+  if a >=0 goto :wloop  ; MISC.S:1006
   *$c010@0xc010 = a            ; MISC.S:1007
   a = *$c057@0xc057        ; MISC.S:1009
   a = *$c050@0xc050        ; MISC.S:1010
   a = *PAGE@0x0000        ; MISC.S:1011
-  if ne goto :1       ; MISC.S:1012
+  if a != #0x00 goto :1  ; MISC.S:1012
   a = *$c055@0xc055        ; MISC.S:1013
 :1:
   a = #" "                  ; MISC.S:1015

@@ -76,6 +76,11 @@ from .ir1 import (
     Transfer,
     Unsupported,
 )
+# Re-use the parser's canonical synthetic-address base so the two
+# modules can't drift. If the cutoff ever needs to move, it moves in
+# `pass0_parse._LABEL_SENTINEL_BASE` and the interpreter follows
+# automatically.
+from .pass0_parse import _LABEL_SENTINEL_BASE
 
 
 class InterpError(RuntimeError):
@@ -126,6 +131,40 @@ class Trace:
         return out
 
 
+def _real_addr(addr: int, src) -> int:
+    """Mask `addr` into a 16-bit RAM index, raising `InterpError` if
+    the high bits flag it as a synthetic-label sentinel.
+
+    Pass 0 puts every globally-scoped program label into
+    `ProgramAST.labels` at `_LABEL_SENTINEL_BASE + i` (0x10000+), so
+    the lifter can accept `lda #SymbolicLabel` / `ldx symbol_table,x`
+    operands. Those addresses are fine to LIFT (the dump just shows
+    the symbolic name), but you can't actually READ or WRITE through
+    them — we haven't assembled the program, so the address is
+    meaningless in terms of real memory layout.
+
+    Calling convention for indexed accesses: validate the *base*
+    here (`_real_addr(item.base.addr, item.src)`) and then apply
+    the index + 16-bit wrap yourself:
+
+        base = _real_addr(item.base.addr, item.src)
+        addr = (base + (idx_val & 0xff)) & 0xffff
+
+    That way a real high-page base (e.g. `$fff0,x` with `x=$30`)
+    wraps to `$0020` instead of falsely tripping the synthetic gate
+    on the un-wrapped `$10020` sum. Synthetic bases still raise."""
+    if addr >= _LABEL_SENTINEL_BASE:
+        where = src.short() if src is not None else "<unknown>"
+        raw = repr(src.raw) if src is not None else ""
+        raise InterpError(
+            f"refusing to access synthetic-label address "
+            f"{addr:#x} at {where} ({raw}). "
+            f"This address came from pass 0's label table and was "
+            f"never resolved to a real assembled location."
+        )
+    return addr & 0xffff
+
+
 def _set_zn(trace: Trace, value: int) -> None:
     """Update Z and N from an 8-bit result. Matches the 6502: Z is set
     when the value is exactly zero; N mirrors bit 7."""
@@ -151,7 +190,10 @@ def _eval_compare(cond: Compare, trace: Trace, ram: bytearray) -> bool:
     if isinstance(cond.rhs, Imm):
         rhs = cond.rhs.value & 0xff
     elif isinstance(cond.rhs, Abs):
-        rhs = ram[cond.rhs.addr & 0xffff]
+        # `_real_addr` raises on synthetic-label dereferences; we
+        # pass `None` for the SourceRef because Compare doesn't
+        # carry one and the error message degrades gracefully.
+        rhs = ram[_real_addr(cond.rhs.addr, None)]
     else:
         raise InterpError(f"unknown Compare rhs type: {type(cond.rhs).__name__}")
     if cond.op == "==":
@@ -229,8 +271,17 @@ def _resolve_indirect_y(ind: IndirectY, trace: Trace, ram: bytearray) -> int:
     `(addr + 1) & 0xffff` rather than the NMOS zero-page wrap, which
     matches POP's actual pointer layouts (never sitting at $ff).
     """
-    lo = ram[ind.ptr.addr & 0xffff]
-    hi = ram[(ind.ptr.addr + 1) & 0xffff]
+    # Validate the base pointer is a real (non-synthetic) address
+    # first. The high-byte read at `base + 1` then uses ordinary
+    # 16-bit wrap (`0xffff + 1 == 0x0000`) — without this two-step
+    # the synthetic-check would falsely reject a `($ff),y` pair whose
+    # high byte legitimately lives at $0000. (NMOS would actually
+    # read $ff and $00 due to the famous page-wrap bug; we use the
+    # cleaner 16-bit wrap, but POP's pointers never sit at $ff so it
+    # doesn't matter for our inputs.)
+    base = _real_addr(ind.ptr.addr, None)
+    lo = ram[base]
+    hi = ram[(base + 1) & 0xffff]
     return (((hi << 8) | lo) + (trace.y & 0xff)) & 0xffff
 
 
@@ -257,7 +308,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         _set_zn(trace, value)
         return True
     if isinstance(item, LoadAbs):
-        value = ram[item.source.addr & 0xffff]
+        value = ram[_real_addr(item.source.addr, item.src)]
         if item.reg is Reg.A:
             trace.a = value
         elif item.reg is Reg.X:
@@ -268,7 +319,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         return True
     if isinstance(item, LoadIndexed):
         idx_val = trace.x if item.index is Reg.X else trace.y
-        addr = (item.base.addr + idx_val) & 0xffff
+        addr = ((_real_addr(item.base.addr, item.src) + (idx_val & 0xff)) & 0xffff)
         value = ram[addr]
         if item.reg is Reg.A:
             trace.a = value
@@ -280,14 +331,14 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         return True
     if isinstance(item, StoreAbs):
         value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
-        addr = item.target.addr & 0xffff
+        addr = _real_addr(item.target.addr, item.src)
         ram[addr] = value
         trace.writes[addr] = value
         return True
     if isinstance(item, StoreIndexed):
         value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
         idx_val = trace.x if item.index is Reg.X else trace.y
-        addr = (item.base.addr + idx_val) & 0xffff
+        addr = ((_real_addr(item.base.addr, item.src) + (idx_val & 0xff)) & 0xffff)
         ram[addr] = value
         trace.writes[addr] = value
         return True
@@ -311,7 +362,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         _set_zn(trace, trace.a)
         return True
     if isinstance(item, AdcAbs):
-        total = (trace.a & 0xff) + ram[item.source.addr & 0xffff] + trace.c
+        total = (trace.a & 0xff) + ram[_real_addr(item.source.addr, item.src)] + trace.c
         trace.a = total & 0xff
         trace.c = 1 if total > 0xff else 0
         _set_zn(trace, trace.a)
@@ -323,7 +374,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         # (i.e. A >= operand + (1-C_in)).
         operand = (
             item.imm.value & 0xff if isinstance(item, SbcImm)
-            else ram[item.source.addr & 0xffff]
+            else ram[_real_addr(item.source.addr, item.src)]
         )
         total = (trace.a & 0xff) + ((operand ^ 0xff) & 0xff) + trace.c
         trace.a = total & 0xff
@@ -345,7 +396,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
     if isinstance(item, Bit):
         operand = (
             item.source.value & 0xff if isinstance(item.source, Imm)
-            else ram[item.source.addr & 0xffff]
+            else ram[_real_addr(item.source.addr, item.src)]
         )
         # Z reflects (A AND operand). N and V come from bits 7 and 6
         # of the operand itself, NOT of the AND result — this is the
@@ -373,7 +424,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
     if isinstance(item, (CmpImm, CmpAbs)):
         reg_val = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
         rhs = item.imm.value & 0xff if isinstance(item, CmpImm) \
-            else ram[item.source.addr & 0xffff]
+            else ram[_real_addr(item.source.addr, item.src)]
         diff = (reg_val - rhs) & 0xff
         trace.c = 1 if reg_val >= rhs else 0
         _set_zn(trace, diff)
@@ -402,7 +453,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
                 trace.y = new
             _set_zn(trace, new)
         else:
-            addr = item.target.addr & 0xffff
+            addr = _real_addr(item.target.addr, item.src)
             new = (ram[addr] + delta) & 0xff
             ram[addr] = new
             trace.writes[addr] = new
@@ -424,7 +475,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         elif isinstance(item.source, IndirectY):
             rhs = ram[_resolve_indirect_y(item.source, trace, ram)]
         else:
-            rhs = ram[item.source.addr & 0xffff]
+            rhs = ram[_real_addr(item.source.addr, item.src)]
         if item.op == "and":
             trace.a = trace.a & rhs
         elif item.op == "or":
@@ -536,7 +587,7 @@ def run(
             continue
 
         if isinstance(item, LoadAbs):
-            value = ram[item.source.addr & 0xffff]
+            value = ram[_real_addr(item.source.addr, item.src)]
             if item.reg is Reg.A:
                 trace.a = value
             elif item.reg is Reg.X:
@@ -549,7 +600,7 @@ def run(
 
         if isinstance(item, LoadIndexed):
             idx_val = trace.x if item.index is Reg.X else trace.y
-            addr = (item.base.addr + idx_val) & 0xffff
+            addr = ((_real_addr(item.base.addr, item.src) + (idx_val & 0xff)) & 0xffff)
             value = ram[addr]
             if item.reg is Reg.A:
                 trace.a = value
@@ -567,7 +618,7 @@ def run(
                 Reg.X: trace.x,
                 Reg.Y: trace.y,
             }[item.reg]
-            addr = item.target.addr & 0xffff
+            addr = _real_addr(item.target.addr, item.src)
             ram[addr] = value
             trace.writes[addr] = value
             idx += 1
@@ -580,7 +631,7 @@ def run(
                 Reg.Y: trace.y,
             }[item.reg]
             idx_val = trace.x if item.index is Reg.X else trace.y
-            addr = (item.base.addr + idx_val) & 0xffff
+            addr = ((_real_addr(item.base.addr, item.src) + (idx_val & 0xff)) & 0xffff)
             ram[addr] = value
             trace.writes[addr] = value
             idx += 1
@@ -614,7 +665,7 @@ def run(
             continue
 
         if isinstance(item, AdcAbs):
-            total = (trace.a & 0xff) + ram[item.source.addr & 0xffff] + trace.c
+            total = (trace.a & 0xff) + ram[_real_addr(item.source.addr, item.src)] + trace.c
             trace.a = total & 0xff
             trace.c = 1 if total > 0xff else 0
             _set_zn(trace, trace.a)
@@ -626,7 +677,7 @@ def run(
             if isinstance(item, CmpImm):
                 rhs = item.imm.value & 0xff
             else:
-                rhs = ram[item.source.addr & 0xffff]
+                rhs = ram[_real_addr(item.source.addr, item.src)]
             # 6502 CMP: compute reg - rhs without storing. C = no-borrow
             # (i.e. reg >= rhs); Z = (reg == rhs); N = bit 7 of result.
             diff = (reg_val - rhs) & 0xff

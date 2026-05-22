@@ -26,7 +26,7 @@ Inspectable intermediate artifacts:
 | `ir/pilot/checkfloor.ir1`     | Pass-1 IR1: `CHECKFLOOR` (CTRL.S) — the cmp / conditional-branch / `]rts`-trampoline slice.         |
 | `ir/pilot/checkfloor.ir2`     | Pass-2 IR2: after `cmp + branch` → `if reg op rhs goto` fusion and flag-liveness elision (CHECKFLOOR ends up cmp-free). |
 | `ir/pilot/checkfloor.ir3`     | Pass-2 IR3: relooped into structured `if` / `tail_call` / `return` (zero gotos for CHECKFLOOR; callees with loops fall back to unstructured form). |
-| `ir/raw/*.ir1` + `SUMMARY.md` | Pass-1 mechanical sweep across every code file. Unlifted opcodes appear as `??? ...` for review.    |
+| `ir/raw/*.ir1` + `*.ir2` + `SUMMARY.md` | Whole-tree sweep: per-module `.ir1` (raw pass-1, with `??? ...` lines for unlifted opcodes) and `.ir2` (pass-2 fused — `cmp + branch` collapsed into self-contained `if a == #foo goto :L`, dead cmps elided). |
 
 Regenerate after lifter changes:
 

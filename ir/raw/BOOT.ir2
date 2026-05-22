@@ -33,7 +33,7 @@ fn entry {
   a = *(skewtbl@0x0073 + y)   ; BOOT.S:54
   *$3d@0x003d = a            ; BOOT.S:55
   a = *(sectaddr@0x0074 + y)   ; BOOT.S:56
-  if eq goto :1       ; BOOT.S:57
+  if a == #0x00 goto :1  ; BOOT.S:57
   *$27@0x0027 = a            ; BOOT.S:58
 :rdsect:
   call $005c                  ; BOOT.S:59
@@ -66,13 +66,11 @@ fn CHECKER {
   *$0800@0x0800 = a            ; BOOT.S:125
   a = *$0C00@0x0c00        ; BOOT.S:126
   cmp a, #0xee              ; BOOT.S:127
-  if ne goto :0       ; BOOT.S:128
+  if a != #0xee goto :0  ; BOOT.S:128
   ??? asl $0C00            ; BOOT.S:129
   a = *$0800@0x0800        ; BOOT.S:130
-  cmp a, *$0C00@0x0c00    ; BOOT.S:131
-  if eq goto :1       ; BOOT.S:132
+  if a == *$0C00@0x0c00 goto :1  ; BOOT.S:132
 :0:
-  c = 0                            ; BOOT.S:133
 :1:
   *$C004@0xc004 = a            ; BOOT.S:134
   *$C002@0xc002 = a            ; BOOT.S:135
@@ -83,7 +81,7 @@ fn check128k {
   *$c081@0xc081 = a            ; BOOT.S:147
   a = *$FBB3@0xfbb3        ; BOOT.S:149
   cmp a, #0x06              ; BOOT.S:150
-  if ne goto NOT128K       ; BOOT.S:151
+  if a != #0x06 goto NOT128K  ; BOOT.S:151
   bit *$C017@0xc017                ; BOOT.S:153
   if mi goto NOT128K       ; BOOT.S:154
   ??? ldx #CHECKEND            ; BOOT.S:156
@@ -91,7 +89,7 @@ fn check128k {
   a = *(CHECKER@0x0076 + x)   ; BOOT.S:157
   *($180@0x0180 + x) = a   ; BOOT.S:158
   x -= 1                         ; BOOT.S:159
-  if pl goto :0       ; BOOT.S:160
+  if x >=0 goto :0  ; BOOT.S:160
   call $180                  ; BOOT.S:162
   if cs goto NOT128K       ; BOOT.S:163
   return                           ; BOOT.S:165
@@ -107,15 +105,15 @@ fn NOT128K {
   y = #0x00                  ; BOOT.S:178
 :0:
   a = *(MEMTEXT@0x0079 + y)   ; BOOT.S:179
-  if eq goto *       ; BOOT.S:180
+  if a == #0x00 goto *  ; BOOT.S:180
   call cout                  ; BOOT.S:181
   cmp a, #0x8d              ; BOOT.S:182
-  if ne goto :1       ; BOOT.S:183
+  if a != #0x8d goto :1  ; BOOT.S:183
   a = #0x04                  ; BOOT.S:184
   *$24@0x0024 = a            ; BOOT.S:185
 :1:
   y += 1                         ; BOOT.S:186
-  if ne goto :0       ; BOOT.S:187
+  if y != #0x00 goto :0  ; BOOT.S:187
 moverw18:
   bit *$c08b@0xc08b                ; BOOT.S:198
   bit *$c08b@0xc08b                ; BOOT.S:199
@@ -134,12 +132,12 @@ movemem:
   a = *(source@0x0002)[y]   ; BOOT.S:218
   *(dest@0x0000)[y] = a   ; BOOT.S:219
   y += 1                         ; BOOT.S:221
-  if ne goto :loop       ; BOOT.S:222
+  if y != #0x00 goto :loop  ; BOOT.S:222
   *source+1@0x0003 += 1                         ; BOOT.S:224
   *dest+1@0x0001 += 1                         ; BOOT.S:225
   a = *source+1@0x0003        ; BOOT.S:227
   cmp a, *endsourc+1@0x0005    ; BOOT.S:228
-  if ne goto :loop       ; BOOT.S:229
+  if a != *endsourc+1@0x0005 goto :loop  ; BOOT.S:229
   return                           ; BOOT.S:231
 }
 
@@ -161,12 +159,12 @@ movemem:
   a = *(source@0x0002)[y]   ; BOOT.S:218
   *(dest@0x0000)[y] = a   ; BOOT.S:219
   y += 1                         ; BOOT.S:221
-  if ne goto :loop       ; BOOT.S:222
+  if y != #0x00 goto :loop  ; BOOT.S:222
   *source+1@0x0003 += 1                         ; BOOT.S:224
   *dest+1@0x0001 += 1                         ; BOOT.S:225
   a = *source+1@0x0003        ; BOOT.S:227
   cmp a, *endsourc+1@0x0005    ; BOOT.S:228
-  if ne goto :loop       ; BOOT.S:229
+  if a != *endsourc+1@0x0005 goto :loop  ; BOOT.S:229
   return                           ; BOOT.S:231
 }
 
@@ -182,11 +180,11 @@ fn movemem {
   a = *(source@0x0002)[y]   ; BOOT.S:218
   *(dest@0x0000)[y] = a   ; BOOT.S:219
   y += 1                         ; BOOT.S:221
-  if ne goto :loop       ; BOOT.S:222
+  if y != #0x00 goto :loop  ; BOOT.S:222
   *source+1@0x0003 += 1                         ; BOOT.S:224
   *dest+1@0x0001 += 1                         ; BOOT.S:225
   a = *source+1@0x0003        ; BOOT.S:227
   cmp a, *endsourc+1@0x0005    ; BOOT.S:228
-  if ne goto :loop       ; BOOT.S:229
+  if a != *endsourc+1@0x0005 goto :loop  ; BOOT.S:229
   return                           ; BOOT.S:231
 }

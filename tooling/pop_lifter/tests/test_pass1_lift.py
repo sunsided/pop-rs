@@ -37,7 +37,7 @@ def _lift_auto(source_dir: Path):
         search_paths=[source_dir],
     )
     file_ast = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
-    return lift_file(file_ast, ast.equates, PILOT_ENTRIES)
+    return lift_file(file_ast, ast.symbols(), PILOT_ENTRIES)
 
 
 def test_pilot_routines_lift_with_no_unsupported_ops(source_dir):
@@ -176,7 +176,7 @@ def _lift(source_dir: Path, file: str, entries: list[str]):
         search_paths=[source_dir],
     )
     file_ast = next(f for f in ast.files if Path(f.path).name == file)
-    return _lift_to_module(file_ast, ast.equates, entries)
+    return _lift_to_module(file_ast, ast.symbols(), entries)
 
 
 def _lift_to_module(file_ast, equates, entries):

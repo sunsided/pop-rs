@@ -36,13 +36,13 @@ fn CHECKFLOOR {
 
 fn onground {
   a = *Fcheck@0x0085        ; CTRL.S:314
-  a = a & #0x40              ; CTRL.S:315
+  a = a & #fcheckmark              ; CTRL.S:315
   if a == #0x00 {    ; CTRL.S:316
     goto ]rts              ; CTRL.S:316
   }
   call getunderft                ; CTRL.S:318
-  cmp a, #0x14              ; CTRL.S:319
-  if a != #0x14 {    ; CTRL.S:320
+  cmp a, #block              ; CTRL.S:319
+  if a != #block {    ; CTRL.S:320
     goto :1              ; CTRL.S:320
   }
   call InsideBlock                ; CTRL.S:321
@@ -79,7 +79,7 @@ fn onground {
     goto :no              ; CTRL.S:342
   }
   :yes:
-  a = #0x01                  ; CTRL.S:344
+  a = #floor                  ; CTRL.S:344
   *(BlueType@0x0024)[y] = a   ; CTRL.S:345
   call indexblock                ; CTRL.S:346
   a = #0x02                  ; CTRL.S:347
@@ -132,22 +132,22 @@ fn onground {
   }
   :1:
   :stepfall:
-  a = #0x07                  ; CTRL.S:387
+  a = #stepfall                  ; CTRL.S:387
   if a != #0x00 {    ; CTRL.S:388
     goto :doit              ; CTRL.S:388
   }
   :stepfall2:
-  a = #0x13                  ; CTRL.S:390
+  a = #stepfall2                  ; CTRL.S:390
   if a != #0x00 {    ; CTRL.S:391
     goto :doit              ; CTRL.S:391
   }
   :jumpfall:
-  a = #0x12                  ; CTRL.S:393
+  a = #jumpfall                  ; CTRL.S:393
   if a != #0x00 {    ; CTRL.S:394
     goto :doit              ; CTRL.S:394
   }
   :rjumpfall:
-  a = #0x15                  ; CTRL.S:396
+  a = #rjumpfall                  ; CTRL.S:396
   if a != #0x00 {    ; CTRL.S:397
     goto :doit              ; CTRL.S:397
   }
@@ -171,19 +171,19 @@ fn onground {
   }
   a = #0x00                  ; CTRL.S:412
   *droppedout@0x00e7 = a            ; CTRL.S:413
-  a = #0x53                  ; CTRL.S:414
+  a = #efightfallfwd                  ; CTRL.S:414
   if a != #0x00 {    ; CTRL.S:415
     goto :doit              ; CTRL.S:415
   }
   :fb:
-  a = #0x52                  ; CTRL.S:416
+  a = #efightfall                  ; CTRL.S:416
   if a != #0x00 {    ; CTRL.S:417
     goto :doit              ; CTRL.S:417
   }
   :player:
   a = #0x01                  ; CTRL.S:418
   *droppedout@0x00e7 = a            ; CTRL.S:419
-  a = #0x51                  ; CTRL.S:420
+  a = #fightfall                  ; CTRL.S:420
   if a != #0x00 {    ; CTRL.S:421
     goto :doit              ; CTRL.S:421
   }
@@ -213,12 +213,12 @@ fn fallon {
     return                           ; CTRL.S:303
   }
   a = *CharYVel@0x0048        ; CTRL.S:253
-  if a >= #0x20 {    ; CTRL.S:255
+  if a >= #grabspeed {    ; CTRL.S:255
     return                           ; CTRL.S:303
   }
   a = *CharY@0x0042        ; CTRL.S:257
   c = 0                            ; CTRL.S:258
-  a = a + #0x19 + c              ; CTRL.S:259
+  a = a + #grablead + c              ; CTRL.S:259
   x = *CharBlockY@0x0045        ; CTRL.S:260
   x += 1                         ; CTRL.S:261
   ??? cmp FloorY,x            ; CTRL.S:262
@@ -227,7 +227,7 @@ fn fallon {
   }
   a = *CharX@0x0041        ; CTRL.S:268
   *savekidx@0x00af = a            ; CTRL.S:269
-  a = #0xf8                  ; CTRL.S:270
+  a = #grabreach                  ; CTRL.S:270
   call addcharx                ; CTRL.S:271
   *CharX@0x0041 = a            ; CTRL.S:272
   call rereadblocks                ; CTRL.S:273
@@ -242,10 +242,10 @@ fn fallon {
     *CharY@0x0042 = a            ; CTRL.S:292
     a = #0x00                  ; CTRL.S:294
     *CharYVel@0x0048 = a            ; CTRL.S:295
-    a = #0x0f                  ; CTRL.S:297
+    a = #fallhang                  ; CTRL.S:297
     call jumpseq                ; CTRL.S:298
     call animchar                ; CTRL.S:299
-    a = #0x0c                  ; CTRL.S:301
+    a = #stuntime                  ; CTRL.S:301
     *stunned@0x00e6 = a            ; CTRL.S:302
     return                           ; CTRL.S:303
   }
@@ -259,8 +259,8 @@ fn InsideBlock {
   cmp a, #0x08              ; CTRL.S:467
   if a >= #0x08 {    ; CTRL.S:468
     call getbehind                ; CTRL.S:485
-    cmp a, #0x14              ; CTRL.S:486
-    if a != #0x14 {    ; CTRL.S:487
+    cmp a, #block              ; CTRL.S:486
+    if a != #block {    ; CTRL.S:487
       call getdist                ; CTRL.S:498
       a = a ^ #0xff              ; CTRL.S:499
       c = 0                            ; CTRL.S:500
@@ -282,11 +282,11 @@ fn InsideBlock {
     tail_call getunderft           ; CTRL.S:482
   }
   call getinfront                ; CTRL.S:471
-  cmp a, #0x14              ; CTRL.S:472
-  if a == #0x14 {    ; CTRL.S:473
+  cmp a, #block              ; CTRL.S:472
+  if a == #block {    ; CTRL.S:473
     call getbehind                ; CTRL.S:485
-    cmp a, #0x14              ; CTRL.S:486
-    if a != #0x14 {    ; CTRL.S:487
+    cmp a, #block              ; CTRL.S:486
+    if a != #block {    ; CTRL.S:487
       call getdist                ; CTRL.S:498
       a = a ^ #0xff              ; CTRL.S:499
       c = 0                            ; CTRL.S:500
@@ -336,7 +336,7 @@ fn CDpatch {
     *CharX@0x0041 = a            ; CTRL.S:454
     tail_call rereadblocks           ; CTRL.S:455
   }
-  a = #0x68                  ; CTRL.S:447
+  a = #patchfall                  ; CTRL.S:447
   call jumpseq                ; CTRL.S:448
   call animchar                ; CTRL.S:449
   tail_call rereadblocks           ; CTRL.S:450

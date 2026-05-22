@@ -102,11 +102,11 @@ fn CLS {
 :smod:
   *($3000@0x3000 + y) = a   ; HIRES.S:220
   y += 1                         ; HIRES.S:221
-  if ne goto :loop       ; HIRES.S:222
+  if y != #0x00 goto :loop  ; HIRES.S:222
   ??? inc :loop+2            ; HIRES.S:224
   ??? inc :smod+2            ; HIRES.S:225
   x -= 1                         ; HIRES.S:227
-  if ne goto :loop       ; HIRES.S:228
+  if x != #0x00 goto :loop  ; HIRES.S:228
   return                           ; HIRES.S:230
 }
 
@@ -119,11 +119,11 @@ fn LRCLS {
   *($700@0x0700 + y) = a   ; HIRES.S:246
   y -= 1                         ; HIRES.S:247
   cmp y, #0x7f              ; HIRES.S:248
-  if ne goto :3       ; HIRES.S:249
+  if y != #0x7f goto :3  ; HIRES.S:249
   y = #0x77                  ; HIRES.S:250
 :3:
   cmp y, #0xff              ; HIRES.S:251
-  if ne goto :2       ; HIRES.S:252
+  if y != #0xff goto :2  ; HIRES.S:252
   return                           ; HIRES.S:253
 }
 
@@ -188,11 +188,11 @@ fn PREPREP {
 fn CROP {
   a = *YCO@0x0002        ; HIRES.S:379
   cmp a, *BOTCUT@0x0013    ; HIRES.S:380
-  if cs goto :botoff       ; HIRES.S:381
+  if a >= *BOTCUT@0x0013 goto :botoff  ; HIRES.S:381
   c = 1                            ; HIRES.S:385
   a = a - *HEIGHT@0x00f7 - (1 - c) ; HIRES.S:386
   cmp a, #0xbf              ; HIRES.S:387
-  if cc goto :topok       ; HIRES.S:388
+  if a < #0xbf goto :topok  ; HIRES.S:388
   a = *TOPCUT@0x000f        ; HIRES.S:390
   c = 1                            ; HIRES.S:391
   a = a - #0x01 - (1 - c)        ; HIRES.S:392
@@ -201,11 +201,11 @@ fn CROP {
 :topok:
   *TOPEDGE@0x00f8 = a            ; HIRES.S:396
   a = *TOPCUT@0x000f        ; HIRES.S:398
-  if eq goto :done       ; HIRES.S:399
+  if a == #0x00 goto :done  ; HIRES.S:399
   c = 1                            ; HIRES.S:401
   a = a - #0x01 - (1 - c)        ; HIRES.S:402
   cmp a, *TOPEDGE@0x00f8    ; HIRES.S:403
-  if cc goto :done       ; HIRES.S:404
+  if a < *TOPEDGE@0x00f8 goto :done  ; HIRES.S:404
   *TOPEDGE@0x00f8 = a            ; HIRES.S:406
   if cs goto :done       ; HIRES.S:407
 :botoff:
@@ -214,7 +214,7 @@ fn CROP {
   c = 0                            ; HIRES.S:414
   a = a + #0x01 + c              ; HIRES.S:415
   cmp a, *BOTCUT@0x0013    ; HIRES.S:416
-  if cs goto :cancel       ; HIRES.S:417
+  if a >= *BOTCUT@0x0013 goto :cancel  ; HIRES.S:417
   c = 1                            ; HIRES.S:418
   a = a - #0x01 - (1 - c)        ; HIRES.S:419
   *TOPEDGE@0x00f8 = a            ; HIRES.S:420
@@ -229,13 +229,13 @@ fn CROP {
 :1:
   x -= 1                         ; HIRES.S:431
   cmp x, *BOTCUT@0x0013    ; HIRES.S:432
-  if cs goto :loop       ; HIRES.S:433
+  if x >= *BOTCUT@0x0013 goto :loop  ; HIRES.S:433
   *YCO@0x0002 = x            ; HIRES.S:435
 :done:
   a = *XCO@0x0001        ; HIRES.S:440
-  if mi goto :leftoff       ; HIRES.S:441
+  if a <0 goto :leftoff  ; HIRES.S:441
   cmp a, *LEFTCUT@0x0010    ; HIRES.S:442
-  if cs goto :leftok       ; HIRES.S:443
+  if a >= *LEFTCUT@0x0010 goto :leftok  ; HIRES.S:443
 :leftoff:
   a = *LEFTCUT@0x0010        ; HIRES.S:448
   c = 1                            ; HIRES.S:449
@@ -244,7 +244,7 @@ fn CROP {
   a = *WIDTH@0x00f6        ; HIRES.S:453
   c = 1                            ; HIRES.S:454
   a = a - *OFFLEFT@0x00f9 - (1 - c) ; HIRES.S:455
-  if mi goto :cancel       ; HIRES.S:456
+  if a <0 goto :cancel  ; HIRES.S:456
   *VISWIDTH@0x001a = a            ; HIRES.S:457
   a = *LEFTCUT@0x0010        ; HIRES.S:459
   *XCO@0x0001 = a            ; HIRES.S:460
@@ -254,11 +254,11 @@ fn CROP {
   return                           ; HIRES.S:467
 :leftok:
   cmp a, *RIGHTCUT@0x0011    ; HIRES.S:472
-  if cs goto :cancel       ; HIRES.S:473
+  if a >= *RIGHTCUT@0x0011 goto :cancel  ; HIRES.S:473
   c = 0                            ; HIRES.S:475
   a = a + *WIDTH@0x00f6 + c    ; HIRES.S:476
   cmp a, *RIGHTCUT@0x0011    ; HIRES.S:477
-  if cc goto :bothok       ; HIRES.S:478
+  if a < *RIGHTCUT@0x0011 goto :bothok  ; HIRES.S:478
   c = 1                            ; HIRES.S:480
   a = a - *RIGHTCUT@0x0011 - (1 - c) ; HIRES.S:481
   *RMOST@0x001b = a            ; HIRES.S:482
@@ -287,8 +287,7 @@ fn CROP {
 }
 
 fn shiftoffset {
-  cmp x, #0x06              ; HIRES.S:518
-  if cs goto :left       ; HIRES.S:519
+  if x >= #0x06 goto :left  ; HIRES.S:519
   x += 1                         ; HIRES.S:521
   return                           ; HIRES.S:522
 :left:
@@ -300,7 +299,7 @@ fn shiftoffset {
 fn LAYRSAVE {
   call PREPREP                  ; HIRES.S:543
   a = *OPACITY@0x0006        ; HIRES.S:545
-  if pl goto :normal       ; HIRES.S:546
+  if a >=0 goto :normal  ; HIRES.S:546
   a = *XCO@0x0001        ; HIRES.S:548
   c = 1                            ; HIRES.S:549
   a = a - *WIDTH@0x00f6 - (1 - c) ; HIRES.S:550
@@ -322,7 +321,7 @@ fn LAYRSAVE {
   ??? sta :smPAGE+1            ; HIRES.S:572
   y = #0x00                  ; HIRES.S:574
   a = *VISWIDTH@0x001a        ; HIRES.S:576
-  if eq goto SKIPIT       ; HIRES.S:577
+  if a == #0x00 goto SKIPIT  ; HIRES.S:577
   *(PEELBUF@0x0009)[y] = a   ; HIRES.S:578
   ??? sta :smWIDTH+1            ; HIRES.S:579
   c = 1                            ; HIRES.S:581
@@ -359,7 +358,7 @@ fn LAYRSAVE {
   a = *($2000@0x2000 + y)   ; HIRES.S:618
   *(PEELBUF@0x0009)[y] = a   ; HIRES.S:619
   y -= 1                         ; HIRES.S:621
-  if pl goto :inloop       ; HIRES.S:622
+  if y >=0 goto :inloop  ; HIRES.S:622
 :smWIDTH:
   a = #0x00                  ; HIRES.S:624
   a = a + *PEELBUF@0x0009 + c    ; HIRES.S:625
@@ -369,7 +368,7 @@ fn LAYRSAVE {
 :2:
   x -= 1                         ; HIRES.S:630
   cmp x, *TOPEDGE@0x00f8    ; HIRES.S:631
-  if ne goto :loop       ; HIRES.S:632
+  if x != *TOPEDGE@0x00f8 goto :loop  ; HIRES.S:632
   tail_call DONE                ; HIRES.S:634
 }
 
@@ -381,17 +380,15 @@ fn SKIPIT {
 
 fn LAY {
   a = *OPACITY@0x0006        ; HIRES.S:659
-  if pl goto :notmirr       ; HIRES.S:660
+  if a >=0 goto :notmirr  ; HIRES.S:660
   a = a & #0x7f              ; HIRES.S:662
   *OPACITY@0x0006 = a            ; HIRES.S:663
   tail_call MLAY                ; HIRES.S:664
 :notmirr:
-  cmp a, #eor              ; HIRES.S:666
-  if ne goto :1       ; HIRES.S:667
+  if a != #eor goto :1  ; HIRES.S:667
   tail_call LayXOR                ; HIRES.S:668
 :1:
-  cmp a, #mask              ; HIRES.S:670
-  if cc goto :2       ; HIRES.S:671
+  if a < #mask goto :2  ; HIRES.S:671
   tail_call LayMask                ; HIRES.S:672
 :2:
   tail_call LayGen                ; HIRES.S:674
@@ -435,7 +432,7 @@ fn LayGen {
   a = a + *PAGE@0x0000 + c    ; HIRES.S:727
   *BASE+1@0x00f1 = a            ; HIRES.S:728
   y = *OFFLEFT@0x00f9        ; HIRES.S:730
-  if eq goto :2       ; HIRES.S:731
+  if y == #0x00 goto :2  ; HIRES.S:731
   y -= 1                         ; HIRES.S:736
 :RAMRD1:
   *$c003@0xc003 = a            ; HIRES.S:738
@@ -479,9 +476,9 @@ fn LayGen {
   *CARRY@0x00fc = a            ; HIRES.S:782
   y += 1                         ; HIRES.S:784
   cmp y, *VISWIDTH@0x001a    ; HIRES.S:785
-  if cc goto :3       ; HIRES.S:786
+  if y < *VISWIDTH@0x001a goto :3  ; HIRES.S:786
   a = *OFFRIGHT@0x00fa        ; HIRES.S:790
-  if ne goto :5       ; HIRES.S:791
+  if a != #0x00 goto :5  ; HIRES.S:791
 :4:
   a = *(BASE@0x00f0)[y]   ; HIRES.S:793
 :BMASK:
@@ -501,7 +498,7 @@ fn LayGen {
   *YCO@0x0002 -= 1                         ; HIRES.S:809
   y = *YCO@0x0002        ; HIRES.S:810
   cmp y, *TOPEDGE@0x00f8    ; HIRES.S:811
-  if ne goto :nextline       ; HIRES.S:812
+  if y != *TOPEDGE@0x00f8 goto :nextline  ; HIRES.S:812
 DONE:
   a = *IMSAVE@0x00f2        ; HIRES.S:816
   *IMAGE@0x0004 = a            ; HIRES.S:817
@@ -568,7 +565,7 @@ fn LayMask {
   a = a + *PAGE@0x0000 + c    ; HIRES.S:885
   *BASE+1@0x00f1 = a            ; HIRES.S:886
   y = *OFFLEFT@0x00f9        ; HIRES.S:888
-  if eq goto :2       ; HIRES.S:889
+  if y == #0x00 goto :2  ; HIRES.S:889
   y -= 1                         ; HIRES.S:894
 :RAMRD1:
   *$c003@0xc003 = a            ; HIRES.S:896
@@ -628,9 +625,9 @@ fn LayMask {
   *CARRY@0x00fc = a            ; HIRES.S:964
   y += 1                         ; HIRES.S:966
   cmp y, *VISWIDTH@0x001a    ; HIRES.S:967
-  if cc goto :inloop       ; HIRES.S:968
+  if y < *VISWIDTH@0x001a goto :inloop  ; HIRES.S:968
   a = *OFFRIGHT@0x00fa        ; HIRES.S:972
-  if ne goto :5       ; HIRES.S:973
+  if a != #0x00 goto :5  ; HIRES.S:973
 :4:
 :BMASK:
   a = #0x00                  ; HIRES.S:976
@@ -650,7 +647,7 @@ fn LayMask {
   *YCO@0x0002 -= 1                         ; HIRES.S:991
   y = *YCO@0x0002        ; HIRES.S:992
   cmp y, *TOPEDGE@0x00f8    ; HIRES.S:993
-  if eq goto :done       ; HIRES.S:994
+  if y == *TOPEDGE@0x00f8 goto :done  ; HIRES.S:994
   goto :nextline                ; HIRES.S:996
 :done:
   tail_call DONE                ; HIRES.S:998
@@ -699,7 +696,7 @@ fn LayXOR {
   a = a + *PAGE@0x0000 + c    ; HIRES.S:1060
   *BASE+1@0x00f1 = a            ; HIRES.S:1061
   y = *OFFLEFT@0x00f9        ; HIRES.S:1063
-  if eq goto :2       ; HIRES.S:1064
+  if y == #0x00 goto :2  ; HIRES.S:1064
   y -= 1                         ; HIRES.S:1069
 :RAMRD1:
   *$c003@0xc003 = a            ; HIRES.S:1071
@@ -756,9 +753,9 @@ fn LayXOR {
   *CARRY@0x00fc = a            ; HIRES.S:1133
   y += 1                         ; HIRES.S:1135
   cmp y, *VISWIDTH@0x001a    ; HIRES.S:1136
-  if cc goto :inloop       ; HIRES.S:1137
+  if y < *VISWIDTH@0x001a goto :inloop  ; HIRES.S:1137
   a = *OFFRIGHT@0x00fa        ; HIRES.S:1141
-  if ne goto :5       ; HIRES.S:1142
+  if a != #0x00 goto :5  ; HIRES.S:1142
 :4:
   a = *CARRY@0x00fc        ; HIRES.S:1144
   a = a | *(BASE@0x00f0)[y]              ; HIRES.S:1146
@@ -776,19 +773,17 @@ fn LayXOR {
   *YCO@0x0002 -= 1                         ; HIRES.S:1161
   y = *YCO@0x0002        ; HIRES.S:1162
   cmp y, *TOPEDGE@0x00f8    ; HIRES.S:1163
-  if eq goto :done       ; HIRES.S:1164
+  if y == *TOPEDGE@0x00f8 goto :done  ; HIRES.S:1164
   goto :0                ; HIRES.S:1166
 :done:
   tail_call DONE                ; HIRES.S:1170
 }
 
 fn MLAY {
-  cmp a, #eor              ; HIRES.S:1187
-  if ne goto :1       ; HIRES.S:1188
+  if a != #eor goto :1  ; HIRES.S:1188
   tail_call MLayXOR                ; HIRES.S:1189
 :1:
-  cmp a, #mask              ; HIRES.S:1191
-  if cc goto :2       ; HIRES.S:1192
+  if a < #mask goto :2  ; HIRES.S:1192
   tail_call MLayMask                ; HIRES.S:1193
 :2:
   tail_call MLayGen                ; HIRES.S:1195
@@ -835,7 +830,7 @@ fn MLayGen {
   a = a + *PAGE@0x0000 + c    ; HIRES.S:1251
   *BASE+1@0x00f1 = a            ; HIRES.S:1252
   y = *OFFLEFT@0x00f9        ; HIRES.S:1254
-  if eq goto :2       ; HIRES.S:1255
+  if y == #0x00 goto :2  ; HIRES.S:1255
   y = *VISWIDTH@0x001a        ; HIRES.S:1259
 :RAMRD1:
   *$c003@0xc003 = a            ; HIRES.S:1261
@@ -849,7 +844,7 @@ fn MLayGen {
   *CARRY@0x00fc = a            ; HIRES.S:1271
 :1:
   y -= 1                         ; HIRES.S:1273
-  if pl goto :3       ; HIRES.S:1274
+  if y >=0 goto :3  ; HIRES.S:1274
   if mi goto :4       ; HIRES.S:1275
 :2:
   y = *XCO@0x0001        ; HIRES.S:1279
@@ -880,12 +875,12 @@ fn MLayGen {
   *BASE@0x00f0 += 1                         ; HIRES.S:1310
   y = *YREG@0x00fb        ; HIRES.S:1312
   cmp y, *RMOST@0x001b    ; HIRES.S:1313
-  if eq goto :7       ; HIRES.S:1314
+  if y == *RMOST@0x001b goto :7  ; HIRES.S:1314
   y -= 1                         ; HIRES.S:1316
-  if pl goto :3       ; HIRES.S:1317
+  if y >=0 goto :3  ; HIRES.S:1317
 :7:
   a = *OFFRIGHT@0x00fa        ; HIRES.S:1321
-  if ne goto :5       ; HIRES.S:1322
+  if a != #0x00 goto :5  ; HIRES.S:1322
 :4:
   y = *XCO@0x0001        ; HIRES.S:1324
   a = *(BASE@0x00f0)[y]   ; HIRES.S:1325
@@ -905,7 +900,7 @@ fn MLayGen {
   *YCO@0x0002 -= 1                         ; HIRES.S:1341
   y = *YCO@0x0002        ; HIRES.S:1342
   cmp y, *TOPEDGE@0x00f8    ; HIRES.S:1343
-  if eq goto :done       ; HIRES.S:1345
+  if y == *TOPEDGE@0x00f8 goto :done  ; HIRES.S:1345
   goto :0                ; HIRES.S:1346
 :done:
   tail_call DONE                ; HIRES.S:1348
@@ -958,7 +953,7 @@ fn MLayMask {
   a = a + *PAGE@0x0000 + c    ; HIRES.S:1413
   *BASE+1@0x00f1 = a            ; HIRES.S:1414
   y = *OFFLEFT@0x00f9        ; HIRES.S:1416
-  if eq goto :2       ; HIRES.S:1417
+  if y == #0x00 goto :2  ; HIRES.S:1417
   y = *VISWIDTH@0x001a        ; HIRES.S:1422
 :RAMRD1:
   *$c003@0xc003 = a            ; HIRES.S:1424
@@ -977,7 +972,7 @@ fn MLayMask {
   *CARRY@0x00fc = a            ; HIRES.S:1440
 :1:
   y -= 1                         ; HIRES.S:1442
-  if pl goto :3       ; HIRES.S:1443
+  if y >=0 goto :3  ; HIRES.S:1443
   if mi goto :4       ; HIRES.S:1444
 :2:
   y = *XCO@0x0001        ; HIRES.S:1449
@@ -1020,12 +1015,12 @@ fn MLayMask {
   *BASE@0x00f0 += 1                         ; HIRES.S:1494
   y = *YREG@0x00fb        ; HIRES.S:1496
   cmp y, *RMOST@0x001b    ; HIRES.S:1497
-  if eq goto :7       ; HIRES.S:1498
+  if y == *RMOST@0x001b goto :7  ; HIRES.S:1498
   y -= 1                         ; HIRES.S:1500
-  if pl goto :3       ; HIRES.S:1501
+  if y >=0 goto :3  ; HIRES.S:1501
 :7:
   a = *OFFRIGHT@0x00fa        ; HIRES.S:1505
-  if ne goto :5       ; HIRES.S:1506
+  if a != #0x00 goto :5  ; HIRES.S:1506
 :4:
   y = *XCO@0x0001        ; HIRES.S:1508
   a = *(BASE@0x00f0)[y]   ; HIRES.S:1509
@@ -1047,7 +1042,7 @@ fn MLayMask {
   *YCO@0x0002 -= 1                         ; HIRES.S:1526
   y = *YCO@0x0002        ; HIRES.S:1527
   cmp y, *TOPEDGE@0x00f8    ; HIRES.S:1528
-  if eq goto :done       ; HIRES.S:1529
+  if y == *TOPEDGE@0x00f8 goto :done  ; HIRES.S:1529
   goto :0                ; HIRES.S:1531
 :done:
   tail_call DONE                ; HIRES.S:1533
@@ -1099,7 +1094,7 @@ fn MLayXOR {
   a = a + *PAGE@0x0000 + c    ; HIRES.S:1597
   *BASE+1@0x00f1 = a            ; HIRES.S:1598
   y = *OFFLEFT@0x00f9        ; HIRES.S:1600
-  if eq goto :2       ; HIRES.S:1601
+  if y == #0x00 goto :2  ; HIRES.S:1601
   y = *VISWIDTH@0x001a        ; HIRES.S:1606
 :RAMRD1:
   *$c003@0xc003 = a            ; HIRES.S:1608
@@ -1116,7 +1111,7 @@ fn MLayXOR {
   *CARRY@0x00fc = a            ; HIRES.S:1620
 :1:
   y -= 1                         ; HIRES.S:1622
-  if pl goto :3       ; HIRES.S:1623
+  if y >=0 goto :3  ; HIRES.S:1623
   if mi goto :4       ; HIRES.S:1624
 :2:
   y = *XCO@0x0001        ; HIRES.S:1629
@@ -1158,12 +1153,12 @@ fn MLayXOR {
   *BASE@0x00f0 += 1                         ; HIRES.S:1674
   y = *YREG@0x00fb        ; HIRES.S:1676
   cmp y, *RMOST@0x001b    ; HIRES.S:1677
-  if eq goto :7       ; HIRES.S:1678
+  if y == *RMOST@0x001b goto :7  ; HIRES.S:1678
   y -= 1                         ; HIRES.S:1680
-  if pl goto :3       ; HIRES.S:1681
+  if y >=0 goto :3  ; HIRES.S:1681
 :7:
   a = *OFFRIGHT@0x00fa        ; HIRES.S:1685
-  if ne goto :5       ; HIRES.S:1686
+  if a != #0x00 goto :5  ; HIRES.S:1686
 :4:
   y = *XCO@0x0001        ; HIRES.S:1688
   a = *CARRY@0x00fc        ; HIRES.S:1690
@@ -1182,7 +1177,7 @@ fn MLayXOR {
   *YCO@0x0002 -= 1                         ; HIRES.S:1707
   y = *YCO@0x0002        ; HIRES.S:1708
   cmp y, *TOPEDGE@0x00f8    ; HIRES.S:1709
-  if eq goto :done       ; HIRES.S:1710
+  if y == *TOPEDGE@0x00f8 goto :done  ; HIRES.S:1710
   goto :0                ; HIRES.S:1712
 :done:
   tail_call DONE                ; HIRES.S:1714
@@ -1202,7 +1197,7 @@ fn FASTLAY {
   call setimage                  ; HIRES.S:1744
   x = *OPACITY@0x0006        ; HIRES.S:1746
   cmp x, #sta              ; HIRES.S:1747
-  if eq goto fastlaySTA       ; HIRES.S:1748
+  if x == #sta goto fastlaySTA  ; HIRES.S:1748
   a = *(OPCODE@0xe9aa + x)   ; HIRES.S:1750
   ??? sta :smod            ; HIRES.S:1751
   a = *PAGE@0x0000        ; HIRES.S:1753
@@ -1251,7 +1246,7 @@ fn FASTLAY {
   a = a | *(BASE@0x00f0)[y]              ; HIRES.S:1802
   *(BASE@0x00f0)[y] = a   ; HIRES.S:1803
   y -= 1                         ; HIRES.S:1805
-  if pl goto :inloop       ; HIRES.S:1806
+  if y >=0 goto :inloop  ; HIRES.S:1806
 :smWIDTH:
   a = #0x04                  ; HIRES.S:1808
   a = a + *IMAGE@0x0004 + c    ; HIRES.S:1809
@@ -1262,7 +1257,7 @@ fn FASTLAY {
   x -= 1                         ; HIRES.S:1814
 :smTOP:
   cmp x, #0xff              ; HIRES.S:1815
-  if ne goto :outloop       ; HIRES.S:1816
+  if x != #0xff goto :outloop  ; HIRES.S:1816
   return                           ; HIRES.S:1818
 }
 
@@ -1309,7 +1304,7 @@ fn fastlaySTA {
 :smod:
   *($2000@0x2000 + y) = a   ; HIRES.S:1870
   y -= 1                         ; HIRES.S:1872
-  if pl goto :inloop       ; HIRES.S:1873
+  if y >=0 goto :inloop  ; HIRES.S:1873
 :smWIDTH:
   a = #0x04                  ; HIRES.S:1875
   a = a + *IMAGE@0x0004 + c    ; HIRES.S:1876
@@ -1320,7 +1315,7 @@ fn fastlaySTA {
   x -= 1                         ; HIRES.S:1881
 :smTOP:
   cmp x, #0xff              ; HIRES.S:1882
-  if ne goto :outloop       ; HIRES.S:1883
+  if x != #0xff goto :outloop  ; HIRES.S:1883
   return                           ; HIRES.S:1885
 }
 
@@ -1377,7 +1372,7 @@ fn FASTMASK {
   a = a & *(BASE@0x00f0)[y]              ; HIRES.S:1952
   *(BASE@0x00f0)[y] = a   ; HIRES.S:1953
   y -= 1                         ; HIRES.S:1955
-  if pl goto :inloop       ; HIRES.S:1956
+  if y >=0 goto :inloop  ; HIRES.S:1956
 :smWIDTH:
   a = #0x04                  ; HIRES.S:1958
   a = a + *IMAGE@0x0004 + c    ; HIRES.S:1959
@@ -1389,7 +1384,7 @@ fn FASTMASK {
   x -= 1                         ; HIRES.S:1965
 :smTOP:
   cmp x, #0xff              ; HIRES.S:1966
-  if ne goto :outloop       ; HIRES.S:1967
+  if x != #0xff goto :outloop  ; HIRES.S:1967
   return                           ; HIRES.S:1969
 }
 
@@ -1406,7 +1401,7 @@ fn SETFASTMAIN {
 
 fn SETFASTAUX {
   a = #0x03                  ; HIRES.S:1991
-  if ne goto ]setfast       ; HIRES.S:1992
+  if a != #0x00 goto ]setfast  ; HIRES.S:1992
 FASTBLACK:
   a = *color@0x0006        ; HIRES.S:2006
   ??? sta :smCOLOR+1            ; HIRES.S:2007
@@ -1440,11 +1435,11 @@ FASTBLACK:
 :smod:
   *($2000@0x2000 + y) = a   ; HIRES.S:2040
   y -= 1                         ; HIRES.S:2041
-  if pl goto :inloop       ; HIRES.S:2042
+  if y >=0 goto :inloop  ; HIRES.S:2042
   x -= 1                         ; HIRES.S:2044
 :smTOP:
   cmp x, #0xff              ; HIRES.S:2045
-  if ne goto :outloop       ; HIRES.S:2046
+  if x != #0xff goto :outloop  ; HIRES.S:2046
   return                           ; HIRES.S:2048
 }
 
@@ -1481,11 +1476,11 @@ fn FASTBLACK {
 :smod:
   *($2000@0x2000 + y) = a   ; HIRES.S:2040
   y -= 1                         ; HIRES.S:2041
-  if pl goto :inloop       ; HIRES.S:2042
+  if y >=0 goto :inloop  ; HIRES.S:2042
   x -= 1                         ; HIRES.S:2044
 :smTOP:
   cmp x, #0xff              ; HIRES.S:2045
-  if ne goto :outloop       ; HIRES.S:2046
+  if x != #0xff goto :outloop  ; HIRES.S:2046
   return                           ; HIRES.S:2048
 }
 
@@ -1511,13 +1506,13 @@ fn COPYSCRN {
 :dst2:
   *($5000@0x5000 + y) = a   ; HIRES.S:2080
   y += 1                         ; HIRES.S:2082
-  if ne goto :loop       ; HIRES.S:2083
+  if y != #0x00 goto :loop  ; HIRES.S:2083
   ??? inc :org1+2            ; HIRES.S:2085
   ??? inc :org2+2            ; HIRES.S:2086
   ??? inc :dst1+2            ; HIRES.S:2087
   ??? inc :dst2+2            ; HIRES.S:2088
   x -= 1                         ; HIRES.S:2090
-  if ne goto :loop       ; HIRES.S:2091
+  if x != #0x00 goto :loop  ; HIRES.S:2091
   return                           ; HIRES.S:2093
 }
 
@@ -1540,7 +1535,7 @@ fn INVERTY {
   x -= 1                         ; HIRES.S:2120
   y += 1                         ; HIRES.S:2121
   cmp y, #0x60              ; HIRES.S:2122
-  if cc goto :loop       ; HIRES.S:2123
+  if y < #0x60 goto :loop  ; HIRES.S:2123
 ]rts:
   return                           ; HIRES.S:2124
   ??? usr $a9,1,$0000,*-org            ; HIRES.S:2129

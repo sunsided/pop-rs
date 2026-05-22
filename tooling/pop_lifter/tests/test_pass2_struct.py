@@ -30,7 +30,7 @@ def _ir1_module(source_dir: Path, file: str, entries: list[str]):
         search_paths=[source_dir],
     )
     file_ast = next(f for f in ast.files if Path(f.path).name == file)
-    return lift_file(file_ast, ast.equates, entries).module
+    return lift_file(file_ast, ast.symbols(), entries).module
 
 
 # ---- fusion correctness (CmpImm / CmpAbs / Load* + branch suffix)

@@ -19,7 +19,7 @@ def _lift_and_structure(source_dir: Path, name: str):
         search_paths=[source_dir],
     )
     ctrl = next(f for f in ast.files if Path(f.path).name == "CTRL.S")
-    ir1 = lift_file(ctrl, ast.equates, [name]).module
+    ir1 = lift_file(ctrl, ast.symbols(), [name]).module
     return structure_module(ir1).find(name)
 
 
@@ -139,7 +139,7 @@ def test_chgshadposn_has_one_back_edge(source_dir):
         search_paths=[source_dir],
     )
     auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
-    ir2 = structure_module(lift_file(auto, ast.equates, ["chgshadposn"]).module)
+    ir2 = structure_module(lift_file(auto, ast.symbols(), ["chgshadposn"]).module)
     cfg = build_cfg(ir2.find("chgshadposn"))
     back = find_back_edges(cfg)
     assert len(back) == 1, f"expected 1 back-edge, got {back}"

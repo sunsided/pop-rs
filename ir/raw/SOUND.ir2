@@ -9,8 +9,7 @@ fn ZEROSOUND  (aka lookup, endlook) {
 fn ADDSOUND {
   *savex@0x02f1 = x            ; SOUND.S:80
   x = *soundtable@0xb6c0        ; SOUND.S:82
-  cmp x, #maxsfx              ; SOUND.S:83
-  if cs goto :rts       ; SOUND.S:84
+  if x >= #maxsfx goto :rts  ; SOUND.S:84
   x += 1                         ; SOUND.S:86
   *(soundtable@0xb6c0 + x) = a   ; SOUND.S:87
   *soundtable@0xb6c0 = x            ; SOUND.S:88
@@ -21,16 +20,16 @@ fn ADDSOUND {
 
 fn PLAYBACK {
   a = *soundon@0x0203        ; SOUND.S:101
-  if eq goto :rts       ; SOUND.S:102
+  if a == #0x00 goto :rts  ; SOUND.S:102
   x = *soundtable@0xb6c0        ; SOUND.S:104
-  if eq goto :rts       ; SOUND.S:105
+  if x == #0x00 goto :rts  ; SOUND.S:105
 :loop:
   a = *(soundtable@0xb6c0 + x)   ; SOUND.S:107
   *savex@0x02f1 = x            ; SOUND.S:109
   call makesound                  ; SOUND.S:111
   x = *savex@0x02f1        ; SOUND.S:113
   x -= 1                         ; SOUND.S:115
-  if ne goto :loop       ; SOUND.S:116
+  if x != #0x00 goto :loop  ; SOUND.S:116
 :rts:
   return                           ; SOUND.S:118
 }
@@ -122,7 +121,7 @@ DoFlashMsg:
   a = pop                          ; SOUND.S:253
   c = 1                            ; SOUND.S:254
   a = a - #0x01 - (1 - c)        ; SOUND.S:255
-  if ne goto :loop       ; SOUND.S:256
+  if a != #0x00 goto :loop  ; SOUND.S:256
   return                           ; SOUND.S:258
 }
 
@@ -141,7 +140,7 @@ fn DoGotKey  (aka DoFlashMsg) {
   a = pop                          ; SOUND.S:253
   c = 1                            ; SOUND.S:254
   a = a - #0x01 - (1 - c)        ; SOUND.S:255
-  if ne goto :loop       ; SOUND.S:256
+  if a != #0x00 goto :loop  ; SOUND.S:256
   return                           ; SOUND.S:258
 }
 
@@ -207,7 +206,7 @@ fn tone {
   if cc goto :midloop       ; SOUND.S:346
   c = 1                            ; SOUND.S:348
   a = a - #0x01 - (1 - c)        ; SOUND.S:349
-  if ne goto :outloop       ; SOUND.S:350
+  if a != #0x00 goto :outloop  ; SOUND.S:350
   return                           ; SOUND.S:352
   ??? usr $a9,20,$e00,*-org            ; SOUND.S:359
 }

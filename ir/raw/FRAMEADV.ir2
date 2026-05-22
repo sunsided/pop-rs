@@ -41,10 +41,10 @@ fn SURE {
   *colno@0x00ea += 1                         ; FRAMEADV.S:100
   a = *colno@0x00ea        ; FRAMEADV.S:102
   cmp a, #0x0a              ; FRAMEADV.S:103
-  if cc goto :loop       ; FRAMEADV.S:104
+  if a < #0x0a goto :loop  ; FRAMEADV.S:104
 :nextln:
   y = *rowno@0x00e9        ; FRAMEADV.S:106
-  if eq goto :done       ; FRAMEADV.S:107
+  if y == #0x00 goto :done  ; FRAMEADV.S:107
   y -= 1                         ; FRAMEADV.S:108
   goto :row                ; FRAMEADV.S:109
 :done:
@@ -77,9 +77,9 @@ fn SURE {
   *XCO@0x0001 = a            ; FRAMEADV.S:149
   *blockxco@0x00f3 = a            ; FRAMEADV.S:150
   a = *scrnAbove@0x0033        ; FRAMEADV.S:152
-  if ne goto :1       ; FRAMEADV.S:153
+  if a != #0x00 goto :1  ; FRAMEADV.S:153
   a = #floor                  ; FRAMEADV.S:154
-  if ne goto :2       ; FRAMEADV.S:155
+  if a != #0x00 goto :2  ; FRAMEADV.S:155
 :1:
   y = *yindex@0x00eb        ; FRAMEADV.S:157
   call getobjid1                  ; FRAMEADV.S:158
@@ -94,7 +94,7 @@ fn SURE {
   *colno@0x00ea += 1                         ; FRAMEADV.S:169
   a = *colno@0x00ea        ; FRAMEADV.S:171
   cmp a, #0x0a              ; FRAMEADV.S:172
-  if cc goto :dloop       ; FRAMEADV.S:173
+  if a < #0x0a goto :dloop  ; FRAMEADV.S:173
   a = pop                          ; FRAMEADV.S:175
   *scrnBelowL@0x0035 = a            ; FRAMEADV.S:176
   a = pop                          ; FRAMEADV.S:177
@@ -152,11 +152,11 @@ fn FAST {
   *colno@0x00ea += 1                         ; FRAMEADV.S:250
   a = *colno@0x00ea        ; FRAMEADV.S:252
   cmp a, #0x0a              ; FRAMEADV.S:253
-  if cs goto :nextln       ; FRAMEADV.S:254
+  if a >= #0x0a goto :nextln  ; FRAMEADV.S:254
   goto :loop                ; FRAMEADV.S:255
 :nextln:
   y = *rowno@0x00e9        ; FRAMEADV.S:257
-  if eq goto :cont       ; FRAMEADV.S:258
+  if y == #0x00 goto :cont  ; FRAMEADV.S:258
   y -= 1                         ; FRAMEADV.S:259
   goto :row                ; FRAMEADV.S:260
 :cont:
@@ -181,7 +181,7 @@ fn FAST {
   *scrnBelowL@0x0035 = a            ; FRAMEADV.S:288
   call getbelow                  ; FRAMEADV.S:290
   a = *scrnAbove@0x0033        ; FRAMEADV.S:292
-  if eq goto :done       ; FRAMEADV.S:293
+  if a == #0x00 goto :done  ; FRAMEADV.S:293
   call calcblue                  ; FRAMEADV.S:294
   a = #0x00                  ; FRAMEADV.S:296
   *colno@0x00ea = a            ; FRAMEADV.S:297
@@ -202,7 +202,7 @@ fn FAST {
   *colno@0x00ea += 1                         ; FRAMEADV.S:316
   a = *colno@0x00ea        ; FRAMEADV.S:318
   cmp a, #0x0a              ; FRAMEADV.S:319
-  if cc goto :dloop       ; FRAMEADV.S:320
+  if a < #0x0a goto :dloop  ; FRAMEADV.S:320
 :done:
   a = pop                          ; FRAMEADV.S:323
   *scrnBelowL@0x0035 = a            ; FRAMEADV.S:324
@@ -212,7 +212,7 @@ fn FAST {
   *yindex@0x00eb = a            ; FRAMEADV.S:331
   call drawobjs                  ; FRAMEADV.S:332
   a = *inbuilder@0x0201        ; FRAMEADV.S:335
-  if ne goto ]rts       ; FRAMEADV.S:336
+  if a != #0x00 goto ]rts  ; FRAMEADV.S:336
   tail_call updatemeters                ; FRAMEADV.S:339
 ]rts:
   return                           ; FRAMEADV.S:179
@@ -241,7 +241,7 @@ fn RedDSure {
 
 fn RedBlockFast {
   a = *(wipebuf@0x5eb4 + y)   ; FRAMEADV.S:382
-  if eq goto :skipwipe       ; FRAMEADV.S:383
+  if a == #0x00 goto :skipwipe  ; FRAMEADV.S:383
   c = 1                            ; FRAMEADV.S:384
   a = a - #0x01 - (1 - c)        ; FRAMEADV.S:385
   *(wipebuf@0x5eb4 + y) = a   ; FRAMEADV.S:386
@@ -249,17 +249,17 @@ fn RedBlockFast {
   y = *yindex@0x00eb        ; FRAMEADV.S:390
 :skipwipe:
   a = *(redbuf@0x5e5a + y)   ; FRAMEADV.S:393
-  if eq goto :skipred       ; FRAMEADV.S:394
+  if a == #0x00 goto :skipred  ; FRAMEADV.S:394
   c = 1                            ; FRAMEADV.S:395
   a = a - #0x01 - (1 - c)        ; FRAMEADV.S:396
   *(redbuf@0x5e5a + y) = a   ; FRAMEADV.S:397
   call setback                  ; FRAMEADV.S:399
   call RedBlockSure                  ; FRAMEADV.S:400
   y = *yindex@0x00eb        ; FRAMEADV.S:402
-  if pl goto :skipmove       ; FRAMEADV.S:403
+  if y >=0 goto :skipmove  ; FRAMEADV.S:403
 :skipred:
   a = *(movebuf@0x5ed2 + y)   ; FRAMEADV.S:406
-  if eq goto :skipmove       ; FRAMEADV.S:407
+  if a == #0x00 goto :skipmove  ; FRAMEADV.S:407
   c = 1                            ; FRAMEADV.S:408
   a = a - #0x01 - (1 - c)        ; FRAMEADV.S:409
   *(movebuf@0x5ed2 + y) = a   ; FRAMEADV.S:410
@@ -270,17 +270,17 @@ fn RedBlockFast {
   y = *yindex@0x00eb        ; FRAMEADV.S:417
 :skipmove:
   a = *(floorbuf@0x5e96 + y)   ; FRAMEADV.S:420
-  if eq goto :skipfloor       ; FRAMEADV.S:421
+  if a == #0x00 goto :skipfloor  ; FRAMEADV.S:421
   c = 1                            ; FRAMEADV.S:422
   a = a - #0x01 - (1 - c)        ; FRAMEADV.S:423
   *(floorbuf@0x5e96 + y) = a   ; FRAMEADV.S:424
   call setmid                  ; FRAMEADV.S:426
   call drawfloor                  ; FRAMEADV.S:427
   y = *yindex@0x00eb        ; FRAMEADV.S:429
-  if pl goto :skiphalf       ; FRAMEADV.S:430
+  if y >=0 goto :skiphalf  ; FRAMEADV.S:430
 :skipfloor:
   a = *(halfbuf@0x5e3c + y)   ; FRAMEADV.S:433
-  if eq goto :skiphalf       ; FRAMEADV.S:434
+  if a == #0x00 goto :skiphalf  ; FRAMEADV.S:434
   c = 1                            ; FRAMEADV.S:435
   a = a - #0x01 - (1 - c)        ; FRAMEADV.S:436
   *(halfbuf@0x5e3c + y) = a   ; FRAMEADV.S:437
@@ -289,7 +289,7 @@ fn RedBlockFast {
   y = *yindex@0x00eb        ; FRAMEADV.S:442
 :skiphalf:
   a = *(objbuf@0x5ef0 + y)   ; FRAMEADV.S:445
-  if eq goto :skipobj       ; FRAMEADV.S:446
+  if a == #0x00 goto :skipobj  ; FRAMEADV.S:446
   a = #0x00                  ; FRAMEADV.S:448
   *(objbuf@0x5ef0 + y) = a   ; FRAMEADV.S:449
   call drawobjs                  ; FRAMEADV.S:451
@@ -298,7 +298,7 @@ fn RedBlockFast {
   y = *yindex@0x00eb        ; FRAMEADV.S:456
 :skipobj:
   a = *(fredbuf@0x5e78 + y)   ; FRAMEADV.S:459
-  if eq goto :skipfred       ; FRAMEADV.S:460
+  if a == #0x00 goto :skipfred  ; FRAMEADV.S:460
   c = 1                            ; FRAMEADV.S:461
   a = a - #0x01 - (1 - c)        ; FRAMEADV.S:462
   *(fredbuf@0x5e78 + y) = a   ; FRAMEADV.S:463
@@ -312,7 +312,7 @@ fn RedBlockFast {
 fn RedDFast {
   y = *colno@0x00ea        ; FRAMEADV.S:478
   a = *(topbuf@0x5f2c + y)   ; FRAMEADV.S:479
-  if eq goto :skip       ; FRAMEADV.S:480
+  if a == #0x00 goto :skip  ; FRAMEADV.S:480
   c = 1                            ; FRAMEADV.S:481
   a = a - #0x01 - (1 - c)        ; FRAMEADV.S:482
   *(topbuf@0x5f2c + y) = a   ; FRAMEADV.S:483
@@ -330,23 +330,23 @@ fn RedDFast {
 
 fn drawobjs {
   a = *objX@0xb493        ; FRAMEADV.S:507
-  if eq goto :rts       ; FRAMEADV.S:508
+  if a == #0x00 goto :rts  ; FRAMEADV.S:508
   y = #0x00                  ; FRAMEADV.S:510
   x = #0x01                  ; FRAMEADV.S:511
 :loop:
   a = *(objINDX@0xb47f + x)   ; FRAMEADV.S:513
   cmp a, *yindex@0x00eb    ; FRAMEADV.S:514
-  if ne goto :next       ; FRAMEADV.S:515
+  if a != *yindex@0x00eb goto :next  ; FRAMEADV.S:515
   a = x                            ; FRAMEADV.S:517
   y += 1                         ; FRAMEADV.S:518
   *(sortX@0x03c0 + y) = a   ; FRAMEADV.S:519
 :next:
   x += 1                         ; FRAMEADV.S:521
   cmp x, *objX@0xb493    ; FRAMEADV.S:522
-  if cc goto :loop       ; FRAMEADV.S:523
+  if x < *objX@0xb493 goto :loop  ; FRAMEADV.S:523
   if eq goto :loop       ; FRAMEADV.S:524
   cmp y, #0x00              ; FRAMEADV.S:526
-  if eq goto :rts       ; FRAMEADV.S:527
+  if y == #0x00 goto :rts  ; FRAMEADV.S:527
   *sortX@0x03c0 = y            ; FRAMEADV.S:528
   call sortlist                  ; FRAMEADV.S:532
   x = #0x01                  ; FRAMEADV.S:536
@@ -358,7 +358,7 @@ fn drawobjs {
   x = *xsave@0x00e8        ; FRAMEADV.S:545
   x += 1                         ; FRAMEADV.S:546
   cmp x, *sortX@0x03c0    ; FRAMEADV.S:547
-  if cc goto :loop2       ; FRAMEADV.S:548
+  if x < *sortX@0x03c0 goto :loop2  ; FRAMEADV.S:548
   if eq goto :loop2       ; FRAMEADV.S:549
 :rts:
   return                           ; FRAMEADV.S:551
@@ -366,9 +366,9 @@ fn drawobjs {
 
 fn getprev {
   a = *SCRNUM@0x0023        ; FRAMEADV.S:561
-  if eq goto :null       ; FRAMEADV.S:562
+  if a == #0x00 goto :null  ; FRAMEADV.S:562
   a = *scrnLeft@0x0031        ; FRAMEADV.S:564
-  if eq goto :blackscrn       ; FRAMEADV.S:565
+  if a == #0x00 goto :blackscrn  ; FRAMEADV.S:565
 :cont:
   call calcblue                  ; FRAMEADV.S:567
   y = #0x09                  ; FRAMEADV.S:569
@@ -389,7 +389,7 @@ fn getprev {
   return                           ; FRAMEADV.S:587
 :null:
   a = *scrnLeft@0x0031        ; FRAMEADV.S:590
-  if ne goto :cont       ; FRAMEADV.S:591
+  if a != #0x00 goto :cont  ; FRAMEADV.S:591
 :blackscrn:
   a = #block                  ; FRAMEADV.S:594
   *PREV@0x002b = a            ; FRAMEADV.S:595
@@ -405,9 +405,9 @@ fn getprev {
 fn getbelow {
   x = *rowno@0x00e9        ; FRAMEADV.S:617
   cmp x, #0x02              ; FRAMEADV.S:618
-  if cc goto :onscr       ; FRAMEADV.S:619
+  if x < #0x02 goto :onscr  ; FRAMEADV.S:619
   a = *scrnBelow@0x0034        ; FRAMEADV.S:623
-  if eq goto :belowblack       ; FRAMEADV.S:624
+  if a == #0x00 goto :belowblack  ; FRAMEADV.S:624
   call calcblue                  ; FRAMEADV.S:625
   y = #0x08                  ; FRAMEADV.S:627
 :loop:
@@ -416,10 +416,10 @@ fn getbelow {
   a = *state@0x00f0        ; FRAMEADV.S:632
   *(SBELOW+1@0x03e1 + y) = a   ; FRAMEADV.S:633
   y -= 1                         ; FRAMEADV.S:634
-  if pl goto :loop       ; FRAMEADV.S:635
+  if y >=0 goto :loop  ; FRAMEADV.S:635
 :cont1:
   a = *scrnBelowL@0x0035        ; FRAMEADV.S:637
-  if eq goto :llblack       ; FRAMEADV.S:638
+  if a == #0x00 goto :llblack  ; FRAMEADV.S:638
   call calcblue                  ; FRAMEADV.S:639
   y = #0x09                  ; FRAMEADV.S:641
   call getobjid                  ; FRAMEADV.S:642
@@ -450,7 +450,7 @@ fn getbelow {
   y += 1                         ; FRAMEADV.S:674
   x += 1                         ; FRAMEADV.S:675
   cmp x, #0x0a              ; FRAMEADV.S:676
-  if cc goto :loop1       ; FRAMEADV.S:677
+  if x < #0x0a goto :loop1  ; FRAMEADV.S:677
   return                           ; FRAMEADV.S:679
 :belowblack:
   a = #0x01                  ; FRAMEADV.S:684
@@ -459,19 +459,19 @@ fn getbelow {
   *(BELOW@0x03d0 + x) = a   ; FRAMEADV.S:686
   x += 1                         ; FRAMEADV.S:687
   cmp x, #0x0a              ; FRAMEADV.S:688
-  if cc goto :loop2       ; FRAMEADV.S:689
+  if x < #0x0a goto :loop2  ; FRAMEADV.S:689
   if cs goto :cont1       ; FRAMEADV.S:690
 :llblack:
   a = *level@0x03f4        ; FRAMEADV.S:693
   cmp a, #0x0c              ; FRAMEADV.S:694
-  if eq goto :2       ; FRAMEADV.S:695
+  if a == #0x0c goto :2  ; FRAMEADV.S:695
   a = #block                  ; FRAMEADV.S:696
 :1:
   *BELOW@0x03d0 = a            ; FRAMEADV.S:697
   if pl goto :done       ; FRAMEADV.S:698
 :2:
   a = #space                  ; FRAMEADV.S:699
-  if pl goto :1       ; FRAMEADV.S:700
+  if a >=0 goto :1  ; FRAMEADV.S:700
 loadobj:
   a = *(objX@0xb493 + x)   ; FRAMEADV.S:717
   *FCharX@0x0071 = a            ; FRAMEADV.S:718
@@ -530,29 +530,24 @@ fn loadobj {
 
 fn drawfrnt {
   x = *PRECED@0x0029        ; FRAMEADV.S:755
-  cmp x, #gate              ; FRAMEADV.S:756
-  if ne goto :a       ; FRAMEADV.S:757
+  if x != #gate goto :a  ; FRAMEADV.S:757
   call DrawGateBF?                  ; FRAMEADV.S:758
 :a:
   x = *objid@0x00ec        ; FRAMEADV.S:760
-  cmp x, #slicer              ; FRAMEADV.S:761
-  if ne goto :11       ; FRAMEADV.S:762
+  if x != #slicer goto :11  ; FRAMEADV.S:762
   tail_call drawslicerf                ; FRAMEADV.S:763
 :11:
-  cmp x, #flask              ; FRAMEADV.S:764
-  if ne goto :1       ; FRAMEADV.S:765
+  if x != #flask goto :1  ; FRAMEADV.S:765
   a = *state@0x00f0        ; FRAMEADV.S:766
   a = a & #0xe0              ; FRAMEADV.S:767
-  cmp a, #0xa0              ; FRAMEADV.S:768
-  if eq goto :1       ; FRAMEADV.S:769
-  cmp a, #0x40              ; FRAMEADV.S:770
-  if cc goto :1       ; FRAMEADV.S:771
+  if a == #0xa0 goto :1  ; FRAMEADV.S:769
+  if a < #0x40 goto :1  ; FRAMEADV.S:771
   a = #specialflask                  ; FRAMEADV.S:772
-  if ne goto :12       ; FRAMEADV.S:773
+  if a != #0x00 goto :12  ; FRAMEADV.S:773
 :1:
   x = *objid@0x00ec        ; FRAMEADV.S:775
   a = *(fronti@0x0057 + x)   ; FRAMEADV.S:776
-  if eq goto ]rts       ; FRAMEADV.S:777
+  if a == #0x00 goto ]rts  ; FRAMEADV.S:777
 :12:
   *IMAGE@0x0004 = a            ; FRAMEADV.S:778
   a = *Ay@0x00ee        ; FRAMEADV.S:780
@@ -563,24 +558,18 @@ fn drawfrnt {
   c = 0                            ; FRAMEADV.S:786
   ??? adc frontx,x            ; FRAMEADV.S:787
   *XCO@0x0001 = a            ; FRAMEADV.S:788
-  cmp x, #archtop2              ; FRAMEADV.S:790
-  if cs goto :sta       ; FRAMEADV.S:791
+  if x >= #archtop2 goto :sta  ; FRAMEADV.S:791
   a = #EditorDisk                  ; FRAMEADV.S:794
-  cmp a, #0x02              ; FRAMEADV.S:795
-  if eq goto :ndunj       ; FRAMEADV.S:796
+  if a == #0x02 goto :ndunj  ; FRAMEADV.S:796
   a = *BGset1@0x0303        ; FRAMEADV.S:799
-  cmp a, #0x01              ; FRAMEADV.S:800
-  if eq goto :ndunj       ; FRAMEADV.S:801
-  cmp x, #posts              ; FRAMEADV.S:803
-  if eq goto :sta       ; FRAMEADV.S:804
+  if a == #0x01 goto :ndunj  ; FRAMEADV.S:801
+  if x == #posts goto :sta  ; FRAMEADV.S:804
 :ndunj:
-  cmp x, #block              ; FRAMEADV.S:805
-  if eq goto :block       ; FRAMEADV.S:806
+  if x == #block goto :block  ; FRAMEADV.S:806
   tail_call maddfore                ; FRAMEADV.S:808
 :block:
   y = *state@0x00f0        ; FRAMEADV.S:812
-  cmp y, #numblox              ; FRAMEADV.S:813
-  if cc goto :2       ; FRAMEADV.S:814
+  if y < #numblox goto :2  ; FRAMEADV.S:814
   y = #0x00                  ; FRAMEADV.S:815
 :2:
   a = *(blockfr@0x0070 + y)   ; FRAMEADV.S:816
@@ -595,15 +584,12 @@ fn drawfrnt {
 
 fn DrawGateBF? {
   a = *rowno@0x00e9        ; FRAMEADV.S:830
-  cmp a, *KidBlockY@0x0055    ; FRAMEADV.S:831
-  if ne goto ]rts       ; FRAMEADV.S:832
+  if a != *KidBlockY@0x0055 goto ]rts  ; FRAMEADV.S:832
   x = *colno@0x00ea        ; FRAMEADV.S:834
   x -= 1                         ; FRAMEADV.S:835
-  cmp x, *KidBlockX@0x0054    ; FRAMEADV.S:836
-  if ne goto ]rts       ; FRAMEADV.S:837
+  if x != *KidBlockX@0x0054 goto ]rts  ; FRAMEADV.S:837
   a = *scrnRight@0x0032        ; FRAMEADV.S:838
-  cmp a, *KidScrn@0x005b    ; FRAMEADV.S:839
-  if eq goto ]rts       ; FRAMEADV.S:840
+  if a == *KidScrn@0x005b goto ]rts  ; FRAMEADV.S:840
   tail_call drawgatebf                ; FRAMEADV.S:842
 ]rts:
   return                           ; FRAMEADV.S:747
@@ -611,25 +597,20 @@ fn DrawGateBF? {
 
 fn drawmb {
   a = *PRECED@0x0029        ; FRAMEADV.S:850
-  cmp a, #gate              ; FRAMEADV.S:852
-  if ne goto :1       ; FRAMEADV.S:853
+  if a != #gate goto :1  ; FRAMEADV.S:853
   tail_call drawgateb                ; FRAMEADV.S:854
 :1:
-  cmp a, #spikes              ; FRAMEADV.S:856
-  if ne goto :2       ; FRAMEADV.S:857
+  if a != #spikes goto :2  ; FRAMEADV.S:857
   tail_call drawspikeb                ; FRAMEADV.S:858
 :2:
-  cmp a, #loose              ; FRAMEADV.S:860
-  if ne goto :3       ; FRAMEADV.S:861
+  if a != #loose goto :3  ; FRAMEADV.S:861
   tail_call drawlooseb                ; FRAMEADV.S:862
 :3:
-  cmp a, #torch              ; FRAMEADV.S:864
-  if ne goto :4       ; FRAMEADV.S:865
+  if a != #torch goto :4  ; FRAMEADV.S:865
   tail_call drawtorchb                ; FRAMEADV.S:866
 :4:
 :5:
-  cmp a, #exit              ; FRAMEADV.S:868
-  if ne goto :6       ; FRAMEADV.S:869
+  if a != #exit goto :6  ; FRAMEADV.S:869
   tail_call drawexitb                ; FRAMEADV.S:870
 :6:
 ]rts:
@@ -638,18 +619,15 @@ fn drawmb {
 
 fn drawmc {
   a = *objid@0x00ec        ; FRAMEADV.S:881
-  cmp a, #space              ; FRAMEADV.S:882
-  if eq goto :ok       ; FRAMEADV.S:883
-  cmp a, #panelwof              ; FRAMEADV.S:884
-  if eq goto :ok       ; FRAMEADV.S:885
+  if a == #space goto :ok  ; FRAMEADV.S:883
+  if a == #panelwof goto :ok  ; FRAMEADV.S:885
   cmp a, #pillartop              ; FRAMEADV.S:886
-  if eq goto :ok       ; FRAMEADV.S:887
+  if a == #pillartop goto :ok  ; FRAMEADV.S:887
   if ne goto ]rts       ; FRAMEADV.S:889
 :ok:
   x = *colno@0x00ea        ; FRAMEADV.S:892
   a = *(BELOW@0x03d0 + x)   ; FRAMEADV.S:893
-  cmp a, #gate              ; FRAMEADV.S:895
-  if ne goto ]rts       ; FRAMEADV.S:896
+  if a != #gate goto ]rts  ; FRAMEADV.S:896
   tail_call drawgatec                ; FRAMEADV.S:899
 ]rts:
   return                           ; FRAMEADV.S:873
@@ -666,13 +644,11 @@ fn drawc {
 
 fn checkc {
   a = *objid@0x00ec        ; FRAMEADV.S:918
-  if eq goto :vis       ; FRAMEADV.S:919
-  cmp a, #pillartop              ; FRAMEADV.S:920
-  if eq goto :vis       ; FRAMEADV.S:921
-  cmp a, #panelwof              ; FRAMEADV.S:922
-  if eq goto :vis       ; FRAMEADV.S:923
+  if a == #0x00 goto :vis  ; FRAMEADV.S:919
+  if a == #pillartop goto :vis  ; FRAMEADV.S:921
+  if a == #panelwof goto :vis  ; FRAMEADV.S:923
   cmp a, #archtop1              ; FRAMEADV.S:924
-  if cs goto :vis       ; FRAMEADV.S:925
+  if a >= #archtop1 goto :vis  ; FRAMEADV.S:925
   if cc goto ]rts       ; FRAMEADV.S:926
 :vis:
   c = 1                            ; FRAMEADV.S:927
@@ -685,11 +661,11 @@ fn dodrawc {
   a = *(BELOW@0x03d0 + x)   ; FRAMEADV.S:937
   x = a                            ; FRAMEADV.S:938
   cmp x, #block              ; FRAMEADV.S:939
-  if eq goto :block       ; FRAMEADV.S:940
+  if x == #block goto :block  ; FRAMEADV.S:940
   a = *(piecec@0x0055 + x)   ; FRAMEADV.S:941
-  if eq goto ]rts       ; FRAMEADV.S:942
+  if a == #0x00 goto ]rts  ; FRAMEADV.S:942
   cmp a, #panelc0              ; FRAMEADV.S:943
-  if eq goto :panel       ; FRAMEADV.S:944
+  if a == #panelc0 goto :panel  ; FRAMEADV.S:944
 :cont:
   *IMAGE@0x0004 = a            ; FRAMEADV.S:945
   a = *blockxco@0x00f3        ; FRAMEADV.S:946
@@ -704,20 +680,20 @@ fn dodrawc {
   a = *(SBELOW@0x03e0 + x)   ; FRAMEADV.S:957
   y = a                            ; FRAMEADV.S:958
   cmp y, #numpans              ; FRAMEADV.S:959
-  if cs goto ]rts       ; FRAMEADV.S:960
+  if y >= #numpans goto ]rts  ; FRAMEADV.S:960
   a = *(panelc@0x0068 + y)   ; FRAMEADV.S:961
-  if ne goto :cont       ; FRAMEADV.S:962
+  if a != #0x00 goto :cont  ; FRAMEADV.S:962
   return                           ; FRAMEADV.S:963
 :block:
   x = *colno@0x00ea        ; FRAMEADV.S:965
   a = *(SBELOW@0x03e0 + x)   ; FRAMEADV.S:966
   y = a                            ; FRAMEADV.S:967
   cmp y, #numblox              ; FRAMEADV.S:968
-  if cc goto :1       ; FRAMEADV.S:969
+  if y < #numblox goto :1  ; FRAMEADV.S:969
   y = #0x00                  ; FRAMEADV.S:970
 :1:
   a = *(blockc@0x006e + y)   ; FRAMEADV.S:971
-  if ne goto :cont       ; FRAMEADV.S:972
+  if a != #0x00 goto :cont  ; FRAMEADV.S:972
 ]rts:
   return                           ; FRAMEADV.S:973
 }
@@ -725,7 +701,7 @@ fn dodrawc {
 fn domaskb {
   x = *PRECED@0x0029        ; FRAMEADV.S:981
   a = *(maskb@0x0051 + x)   ; FRAMEADV.S:982
-  if eq goto ]rts       ; FRAMEADV.S:983
+  if a == #0x00 goto ]rts  ; FRAMEADV.S:983
   *IMAGE@0x0004 = a            ; FRAMEADV.S:984
   a = *Dy@0x00ef        ; FRAMEADV.S:986
   *YCO@0x0002 = a            ; FRAMEADV.S:987
@@ -739,29 +715,29 @@ fn domaskb {
 fn drawb {
   a = *objid@0x00ec        ; FRAMEADV.S:998
   cmp a, #block              ; FRAMEADV.S:999
-  if eq goto ]rts       ; FRAMEADV.S:1000
+  if a == #block goto ]rts  ; FRAMEADV.S:1000
   x = *PRECED@0x0029        ; FRAMEADV.S:1002
   cmp x, #space              ; FRAMEADV.S:1003
-  if eq goto :space       ; FRAMEADV.S:1004
+  if x == #space goto :space  ; FRAMEADV.S:1004
   cmp x, #floor              ; FRAMEADV.S:1005
-  if eq goto :floor       ; FRAMEADV.S:1006
+  if x == #floor goto :floor  ; FRAMEADV.S:1006
   cmp x, #block              ; FRAMEADV.S:1007
-  if eq goto :block       ; FRAMEADV.S:1008
+  if x == #block goto :block  ; FRAMEADV.S:1008
   a = *(pieceb@0x0052 + x)   ; FRAMEADV.S:1009
-  if eq goto :stripe       ; FRAMEADV.S:1010
+  if a == #0x00 goto :stripe  ; FRAMEADV.S:1010
   cmp a, #panelb0              ; FRAMEADV.S:1011
-  if eq goto :panel       ; FRAMEADV.S:1012
+  if a == #panelb0 goto :panel  ; FRAMEADV.S:1012
   call :cont1                  ; FRAMEADV.S:1016
   a = #EditorDisk                  ; FRAMEADV.S:1021
   cmp a, #0x02              ; FRAMEADV.S:1022
-  if eq goto :stripe       ; FRAMEADV.S:1023
+  if a == #0x02 goto :stripe  ; FRAMEADV.S:1023
   a = *BGset1@0x0303        ; FRAMEADV.S:1026
   cmp a, #0x01              ; FRAMEADV.S:1027
-  if ne goto ]rts       ; FRAMEADV.S:1028
+  if a != #0x01 goto ]rts  ; FRAMEADV.S:1028
 :str1:
   x = *PRECED@0x0029        ; FRAMEADV.S:1030
   a = *(bstripe@0x0054 + x)   ; FRAMEADV.S:1031
-  if eq goto ]rts       ; FRAMEADV.S:1032
+  if a == #0x00 goto ]rts  ; FRAMEADV.S:1032
   *IMAGE@0x0004 = a            ; FRAMEADV.S:1033
   a = *Ay@0x00ee        ; FRAMEADV.S:1034
   c = 1                            ; FRAMEADV.S:1035
@@ -770,36 +746,36 @@ fn drawb {
 :panel:
   y = *spreced@0x002a        ; FRAMEADV.S:1041
   cmp y, #numpans              ; FRAMEADV.S:1042
-  if cs goto ]rts       ; FRAMEADV.S:1043
+  if y >= #numpans goto ]rts  ; FRAMEADV.S:1043
   a = *(panelb@0x0067 + y)   ; FRAMEADV.S:1044
-  if ne goto :cont1       ; FRAMEADV.S:1045
+  if a != #0x00 goto :cont1  ; FRAMEADV.S:1045
 ]rts:
   return                           ; FRAMEADV.S:1046
 :block:
   y = *spreced@0x002a        ; FRAMEADV.S:1048
   cmp y, #numblox              ; FRAMEADV.S:1049
-  if cc goto :1       ; FRAMEADV.S:1050
+  if y < #numblox goto :1  ; FRAMEADV.S:1050
   y = #0x00                  ; FRAMEADV.S:1051
 :1:
   a = *(blockb@0x006d + y)   ; FRAMEADV.S:1052
-  if ne goto :cont1       ; FRAMEADV.S:1053
+  if a != #0x00 goto :cont1  ; FRAMEADV.S:1053
 :floor:
   y = *spreced@0x002a        ; FRAMEADV.S:1055
   cmp y, #numbpans+1              ; FRAMEADV.S:1056
-  if cc goto :3       ; FRAMEADV.S:1057
+  if y < #numbpans+1 goto :3  ; FRAMEADV.S:1057
   y = #0x00                  ; FRAMEADV.S:1058
 :3:
   a = *(floorb@0x006b + y)   ; FRAMEADV.S:1059
-  if eq goto ]rts       ; FRAMEADV.S:1060
+  if a == #0x00 goto ]rts  ; FRAMEADV.S:1060
   *IMAGE@0x0004 = a            ; FRAMEADV.S:1061
   a = *(floorby@0x006c + y)   ; FRAMEADV.S:1062
   goto :cont                ; FRAMEADV.S:1063
 :space:
   y = *spreced@0x002a        ; FRAMEADV.S:1065
   cmp y, #numbpans+1              ; FRAMEADV.S:1066
-  if cs goto ]rts       ; FRAMEADV.S:1067
+  if y >= #numbpans+1 goto ]rts  ; FRAMEADV.S:1067
   a = *(spaceb@0x0069 + y)   ; FRAMEADV.S:1068
-  if eq goto ]rts       ; FRAMEADV.S:1069
+  if a == #0x00 goto ]rts  ; FRAMEADV.S:1069
   *IMAGE@0x0004 = a            ; FRAMEADV.S:1070
   a = *(spaceby@0x006a + y)   ; FRAMEADV.S:1071
   goto :cont                ; FRAMEADV.S:1072
@@ -831,15 +807,15 @@ fn drawd {
   *OPACITY@0x0006 = a            ; FRAMEADV.S:1097
   x = *objid@0x00ec        ; FRAMEADV.S:1098
   cmp x, #block              ; FRAMEADV.S:1099
-  if eq goto :block       ; FRAMEADV.S:1100
+  if x == #block goto :block  ; FRAMEADV.S:1100
   cmp x, #panelwof              ; FRAMEADV.S:1101
-  if ne goto :cont       ; FRAMEADV.S:1102
+  if x != #panelwof goto :cont  ; FRAMEADV.S:1102
 :mask:
   a = #ora                  ; FRAMEADV.S:1103
   *OPACITY@0x0006 = a            ; FRAMEADV.S:1104
 :cont:
   a = *(pieced@0x0056 + x)   ; FRAMEADV.S:1105
-  if eq goto ]rts       ; FRAMEADV.S:1106
+  if a == #0x00 goto ]rts  ; FRAMEADV.S:1106
 :cont1:
   *IMAGE@0x0004 = a            ; FRAMEADV.S:1107
   a = *blockxco@0x00f3        ; FRAMEADV.S:1108
@@ -853,23 +829,23 @@ fn drawd {
 :block:
   y = *state@0x00f0        ; FRAMEADV.S:1118
   cmp y, #numblox              ; FRAMEADV.S:1119
-  if cc goto :1       ; FRAMEADV.S:1120
+  if y < #numblox goto :1  ; FRAMEADV.S:1120
   y = #0x00                  ; FRAMEADV.S:1121
 :1:
   a = *(blockd@0x006f + y)   ; FRAMEADV.S:1122
-  if ne goto :cont1       ; FRAMEADV.S:1123
+  if a != #0x00 goto :cont1  ; FRAMEADV.S:1123
 drawa:
   a = *PRECED@0x0029        ; FRAMEADV.S:1135
   cmp a, #archtop1              ; FRAMEADV.S:1136
-  if eq goto :special       ; FRAMEADV.S:1137
+  if a == #archtop1 goto :special  ; FRAMEADV.S:1137
   cmp a, #panelwif              ; FRAMEADV.S:1138
-  if eq goto :needmask       ; FRAMEADV.S:1139
+  if a == #panelwif goto :needmask  ; FRAMEADV.S:1139
   cmp a, #panelwof              ; FRAMEADV.S:1140
-  if eq goto :needmask       ; FRAMEADV.S:1141
+  if a == #panelwof goto :needmask  ; FRAMEADV.S:1141
   cmp a, #pillartop              ; FRAMEADV.S:1142
-  if eq goto :needmask       ; FRAMEADV.S:1143
+  if a == #pillartop goto :needmask  ; FRAMEADV.S:1143
   cmp a, #block              ; FRAMEADV.S:1144
-  if ne goto :nomask       ; FRAMEADV.S:1145
+  if a != #block goto :nomask  ; FRAMEADV.S:1145
 :needmask:
   call addamask                  ; FRAMEADV.S:1147
 :nomask:
@@ -877,7 +853,7 @@ drawa:
 :special:
   x = *objid@0x00ec        ; FRAMEADV.S:1151
   cmp x, #panelwof              ; FRAMEADV.S:1152
-  if ne goto :nomask       ; FRAMEADV.S:1153
+  if x != #panelwof goto :nomask  ; FRAMEADV.S:1153
   a = #archpanel                  ; FRAMEADV.S:1154
   tail_call adda1                ; FRAMEADV.S:1155
 }
@@ -885,15 +861,15 @@ drawa:
 fn drawa {
   a = *PRECED@0x0029        ; FRAMEADV.S:1135
   cmp a, #archtop1              ; FRAMEADV.S:1136
-  if eq goto :special       ; FRAMEADV.S:1137
+  if a == #archtop1 goto :special  ; FRAMEADV.S:1137
   cmp a, #panelwif              ; FRAMEADV.S:1138
-  if eq goto :needmask       ; FRAMEADV.S:1139
+  if a == #panelwif goto :needmask  ; FRAMEADV.S:1139
   cmp a, #panelwof              ; FRAMEADV.S:1140
-  if eq goto :needmask       ; FRAMEADV.S:1141
+  if a == #panelwof goto :needmask  ; FRAMEADV.S:1141
   cmp a, #pillartop              ; FRAMEADV.S:1142
-  if eq goto :needmask       ; FRAMEADV.S:1143
+  if a == #pillartop goto :needmask  ; FRAMEADV.S:1143
   cmp a, #block              ; FRAMEADV.S:1144
-  if ne goto :nomask       ; FRAMEADV.S:1145
+  if a != #block goto :nomask  ; FRAMEADV.S:1145
 :needmask:
   call addamask                  ; FRAMEADV.S:1147
 :nomask:
@@ -901,7 +877,7 @@ fn drawa {
 :special:
   x = *objid@0x00ec        ; FRAMEADV.S:1151
   cmp x, #panelwof              ; FRAMEADV.S:1152
-  if ne goto :nomask       ; FRAMEADV.S:1153
+  if x != #panelwof goto :nomask  ; FRAMEADV.S:1153
   a = #archpanel                  ; FRAMEADV.S:1154
   tail_call adda1                ; FRAMEADV.S:1155
 }
@@ -944,7 +920,7 @@ fn maddfore {
 fn addamask {
   x = *objid@0x00ec        ; FRAMEADV.S:1183
   a = *(maska@0x004e + x)   ; FRAMEADV.S:1184
-  if eq goto ]rts       ; FRAMEADV.S:1185
+  if a == #0x00 goto ]rts  ; FRAMEADV.S:1185
   *IMAGE@0x0004 = a            ; FRAMEADV.S:1186
   a = *blockxco@0x00f3        ; FRAMEADV.S:1187
   *XCO@0x0001 = a            ; FRAMEADV.S:1188
@@ -991,20 +967,16 @@ fn adda1 {
 
 fn drawma {
   a = *objid@0x00ec        ; FRAMEADV.S:1215
-  cmp a, #spikes              ; FRAMEADV.S:1216
-  if ne goto :2       ; FRAMEADV.S:1217
+  if a != #spikes goto :2  ; FRAMEADV.S:1217
   tail_call drawspikea                ; FRAMEADV.S:1218
 :2:
-  cmp a, #slicer              ; FRAMEADV.S:1220
-  if ne goto :3       ; FRAMEADV.S:1221
+  if a != #slicer goto :3  ; FRAMEADV.S:1221
   tail_call drawslicera                ; FRAMEADV.S:1222
 :3:
-  cmp a, #flask              ; FRAMEADV.S:1224
-  if ne goto :4       ; FRAMEADV.S:1225
+  if a != #flask goto :4  ; FRAMEADV.S:1225
   tail_call drawflaska                ; FRAMEADV.S:1226
 :4:
-  cmp a, #sword              ; FRAMEADV.S:1228
-  if ne goto :5       ; FRAMEADV.S:1229
+  if a != #sword goto :5  ; FRAMEADV.S:1229
   tail_call drawsworda                ; FRAMEADV.S:1230
 :5:
 ]rts:
@@ -1013,8 +985,7 @@ fn drawma {
 
 fn drawmd {
   a = *objid@0x00ec        ; FRAMEADV.S:1240
-  cmp a, #loose              ; FRAMEADV.S:1241
-  if ne goto :1       ; FRAMEADV.S:1242
+  if a != #loose goto :1  ; FRAMEADV.S:1242
   tail_call drawloosed                ; FRAMEADV.S:1243
 :1:
 ]rts:
@@ -1023,7 +994,7 @@ fn drawmd {
 
 fn drawfloor {
   a = *PRECED@0x0029        ; FRAMEADV.S:1253
-  if ne goto ]rts       ; FRAMEADV.S:1254
+  if a != #0x00 goto ]rts  ; FRAMEADV.S:1254
 ]drawflr:
   call addamask                  ; FRAMEADV.S:1256
   call adda                  ; FRAMEADV.S:1257
@@ -1035,27 +1006,20 @@ fn drawfloor {
 
 fn drawhalf {
   a = *PRECED@0x0029        ; FRAMEADV.S:1269
-  if ne goto ]rts       ; FRAMEADV.S:1270
+  if a != #0x00 goto ]rts  ; FRAMEADV.S:1270
   x = *objid@0x00ec        ; FRAMEADV.S:1274
-  cmp x, #floor              ; FRAMEADV.S:1275
-  if eq goto :flr       ; FRAMEADV.S:1276
-  cmp x, #torch              ; FRAMEADV.S:1277
-  if eq goto :flr       ; FRAMEADV.S:1278
-  cmp x, #dpressplate              ; FRAMEADV.S:1279
-  if eq goto :flr       ; FRAMEADV.S:1280
-  cmp x, #exit              ; FRAMEADV.S:1281
-  if eq goto :flr       ; FRAMEADV.S:1282
+  if x == #floor goto :flr  ; FRAMEADV.S:1276
+  if x == #torch goto :flr  ; FRAMEADV.S:1278
+  if x == #dpressplate goto :flr  ; FRAMEADV.S:1280
+  if x == #exit goto :flr  ; FRAMEADV.S:1282
   a = *BGset1@0x0303        ; FRAMEADV.S:1284
-  cmp a, #0x01              ; FRAMEADV.S:1285
-  if ne goto ]drawflr       ; FRAMEADV.S:1286
-  cmp x, #posts              ; FRAMEADV.S:1288
-  if eq goto :post       ; FRAMEADV.S:1289
-  cmp x, #archbot              ; FRAMEADV.S:1290
-  if ne goto ]drawflr       ; FRAMEADV.S:1291
+  if a != #0x01 goto ]drawflr  ; FRAMEADV.S:1286
+  if x == #posts goto :post  ; FRAMEADV.S:1289
+  if x != #archbot goto ]drawflr  ; FRAMEADV.S:1291
 :post:
   call :sub                  ; FRAMEADV.S:1293
   a = #CUpost                  ; FRAMEADV.S:1294
-  if ne goto :cont       ; FRAMEADV.S:1295
+  if a != #0x00 goto :cont  ; FRAMEADV.S:1295
 :flr:
   call :sub                  ; FRAMEADV.S:1297
   a = #CUpiece                  ; FRAMEADV.S:1298
@@ -1073,8 +1037,7 @@ fn drawhalf {
   a = *Ay@0x00ee        ; FRAMEADV.S:1309
   *YCO@0x0002 = a            ; FRAMEADV.S:1310
   x = *objid@0x00ec        ; FRAMEADV.S:1311
-  cmp x, #dpressplate              ; FRAMEADV.S:1312
-  if ne goto :1       ; FRAMEADV.S:1313
+  if x != #dpressplate goto :1  ; FRAMEADV.S:1313
   *YCO@0x0002 += 1                         ; FRAMEADV.S:1314
 :1:
   a = #and                  ; FRAMEADV.S:1315
@@ -1102,14 +1065,11 @@ fn wipesq {
 
 fn wiped {
   a = *objid@0x00ec        ; FRAMEADV.S:1349
-  cmp a, #pillartop              ; FRAMEADV.S:1350
-  if eq goto ]rts       ; FRAMEADV.S:1351
-  cmp a, #panelwif              ; FRAMEADV.S:1352
-  if eq goto ]rts       ; FRAMEADV.S:1353
-  cmp a, #panelwof              ; FRAMEADV.S:1354
-  if eq goto ]rts       ; FRAMEADV.S:1355
+  if a == #pillartop goto ]rts  ; FRAMEADV.S:1351
+  if a == #panelwif goto ]rts  ; FRAMEADV.S:1353
+  if a == #panelwof goto ]rts  ; FRAMEADV.S:1355
   cmp a, #block              ; FRAMEADV.S:1356
-  if eq goto ]rts       ; FRAMEADV.S:1357
+  if a == #block goto ]rts  ; FRAMEADV.S:1357
   a = #0x03                  ; FRAMEADV.S:1359
   goto ]wipe                ; FRAMEADV.S:1360
 ]rts:
@@ -1120,7 +1080,7 @@ fn drawloosed {
   a = *state@0x00f0        ; FRAMEADV.S:1366
   call getloosey                  ; FRAMEADV.S:1367
   a = *(loosed@0x0066 + y)   ; FRAMEADV.S:1369
-  if eq goto :rts       ; FRAMEADV.S:1370
+  if a == #0x00 goto :rts  ; FRAMEADV.S:1370
   *IMAGE@0x0004 = a            ; FRAMEADV.S:1371
   a = *blockxco@0x00f3        ; FRAMEADV.S:1373
   *XCO@0x0001 = a            ; FRAMEADV.S:1374
@@ -1149,8 +1109,7 @@ fn drawlooseb {
 }
 
 fn getpiecea {
-  cmp x, #loose              ; FRAMEADV.S:1414
-  if eq goto :loose       ; FRAMEADV.S:1415
+  if x == #loose goto :loose  ; FRAMEADV.S:1415
   a = *(piecea@0x004f + x)   ; FRAMEADV.S:1417
 ]rts:
   return                           ; FRAMEADV.S:1418
@@ -1163,11 +1122,11 @@ fn getpiecea {
 
 fn drawspikea {
   x = *state@0x00f0        ; FRAMEADV.S:1454
-  if pl goto :1       ; FRAMEADV.S:1455
+  if x >=0 goto :1  ; FRAMEADV.S:1455
   x = #spikeExt                  ; FRAMEADV.S:1456
 :1:
   a = *(spikea@0x005c + x)   ; FRAMEADV.S:1457
-  if eq goto ]rts       ; FRAMEADV.S:1458
+  if a == #0x00 goto ]rts  ; FRAMEADV.S:1458
   *IMAGE@0x0004 = a            ; FRAMEADV.S:1459
   a = *blockxco@0x00f3        ; FRAMEADV.S:1460
   *XCO@0x0001 = a            ; FRAMEADV.S:1461
@@ -1184,11 +1143,11 @@ fn drawspikea {
 
 fn drawspikeb {
   x = *spreced@0x002a        ; FRAMEADV.S:1474
-  if pl goto :1       ; FRAMEADV.S:1475
+  if x >=0 goto :1  ; FRAMEADV.S:1475
   x = #spikeExt                  ; FRAMEADV.S:1476
 :1:
   a = *(spikeb@0x005d + x)   ; FRAMEADV.S:1477
-  if eq goto ]rts       ; FRAMEADV.S:1478
+  if a == #0x00 goto ]rts  ; FRAMEADV.S:1478
   *IMAGE@0x0004 = a            ; FRAMEADV.S:1479
   a = *blockxco@0x00f3        ; FRAMEADV.S:1480
   *XCO@0x0001 = a            ; FRAMEADV.S:1481
@@ -1206,8 +1165,7 @@ fn drawspikeb {
 fn drawsworda {
   a = #swordgleam0                  ; FRAMEADV.S:1531
   x = *state@0x00f0        ; FRAMEADV.S:1532
-  cmp x, #0x01              ; FRAMEADV.S:1533
-  if ne goto :0       ; FRAMEADV.S:1534
+  if x != #0x01 goto :0  ; FRAMEADV.S:1534
   a = #swordgleam1                  ; FRAMEADV.S:1535
 :0:
   *IMAGE@0x0004 = a            ; FRAMEADV.S:1536
@@ -1224,8 +1182,7 @@ fn drawslicera {
   a = *state@0x00f0        ; FRAMEADV.S:1549
   a = a & #0x7f              ; FRAMEADV.S:1550
   x = a                            ; FRAMEADV.S:1551
-  cmp x, #slicerRet              ; FRAMEADV.S:1552
-  if cc goto :1       ; FRAMEADV.S:1553
+  if x < #slicerRet goto :1  ; FRAMEADV.S:1553
   x = #slicerRet                  ; FRAMEADV.S:1554
 :1:
   a = *(slicerseq@0x005e + x)   ; FRAMEADV.S:1555
@@ -1237,12 +1194,12 @@ fn drawslicera {
   a = *Ay@0x00ee        ; FRAMEADV.S:1562
   *YCO@0x0002 = a            ; FRAMEADV.S:1563
   a = *state@0x00f0        ; FRAMEADV.S:1564
-  if pl goto :clean       ; FRAMEADV.S:1565
+  if a >=0 goto :clean  ; FRAMEADV.S:1565
   a = *(slicerbot2@0x0061 + x)   ; FRAMEADV.S:1566
-  if ne goto :3       ; FRAMEADV.S:1567
+  if a != #0x00 goto :3  ; FRAMEADV.S:1567
 :clean:
   a = *(slicerbot@0x0060 + x)   ; FRAMEADV.S:1568
-  if eq goto :2       ; FRAMEADV.S:1569
+  if a == #0x00 goto :2  ; FRAMEADV.S:1569
 :3:
   *IMAGE@0x0004 = a            ; FRAMEADV.S:1570
   a = #ora                  ; FRAMEADV.S:1571
@@ -1251,7 +1208,7 @@ fn drawslicera {
   x = *xsave@0x00e8        ; FRAMEADV.S:1574
 :2:
   a = *(slicertop@0x005f + x)   ; FRAMEADV.S:1576
-  if eq goto ]rts       ; FRAMEADV.S:1577
+  if a == #0x00 goto ]rts  ; FRAMEADV.S:1577
   *IMAGE@0x0004 = a            ; FRAMEADV.S:1578
   a = *Ay@0x00ee        ; FRAMEADV.S:1579
   c = 1                            ; FRAMEADV.S:1580
@@ -1268,8 +1225,7 @@ fn drawslicerf {
   a = *state@0x00f0        ; FRAMEADV.S:1591
   a = a & #0x7f              ; FRAMEADV.S:1592
   x = a                            ; FRAMEADV.S:1593
-  cmp x, #slicerRet              ; FRAMEADV.S:1594
-  if cc goto :1       ; FRAMEADV.S:1595
+  if x < #slicerRet goto :1  ; FRAMEADV.S:1595
   x = #slicerRet                  ; FRAMEADV.S:1596
 :1:
   a = *(slicerseq@0x005e + x)   ; FRAMEADV.S:1597
@@ -1281,7 +1237,7 @@ fn drawslicerf {
   a = *Ay@0x00ee        ; FRAMEADV.S:1604
   *YCO@0x0002 = a            ; FRAMEADV.S:1605
   a = *(slicerfrnt@0x0063 + x)   ; FRAMEADV.S:1606
-  if eq goto :2       ; FRAMEADV.S:1607
+  if a == #0x00 goto :2  ; FRAMEADV.S:1607
   *IMAGE@0x0004 = a            ; FRAMEADV.S:1608
   tail_call maddfore                ; FRAMEADV.S:1609
 :2:
@@ -1298,7 +1254,7 @@ fn drawexitb {
   *YCO@0x0002 = a            ; FRAMEADV.S:1623
   a = *blockxco@0x00f3        ; FRAMEADV.S:1625
   cmp a, #0x24              ; FRAMEADV.S:1626
-  if cs goto ]rts       ; FRAMEADV.S:1627
+  if a >= #0x24 goto ]rts  ; FRAMEADV.S:1627
   c = 0                            ; FRAMEADV.S:1628
   a = a + #0x01 + c              ; FRAMEADV.S:1629
   *XCO@0x0001 = a            ; FRAMEADV.S:1630
@@ -1306,14 +1262,14 @@ fn drawexitb {
   *OPACITY@0x0006 = a            ; FRAMEADV.S:1633
   a = *SCRNUM@0x0023        ; FRAMEADV.S:1635
   cmp a, *KidStartScrn@0xbf40    ; FRAMEADV.S:1636
-  if eq goto :nostairs       ; FRAMEADV.S:1637
+  if a == *KidStartScrn@0xbf40 goto :nostairs  ; FRAMEADV.S:1637
   call add                  ; FRAMEADV.S:1638
 :nostairs:
   a = *Dy@0x00ef        ; FRAMEADV.S:1643
   c = 1                            ; FRAMEADV.S:1644
   a = a - #0x43 - (1 - c)        ; FRAMEADV.S:1645
   cmp a, #0xc0              ; FRAMEADV.S:1646
-  if cs goto ]rts       ; FRAMEADV.S:1647
+  if a >= #0xc0 goto ]rts  ; FRAMEADV.S:1647
   *blockthr@0x00f7 = a            ; FRAMEADV.S:1648
   a = *spreced@0x002a        ; FRAMEADV.S:1650
   a = a >> 1                       ; FRAMEADV.S:1651
@@ -1340,12 +1296,12 @@ fn drawexitb {
   c = 1                            ; FRAMEADV.S:1675
   a = a - #0x04 - (1 - c)        ; FRAMEADV.S:1676
   cmp a, *blockthr@0x00f7    ; FRAMEADV.S:1677
-  if cs goto :loop       ; FRAMEADV.S:1678
+  if a >= *blockthr@0x00f7 goto :loop  ; FRAMEADV.S:1678
   a = *Ay@0x00ee        ; FRAMEADV.S:1682
   c = 1                            ; FRAMEADV.S:1683
   a = a - #0x40 - (1 - c)        ; FRAMEADV.S:1684
   cmp a, #0xc0              ; FRAMEADV.S:1685
-  if cs goto ]rts       ; FRAMEADV.S:1686
+  if a >= #0xc0 goto ]rts  ; FRAMEADV.S:1686
   *YCO@0x0002 = a            ; FRAMEADV.S:1688
   a = #toprepair                  ; FRAMEADV.S:1690
   *IMAGE@0x0004 = a            ; FRAMEADV.S:1691
@@ -1366,8 +1322,7 @@ fn drawgatec {
   call add                  ; FRAMEADV.S:1708
   x = *colno@0x00ea        ; FRAMEADV.S:1710
   a = *(SBELOW@0x03e0 + x)   ; FRAMEADV.S:1711
-  cmp a, #gmaxval              ; FRAMEADV.S:1712
-  if cc goto :1       ; FRAMEADV.S:1713
+  if a < #gmaxval goto :1  ; FRAMEADV.S:1713
   a = #gmaxval                  ; FRAMEADV.S:1714
 :1:
   a = a >> 1                       ; FRAMEADV.S:1715
@@ -1393,8 +1348,7 @@ fn setupdgb {
   a = a - #0x3e - (1 - c)        ; FRAMEADV.S:1745
   *blockthr@0x00f7 = a            ; FRAMEADV.S:1746
   a = *spreced@0x002a        ; FRAMEADV.S:1748
-  cmp a, #gmaxval              ; FRAMEADV.S:1749
-  if cc goto :1       ; FRAMEADV.S:1750
+  if a < #gmaxval goto :1  ; FRAMEADV.S:1750
   a = #gmaxval                  ; FRAMEADV.S:1751
 :1:
   a = a >> 1                       ; FRAMEADV.S:1752
@@ -1430,17 +1384,17 @@ fn drawgatebf {
 :loop:
   *YCO@0x0002 = a            ; FRAMEADV.S:1793
   cmp a, #0xc0              ; FRAMEADV.S:1794
-  if cs goto ]rts       ; FRAMEADV.S:1795
+  if a >= #0xc0 goto ]rts  ; FRAMEADV.S:1795
   c = 1                            ; FRAMEADV.S:1797
   a = a - #0x07 - (1 - c)        ; FRAMEADV.S:1798
   if cc goto :done       ; FRAMEADV.S:1799
   cmp a, *blockthr@0x00f7    ; FRAMEADV.S:1800
-  if cc goto :done       ; FRAMEADV.S:1801
+  if a < *blockthr@0x00f7 goto :done  ; FRAMEADV.S:1801
   call addfore                  ; FRAMEADV.S:1803
   a = *YCO@0x0002        ; FRAMEADV.S:1805
   c = 1                            ; FRAMEADV.S:1806
   a = a - #0x08 - (1 - c)        ; FRAMEADV.S:1807
-  if ne goto :loop       ; FRAMEADV.S:1808
+  if a != #0x00 goto :loop  ; FRAMEADV.S:1808
 :done:
 ]rts:
   return                           ; FRAMEADV.S:1811
@@ -1451,7 +1405,7 @@ fn drawgateb {
   c = 0                            ; FRAMEADV.S:1819
   a = a + #0x0c + c              ; FRAMEADV.S:1820
   cmp a, *Ay@0x00ee    ; FRAMEADV.S:1821
-  if cc goto :storit       ; FRAMEADV.S:1822
+  if a < *Ay@0x00ee goto :storit  ; FRAMEADV.S:1822
 :orit:
   call restorebot                  ; FRAMEADV.S:1828
   a = *gatebot@0x00f1        ; FRAMEADV.S:1830
@@ -1483,17 +1437,17 @@ fn drawgateb {
 :loop:
   *YCO@0x0002 = a            ; FRAMEADV.S:1872
   cmp a, #0xc0              ; FRAMEADV.S:1873
-  if cs goto :rts       ; FRAMEADV.S:1874
+  if a >= #0xc0 goto :rts  ; FRAMEADV.S:1874
   c = 1                            ; FRAMEADV.S:1876
   a = a - #0x07 - (1 - c)        ; FRAMEADV.S:1877
   if cc goto :done       ; FRAMEADV.S:1878
   cmp a, *blockthr@0x00f7    ; FRAMEADV.S:1879
-  if cc goto :done       ; FRAMEADV.S:1880
+  if a < *blockthr@0x00f7 goto :done  ; FRAMEADV.S:1880
   call addback                  ; FRAMEADV.S:1882
   a = *YCO@0x0002        ; FRAMEADV.S:1884
   c = 1                            ; FRAMEADV.S:1885
   a = a - #0x08 - (1 - c)        ; FRAMEADV.S:1886
-  if ne goto :loop       ; FRAMEADV.S:1887
+  if a != #0x00 goto :loop  ; FRAMEADV.S:1887
 :done:
   a = *YCO@0x0002        ; FRAMEADV.S:1891
   c = 1                            ; FRAMEADV.S:1892
@@ -1502,7 +1456,7 @@ fn drawgateb {
   a = a + #0x01 + c              ; FRAMEADV.S:1895
   if eq goto :rts       ; FRAMEADV.S:1897
   cmp a, #0x09              ; FRAMEADV.S:1898
-  if cs goto :rts       ; FRAMEADV.S:1899
+  if a >= #0x09 goto :rts  ; FRAMEADV.S:1899
   y = a                            ; FRAMEADV.S:1901
   a = *(gate8b-1@0x005a + y)   ; FRAMEADV.S:1902
   *IMAGE@0x0004 = a            ; FRAMEADV.S:1903
@@ -1533,30 +1487,23 @@ fn restorebot {
 
 fn drawobjx {
   call loadobj                  ; FRAMEADV.S:1938
-  cmp a, #TypeKid              ; FRAMEADV.S:1940
-  if eq goto :kid       ; FRAMEADV.S:1941
-  cmp a, #TypeReflect              ; FRAMEADV.S:1942
-  if ne goto :1       ; FRAMEADV.S:1943
+  if a == #TypeKid goto :kid  ; FRAMEADV.S:1941
+  if a != #TypeReflect goto :1  ; FRAMEADV.S:1943
 :kid:
   tail_call DrawKid                ; FRAMEADV.S:1944
 :1:
-  cmp a, #TypeShad              ; FRAMEADV.S:1946
-  if ne goto :2       ; FRAMEADV.S:1947
+  if a != #TypeShad goto :2  ; FRAMEADV.S:1947
   tail_call DrawShad                ; FRAMEADV.S:1948
 :2:
-  cmp a, #TypeFF              ; FRAMEADV.S:1950
-  if ne goto :3       ; FRAMEADV.S:1951
+  if a != #TypeFF goto :3  ; FRAMEADV.S:1951
   tail_call DrawFF                ; FRAMEADV.S:1952
 :3:
-  cmp a, #TypeSword              ; FRAMEADV.S:1954
-  if eq goto :5       ; FRAMEADV.S:1955
-  cmp a, #TypeComix              ; FRAMEADV.S:1956
-  if ne goto :4       ; FRAMEADV.S:1957
+  if a == #TypeSword goto :5  ; FRAMEADV.S:1955
+  if a != #TypeComix goto :4  ; FRAMEADV.S:1957
 :5:
   tail_call DrawSword                ; FRAMEADV.S:1958
 :4:
-  cmp a, #TypeGd              ; FRAMEADV.S:1960
-  if ne goto :6       ; FRAMEADV.S:1961
+  if a != #TypeGd goto :6  ; FRAMEADV.S:1961
   tail_call DrawGuard                ; FRAMEADV.S:1962
 :6:
 ]rts:
@@ -1613,26 +1560,23 @@ fn DrawFF {
 
 fn getobjid {
   a = *SCRNUM@0x0023        ; FRAMEADV.S:2042
-  if eq goto GOnull       ; FRAMEADV.S:2043
+  if a == #0x00 goto GOnull  ; FRAMEADV.S:2043
 getobjid1:
   a = *inbuilder@0x0201        ; FRAMEADV.S:2049
-  if ne goto getobjbldr       ; FRAMEADV.S:2050
+  if a != #0x00 goto getobjbldr  ; FRAMEADV.S:2050
   a = *(BlueSpec@0x0026)[y]   ; FRAMEADV.S:2053
   *state@0x00f0 = a            ; FRAMEADV.S:2054
   a = *(BlueType@0x0024)[y]   ; FRAMEADV.S:2056
   a = a & #idmask              ; FRAMEADV.S:2057
-  cmp a, #pressplate              ; FRAMEADV.S:2059
-  if eq goto :plate       ; FRAMEADV.S:2060
-  cmp a, #upressplate              ; FRAMEADV.S:2062
-  if eq goto :upp       ; FRAMEADV.S:2063
+  if a == #pressplate goto :plate  ; FRAMEADV.S:2060
+  if a == #upressplate goto :upp  ; FRAMEADV.S:2063
   return                           ; FRAMEADV.S:2065
 :plate:
   a = *state@0x00f0        ; FRAMEADV.S:2069
   x = a                            ; FRAMEADV.S:2070
   a = *(LINKMAP@0xbda0 + x)   ; FRAMEADV.S:2071
   a = a & #0x1f              ; FRAMEADV.S:2073
-  cmp a, #0x02              ; FRAMEADV.S:2074
-  if cc goto :up       ; FRAMEADV.S:2075
+  if a < #0x02 goto :up  ; FRAMEADV.S:2075
   a = #dpressplate                  ; FRAMEADV.S:2077
   return                           ; FRAMEADV.S:2078
 :up:
@@ -1643,8 +1587,7 @@ getobjid1:
   x = a                            ; FRAMEADV.S:2086
   a = *(LINKMAP@0xbda0 + x)   ; FRAMEADV.S:2087
   a = a & #0x1f              ; FRAMEADV.S:2088
-  cmp a, #0x02              ; FRAMEADV.S:2089
-  if cc goto :up1       ; FRAMEADV.S:2090
+  if a < #0x02 goto :up1  ; FRAMEADV.S:2090
   a = #0x00                  ; FRAMEADV.S:2092
   *state@0x00f0 = a            ; FRAMEADV.S:2093
   a = #floor                  ; FRAMEADV.S:2094
@@ -1672,7 +1615,7 @@ sortlist:
   x = *sortX@0x03c0        ; FRAMEADV.S:2141
 :loop:
   cmp x, #0x01              ; FRAMEADV.S:2143
-  if eq goto :attop       ; FRAMEADV.S:2144
+  if x == #0x01 goto :attop  ; FRAMEADV.S:2144
   *xsave@0x00e8 = x            ; FRAMEADV.S:2146
   call compare                  ; FRAMEADV.S:2148
   x = *xsave@0x00e8        ; FRAMEADV.S:2150
@@ -1685,10 +1628,10 @@ sortlist:
   *(sortX-1@0x03bf + x) = a   ; FRAMEADV.S:2159
 :ok:
   x -= 1                         ; FRAMEADV.S:2161
-  if ne goto :loop       ; FRAMEADV.S:2162
+  if x != #0x00 goto :loop  ; FRAMEADV.S:2162
 :attop:
   a = *switches@0x00f4        ; FRAMEADV.S:2167
-  if ne goto :newpass       ; FRAMEADV.S:2168
+  if a != #0x00 goto :newpass  ; FRAMEADV.S:2168
 :rts:
   return                           ; FRAMEADV.S:2172
 }
@@ -1699,7 +1642,7 @@ fn sortlist  (aka :newpass) {
   x = *sortX@0x03c0        ; FRAMEADV.S:2141
 :loop:
   cmp x, #0x01              ; FRAMEADV.S:2143
-  if eq goto :attop       ; FRAMEADV.S:2144
+  if x == #0x01 goto :attop  ; FRAMEADV.S:2144
   *xsave@0x00e8 = x            ; FRAMEADV.S:2146
   call compare                  ; FRAMEADV.S:2148
   x = *xsave@0x00e8        ; FRAMEADV.S:2150
@@ -1712,10 +1655,10 @@ fn sortlist  (aka :newpass) {
   *(sortX-1@0x03bf + x) = a   ; FRAMEADV.S:2159
 :ok:
   x -= 1                         ; FRAMEADV.S:2161
-  if ne goto :loop       ; FRAMEADV.S:2162
+  if x != #0x00 goto :loop  ; FRAMEADV.S:2162
 :attop:
   a = *switches@0x00f4        ; FRAMEADV.S:2167
-  if ne goto :newpass       ; FRAMEADV.S:2168
+  if a != #0x00 goto :newpass  ; FRAMEADV.S:2168
 :rts:
   return                           ; FRAMEADV.S:2172
 }
@@ -1729,7 +1672,7 @@ fn compare {
   y = *obj2@0x00f6        ; FRAMEADV.S:2189
   a = *(objTYP@0xb4f7 + x)   ; FRAMEADV.S:2191
   cmp a, #TypeShad              ; FRAMEADV.S:2192
-  if eq goto :xinfront       ; FRAMEADV.S:2193
+  if a == #TypeShad goto :xinfront  ; FRAMEADV.S:2193
   a = *(objY@0xb4bb + x)   ; FRAMEADV.S:2195
   ??? cmp objY,y            ; FRAMEADV.S:2196
   if eq goto :same       ; FRAMEADV.S:2197
@@ -1737,10 +1680,8 @@ fn compare {
   if cs goto :yinfront       ; FRAMEADV.S:2199
 :same:
 :xinfront:
-  c = 0                            ; FRAMEADV.S:2202
   return                           ; FRAMEADV.S:2203
 :yinfront:
-  c = 1                            ; FRAMEADV.S:2205
   return                           ; FRAMEADV.S:2206
 }
 
@@ -1748,18 +1689,15 @@ fn GETINITOBJ {
   a = *(BlueType@0x0024)[y]   ; FRAMEADV.S:2218
   a = a & #idmask              ; FRAMEADV.S:2219
 getinitobj1:
-  cmp a, #gate              ; FRAMEADV.S:2222
-  if eq goto :okgate       ; FRAMEADV.S:2223
-  cmp a, #loose              ; FRAMEADV.S:2224
-  if eq goto :okloose       ; FRAMEADV.S:2225
+  if a == #gate goto :okgate  ; FRAMEADV.S:2223
+  if a == #loose goto :okloose  ; FRAMEADV.S:2225
   cmp a, #flask              ; FRAMEADV.S:2226
-  if eq goto :okflask       ; FRAMEADV.S:2227
+  if a == #flask goto :okflask  ; FRAMEADV.S:2227
   if ne goto :skip       ; FRAMEADV.S:2228
 :okgate:
   a = *(BlueSpec@0x0026)[y]   ; FRAMEADV.S:2230
   x = a                            ; FRAMEADV.S:2231
   a = *(initsettings-1@0x0114 + x)   ; FRAMEADV.S:2232
-  c = 1                            ; FRAMEADV.S:2233
   return                           ; FRAMEADV.S:2234
 :okloose:
   a = #0x00                  ; FRAMEADV.S:2236
@@ -1771,27 +1709,22 @@ getinitobj1:
   a = a << 1                       ; FRAMEADV.S:2242
   a = a << 1                       ; FRAMEADV.S:2243
   a = a << 1                       ; FRAMEADV.S:2244
-  c = 1                            ; FRAMEADV.S:2245
   return                           ; FRAMEADV.S:2246
 :skip:
-  c = 0                            ; FRAMEADV.S:2248
 ]rts:
   return                           ; FRAMEADV.S:2249
 }
 
 fn getinitobj1 {
-  cmp a, #gate              ; FRAMEADV.S:2222
-  if eq goto :okgate       ; FRAMEADV.S:2223
-  cmp a, #loose              ; FRAMEADV.S:2224
-  if eq goto :okloose       ; FRAMEADV.S:2225
+  if a == #gate goto :okgate  ; FRAMEADV.S:2223
+  if a == #loose goto :okloose  ; FRAMEADV.S:2225
   cmp a, #flask              ; FRAMEADV.S:2226
-  if eq goto :okflask       ; FRAMEADV.S:2227
+  if a == #flask goto :okflask  ; FRAMEADV.S:2227
   if ne goto :skip       ; FRAMEADV.S:2228
 :okgate:
   a = *(BlueSpec@0x0026)[y]   ; FRAMEADV.S:2230
   x = a                            ; FRAMEADV.S:2231
   a = *(initsettings-1@0x0114 + x)   ; FRAMEADV.S:2232
-  c = 1                            ; FRAMEADV.S:2233
   return                           ; FRAMEADV.S:2234
 :okloose:
   a = #0x00                  ; FRAMEADV.S:2236
@@ -1803,10 +1736,8 @@ fn getinitobj1 {
   a = a << 1                       ; FRAMEADV.S:2242
   a = a << 1                       ; FRAMEADV.S:2243
   a = a << 1                       ; FRAMEADV.S:2244
-  c = 1                            ; FRAMEADV.S:2245
   return                           ; FRAMEADV.S:2246
 :skip:
-  c = 0                            ; FRAMEADV.S:2248
 ]rts:
   return                           ; FRAMEADV.S:2249
 }
@@ -1852,23 +1783,20 @@ fn mbsub {
 
 fn getobjid1 {
   a = *inbuilder@0x0201        ; FRAMEADV.S:2049
-  if ne goto getobjbldr       ; FRAMEADV.S:2050
+  if a != #0x00 goto getobjbldr  ; FRAMEADV.S:2050
   a = *(BlueSpec@0x0026)[y]   ; FRAMEADV.S:2053
   *state@0x00f0 = a            ; FRAMEADV.S:2054
   a = *(BlueType@0x0024)[y]   ; FRAMEADV.S:2056
   a = a & #idmask              ; FRAMEADV.S:2057
-  cmp a, #pressplate              ; FRAMEADV.S:2059
-  if eq goto :plate       ; FRAMEADV.S:2060
-  cmp a, #upressplate              ; FRAMEADV.S:2062
-  if eq goto :upp       ; FRAMEADV.S:2063
+  if a == #pressplate goto :plate  ; FRAMEADV.S:2060
+  if a == #upressplate goto :upp  ; FRAMEADV.S:2063
   return                           ; FRAMEADV.S:2065
 :plate:
   a = *state@0x00f0        ; FRAMEADV.S:2069
   x = a                            ; FRAMEADV.S:2070
   a = *(LINKMAP@0xbda0 + x)   ; FRAMEADV.S:2071
   a = a & #0x1f              ; FRAMEADV.S:2073
-  cmp a, #0x02              ; FRAMEADV.S:2074
-  if cc goto :up       ; FRAMEADV.S:2075
+  if a < #0x02 goto :up  ; FRAMEADV.S:2075
   a = #dpressplate                  ; FRAMEADV.S:2077
   return                           ; FRAMEADV.S:2078
 :up:
@@ -1879,8 +1807,7 @@ fn getobjid1 {
   x = a                            ; FRAMEADV.S:2086
   a = *(LINKMAP@0xbda0 + x)   ; FRAMEADV.S:2087
   a = a & #0x1f              ; FRAMEADV.S:2088
-  cmp a, #0x02              ; FRAMEADV.S:2089
-  if cc goto :up1       ; FRAMEADV.S:2090
+  if a < #0x02 goto :up1  ; FRAMEADV.S:2090
   a = #0x00                  ; FRAMEADV.S:2092
   *state@0x00f0 = a            ; FRAMEADV.S:2093
   a = #floor                  ; FRAMEADV.S:2094
@@ -1892,9 +1819,9 @@ fn getobjid1 {
 
 fn drawtorchb {
   a = *inbuilder@0x0201        ; FRAMEADV.S:1495
-  if ne goto ]rts       ; FRAMEADV.S:1496
+  if a != #0x00 goto ]rts  ; FRAMEADV.S:1496
   a = *blockxco@0x00f3        ; FRAMEADV.S:1499
-  if eq goto ]rts       ; FRAMEADV.S:1500
+  if a == #0x00 goto ]rts  ; FRAMEADV.S:1500
   *XCO@0x0001 = a            ; FRAMEADV.S:1501
   a = *Ay@0x00ee        ; FRAMEADV.S:1502
   *YCO@0x0002 = a            ; FRAMEADV.S:1503
@@ -1918,23 +1845,23 @@ fn :cont1 {
 :block:
   y = *state@0x00f0        ; FRAMEADV.S:1118
   cmp y, #numblox              ; FRAMEADV.S:1119
-  if cc goto :1       ; FRAMEADV.S:1120
+  if y < #numblox goto :1  ; FRAMEADV.S:1120
   y = #0x00                  ; FRAMEADV.S:1121
 :1:
   a = *(blockd@0x006f + y)   ; FRAMEADV.S:1122
-  if ne goto :cont1       ; FRAMEADV.S:1123
+  if a != #0x00 goto :cont1  ; FRAMEADV.S:1123
 drawa:
   a = *PRECED@0x0029        ; FRAMEADV.S:1135
   cmp a, #archtop1              ; FRAMEADV.S:1136
-  if eq goto :special       ; FRAMEADV.S:1137
+  if a == #archtop1 goto :special  ; FRAMEADV.S:1137
   cmp a, #panelwif              ; FRAMEADV.S:1138
-  if eq goto :needmask       ; FRAMEADV.S:1139
+  if a == #panelwif goto :needmask  ; FRAMEADV.S:1139
   cmp a, #panelwof              ; FRAMEADV.S:1140
-  if eq goto :needmask       ; FRAMEADV.S:1141
+  if a == #panelwof goto :needmask  ; FRAMEADV.S:1141
   cmp a, #pillartop              ; FRAMEADV.S:1142
-  if eq goto :needmask       ; FRAMEADV.S:1143
+  if a == #pillartop goto :needmask  ; FRAMEADV.S:1143
   cmp a, #block              ; FRAMEADV.S:1144
-  if ne goto :nomask       ; FRAMEADV.S:1145
+  if a != #block goto :nomask  ; FRAMEADV.S:1145
 :needmask:
   call addamask                  ; FRAMEADV.S:1147
 :nomask:
@@ -1942,14 +1869,14 @@ drawa:
 :special:
   x = *objid@0x00ec        ; FRAMEADV.S:1151
   cmp x, #panelwof              ; FRAMEADV.S:1152
-  if ne goto :nomask       ; FRAMEADV.S:1153
+  if x != #panelwof goto :nomask  ; FRAMEADV.S:1153
   a = #archpanel                  ; FRAMEADV.S:1154
   tail_call adda1                ; FRAMEADV.S:1155
 }
 
 fn drawflaska {
   a = *inbuilder@0x0201        ; FRAMEADV.S:1514
-  if ne goto ]rts       ; FRAMEADV.S:1515
+  if a != #0x00 goto ]rts  ; FRAMEADV.S:1515
   a = *blockxco@0x00f3        ; FRAMEADV.S:1518
   *XCO@0x0001 = a            ; FRAMEADV.S:1519
   a = *Ay@0x00ee        ; FRAMEADV.S:1520
@@ -1970,8 +1897,7 @@ fn :sub {
   a = *Ay@0x00ee        ; FRAMEADV.S:1309
   *YCO@0x0002 = a            ; FRAMEADV.S:1310
   x = *objid@0x00ec        ; FRAMEADV.S:1311
-  cmp x, #dpressplate              ; FRAMEADV.S:1312
-  if ne goto :1       ; FRAMEADV.S:1313
+  if x != #dpressplate goto :1  ; FRAMEADV.S:1313
   *YCO@0x0002 += 1                         ; FRAMEADV.S:1314
 :1:
   a = #and                  ; FRAMEADV.S:1315
@@ -1981,15 +1907,14 @@ fn :sub {
 
 fn getloosey {
   y = *inbuilder@0x0201        ; FRAMEADV.S:1435
-  if eq goto :1       ; FRAMEADV.S:1436
+  if y == #0x00 goto :1  ; FRAMEADV.S:1436
   y = #0x01                  ; FRAMEADV.S:1437
   return                           ; FRAMEADV.S:1438
 :1:
   y = a                            ; FRAMEADV.S:1441
-  if pl goto ]rts       ; FRAMEADV.S:1442
+  if y >=0 goto ]rts  ; FRAMEADV.S:1442
   a = a & #0x7f              ; FRAMEADV.S:1443
-  cmp a, #Ffalling+1              ; FRAMEADV.S:1444
-  if cc goto :ok       ; FRAMEADV.S:1445
+  if a < #Ffalling+1 goto :ok  ; FRAMEADV.S:1445
   a = #0x01                  ; FRAMEADV.S:1446
 :ok:
   y = a                            ; FRAMEADV.S:1447

@@ -136,7 +136,7 @@ fn SAVEGAME {
   a = *(savedgame@0xb6f0 + x)   ; MASTER.S:399
   *($200@0x0200 + x) = a   ; MASTER.S:400
   x -= 1                         ; MASTER.S:401
-  if pl goto :loop       ; MASTER.S:402
+  if x >=0 goto :loop  ; MASTER.S:402
   *RAMRDmain@0xc002 = a            ; MASTER.S:403
   a = #0x17                  ; MASTER.S:405
   *track@0x00fe = a            ; MASTER.S:406
@@ -158,7 +158,7 @@ fn LOADGAME {
   a = *($200@0x0200 + x)   ; MASTER.S:428
   *(savedgame@0xb6f0 + x) = a   ; MASTER.S:429
   x -= 1                         ; MASTER.S:430
-  if pl goto :loop       ; MASTER.S:431
+  if x >=0 goto :loop  ; MASTER.S:431
   tail_call driveoff                ; MASTER.S:433
 }
 
@@ -193,10 +193,10 @@ fn setbluep {
 fn vidstuff {
   a = *BBundID@0x03f5        ; MASTER.S:492
   cmp a, #POPside2              ; MASTER.S:493
-  if ne goto ]rts       ; MASTER.S:494
+  if a != #POPside2 goto ]rts  ; MASTER.S:494
   a = *$c000@0xc000        ; MASTER.S:495
   cmp a, #"^"              ; MASTER.S:496
-  if ne goto ]rts       ; MASTER.S:497
+  if a != #"^" goto ]rts  ; MASTER.S:497
   call setmain                  ; MASTER.S:499
   a = #0x0c                  ; MASTER.S:500
   *track@0x00fe = a            ; MASTER.S:501
@@ -208,7 +208,7 @@ fn vidstuff {
   a = a + #0x12 + c              ; MASTER.S:511
   ??? sta :sm            ; MASTER.S:512
   cmp a, #0x6c              ; MASTER.S:513
-  if cc goto :loop       ; MASTER.S:514
+  if a < #0x6c goto :loop  ; MASTER.S:514
   call driveoff                  ; MASTER.S:515
   call setmain                  ; MASTER.S:516
   tail_call $c00                ; MASTER.S:517
@@ -218,8 +218,7 @@ fn vidstuff {
 
 fn rdbg1 {
   x = *newBGset1@0x00f6        ; MASTER.S:530
-  cmp x, *BGset1@0x0303    ; MASTER.S:531
-  if eq goto :rts       ; MASTER.S:532
+  if x == *BGset1@0x0303 goto :rts  ; MASTER.S:532
   *BGset1@0x0303 = x            ; MASTER.S:533
   a = *(bg1trk@0x022b + x)   ; MASTER.S:534
   *track@0x00fe = a            ; MASTER.S:535
@@ -232,8 +231,7 @@ fn rdbg1 {
 
 fn rdbg2 {
   x = *newBGset2@0x00f7        ; MASTER.S:543
-  cmp x, *BGset2@0x0304    ; MASTER.S:544
-  if eq goto ]rts       ; MASTER.S:545
+  if x == *BGset2@0x0304 goto ]rts  ; MASTER.S:545
   *BGset2@0x0304 = x            ; MASTER.S:546
   a = *(bg2trk@0x022c + x)   ; MASTER.S:547
   *track@0x00fe = a            ; MASTER.S:548
@@ -245,17 +243,14 @@ fn rdbg2 {
 
 fn rdch4 {
   x = *newCHset@0x00f8        ; MASTER.S:553
-  cmp x, *CHset@0x0305    ; MASTER.S:554
-  if eq goto ]rts       ; MASTER.S:555
+  if x == *CHset@0x0305 goto ]rts  ; MASTER.S:555
   *CHset@0x0305 = x            ; MASTER.S:556
   a = *(ch4trk@0x022d + x)   ; MASTER.S:557
   *track@0x00fe = a            ; MASTER.S:558
   a = *(ch4off@0x022e + x)   ; MASTER.S:559
-  if eq goto :off0       ; MASTER.S:560
-  cmp a, #0x06              ; MASTER.S:561
-  if eq goto :off6       ; MASTER.S:562
-  cmp a, #0x0c              ; MASTER.S:563
-  if eq goto :off12       ; MASTER.S:564
+  if a == #0x00 goto :off0  ; MASTER.S:560
+  if a == #0x06 goto :off6  ; MASTER.S:562
+  if a == #0x0c goto :off12  ; MASTER.S:564
   return                           ; MASTER.S:565
 :off12:
   call rw18                  ; MASTER.S:567
@@ -292,7 +287,7 @@ fn rdbluep {
 fn copy1to2 {
   a = #0x40                  ; MASTER.S:624
   x = #0x20                  ; MASTER.S:625
-  if ne goto copydhires       ; MASTER.S:626
+  if x != #0x00 goto copydhires  ; MASTER.S:626
 copy2to1:
   a = #0x20                  ; MASTER.S:629
   x = #0x40                  ; MASTER.S:630
@@ -357,7 +352,7 @@ fn EPILOG {
   *$c010@0xc010 = a            ; MASTER.S:675
 :loop:
   a = *$c000@0xc000        ; MASTER.S:676
-  if pl goto :loop       ; MASTER.S:677
+  if a >=0 goto :loop  ; MASTER.S:677
 ATTRACTMODE:
 AttractLoop:
   a = #0x01                  ; MASTER.S:688
@@ -481,7 +476,7 @@ fn Prolog2 {
 
 fn Epilog {
   a = *IIGS@0x0211        ; MASTER.S:892
-  if ne goto SuperEpilog       ; MASTER.S:893
+  if a != #0x00 goto SuperEpilog  ; MASTER.S:893
   a = #pacEpilog                  ; MASTER.S:895
   *RAMRDaux@0xc003 = a            ; MASTER.S:896
   call DblExpand                  ; MASTER.S:897
@@ -543,31 +538,28 @@ fn pauseNI  (aka :loop) {
   x = #0x00                  ; MASTER.S:979
 :loop2:
   x -= 1                         ; MASTER.S:980
-  if ne goto :loop2       ; MASTER.S:981
+  if x != #0x00 goto :loop2  ; MASTER.S:981
   y -= 1                         ; MASTER.S:982
-  if ne goto :loop1       ; MASTER.S:983
+  if y != #0x00 goto :loop1  ; MASTER.S:983
   a = *pausetemp@0x03f7        ; MASTER.S:985
   c = 1                            ; MASTER.S:986
   a = a - #0x01 - (1 - c)        ; MASTER.S:987
-  if ne goto :loop       ; MASTER.S:988
+  if a != #0x00 goto :loop  ; MASTER.S:988
 ]rts:
   return                           ; MASTER.S:989
 }
 
 fn StartGame? {
   call musickeys                  ; MASTER.S:997
-  cmp a, #0x80              ; MASTER.S:998
-  if cc goto ]rts       ; MASTER.S:999
-  cmp a, #kdemo              ; MASTER.S:1003
-  if ne goto :1       ; MASTER.S:1004
+  if a < #0x80 goto ]rts  ; MASTER.S:999
+  if a != #kdemo goto :1  ; MASTER.S:1004
   tail_call Demo                ; MASTER.S:1005
 :1:
   cmp a, #kprincess              ; MASTER.S:1006
-  if ne goto :2       ; MASTER.S:1007
+  if a != #kprincess goto :2  ; MASTER.S:1007
   goto ]princess                ; MASTER.S:1008
 :2:
-  cmp a, #krestart              ; MASTER.S:1011
-  if ne goto :3       ; MASTER.S:1012
+  if a != #krestart goto :3  ; MASTER.S:1012
   tail_call AttractLoop                ; MASTER.S:1013
 :3:
 DOSTARTGAME:
@@ -580,8 +572,7 @@ DOSTARTGAME:
   a = #0x01                  ; MASTER.S:1039
   *musicon@0x031a = a            ; MASTER.S:1040
   a = *keypress@0x020f        ; MASTER.S:1045
-  cmp a, #kresume              ; MASTER.S:1046
-  if ne goto :newgame       ; MASTER.S:1047
+  if a != #kresume goto :newgame  ; MASTER.S:1047
   a = #0x04                  ; MASTER.S:1051
   tail_call startresume                ; MASTER.S:1052
 :newgame:
@@ -601,8 +592,7 @@ fn :3  (aka DOSTARTGAME) {
   a = #0x01                  ; MASTER.S:1039
   *musicon@0x031a = a            ; MASTER.S:1040
   a = *keypress@0x020f        ; MASTER.S:1045
-  cmp a, #kresume              ; MASTER.S:1046
-  if ne goto :newgame       ; MASTER.S:1047
+  if a != #kresume goto :newgame  ; MASTER.S:1047
   a = #0x04                  ; MASTER.S:1051
   tail_call startresume                ; MASTER.S:1052
 :newgame:
@@ -672,7 +662,7 @@ fn LoadStage1B {
   call driveon                  ; MASTER.S:1196
   call loadmusic3                  ; MASTER.S:1198
   a = *IIGS@0x0211        ; MASTER.S:1200
-  if ne goto :shires       ; MASTER.S:1201
+  if a != #0x00 goto :shires  ; MASTER.S:1201
   a = #0x12                  ; MASTER.S:1203
   call ]lsub                  ; MASTER.S:1204
   tail_call driveoff                ; MASTER.S:1205
@@ -702,7 +692,7 @@ fn ReloadStuff {
 fn LoadStage2 {
   x = *BBundID@0x03f5        ; MASTER.S:1246
   cmp x, #POPside2              ; MASTER.S:1247
-  if eq goto LoadStage2B       ; MASTER.S:1248
+  if x == #POPside2 goto LoadStage2B  ; MASTER.S:1248
 LoadStage2A:
   call driveon                  ; MASTER.S:1251
   a = #0x00                  ; MASTER.S:1253
@@ -766,7 +756,7 @@ fn loadch7 {
 fn LoadStage2B {
   call driveon                  ; MASTER.S:1303
   a = #0x18                  ; MASTER.S:1305
-  if ne goto ]ls2       ; MASTER.S:1306
+  if a != #0x00 goto ]ls2  ; MASTER.S:1306
 LoadStage3:
   call driveon                  ; MASTER.S:1317
   a = #0x04                  ; MASTER.S:1319
@@ -837,7 +827,7 @@ fn PlaySongNI {
 :loop:
   call xmplay                  ; MASTER.S:1383
   cmp a, #0x00              ; MASTER.S:1384
-  if ne goto :loop       ; MASTER.S:1385
+  if a != #0x00 goto :loop  ; MASTER.S:1385
 ]rts:
   return                           ; MASTER.S:1386
 }
@@ -848,14 +838,14 @@ fn PlaySongI {
   y = a                            ; MASTER.S:1393
   a = *musicon@0x031a        ; MASTER.S:1394
   a = a & *soundon@0x0203              ; MASTER.S:1395
-  if eq goto :pause       ; MASTER.S:1396
+  if a == #0x00 goto :pause  ; MASTER.S:1396
   a = y                            ; MASTER.S:1398
   call xminit                  ; MASTER.S:1399
 :loop:
   call StartGame?                  ; MASTER.S:1400
   call xmplay                  ; MASTER.S:1401
   cmp a, #0x00              ; MASTER.S:1402
-  if ne goto :loop       ; MASTER.S:1403
+  if a != #0x00 goto :loop  ; MASTER.S:1403
 ]rts:
   return                           ; MASTER.S:1404
 :pause:
@@ -869,13 +859,13 @@ tpause:
 :loop2:
   call StartGame?                  ; MASTER.S:1417
   x -= 1                         ; MASTER.S:1418
-  if ne goto :loop2       ; MASTER.S:1419
+  if x != #0x00 goto :loop2  ; MASTER.S:1419
   y -= 1                         ; MASTER.S:1420
-  if ne goto :loop1       ; MASTER.S:1421
+  if y != #0x00 goto :loop1  ; MASTER.S:1421
   a = *pausetemp@0x03f7        ; MASTER.S:1423
   c = 1                            ; MASTER.S:1424
   a = a - #0x01 - (1 - c)        ; MASTER.S:1425
-  if ne goto :loop       ; MASTER.S:1426
+  if a != #0x00 goto :loop  ; MASTER.S:1426
 ]rts:
   return                           ; MASTER.S:1427
 }
@@ -888,13 +878,13 @@ fn tpause  (aka :loop) {
 :loop2:
   call StartGame?                  ; MASTER.S:1417
   x -= 1                         ; MASTER.S:1418
-  if ne goto :loop2       ; MASTER.S:1419
+  if x != #0x00 goto :loop2  ; MASTER.S:1419
   y -= 1                         ; MASTER.S:1420
-  if ne goto :loop1       ; MASTER.S:1421
+  if y != #0x00 goto :loop1  ; MASTER.S:1421
   a = *pausetemp@0x03f7        ; MASTER.S:1423
   c = 1                            ; MASTER.S:1424
   a = a - #0x01 - (1 - c)        ; MASTER.S:1425
-  if ne goto :loop       ; MASTER.S:1426
+  if a != #0x00 goto :loop  ; MASTER.S:1426
 ]rts:
   return                           ; MASTER.S:1427
 }

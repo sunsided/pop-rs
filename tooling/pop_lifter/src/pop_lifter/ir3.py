@@ -188,11 +188,17 @@ class ModuleIR3:
 
 
 def _fmt_compare(c: Compare) -> str:
-    from .ir1 import Abs, Imm
+    # Delegate Imm rendering to ir1's `_fmt_imm` so symbolic operand
+    # names (e.g. `#block`) propagate from the original `cmp` into the
+    # structured `if` form. Previously this hard-coded the numeric
+    # format, which silently dropped the symbolic intent — a `cmp a,
+    # #block` followed by `if a != #0x14 { ... }` would mis-render
+    # because the imm was rebuilt with the value-only template.
+    from .ir1 import Abs, Imm, _fmt_imm
     if c.rhs is None:
         return f"{c.reg} {c.op}"
     if isinstance(c.rhs, Imm):
-        return f"{c.reg} {c.op} #{c.rhs.value:#04x}"
+        return f"{c.reg} {c.op} {_fmt_imm(c.rhs)}"
     if isinstance(c.rhs, Abs):
         return f"{c.reg} {c.op} *{c.rhs.name}@{c.rhs.addr:#06x}"
     return f"{c.reg} {c.op} {c.rhs!r}"

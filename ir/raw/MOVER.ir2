@@ -2,28 +2,26 @@
 
 fn searchtrob {
   x = *numtrans@0x0095        ; MOVER.S:106
-  if eq goto :rts       ; MOVER.S:107
+  if x == #0x00 goto :rts  ; MOVER.S:107
 :loop:
   a = *(trloc@0xb600 + x)   ; MOVER.S:109
   cmp a, *trloc@0xb600    ; MOVER.S:110
-  if ne goto :next       ; MOVER.S:111
+  if a != *trloc@0xb600 goto :next  ; MOVER.S:111
   a = *(trscrn@0xb620 + x)   ; MOVER.S:112
   cmp a, *trscrn@0xb620    ; MOVER.S:113
-  if eq goto :rts       ; MOVER.S:114
+  if a == *trscrn@0xb620 goto :rts  ; MOVER.S:114
 :next:
   x -= 1                         ; MOVER.S:116
-  if ne goto :loop       ; MOVER.S:117
+  if x != #0x00 goto :loop  ; MOVER.S:117
 :rts:
   return                           ; MOVER.S:119
 }
 
 fn addtrob {
   call searchtrob                  ; MOVER.S:130
-  cmp x, #0x00              ; MOVER.S:132
-  if ne goto :chdir       ; MOVER.S:133
+  if x != #0x00 goto :chdir  ; MOVER.S:133
   x = *numtrans@0x0095        ; MOVER.S:137
-  cmp x, #maxtr              ; MOVER.S:138
-  if eq goto :rts       ; MOVER.S:139
+  if x == #maxtr goto :rts  ; MOVER.S:139
   x += 1                         ; MOVER.S:141
   *numtrans@0x0095 = x            ; MOVER.S:142
   a = *trdirec@0xb640        ; MOVER.S:144
@@ -42,8 +40,7 @@ fn addtrob {
 
 fn addamob {
   x = *nummob@0x030d        ; MOVER.S:164
-  cmp x, #maxmob              ; MOVER.S:165
-  if eq goto :rts       ; MOVER.S:166
+  if x == #maxmob goto :rts  ; MOVER.S:166
   x += 1                         ; MOVER.S:168
   *nummob@0x030d = x            ; MOVER.S:169
   tail_call savemob                ; MOVER.S:171
@@ -87,9 +84,8 @@ fn loadmob {
 fn TRIGSLICER {
   *state@0x00f0 = a            ; MOVER.S:218
   a = *(BlueSpec@0x0026)[y]   ; MOVER.S:220
-  if eq goto :ok       ; MOVER.S:221
-  cmp a, #slicerRet              ; MOVER.S:222
-  if cc goto ]rts       ; MOVER.S:223
+  if a == #0x00 goto :ok  ; MOVER.S:221
+  if a < #slicerRet goto ]rts  ; MOVER.S:223
 :ok:
   *trloc@0xb600 = y            ; MOVER.S:227
   a = *state@0x00f0        ; MOVER.S:229
@@ -156,10 +152,9 @@ fn TRIGTORCH {
 
 fn TRIGSPIKES {
   a = *(BlueSpec@0x0026)[y]   ; MOVER.S:324
-  if eq goto :ready       ; MOVER.S:325
+  if a == #0x00 goto :ready  ; MOVER.S:325
   if pl goto ]rts       ; MOVER.S:327
-  cmp a, #0xff              ; MOVER.S:328
-  if eq goto ]rts       ; MOVER.S:329
+  if a == #0xff goto ]rts  ; MOVER.S:329
   a = #spiketimer                  ; MOVER.S:330
   *(BlueSpec@0x0026)[y] = a   ; MOVER.S:331
 ]rts:
@@ -181,19 +176,19 @@ fn JAMSPIKES {
   a = #0xff                  ; MOVER.S:355
   *(BlueSpec@0x0026)[y] = a   ; MOVER.S:356
   x = #0xff                  ; MOVER.S:357
-  if mi goto ]cont       ; MOVER.S:358
+  if x <0 goto ]cont  ; MOVER.S:358
 GETSPIKES:
   a = *(BlueSpec@0x0026)[y]   ; MOVER.S:366
-  if mi goto :sprung       ; MOVER.S:367
+  if a <0 goto :sprung  ; MOVER.S:367
   if eq goto :safe       ; MOVER.S:368
   cmp a, #spikeExt              ; MOVER.S:370
-  if cc goto :springing       ; MOVER.S:371
+  if a < #spikeExt goto :springing  ; MOVER.S:371
 :safe:
   a = #0x00                  ; MOVER.S:373
   return                           ; MOVER.S:374
 :sprung:
   cmp a, #0xff              ; MOVER.S:376
-  if eq goto :safe       ; MOVER.S:377
+  if a == #0xff goto :safe  ; MOVER.S:377
   a = #0x01                  ; MOVER.S:378
   return                           ; MOVER.S:379
 :springing:
@@ -204,16 +199,16 @@ GETSPIKES:
 
 fn GETSPIKES {
   a = *(BlueSpec@0x0026)[y]   ; MOVER.S:366
-  if mi goto :sprung       ; MOVER.S:367
+  if a <0 goto :sprung  ; MOVER.S:367
   if eq goto :safe       ; MOVER.S:368
   cmp a, #spikeExt              ; MOVER.S:370
-  if cc goto :springing       ; MOVER.S:371
+  if a < #spikeExt goto :springing  ; MOVER.S:371
 :safe:
   a = #0x00                  ; MOVER.S:373
   return                           ; MOVER.S:374
 :sprung:
   cmp a, #0xff              ; MOVER.S:376
-  if eq goto :safe       ; MOVER.S:377
+  if a == #0xff goto :safe  ; MOVER.S:377
   a = #0x01                  ; MOVER.S:378
   return                           ; MOVER.S:379
 :springing:
@@ -228,9 +223,9 @@ BREAKLOOSE1:
   *state@0x00f0 = a            ; MOVER.S:393
   a = *(BlueType@0x0024)[y]   ; MOVER.S:395
   a = a & #reqmask              ; MOVER.S:396
-  if ne goto ]rts       ; MOVER.S:397
+  if a != #0x00 goto ]rts  ; MOVER.S:397
   a = *(BlueSpec@0x0026)[y]   ; MOVER.S:399
-  if mi goto :ok       ; MOVER.S:400
+  if a <0 goto :ok  ; MOVER.S:400
   if ne goto ]rts       ; MOVER.S:401
 :ok:
   a = *state@0x00f0        ; MOVER.S:403
@@ -250,9 +245,9 @@ fn BREAKLOOSE1 {
   *state@0x00f0 = a            ; MOVER.S:393
   a = *(BlueType@0x0024)[y]   ; MOVER.S:395
   a = a & #reqmask              ; MOVER.S:396
-  if ne goto ]rts       ; MOVER.S:397
+  if a != #0x00 goto ]rts  ; MOVER.S:397
   a = *(BlueSpec@0x0026)[y]   ; MOVER.S:399
-  if mi goto :ok       ; MOVER.S:400
+  if a <0 goto :ok  ; MOVER.S:400
   if ne goto ]rts       ; MOVER.S:401
 :ok:
   a = *state@0x00f0        ; MOVER.S:403
@@ -278,9 +273,9 @@ pushpp1:
   x = a                            ; MOVER.S:432
   call gettimer                  ; MOVER.S:433
   cmp a, #0x1f              ; MOVER.S:435
-  if eq goto ]rts       ; MOVER.S:436
+  if a == #0x1f goto ]rts  ; MOVER.S:436
   cmp a, #0x02              ; MOVER.S:438
-  if cs goto :starttimer       ; MOVER.S:439
+  if a >= #0x02 goto :starttimer  ; MOVER.S:439
   a = #pptimer                  ; MOVER.S:444
   call chgtimer                  ; MOVER.S:445
   *trloc@0xb600 = y            ; MOVER.S:447
@@ -310,9 +305,9 @@ fn pushpp1 {
   x = a                            ; MOVER.S:432
   call gettimer                  ; MOVER.S:433
   cmp a, #0x1f              ; MOVER.S:435
-  if eq goto ]rts       ; MOVER.S:436
+  if a == #0x1f goto ]rts  ; MOVER.S:436
   cmp a, #0x02              ; MOVER.S:438
-  if cs goto :starttimer       ; MOVER.S:439
+  if a >= #0x02 goto :starttimer  ; MOVER.S:439
   a = #pptimer                  ; MOVER.S:444
   call chgtimer                  ; MOVER.S:445
   *trloc@0xb600 = y            ; MOVER.S:447
@@ -341,7 +336,7 @@ fn JAMPP {
   a = a & #idmask              ; MOVER.S:482
   *pptype@0x00f4 = a            ; MOVER.S:483
   cmp a, #pressplate              ; MOVER.S:484
-  if eq goto :1       ; MOVER.S:485
+  if a == #pressplate goto :1  ; MOVER.S:485
   a = #floor                  ; MOVER.S:487
   *(BlueType@0x0024)[y] = a   ; MOVER.S:488
   a = #0x00                  ; MOVER.S:489
@@ -358,7 +353,7 @@ trigger:
   x = *linkindex@0x00f3        ; MOVER.S:507
   a = *(LINKLOC@0xbca0 + x)   ; MOVER.S:509
   cmp a, #0xff              ; MOVER.S:510
-  if eq goto :rts       ; MOVER.S:511
+  if a == #0xff goto :rts  ; MOVER.S:511
   call getloc                  ; MOVER.S:513
   *trloc@0xb600 = a            ; MOVER.S:514
   call getscrn                  ; MOVER.S:516
@@ -369,7 +364,7 @@ trigger:
   a = a & #idmask              ; MOVER.S:522
   call trigobj                  ; MOVER.S:524
   a = *trdirec@0xb640        ; MOVER.S:526
-  if mi goto :skip       ; MOVER.S:527
+  if a <0 goto :skip  ; MOVER.S:527
   call addtrob                  ; MOVER.S:529
 :skip:
   x = *linkindex@0x00f3        ; MOVER.S:531
@@ -383,8 +378,7 @@ trigger:
 fn trigger  (aka :loop) {
   x = *linkindex@0x00f3        ; MOVER.S:507
   a = *(LINKLOC@0xbca0 + x)   ; MOVER.S:509
-  cmp a, #0xff              ; MOVER.S:510
-  if eq goto :rts       ; MOVER.S:511
+  if a == #0xff goto :rts  ; MOVER.S:511
   call getloc                  ; MOVER.S:513
   *trloc@0xb600 = a            ; MOVER.S:514
   call getscrn                  ; MOVER.S:516
@@ -395,7 +389,7 @@ fn trigger  (aka :loop) {
   a = a & #idmask              ; MOVER.S:522
   call trigobj                  ; MOVER.S:524
   a = *trdirec@0xb640        ; MOVER.S:526
-  if mi goto :skip       ; MOVER.S:527
+  if a <0 goto :skip  ; MOVER.S:527
   call addtrob                  ; MOVER.S:529
 :skip:
   x = *linkindex@0x00f3        ; MOVER.S:531
@@ -407,12 +401,10 @@ fn trigger  (aka :loop) {
 }
 
 fn trigobj {
-  cmp a, #gate              ; MOVER.S:547
-  if ne goto :1       ; MOVER.S:548
+  if a != #gate goto :1  ; MOVER.S:548
   tail_call triggate                ; MOVER.S:549
 :1:
-  cmp a, #exit              ; MOVER.S:551
-  if ne goto :2       ; MOVER.S:552
+  if a != #exit goto :2  ; MOVER.S:552
   tail_call openexit                ; MOVER.S:553
 :2:
 ]rts:
@@ -421,9 +413,9 @@ fn trigobj {
 
 fn openexit {
   a = *(BlueSpec@0x0026)[y]   ; MOVER.S:563
-  if ne goto :fail       ; MOVER.S:564
+  if a != #0x00 goto :fail  ; MOVER.S:564
   a = #0x01                  ; MOVER.S:566
-  if pl goto :1       ; MOVER.S:567
+  if a >=0 goto :1  ; MOVER.S:567
 :fail:
   a = #0xff                  ; MOVER.S:569
 :1:
@@ -435,12 +427,12 @@ fn triggate {
   a = *(BlueSpec@0x0026)[y]   ; MOVER.S:582
   x = *pptype@0x00f4        ; MOVER.S:584
   cmp x, #upressplate              ; MOVER.S:585
-  if eq goto :raise       ; MOVER.S:586
+  if x == #upressplate goto :raise  ; MOVER.S:586
   cmp x, #rubble              ; MOVER.S:587
-  if eq goto :jam       ; MOVER.S:588
+  if x == #rubble goto :jam  ; MOVER.S:588
 :lower:
   cmp a, #gminval              ; MOVER.S:592
-  if ne goto :yeslower       ; MOVER.S:593
+  if a != #gminval goto :yeslower  ; MOVER.S:593
 :fail:
   tail_call stopobj                ; MOVER.S:595
 :yeslower:
@@ -451,16 +443,16 @@ fn triggate {
   x = #0x02                  ; MOVER.S:602
   *trdirec@0xb640 = x            ; MOVER.S:603
   cmp a, #gmaxval              ; MOVER.S:604
-  if cc goto :1       ; MOVER.S:605
+  if a < #gmaxval goto :1  ; MOVER.S:605
   a = #0xff                  ; MOVER.S:606
-  if mi goto :3       ; MOVER.S:607
+  if a <0 goto :3  ; MOVER.S:607
 :raise:
   x = #0x01                  ; MOVER.S:609
   *trdirec@0xb640 = x            ; MOVER.S:610
   cmp a, #0xff              ; MOVER.S:611
-  if eq goto :fail       ; MOVER.S:612
+  if a == #0xff goto :fail  ; MOVER.S:612
   cmp a, #gmaxval              ; MOVER.S:613
-  if cc goto :1       ; MOVER.S:614
+  if a < #gmaxval goto :1  ; MOVER.S:614
   a = #gatetimer                  ; MOVER.S:615
 :3:
   *(BlueSpec@0x0026)[y] = a   ; MOVER.S:616
@@ -472,7 +464,7 @@ ANIMTRANS:
   a = #0x00                  ; MOVER.S:630
   *trobcount@0xb6e0 = a            ; MOVER.S:631
   x = *numtrans@0x0095        ; MOVER.S:633
-  if eq goto ]rts       ; MOVER.S:634
+  if x == #0x00 goto ]rts  ; MOVER.S:634
   a = #0x00                  ; MOVER.S:636
   ??? sta ]cleanflag            ; MOVER.S:637
 :loop:
@@ -480,13 +472,13 @@ ANIMTRANS:
   call animobj                  ; MOVER.S:641
   x = *tempnt@0x0096        ; MOVER.S:643
   a = *trdirec@0xb640        ; MOVER.S:645
-  if pl goto :1       ; MOVER.S:646
+  if a >=0 goto :1  ; MOVER.S:646
   a = #0xff                  ; MOVER.S:648
   ??? sta ]cleanflag            ; MOVER.S:649
 :1:
   *(trdirec@0xb640 + x) = a   ; MOVER.S:651
   x -= 1                         ; MOVER.S:653
-  if ne goto :loop       ; MOVER.S:654
+  if x != #0x00 goto :loop  ; MOVER.S:654
   ??? lda ]cleanflag            ; MOVER.S:656
   if eq goto ]rts       ; MOVER.S:657
   x = #0x01                  ; MOVER.S:663
@@ -494,7 +486,7 @@ ANIMTRANS:
 :dloop:
   a = *(trdirec@0xb640 + x)   ; MOVER.S:666
   cmp a, #0xff              ; MOVER.S:667
-  if eq goto :next       ; MOVER.S:668
+  if a == #0xff goto :next  ; MOVER.S:668
   y += 1                         ; MOVER.S:670
   *(trdirec@0xb640 + y) = a   ; MOVER.S:671
   a = *(trloc@0xb600 + x)   ; MOVER.S:672
@@ -504,7 +496,7 @@ ANIMTRANS:
 :next:
   x += 1                         ; MOVER.S:677
   cmp x, *numtrans@0x0095    ; MOVER.S:679
-  if cc goto :dloop       ; MOVER.S:680
+  if x < *numtrans@0x0095 goto :dloop  ; MOVER.S:680
   if eq goto :dloop       ; MOVER.S:681
   *numtrans@0x0095 = y            ; MOVER.S:683
   return                           ; MOVER.S:684
@@ -514,7 +506,7 @@ fn ANIMTRANS {
   a = #0x00                  ; MOVER.S:630
   *trobcount@0xb6e0 = a            ; MOVER.S:631
   x = *numtrans@0x0095        ; MOVER.S:633
-  if eq goto ]rts       ; MOVER.S:634
+  if x == #0x00 goto ]rts  ; MOVER.S:634
   a = #0x00                  ; MOVER.S:636
   ??? sta ]cleanflag            ; MOVER.S:637
 :loop:
@@ -522,13 +514,13 @@ fn ANIMTRANS {
   call animobj                  ; MOVER.S:641
   x = *tempnt@0x0096        ; MOVER.S:643
   a = *trdirec@0xb640        ; MOVER.S:645
-  if pl goto :1       ; MOVER.S:646
+  if a >=0 goto :1  ; MOVER.S:646
   a = #0xff                  ; MOVER.S:648
   ??? sta ]cleanflag            ; MOVER.S:649
 :1:
   *(trdirec@0xb640 + x) = a   ; MOVER.S:651
   x -= 1                         ; MOVER.S:653
-  if ne goto :loop       ; MOVER.S:654
+  if x != #0x00 goto :loop  ; MOVER.S:654
   ??? lda ]cleanflag            ; MOVER.S:656
   if eq goto ]rts       ; MOVER.S:657
   x = #0x01                  ; MOVER.S:663
@@ -536,7 +528,7 @@ fn ANIMTRANS {
 :dloop:
   a = *(trdirec@0xb640 + x)   ; MOVER.S:666
   cmp a, #0xff              ; MOVER.S:667
-  if eq goto :next       ; MOVER.S:668
+  if a == #0xff goto :next  ; MOVER.S:668
   y += 1                         ; MOVER.S:670
   *(trdirec@0xb640 + y) = a   ; MOVER.S:671
   a = *(trloc@0xb600 + x)   ; MOVER.S:672
@@ -546,7 +538,7 @@ fn ANIMTRANS {
 :next:
   x += 1                         ; MOVER.S:677
   cmp x, *numtrans@0x0095    ; MOVER.S:679
-  if cc goto :dloop       ; MOVER.S:680
+  if x < *numtrans@0x0095 goto :dloop  ; MOVER.S:680
   if eq goto :dloop       ; MOVER.S:681
   *numtrans@0x0095 = y            ; MOVER.S:683
   return                           ; MOVER.S:684
@@ -568,56 +560,45 @@ fn animobj {
   *state@0x00f0 = a            ; MOVER.S:705
   a = *(BlueType@0x0024)[y]   ; MOVER.S:707
   a = a & #idmask              ; MOVER.S:708
-  cmp a, #torch              ; MOVER.S:712
-  if ne goto :1       ; MOVER.S:713
+  if a != #torch goto :1  ; MOVER.S:713
   call animtorch                  ; MOVER.S:714
   goto :done                ; MOVER.S:715
 :1:
-  cmp a, #upressplate              ; MOVER.S:717
-  if eq goto :plate       ; MOVER.S:718
-  cmp a, #pressplate              ; MOVER.S:719
-  if ne goto :2       ; MOVER.S:720
+  if a == #upressplate goto :plate  ; MOVER.S:718
+  if a != #pressplate goto :2  ; MOVER.S:720
 :plate:
   call animplate                  ; MOVER.S:721
   goto :done                ; MOVER.S:722
 :2:
-  cmp a, #spikes              ; MOVER.S:724
-  if ne goto :3       ; MOVER.S:725
+  if a != #spikes goto :3  ; MOVER.S:725
   call animspikes                  ; MOVER.S:726
   goto :done                ; MOVER.S:727
 :3:
-  cmp a, #loose              ; MOVER.S:729
-  if ne goto :31       ; MOVER.S:730
+  if a != #loose goto :31  ; MOVER.S:730
   call animfloor                  ; MOVER.S:731
   goto :done                ; MOVER.S:732
 :31:
-  cmp a, #space              ; MOVER.S:734
-  if ne goto :4       ; MOVER.S:735
+  if a != #space goto :4  ; MOVER.S:735
   call animspace                  ; MOVER.S:736
   goto :done                ; MOVER.S:737
 :4:
-  cmp a, #slicer              ; MOVER.S:739
-  if ne goto :5       ; MOVER.S:740
+  if a != #slicer goto :5  ; MOVER.S:740
   call animslicer                  ; MOVER.S:741
   goto :done                ; MOVER.S:742
 :5:
-  cmp a, #gate              ; MOVER.S:744
-  if ne goto :6       ; MOVER.S:745
+  if a != #gate goto :6  ; MOVER.S:745
   call animgate                  ; MOVER.S:746
   goto :done                ; MOVER.S:747
 :6:
-  cmp a, #exit              ; MOVER.S:749
-  if ne goto :7       ; MOVER.S:750
+  if a != #exit goto :7  ; MOVER.S:750
   call animexit                  ; MOVER.S:751
   goto :done                ; MOVER.S:752
 :7:
-  cmp a, #flask              ; MOVER.S:754
-  if ne goto :8       ; MOVER.S:755
+  if a != #flask goto :8  ; MOVER.S:755
   call animflask                  ; MOVER.S:756
   goto :done                ; MOVER.S:757
 :8:
-  cmp a, #sword              ; MOVER.S:759
-  if ne goto :9       ; MOVER.S:760
+  if a != #sword goto :9  ; MOVER.S:760
   call animsword                  ; MOVER.S:761
   goto :done                ; MOVER.S:762
 :9:
@@ -632,9 +613,9 @@ fn animobj {
 
 fn animexit {
   x = *trdirec@0xb640        ; MOVER.S:778
-  if mi goto :cont       ; MOVER.S:779
+  if x <0 goto :cont  ; MOVER.S:779
   cmp x, #0x03              ; MOVER.S:780
-  if cs goto :downfast       ; MOVER.S:781
+  if x >= #0x03 goto :downfast  ; MOVER.S:781
   a = #RaisingExit                  ; MOVER.S:783
   call addsound                  ; MOVER.S:784
   a = *state@0x00f0        ; MOVER.S:786
@@ -642,7 +623,7 @@ fn animexit {
   a = a + #exitinc + c              ; MOVER.S:788
   *state@0x00f0 = a            ; MOVER.S:789
   cmp a, #emaxval              ; MOVER.S:791
-  if cs goto :stop       ; MOVER.S:792
+  if a >= #emaxval goto :stop  ; MOVER.S:792
 :cont:
   tail_call redexit                ; MOVER.S:794
 :stop:
@@ -678,28 +659,28 @@ fn animexit {
 
 fn animgate {
   x = *trdirec@0xb640        ; MOVER.S:838
-  if mi goto :cont       ; MOVER.S:839
+  if x <0 goto :cont  ; MOVER.S:839
   cmp x, #0x03              ; MOVER.S:841
-  if cs goto :downfast       ; MOVER.S:842
+  if x >= #0x03 goto :downfast  ; MOVER.S:842
   a = *state@0x00f0        ; MOVER.S:844
   cmp a, #0xff              ; MOVER.S:845
-  if eq goto :stop       ; MOVER.S:846
+  if a == #0xff goto :stop  ; MOVER.S:846
   c = 0                            ; MOVER.S:847
   ??? adc gateinc,x            ; MOVER.S:848
   *state@0x00f0 = a            ; MOVER.S:849
   cmp x, #0x00              ; MOVER.S:851
-  if eq goto :goingdown       ; MOVER.S:852
+  if x == #0x00 goto :goingdown  ; MOVER.S:852
   cmp a, #gmaxval              ; MOVER.S:854
-  if cs goto :attop       ; MOVER.S:855
+  if a >= #gmaxval goto :attop  ; MOVER.S:855
   a = #RaisingGate                  ; MOVER.S:857
   call addsound                  ; MOVER.S:858
   goto :cont                ; MOVER.S:860
 :goingdown:
   cmp a, #gminval              ; MOVER.S:863
-  if eq goto :stop       ; MOVER.S:864
+  if a == #gminval goto :stop  ; MOVER.S:864
   if cc goto :stop       ; MOVER.S:865
   cmp a, #gmaxval              ; MOVER.S:867
-  if cs goto :cont       ; MOVER.S:868
+  if a >= #gmaxval goto :cont  ; MOVER.S:868
   call addlowersound                  ; MOVER.S:869
 :cont:
   tail_call redgate                ; MOVER.S:871
@@ -710,7 +691,7 @@ fn animgate {
   goto :cont                ; MOVER.S:878
 :attop:
   cmp x, #0x02              ; MOVER.S:885
-  if cc goto :tr1       ; MOVER.S:886
+  if x < #0x02 goto :tr1  ; MOVER.S:886
   a = #0xff                  ; MOVER.S:887
   *state@0x00f0 = a            ; MOVER.S:888
   goto :stop                ; MOVER.S:889
@@ -743,7 +724,7 @@ fn animgate {
 
 fn animplate {
   x = *trdirec@0xb640        ; MOVER.S:928
-  if mi goto ]rts       ; MOVER.S:929
+  if x <0 goto ]rts  ; MOVER.S:929
   a = *state@0x00f0        ; MOVER.S:931
   x = a                            ; MOVER.S:932
   call gettimer                  ; MOVER.S:933
@@ -752,8 +733,7 @@ fn animplate {
   push a                           ; MOVER.S:936
   call chgtimer                  ; MOVER.S:937
   a = pop                          ; MOVER.S:938
-  cmp a, #0x02              ; MOVER.S:939
-  if cs goto ]rts       ; MOVER.S:940
+  if a >= #0x02 goto ]rts  ; MOVER.S:940
   a = #PlateUp                  ; MOVER.S:942
   call addsound                  ; MOVER.S:943
   call stopobj                  ; MOVER.S:945
@@ -764,7 +744,7 @@ fn animplate {
 
 fn animslicer {
   x = *trdirec@0xb640        ; MOVER.S:956
-  if mi goto :done       ; MOVER.S:957
+  if x <0 goto :done  ; MOVER.S:957
   a = *state@0x00f0        ; MOVER.S:959
   x = a                            ; MOVER.S:960
   a = a & #0x80              ; MOVER.S:961
@@ -773,42 +753,36 @@ fn animslicer {
   a = a & #0x7f              ; MOVER.S:964
   c = 0                            ; MOVER.S:965
   a = a + #0x01 + c              ; MOVER.S:966
-  cmp a, #slicetimer+1              ; MOVER.S:967
-  if cc goto :1       ; MOVER.S:968
+  if a < #slicetimer+1 goto :1  ; MOVER.S:968
   a = #0x01                  ; MOVER.S:969
 :1:
   a = a | *state@0x00f0              ; MOVER.S:970
   *state@0x00f0 = a            ; MOVER.S:971
   a = a & #0x7f              ; MOVER.S:972
-  cmp a, #slicerExt              ; MOVER.S:973
-  if ne goto :2       ; MOVER.S:974
+  if a != #slicerExt goto :2  ; MOVER.S:974
   a = #JawsClash                  ; MOVER.S:976
   call addsound                  ; MOVER.S:977
 :2:
   a = *trscrn@0xb620        ; MOVER.S:979
-  cmp a, *VisScrn@0x00cb    ; MOVER.S:980
-  if ne goto :os       ; MOVER.S:981
+  if a != *VisScrn@0x00cb goto :os  ; MOVER.S:981
   a = *trloc@0xb600        ; MOVER.S:983
   call unindex                  ; MOVER.S:984
-  cmp x, *KidBlockY@0x0055    ; MOVER.S:985
-  if ne goto :os       ; MOVER.S:986
+  if x != *KidBlockY@0x0055 goto :os  ; MOVER.S:986
   a = *KidLife@0x005f        ; MOVER.S:988
-  if mi goto :done       ; MOVER.S:989
+  if a <0 goto :done  ; MOVER.S:989
   a = *state@0x00f0        ; MOVER.S:991
   a = a & #0x80              ; MOVER.S:992
-  if ne goto :done       ; MOVER.S:993
+  if a != #0x00 goto :done  ; MOVER.S:993
 :os:
   a = *state@0x00f0        ; MOVER.S:997
   a = a & #0x7f              ; MOVER.S:998
-  cmp a, #slicerRet              ; MOVER.S:999
-  if cc goto :done       ; MOVER.S:1000
+  if a < #slicerRet goto :done  ; MOVER.S:1000
 :purge:
   call stopobj                  ; MOVER.S:1002
 :done:
   a = *state@0x00f0        ; MOVER.S:1004
   a = a & #0x7f              ; MOVER.S:1005
-  cmp a, #slicerRet              ; MOVER.S:1006
-  if cs goto ]rts       ; MOVER.S:1007
+  if a >= #slicerRet goto ]rts  ; MOVER.S:1007
   tail_call redslicer                ; MOVER.S:1009
 ]rts:
   return                           ; MOVER.S:948
@@ -816,10 +790,9 @@ fn animslicer {
 
 fn animflask {
   x = *trdirec@0xb640        ; MOVER.S:1017
-  if mi goto ]rts       ; MOVER.S:1018
+  if x <0 goto ]rts  ; MOVER.S:1018
   a = *trscrn@0xb620        ; MOVER.S:1020
-  cmp a, *VisScrn@0x00cb    ; MOVER.S:1021
-  if ne goto :purge       ; MOVER.S:1022
+  if a != *VisScrn@0x00cb goto :purge  ; MOVER.S:1022
   a = *state@0x00f0        ; MOVER.S:1024
   a = a & #0xe0              ; MOVER.S:1025
   *temp1@0x00f1 = a            ; MOVER.S:1026
@@ -838,8 +811,7 @@ fn animflask {
 
 fn animsword {
   a = *trscrn@0xb620        ; MOVER.S:1043
-  cmp a, *VisScrn@0x00cb    ; MOVER.S:1044
-  if ne goto ]purge       ; MOVER.S:1045
+  if a != *VisScrn@0x00cb goto ]purge  ; MOVER.S:1045
   *state@0x00f0 -= 1                         ; MOVER.S:1047
   if ne goto :1       ; MOVER.S:1048
   call rnd                  ; MOVER.S:1049
@@ -855,10 +827,9 @@ fn animsword {
 
 fn animtorch {
   x = *trdirec@0xb640        ; MOVER.S:1064
-  if mi goto ]rts       ; MOVER.S:1065
+  if x <0 goto ]rts  ; MOVER.S:1065
   a = *trscrn@0xb620        ; MOVER.S:1067
-  cmp a, *VisScrn@0x00cb    ; MOVER.S:1068
-  if ne goto ]purge       ; MOVER.S:1069
+  if a != *VisScrn@0x00cb goto ]purge  ; MOVER.S:1069
   a = *state@0x00f0        ; MOVER.S:1071
   call GETFLAMEFRAME                  ; MOVER.S:1072
   *state@0x00f0 = a            ; MOVER.S:1073
@@ -870,16 +841,13 @@ fn animtorch {
 fn GETFLAMEFRAME {
   *state@0x00f0 = a            ; MOVER.S:1085
   call rnd                  ; MOVER.S:1087
-  cmp a, *state@0x00f0    ; MOVER.S:1089
-  if eq goto :2       ; MOVER.S:1090
-  cmp a, #torchLast+1              ; MOVER.S:1091
-  if cc goto :1       ; MOVER.S:1092
+  if a == *state@0x00f0 goto :2  ; MOVER.S:1090
+  if a < #torchLast+1 goto :1  ; MOVER.S:1092
   a = *state@0x00f0        ; MOVER.S:1094
 :2:
   c = 0                            ; MOVER.S:1095
   a = a + #0x01 + c              ; MOVER.S:1096
-  cmp a, #torchLast+1              ; MOVER.S:1097
-  if cc goto :1       ; MOVER.S:1098
+  if a < #torchLast+1 goto :1  ; MOVER.S:1098
   a = #0x00                  ; MOVER.S:1100
 :1:
 ]rts:
@@ -889,8 +857,7 @@ fn GETFLAMEFRAME {
 fn GETFLASKFRAME {
   c = 0                            ; MOVER.S:1112
   a = a + #0x01 + c              ; MOVER.S:1113
-  cmp a, #bubbLast+1              ; MOVER.S:1114
-  if cc goto ]rts       ; MOVER.S:1115
+  if a < #bubbLast+1 goto ]rts  ; MOVER.S:1115
   a = #0x01                  ; MOVER.S:1116
 ]rts:
   return                           ; MOVER.S:1117
@@ -898,14 +865,14 @@ fn GETFLASKFRAME {
 
 fn animspikes {
   x = *trdirec@0xb640        ; MOVER.S:1125
-  if mi goto :done       ; MOVER.S:1126
+  if x <0 goto :done  ; MOVER.S:1126
   a = *state@0x00f0        ; MOVER.S:1128
-  if mi goto :timerloop       ; MOVER.S:1129
+  if a <0 goto :timerloop  ; MOVER.S:1129
   *state@0x00f0 += 1                         ; MOVER.S:1134
   cmp a, #spikeExt              ; MOVER.S:1136
-  if eq goto :starttimer       ; MOVER.S:1137
+  if a == #spikeExt goto :starttimer  ; MOVER.S:1137
   cmp a, #spikeRet              ; MOVER.S:1139
-  if ne goto :done       ; MOVER.S:1140
+  if a != #spikeRet goto :done  ; MOVER.S:1140
   a = #0x00                  ; MOVER.S:1142
   *state@0x00f0 = a            ; MOVER.S:1143
   call stopobj                  ; MOVER.S:1145
@@ -919,7 +886,7 @@ fn animspikes {
   *state@0x00f0 -= 1                         ; MOVER.S:1158
   a = *state@0x00f0        ; MOVER.S:1160
   a = a & #0x7f              ; MOVER.S:1161
-  if ne goto :rts       ; MOVER.S:1162
+  if a != #0x00 goto :rts  ; MOVER.S:1162
   a = #spikeExt+1                  ; MOVER.S:1164
   *state@0x00f0 = a            ; MOVER.S:1165
   if ne goto :done       ; MOVER.S:1167
@@ -930,12 +897,12 @@ fn animspikes {
 
 fn animfloor {
   x = *trdirec@0xb640        ; MOVER.S:1177
-  if mi goto :red       ; MOVER.S:1178
+  if x <0 goto :red  ; MOVER.S:1178
   *state@0x00f0 += 1                         ; MOVER.S:1184
   a = *state@0x00f0        ; MOVER.S:1186
-  if mi goto :wiggle       ; MOVER.S:1187
+  if a <0 goto :wiggle  ; MOVER.S:1187
   cmp a, #loosetimer              ; MOVER.S:1189
-  if cc goto :red       ; MOVER.S:1190
+  if a < #loosetimer goto :red  ; MOVER.S:1190
   call makespace                  ; MOVER.S:1194
   *state@0x00f0 = a            ; MOVER.S:1195
   call stopobj                  ; MOVER.S:1197
@@ -958,9 +925,9 @@ fn animfloor {
 :wiggle:
   x = *level@0x03f4        ; MOVER.S:1225
   cmp x, #0x0d              ; MOVER.S:1226
-  if eq goto ]rts       ; MOVER.S:1227
+  if x == #0x0d goto ]rts  ; MOVER.S:1227
   cmp a, #wiggletime+$80              ; MOVER.S:1229
-  if cc goto :red       ; MOVER.S:1230
+  if a < #wiggletime+$80 goto :red  ; MOVER.S:1230
   a = #0x00                  ; MOVER.S:1232
   *state@0x00f0 = a            ; MOVER.S:1233
   call stopobj                  ; MOVER.S:1234
@@ -1048,7 +1015,7 @@ fn redplate {
   return                           ; MOVER.S:1344
 ]above:
   cmp a, *scrnAbove@0x0033    ; MOVER.S:1346
-  if ne goto ]rts       ; MOVER.S:1347
+  if a != *scrnAbove@0x0033 goto ]rts  ; MOVER.S:1347
   a = *trloc@0xb600        ; MOVER.S:1349
   c = 1                            ; MOVER.S:1350
   a = a - #0x14 - (1 - c)        ; MOVER.S:1351
@@ -1059,145 +1026,104 @@ fn redplate {
 
 fn check {
   a = *trscrn@0xb620        ; MOVER.S:1361
-  cmp a, *VisScrn@0x00cb    ; MOVER.S:1362
-  if ne goto ]above       ; MOVER.S:1363
+  if a != *VisScrn@0x00cb goto ]above  ; MOVER.S:1363
   y = *trloc@0xb600        ; MOVER.S:1365
-  cmp y, #0x1e              ; MOVER.S:1366
   return                           ; MOVER.S:1367
 }
 
 fn checkleft {
   a = *trscrn@0xb620        ; MOVER.S:1373
-  cmp a, *VisScrn@0x00cb    ; MOVER.S:1374
-  if ne goto :notonscrn       ; MOVER.S:1375
-  cmp y, #0x00              ; MOVER.S:1377
-  if eq goto ]no       ; MOVER.S:1378
-  cmp y, #0x0a              ; MOVER.S:1379
-  if eq goto ]no       ; MOVER.S:1380
-  cmp y, #0x14              ; MOVER.S:1381
-  if eq goto ]no       ; MOVER.S:1382
+  if a != *VisScrn@0x00cb goto :notonscrn  ; MOVER.S:1375
+  if y == #0x00 goto ]no  ; MOVER.S:1378
+  if y == #0x0a goto ]no  ; MOVER.S:1380
+  if y == #0x14 goto ]no  ; MOVER.S:1382
   y -= 1                         ; MOVER.S:1384
-  c = 0                            ; MOVER.S:1385
   return                           ; MOVER.S:1386
 :notonscrn:
-  cmp a, *scrnRight@0x0032    ; MOVER.S:1389
-  if ne goto ]above       ; MOVER.S:1390
+  if a != *scrnRight@0x0032 goto ]above  ; MOVER.S:1390
   y = *trloc@0xb600        ; MOVER.S:1392
-  cmp y, #0x00              ; MOVER.S:1393
-  if eq goto :yesr       ; MOVER.S:1394
-  cmp y, #0x0a              ; MOVER.S:1395
-  if eq goto :yesr       ; MOVER.S:1396
-  cmp y, #0x14              ; MOVER.S:1397
-  if ne goto :yesr       ; MOVER.S:1398
+  if y == #0x00 goto :yesr  ; MOVER.S:1394
+  if y == #0x0a goto :yesr  ; MOVER.S:1396
+  if y != #0x14 goto :yesr  ; MOVER.S:1398
 :yesr:
   a = y                            ; MOVER.S:1400
   c = 0                            ; MOVER.S:1401
   a = a + #0x09 + c              ; MOVER.S:1402
   y = a                            ; MOVER.S:1403
-  c = 0                            ; MOVER.S:1405
   return                           ; MOVER.S:1406
 }
 
 fn checkright {
   a = *trscrn@0xb620        ; MOVER.S:1412
-  cmp a, *VisScrn@0x00cb    ; MOVER.S:1413
-  if ne goto :notonscrn       ; MOVER.S:1414
+  if a != *VisScrn@0x00cb goto :notonscrn  ; MOVER.S:1414
   y = *trloc@0xb600        ; MOVER.S:1416
-  cmp y, #0x09              ; MOVER.S:1417
-  if eq goto ]no       ; MOVER.S:1418
-  cmp y, #0x13              ; MOVER.S:1420
-  if eq goto ]no       ; MOVER.S:1421
-  cmp y, #0x1d              ; MOVER.S:1423
-  if eq goto ]no       ; MOVER.S:1424
+  if y == #0x09 goto ]no  ; MOVER.S:1418
+  if y == #0x13 goto ]no  ; MOVER.S:1421
+  if y == #0x1d goto ]no  ; MOVER.S:1424
   y += 1                         ; MOVER.S:1426
-  c = 0                            ; MOVER.S:1427
   return                           ; MOVER.S:1428
 :notonscrn:
-  cmp a, *scrnLeft@0x0031    ; MOVER.S:1431
-  if ne goto ]above       ; MOVER.S:1432
+  if a != *scrnLeft@0x0031 goto ]above  ; MOVER.S:1432
   y = *trloc@0xb600        ; MOVER.S:1434
-  cmp y, #0x09              ; MOVER.S:1435
-  if eq goto :yesl       ; MOVER.S:1436
-  cmp y, #0x13              ; MOVER.S:1438
-  if eq goto :yesl       ; MOVER.S:1439
-  cmp y, #0x1d              ; MOVER.S:1441
-  if ne goto ]no       ; MOVER.S:1442
+  if y == #0x09 goto :yesl  ; MOVER.S:1436
+  if y == #0x13 goto :yesl  ; MOVER.S:1439
+  if y != #0x1d goto ]no  ; MOVER.S:1442
 :yesl:
   a = y                            ; MOVER.S:1444
   c = 1                            ; MOVER.S:1445
   a = a - #0x09 - (1 - c)        ; MOVER.S:1446
   y = a                            ; MOVER.S:1447
-  c = 0                            ; MOVER.S:1449
   return                           ; MOVER.S:1450
 ]no:
   y = #0x1e                  ; MOVER.S:1452
-  c = 1                            ; MOVER.S:1453
 ]rts:
   return                           ; MOVER.S:1454
 }
 
 fn checkabover {
   a = *trscrn@0xb620        ; MOVER.S:1460
-  cmp a, *VisScrn@0x00cb    ; MOVER.S:1461
-  if ne goto :notonscrn       ; MOVER.S:1462
+  if a != *VisScrn@0x00cb goto :notonscrn  ; MOVER.S:1462
   y = *trloc@0xb600        ; MOVER.S:1464
-  cmp y, #0x0a              ; MOVER.S:1465
-  if cc goto :above       ; MOVER.S:1466
-  cmp y, #0x13              ; MOVER.S:1468
-  if eq goto ]no       ; MOVER.S:1469
-  cmp y, #0x1d              ; MOVER.S:1471
-  if eq goto ]no       ; MOVER.S:1472
+  if y < #0x0a goto :above  ; MOVER.S:1466
+  if y == #0x13 goto ]no  ; MOVER.S:1469
+  if y == #0x1d goto ]no  ; MOVER.S:1472
   a = y                            ; MOVER.S:1474
   c = 1                            ; MOVER.S:1475
   a = a - #0x09 - (1 - c)        ; MOVER.S:1476
   y = a                            ; MOVER.S:1477
-  c = 0                            ; MOVER.S:1479
   return                           ; MOVER.S:1480
 :above:
   y += 1                         ; MOVER.S:1483
-  c = 1                            ; MOVER.S:1484
   return                           ; MOVER.S:1485
 :notonscrn:
-  cmp a, *scrnLeft@0x0031    ; MOVER.S:1488
-  if ne goto :notonleft       ; MOVER.S:1489
+  if a != *scrnLeft@0x0031 goto :notonleft  ; MOVER.S:1489
   y = *trloc@0xb600        ; MOVER.S:1491
-  cmp y, #0x09              ; MOVER.S:1492
-  if eq goto :yes0       ; MOVER.S:1493
-  cmp y, #0x13              ; MOVER.S:1495
-  if eq goto :yesl       ; MOVER.S:1496
-  cmp y, #0x1d              ; MOVER.S:1498
-  if ne goto ]no       ; MOVER.S:1499
+  if y == #0x09 goto :yes0  ; MOVER.S:1493
+  if y == #0x13 goto :yesl  ; MOVER.S:1496
+  if y != #0x1d goto ]no  ; MOVER.S:1499
 :yesl:
   a = y                            ; MOVER.S:1501
   c = 1                            ; MOVER.S:1502
   a = a - #0x13 - (1 - c)        ; MOVER.S:1503
   y = a                            ; MOVER.S:1504
-  c = 0                            ; MOVER.S:1506
   return                           ; MOVER.S:1507
 :yes0:
   y = #0x00                  ; MOVER.S:1509
-  c = 1                            ; MOVER.S:1510
   return                           ; MOVER.S:1511
 :notonleft:
-  cmp a, *scrnBelow@0x0034    ; MOVER.S:1514
-  if ne goto :notbelow       ; MOVER.S:1515
+  if a != *scrnBelow@0x0034 goto :notbelow  ; MOVER.S:1515
   y = *trloc@0xb600        ; MOVER.S:1517
-  cmp y, #0x09              ; MOVER.S:1518
-  if cs goto ]no       ; MOVER.S:1519
+  if y >= #0x09 goto ]no  ; MOVER.S:1519
   a = y                            ; MOVER.S:1521
   c = 0                            ; MOVER.S:1522
   a = a + #0x15 + c              ; MOVER.S:1523
   y = a                            ; MOVER.S:1524
-  c = 0                            ; MOVER.S:1526
   return                           ; MOVER.S:1527
 :notbelow:
-  cmp a, *scrnBelowL@0x0035    ; MOVER.S:1530
-  if ne goto ]rts       ; MOVER.S:1531
+  if a != *scrnBelowL@0x0035 goto ]rts  ; MOVER.S:1531
   y = *trloc@0xb600        ; MOVER.S:1533
-  cmp y, #0x09              ; MOVER.S:1534
-  if ne goto ]no       ; MOVER.S:1535
+  if y != #0x09 goto ]no  ; MOVER.S:1535
   y = #0x14                  ; MOVER.S:1537
-  c = 0                            ; MOVER.S:1538
   return                           ; MOVER.S:1539
 ]rts:
   return                           ; MOVER.S:1454
@@ -1249,7 +1175,7 @@ fn getscrn {
 
 fn ANIMMOBS {
   x = *nummob@0x030d        ; MOVER.S:1589
-  if eq goto ]rts       ; MOVER.S:1590
+  if x == #0x00 goto ]rts  ; MOVER.S:1590
 :loop:
   *tempnt@0x0096 = x            ; MOVER.S:1592
   call loadmob                  ; MOVER.S:1593
@@ -1258,13 +1184,13 @@ fn ANIMMOBS {
   x = *tempnt@0x0096        ; MOVER.S:1599
   call savemob                  ; MOVER.S:1600
   x -= 1                         ; MOVER.S:1602
-  if ne goto :loop       ; MOVER.S:1603
+  if x != #0x00 goto :loop  ; MOVER.S:1603
   x = #0x01                  ; MOVER.S:1607
   y = #0x00                  ; MOVER.S:1608
 :dloop:
   a = *(mobvel@0xb690 + x)   ; MOVER.S:1610
   cmp a, #0xff              ; MOVER.S:1611
-  if eq goto :next       ; MOVER.S:1612
+  if a == #0xff goto :next  ; MOVER.S:1612
   y += 1                         ; MOVER.S:1614
   *(mobvel@0xb690 + y) = a   ; MOVER.S:1615
   a = *(mobx@0xb660 + x)   ; MOVER.S:1616
@@ -1280,7 +1206,7 @@ fn ANIMMOBS {
 :next:
   x += 1                         ; MOVER.S:1627
   cmp x, *nummob@0x030d    ; MOVER.S:1629
-  if cc goto :dloop       ; MOVER.S:1630
+  if x < *nummob@0x030d goto :dloop  ; MOVER.S:1630
   if eq goto :dloop       ; MOVER.S:1631
   *nummob@0x030d = y            ; MOVER.S:1633
 ]rts:
@@ -1289,11 +1215,11 @@ fn ANIMMOBS {
 
 fn animmob {
   a = *mobtype@0xb6a0        ; MOVER.S:1643
-  if ne goto :done       ; MOVER.S:1644
+  if a != #0x00 goto :done  ; MOVER.S:1644
   call mobfloor                  ; MOVER.S:1645
 :done:
   a = *mobvel@0xb690        ; MOVER.S:1647
-  if pl goto ]rts       ; MOVER.S:1648
+  if a >=0 goto ]rts  ; MOVER.S:1648
   *mobvel@0xb690 += 1                         ; MOVER.S:1649
 ]rts:
   return                           ; MOVER.S:1650
@@ -1301,10 +1227,9 @@ fn animmob {
 
 fn mobfloor {
   a = *mobvel@0xb690        ; MOVER.S:1658
-  if mi goto ]rts       ; MOVER.S:1659
+  if a <0 goto ]rts  ; MOVER.S:1659
 :ok1:
-  cmp a, #FFtermvel              ; MOVER.S:1661
-  if cs goto :tv       ; MOVER.S:1662
+  if a >= #FFtermvel goto :tv  ; MOVER.S:1662
   c = 0                            ; MOVER.S:1663
   a = a + #FFaccel + c              ; MOVER.S:1664
   *mobvel@0xb690 = a            ; MOVER.S:1665
@@ -1313,9 +1238,9 @@ fn mobfloor {
   a = a + *moby@0xb670 + c    ; MOVER.S:1668
   *moby@0xb670 = a            ; MOVER.S:1669
   x = *mobscrn@0xb680        ; MOVER.S:1673
-  if eq goto :null       ; MOVER.S:1674
+  if x == #0x00 goto :null  ; MOVER.S:1674
   cmp a, #0xe2              ; MOVER.S:1676
-  if cs goto :fallon       ; MOVER.S:1677
+  if a >= #0xe2 goto :fallon  ; MOVER.S:1677
   x = *moblevel@0xb6b0        ; MOVER.S:1679
   ??? cmp BlockAy+1,x            ; MOVER.S:1680
   if cc goto :fallon       ; MOVER.S:1681
@@ -1329,10 +1254,8 @@ fn mobfloor {
   *tempscrn@0x0093 = a            ; MOVER.S:1695
   call rdblock1                  ; MOVER.S:1697
   *underFF@0x00f6 = a            ; MOVER.S:1698
-  cmp a, #space              ; MOVER.S:1700
-  if eq goto :passthru       ; MOVER.S:1701
-  cmp a, #loose              ; MOVER.S:1703
-  if ne goto :crash       ; MOVER.S:1704
+  if a == #space goto :passthru  ; MOVER.S:1701
+  if a != #loose goto :crash  ; MOVER.S:1704
   call knockloose                  ; MOVER.S:1709
   goto :passthru                ; MOVER.S:1711
 :crash:
@@ -1356,8 +1279,7 @@ fn mobfloor {
   return                           ; MOVER.S:1739
 :null:
   a = *moby@0xb670        ; MOVER.S:1744
-  cmp a, #192+17              ; MOVER.S:1745
-  if cc goto ]rts       ; MOVER.S:1746
+  if a < #192+17 goto ]rts  ; MOVER.S:1746
   a = #-disappeartime                  ; MOVER.S:1748
   *mobvel@0xb690 = a            ; MOVER.S:1749
 ]rts:
@@ -1390,8 +1312,7 @@ fn makespace {
   return                           ; MOVER.S:1794
   a = #0x00                  ; MOVER.S:1797
   x = *BGset1@0x0303        ; MOVER.S:1798
-  cmp x, #0x01              ; MOVER.S:1799
-  if ne goto ]rts       ; MOVER.S:1800
+  if x != #0x01 goto ]rts  ; MOVER.S:1800
   a = #0x01                  ; MOVER.S:1801
 ]rts:
   return                           ; MOVER.S:1802
@@ -1400,8 +1321,7 @@ fn makespace {
 fn passthru {
   *moblevel@0xb6b0 += 1                         ; MOVER.S:1808
   a = *moblevel@0xb6b0        ; MOVER.S:1810
-  cmp a, #0x03              ; MOVER.S:1811
-  if cc goto ]rts       ; MOVER.S:1812
+  if a < #0x03 goto ]rts  ; MOVER.S:1812
   a = *moby@0xb670        ; MOVER.S:1817
   c = 1                            ; MOVER.S:1818
   a = a - #0xc0 - (1 - c)        ; MOVER.S:1819
@@ -1425,18 +1345,13 @@ fn makerubble {
   a = *mobscrn@0xb680        ; MOVER.S:1843
   *tempscrn@0x0093 = a            ; MOVER.S:1844
   call rdblock1                  ; MOVER.S:1846
-  cmp a, #pressplate              ; MOVER.S:1848
-  if eq goto :pp       ; MOVER.S:1849
-  cmp a, #upressplate              ; MOVER.S:1850
-  if eq goto :jampp       ; MOVER.S:1851
-  cmp a, #floor              ; MOVER.S:1852
-  if eq goto :notpp       ; MOVER.S:1853
-  cmp a, #spikes              ; MOVER.S:1854
-  if eq goto :notpp       ; MOVER.S:1855
-  cmp a, #flask              ; MOVER.S:1856
-  if eq goto :notpp       ; MOVER.S:1857
+  if a == #pressplate goto :pp  ; MOVER.S:1849
+  if a == #upressplate goto :jampp  ; MOVER.S:1851
+  if a == #floor goto :notpp  ; MOVER.S:1853
+  if a == #spikes goto :notpp  ; MOVER.S:1855
+  if a == #flask goto :notpp  ; MOVER.S:1857
   cmp a, #torch              ; MOVER.S:1858
-  if eq goto :notpp       ; MOVER.S:1859
+  if a == #torch goto :notpp  ; MOVER.S:1859
   if ne goto ]rts       ; MOVER.S:1860
 :jampp:
   a = #rubble                  ; MOVER.S:1862
@@ -1454,8 +1369,7 @@ fn makerubble {
 
 fn markmob {
   a = *mobscrn@0xb680        ; MOVER.S:1876
-  cmp a, *VisScrn@0x00cb    ; MOVER.S:1877
-  if ne goto ]rts       ; MOVER.S:1878
+  if a != *VisScrn@0x00cb goto ]rts  ; MOVER.S:1878
   a = #loosewipe                  ; MOVER.S:1880
   *height@0x0004 = a            ; MOVER.S:1881
   call indexblock                  ; MOVER.S:1883
@@ -1484,21 +1398,17 @@ fn checkcrush {
 
 fn chcrush1 {
   a = *mobscrn@0xb680        ; MOVER.S:1911
-  cmp a, *CharScrn@0x004b    ; MOVER.S:1912
-  if ne goto :no       ; MOVER.S:1913
+  if a != *CharScrn@0x004b goto :no  ; MOVER.S:1913
   a = *mobx@0xb660        ; MOVER.S:1915
   a = a >> 1                       ; MOVER.S:1916
   a = a >> 1                       ; MOVER.S:1917
-  cmp a, *CharBlockX@0x0044    ; MOVER.S:1918
-  if ne goto :no       ; MOVER.S:1919
+  if a != *CharBlockX@0x0044 goto :no  ; MOVER.S:1919
   a = *moby@0xb670        ; MOVER.S:1921
-  cmp a, *CharY@0x0042    ; MOVER.S:1922
-  if cs goto :no       ; MOVER.S:1923
+  if a >= *CharY@0x0042 goto :no  ; MOVER.S:1923
   a = *CharY@0x0042        ; MOVER.S:1925
   c = 1                            ; MOVER.S:1926
   a = a - #CrushDist - (1 - c)        ; MOVER.S:1927
-  cmp a, *moby@0xb670    ; MOVER.S:1928
-  if cs goto :no       ; MOVER.S:1929
+  if a >= *moby@0xb670 goto :no  ; MOVER.S:1929
   c = 1                            ; MOVER.S:1930
   return                           ; MOVER.S:1931
 :no:
@@ -1509,19 +1419,14 @@ fn chcrush1 {
 
 fn crushchar {
   a = *level@0x03f4        ; MOVER.S:1943
-  cmp a, #0x0d              ; MOVER.S:1944
-  if eq goto :1       ; MOVER.S:1945
+  if a == #0x0d goto :1  ; MOVER.S:1945
   a = *CharPosn@0x0040        ; MOVER.S:1946
-  cmp a, #0x05              ; MOVER.S:1947
-  if cc goto :1       ; MOVER.S:1948
-  cmp a, #0x0f              ; MOVER.S:1949
-  if cc goto ]rts       ; MOVER.S:1950
+  if a < #0x05 goto :1  ; MOVER.S:1948
+  if a < #0x0f goto ]rts  ; MOVER.S:1950
 :1:
   a = *CharAction@0x0046        ; MOVER.S:1952
-  cmp a, #0x02              ; MOVER.S:1953
-  if cc goto :ground       ; MOVER.S:1954
-  cmp a, #0x07              ; MOVER.S:1955
-  if ne goto ]rts       ; MOVER.S:1956
+  if a < #0x02 goto :ground  ; MOVER.S:1954
+  if a != #0x07 goto ]rts  ; MOVER.S:1956
 :ground:
   x = *CharBlockY@0x0045        ; MOVER.S:1961
   x += 1                         ; MOVER.S:1962
@@ -1531,8 +1436,7 @@ fn crushchar {
   call decstr                  ; MOVER.S:1967
   if eq goto :kill       ; MOVER.S:1968
   a = *CharPosn@0x0040        ; MOVER.S:1970
-  cmp a, #0x6d              ; MOVER.S:1971
-  if eq goto ]rts       ; MOVER.S:1972
+  if a == #0x6d goto ]rts  ; MOVER.S:1972
   a = #crush                  ; MOVER.S:1973
   tail_call jumpseq                ; MOVER.S:1974
 :kill:
@@ -1544,17 +1448,17 @@ fn crushchar {
 
 fn ADDMOBS {
   x = *nummob@0x030d        ; MOVER.S:1985
-  if eq goto :rts       ; MOVER.S:1986
+  if x == #0x00 goto :rts  ; MOVER.S:1986
 :loop:
   *tempnt@0x0096 = x            ; MOVER.S:1988
   call loadmob                  ; MOVER.S:1989
   a = *mobtype@0xb6a0        ; MOVER.S:1991
-  if ne goto :1       ; MOVER.S:1992
+  if a != #0x00 goto :1  ; MOVER.S:1992
   call ATM                  ; MOVER.S:1993
 :1:
   x = *tempnt@0x0096        ; MOVER.S:1995
   x -= 1                         ; MOVER.S:1996
-  if ne goto :loop       ; MOVER.S:1997
+  if x != #0x00 goto :loop  ; MOVER.S:1997
 :rts:
 ]rts:
   return                           ; MOVER.S:1999
@@ -1562,20 +1466,15 @@ fn ADDMOBS {
 
 fn ATM {
   a = *mobscrn@0xb680        ; MOVER.S:2010
-  cmp a, *VisScrn@0x00cb    ; MOVER.S:2011
-  if ne goto :ok2       ; MOVER.S:2012
+  if a != *VisScrn@0x00cb goto :ok2  ; MOVER.S:2012
   a = *moby@0xb670        ; MOVER.S:2014
-  cmp a, #192+17              ; MOVER.S:2015
-  if cc goto :ok       ; MOVER.S:2016
+  if a < #192+17 goto :ok  ; MOVER.S:2016
   return                           ; MOVER.S:2017
 :ok2:
-  cmp a, *scrnBelow@0x0034    ; MOVER.S:2019
-  if ne goto ]rts       ; MOVER.S:2020
+  if a != *scrnBelow@0x0034 goto ]rts  ; MOVER.S:2020
   a = *moby@0xb670        ; MOVER.S:2022
-  cmp a, #0xef              ; MOVER.S:2023
-  if cs goto :ok1       ; MOVER.S:2024
-  cmp a, #0x11              ; MOVER.S:2025
-  if cs goto ]rts       ; MOVER.S:2026
+  if a >= #0xef goto :ok1  ; MOVER.S:2024
+  if a >= #0x11 goto ]rts  ; MOVER.S:2026
 :ok1:
   c = 0                            ; MOVER.S:2028
   a = a + #0xc0 + c              ; MOVER.S:2029
@@ -1600,8 +1499,7 @@ fn ATM {
   c = 1                            ; MOVER.S:2058
   a = a - #FFheight - (1 - c)        ; MOVER.S:2059
   call getblocky                  ; MOVER.S:2060
-  cmp a, *tempblocky@0x0092    ; MOVER.S:2061
-  if eq goto :same       ; MOVER.S:2062
+  if a == *tempblocky@0x0092 goto :same  ; MOVER.S:2062
   *tempblocky@0x0092 = a            ; MOVER.S:2064
   call indexblock                  ; MOVER.S:2065
   a = #0x02                  ; MOVER.S:2067
@@ -1642,7 +1540,7 @@ fn addmobobj {
 fn SHAKEM {
   x = *level@0x03f4        ; MOVER.S:2121
   cmp x, #0x0d              ; MOVER.S:2122
-  if eq goto ]rts       ; MOVER.S:2123
+  if x == #0x0d goto ]rts  ; MOVER.S:2123
   *tempblocky@0x0092 = a            ; MOVER.S:2125
   a = *VisScrn@0x00cb        ; MOVER.S:2127
   *tempscrn@0x0093 = a            ; MOVER.S:2128
@@ -1654,13 +1552,13 @@ SHAKEM1:
   *tempblockx@0x0091 = a            ; MOVER.S:2134
   call rdblock1                  ; MOVER.S:2136
   cmp a, #loose              ; MOVER.S:2137
-  if ne goto :cont       ; MOVER.S:2138
+  if a != #loose goto :cont  ; MOVER.S:2138
   call shakeit                  ; MOVER.S:2140
 :cont:
   a = pop                          ; MOVER.S:2142
   x = a                            ; MOVER.S:2143
   x -= 1                         ; MOVER.S:2144
-  if pl goto :loop       ; MOVER.S:2145
+  if x >=0 goto :loop  ; MOVER.S:2145
 ]rts:
   return                           ; MOVER.S:2147
 }
@@ -1673,20 +1571,20 @@ fn SHAKEM1 {
   *tempblockx@0x0091 = a            ; MOVER.S:2134
   call rdblock1                  ; MOVER.S:2136
   cmp a, #loose              ; MOVER.S:2137
-  if ne goto :cont       ; MOVER.S:2138
+  if a != #loose goto :cont  ; MOVER.S:2138
   call shakeit                  ; MOVER.S:2140
 :cont:
   a = pop                          ; MOVER.S:2142
   x = a                            ; MOVER.S:2143
   x -= 1                         ; MOVER.S:2144
-  if pl goto :loop       ; MOVER.S:2145
+  if x >=0 goto :loop  ; MOVER.S:2145
 ]rts:
   return                           ; MOVER.S:2147
 }
 
 fn shakeit {
   a = *(BlueSpec@0x0026)[y]   ; MOVER.S:2153
-  if mi goto ]rts       ; MOVER.S:2154
+  if a <0 goto ]rts  ; MOVER.S:2154
   if ne goto ]rts       ; MOVER.S:2155
   a = #0x80                  ; MOVER.S:2157
   *(BlueSpec@0x0026)[y] = a   ; MOVER.S:2158
