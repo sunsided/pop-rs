@@ -212,6 +212,72 @@ class AdcAbs:
 
 
 @dataclass(frozen=True)
+class LoadIndexed:
+    """`lda/ldx/ldy base,idx` — load from `mem[base + idx_reg]`.
+
+    The 6502 has separate forms for `,x` and `,y`; we just record the
+    index register on the IR node. Loads also conceptually set Z/N
+    based on the loaded value; the interpreter updates `Trace.z` /
+    `Trace.n` so subsequent branches can read them."""
+
+    reg: Reg
+    base: Abs
+    index: Reg          # always X or Y
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class StoreIndexed:
+    """`sta/stx/sty base,idx` — store register at `mem[base + idx_reg]`.
+    Doesn't affect flags."""
+
+    reg: Reg
+    base: Abs
+    index: Reg
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class CmpImm:
+    """`cmp #imm` / `cpx #imm` / `cpy #imm` — compute `reg - imm`,
+    don't store; set Z, N, and C (C is set when there's no borrow,
+    i.e. when `reg >= imm`)."""
+
+    reg: Reg
+    imm: Imm
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class CmpAbs:
+    """`cmp addr` / `cpx addr` / `cpy addr` — same semantics as
+    `CmpImm`, but the operand is read from memory."""
+
+    reg: Reg
+    source: Abs
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class Branch:
+    """Conditional control transfer. `cond` is the 6502 flag combination
+    encoded as the suffix of the original mnemonic — `eq` (Z=1),
+    `ne` (Z=0), `cc` (C=0), `cs` (C=1), `pl` (N=0), `mi` (N=1),
+    `vc` (V=0), `vs` (V=1).
+
+    Pass 1 always emits `target` as a label name. The lifter places the
+    `Label` items inside the routine body when it walks past a labeled
+    code line, so `_find_label_index` in the interpreter can resolve
+    them. Cross-routine branches in the upstream source are rare —
+    they'll surface as InterpError until the lifter handles them.
+    """
+
+    cond: str
+    target: str
+    src: SourceRef
+
+
+@dataclass(frozen=True)
 class Unsupported:
     """An opcode the current lifter does not yet model. We keep it in
     the IR so dumps stay aligned with the source and so pass-2 reports
@@ -225,6 +291,7 @@ class Unsupported:
 Instr = (
     LoadImm | StoreAbs | Goto | Return | Call
     | LoadAbs | Asl | Clc | Sec | AdcImm | AdcAbs
+    | LoadIndexed | StoreIndexed | CmpImm | CmpAbs | Branch
     | Unsupported
 )
 Item = Label | Instr
@@ -307,6 +374,22 @@ def format_item(item: Item) -> str:
         return f"  a = a + {_fmt_imm(item.imm)} + c              ; {item.src.short()}"
     if isinstance(item, AdcAbs):
         return f"  a = a + *{_fmt_abs(item.source)} + c    ; {item.src.short()}"
+    if isinstance(item, LoadIndexed):
+        return (
+            f"  {item.reg} = *({_fmt_abs(item.base)} + {item.index})"
+            f"   ; {item.src.short()}"
+        )
+    if isinstance(item, StoreIndexed):
+        return (
+            f"  *({_fmt_abs(item.base)} + {item.index}) = {item.reg}"
+            f"   ; {item.src.short()}"
+        )
+    if isinstance(item, CmpImm):
+        return f"  cmp {item.reg}, {_fmt_imm(item.imm)}              ; {item.src.short()}"
+    if isinstance(item, CmpAbs):
+        return f"  cmp {item.reg}, *{_fmt_abs(item.source)}    ; {item.src.short()}"
+    if isinstance(item, Branch):
+        return f"  if {item.cond} goto {item.target}       ; {item.src.short()}"
     if isinstance(item, Call):
         return f"  call {item.target}                  ; {item.src.short()}"
     if isinstance(item, Goto):

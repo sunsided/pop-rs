@@ -218,6 +218,243 @@ def test_rndp_tail_calls_into_RND_via_alias(source_dir):
     assert trace.max_stack_depth == 0
 
 
+# ---- CheckFloor slice: cmp + branches + Z/N flags, every code path
+
+
+# Addresses the CHECKFLOOR routine reads. Pinned here so a regression
+# in pass-0 equate resolution also fails this test.
+CHAR_ACTION = 0x46
+CHAR_POSN = 0x40
+
+
+def _checkfloor_module(source_dir):
+    """Lift CHECKFLOOR plus tiny stub routines for the three tail-call
+    targets (`onground`, `falling`, `fallon`) so every path can run."""
+    from pop_lifter.ir1 import (
+        Abs,
+        Imm,
+        LoadImm,
+        ModuleIR1,
+        Reg,
+        Return,
+        Routine,
+        SourceRef,
+        StoreAbs,
+    )
+    from pop_lifter.pass1_lift import lift_file
+
+    ast = parse_files(
+        [
+            source_dir / "EQ.S",
+            source_dir / "GAMEEQ.S",
+            source_dir / "CTRL.S",
+        ],
+        search_paths=[source_dir],
+    )
+    ctrl = next(f for f in ast.files if Path(f.path).name == "CTRL.S")
+    real = lift_file(ctrl, ast.equates, ["CHECKFLOOR"]).module
+
+    # The lifted module already includes a partial `falling`, `fallon`,
+    # `onground` (the tail-call chase pulled them in). Replace them
+    # with minimal stubs that just record their own visit by writing
+    # a sentinel byte to a known address — that lets us assert which
+    # tail-call CHECKFLOOR took.
+    SENTINEL_ONGROUND = 0x200
+    SENTINEL_FALLING = 0x201
+    SENTINEL_FALLON = 0x202
+
+    src = SourceRef(file="synthetic", line=0, raw="")
+
+    def _stub(name: str, sentinel_addr: int) -> Routine:
+        return Routine(
+            name=name,
+            body=[
+                LoadImm(reg=Reg.A, imm=Imm(value=1, text="#1"), src=src),
+                StoreAbs(
+                    reg=Reg.A,
+                    target=Abs(name=f"<{name}_sentinel>", addr=sentinel_addr),
+                    src=src,
+                ),
+                Return(src=src),
+            ],
+        )
+
+    stubs = ModuleIR1(
+        name="STUBS",
+        file="synthetic",
+        routines=[
+            _stub("onground", SENTINEL_ONGROUND),
+            _stub("falling", SENTINEL_FALLING),
+            _stub("fallon", SENTINEL_FALLON),
+        ],
+    )
+
+    # Strip the real (Unsupported-laden) implementations from the
+    # CTRL module so the interpreter doesn't trip on them.
+    real.routines = [
+        r for r in real.routines
+        if r.name not in ("onground", "falling", "fallon")
+    ]
+    return real, stubs, SENTINEL_ONGROUND, SENTINEL_FALLING, SENTINEL_FALLON
+
+
+def _run_checkfloor(source_dir, action: int, posn: int = 0):
+    ctrl, stubs, _, _, _ = _checkfloor_module(source_dir)
+    ram = bytearray(0x10000)
+    ram[CHAR_ACTION] = action
+    ram[CHAR_POSN] = posn
+    return run([ctrl, stubs], "CHECKFLOOR", ram=ram), ram
+
+
+def test_checkfloor_action_6_returns_immediately(source_dir):
+    """CharAction = 6 (hanging) — first `cmp #6; beq ]rts` exits."""
+    trace, ram = _run_checkfloor(source_dir, action=6)
+    # No tail-call sentinels touched.
+    assert ram[0x200] == ram[0x201] == ram[0x202] == 0
+    # The `]rts` synthesized trampoline returned at stack depth 0.
+    assert trace.max_stack_depth == 0
+
+
+def test_checkfloor_action_2_returns_immediately(source_dir):
+    """CharAction = 2 (hanging) — reaches `:1 cmp #2; beq ]rts`."""
+    trace, ram = _run_checkfloor(source_dir, action=2)
+    assert ram[0x200] == ram[0x201] == ram[0x202] == 0
+    assert trace.z == 1  # last cmp matched
+
+
+def test_checkfloor_action_5_other_posn_returns(source_dir):
+    """CharAction = 5 (bumped), CharPosn not in {109, 185} — the
+    `cmp #185; bne ]rts` path exits."""
+    trace, ram = _run_checkfloor(source_dir, action=5, posn=42)
+    assert ram[0x200] == ram[0x201] == ram[0x202] == 0
+    # bne taken means Z=0 at the moment of the branch.
+    assert trace.z == 0
+
+
+def test_checkfloor_action_5_posn_109_tail_calls_onground(source_dir):
+    """CharAction = 5, CharPosn = 109 (crouched on loose floor) —
+    `:ong jmp onground`."""
+    _, ram = _run_checkfloor(source_dir, action=5, posn=109)
+    assert ram[0x200] == 1   # onground sentinel
+    assert ram[0x201] == 0   # falling untouched
+    assert ram[0x202] == 0   # fallon untouched
+
+
+def test_checkfloor_action_5_posn_185_tail_calls_onground(source_dir):
+    """CharAction = 5, CharPosn = 185 (dead) — falls through to
+    `:ong jmp onground` rather than the `bne ]rts`."""
+    _, ram = _run_checkfloor(source_dir, action=5, posn=185)
+    assert ram[0x200] == 1
+
+
+def test_checkfloor_action_4_branches_to_falling(source_dir):
+    """CharAction = 4 (freefall) — `cmp #4; beq falling`. This is the
+    cross-routine conditional branch path the interpreter has to
+    resolve via the module list."""
+    _, ram = _run_checkfloor(source_dir, action=4)
+    assert ram[0x201] == 1   # falling sentinel
+    assert ram[0x200] == 0
+    assert ram[0x202] == 0
+
+
+def test_checkfloor_action_3_posn_in_range_calls_fallon(source_dir):
+    """CharAction = 3, CharPosn in [102, 105] — both `bcc ]rts` and
+    `bcs ]rts` skipped, hitting `jmp fallon`."""
+    _, ram = _run_checkfloor(source_dir, action=3, posn=104)
+    assert ram[0x202] == 1   # fallon sentinel
+
+
+def test_checkfloor_action_3_posn_below_returns(source_dir):
+    """CharAction = 3, CharPosn = 50 (< 102) — `cmp #102; bcc ]rts`."""
+    _, ram = _run_checkfloor(source_dir, action=3, posn=50)
+    assert ram[0x200] == ram[0x201] == ram[0x202] == 0
+
+
+def test_checkfloor_action_3_posn_above_returns(source_dir):
+    """CharAction = 3, CharPosn = 200 (>= 106) — `cmp #106; bcs ]rts`."""
+    _, ram = _run_checkfloor(source_dir, action=3, posn=200)
+    assert ram[0x200] == ram[0x201] == ram[0x202] == 0
+
+
+def test_checkfloor_action_0_or_1_or_7_tail_calls_onground(source_dir):
+    """CharAction in {0, 1, 7} reaches `:1 cmp #2; beq ]rts` (not
+    taken), then `jmp onground`."""
+    for action in (0, 1, 7):
+        _, ram = _run_checkfloor(source_dir, action=action)
+        assert ram[0x200] == 1, f"action={action} should reach onground"
+
+
+# ---- flag and indexed-addressing primitives in isolation
+
+
+def test_cmp_sets_carry_correctly():
+    """`cmp` sets C iff `reg >= operand` (6502 datasheet)."""
+    from pop_lifter.ir1 import (
+        CmpImm,
+        Imm,
+        LoadImm,
+        ModuleIR1,
+        Reg,
+        Return,
+        Routine,
+        SourceRef,
+    )
+
+    src = SourceRef(file="synthetic", line=0, raw="")
+
+    def go(a_val: int, rhs: int) -> tuple[int, int, int]:
+        module = ModuleIR1(
+            name="SYN",
+            file="synthetic",
+            routines=[Routine(name="f", body=[
+                LoadImm(reg=Reg.A, imm=Imm(value=a_val, text=""), src=src),
+                CmpImm(reg=Reg.A, imm=Imm(value=rhs, text=""), src=src),
+                Return(src=src),
+            ])],
+        )
+        t = run(module, "f")
+        return t.c, t.z, t.n
+
+    assert go(5, 3) == (1, 0, 0)        # 5 > 3 → C=1, Z=0, N=0
+    assert go(3, 3) == (1, 1, 0)        # equal → C=1, Z=1
+    assert go(2, 3) == (0, 0, 1)        # 2 < 3 → C=0, N=1 (bit 7 of (2-3)&0xff=0xff)
+
+
+def test_load_indexed_reads_ram_at_base_plus_index():
+    from pop_lifter.ir1 import (
+        Abs,
+        Imm,
+        LoadImm,
+        LoadIndexed,
+        ModuleIR1,
+        Reg,
+        Return,
+        Routine,
+        SourceRef,
+    )
+
+    src = SourceRef(file="synthetic", line=0, raw="")
+    module = ModuleIR1(
+        name="SYN",
+        file="synthetic",
+        routines=[Routine(name="f", body=[
+            LoadImm(reg=Reg.X, imm=Imm(value=3, text=""), src=src),
+            LoadIndexed(
+                reg=Reg.A,
+                base=Abs(name="tbl", addr=0x300),
+                index=Reg.X,
+                src=src,
+            ),
+            Return(src=src),
+        ])],
+    )
+    ram = bytearray(0x10000)
+    ram[0x300:0x305] = bytes([10, 20, 30, 40, 50])
+    trace = run(module, "f", ram=ram)
+    assert trace.a == 40   # ram[0x300 + 3]
+    assert trace.x == 3
+
+
 def test_jsr_rts_returns_to_caller(source_dir):
     """`jsr` followed by `rts` must resume at the next IR1 item, not
     at routine entry. A minimal sanity check: lift AUTOCTRL's prefix
