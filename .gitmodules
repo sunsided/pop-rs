@@ -1,0 +1,3 @@
+[submodule "vendor/pop-apple2"]
+	path = vendor/pop-apple2
+	url = https://github.com/widemeadows/Prince-of-Persia-Apple-II.git

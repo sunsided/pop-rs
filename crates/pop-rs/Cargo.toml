@@ -1,0 +1,16 @@
+[package]
+name = "pop-rs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Rust port of the original Prince of Persia (Apple II) game logic."
+
+[lints]
+workspace = true
+
+[features]
+default = []
+backend-sdl2 = []
+backend-headless = []
