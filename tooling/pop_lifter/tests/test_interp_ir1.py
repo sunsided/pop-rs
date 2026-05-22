@@ -119,3 +119,23 @@ def test_ram_outside_writes_is_untouched(source_dir):
     # claims to have written. A simple checksum suffices.
     untouched = sum(trace.ram[i] for i in range(0x10000) if i not in trace.writes)
     assert untouched == 0
+
+
+def test_step_limit_is_exclusive_upper_bound(source_dir):
+    """`max_steps=N` permits exactly N executed IR1 items, then raises.
+
+    The pilot routine `DoStrike` executes 4 items (LoadImm, StoreAbs,
+    StoreAbs, Return). With `max_steps=4` the run must complete; with
+    `max_steps=3` it must raise before reaching the Return.
+    """
+    import pytest
+
+    from pop_lifter.interp_ir1 import InterpError
+
+    module = _module(source_dir)
+    # Allow exactly the four items DoStrike executes — should succeed.
+    trace = run(module, "DoStrike", max_steps=4)
+    assert trace.steps == 4
+    # One fewer than required — should raise.
+    with pytest.raises(InterpError, match="step limit"):
+        run(module, "DoStrike", max_steps=3)

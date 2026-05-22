@@ -8,10 +8,12 @@ the shared `]rts` trampoline.
 
 What works:
 
-* Routine discovery: a routine begins at any instruction line whose
-  pending label group contains a requested entry name, *or* whose group
-  follows a terminator (rts/jmp) and is reached by fall-through from a
-  previous routine via an unconditional `jmp`.
+* Routine discovery: the caller passes a list of entry-point labels.
+  The lifter walks forward from each one and additionally chases any
+  `jmp` to a global-style label name as a tail-call target, so the
+  full reachable set inside the file gets lifted. Reachability via
+  fall-through across `rts` boundaries is deliberately *not* done here
+  — pass 2's CFG analysis owns that.
 * Multiple labels above one instruction collapse into a single routine
   with `entry_aliases` populated.
 * Opcodes lifted: `lda/ldx/ldy #imm`, `sta/stx/sty abs`, `rts`, `jmp`.
@@ -78,7 +80,6 @@ class LiftReport:
 
     module: ModuleIR1
     unsupported: list[Unsupported]  # all unsupported instructions across routines
-    skipped_lines: int                # source lines pass 1 ignored entirely
 
 
 # ---------------------------------------------------------------- helpers
@@ -209,7 +210,6 @@ def lift_file(
     entry_set = set(entries)
     requested: list[str] = list(entries)
     lifted_names: set[str] = set()
-    skipped_lines = 0
     all_unsupported: list[Unsupported] = []
 
     # Pre-index the lines so we can walk forward cheaply from any label.
@@ -386,4 +386,4 @@ def lift_file(
                 if item.target in label_to_instr_index and item.target not in lifted_names:
                     requested.append(item.target)
 
-    return LiftReport(module=module, unsupported=all_unsupported, skipped_lines=skipped_lines)
+    return LiftReport(module=module, unsupported=all_unsupported)

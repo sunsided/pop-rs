@@ -12,9 +12,9 @@ The interpreter is deliberately minimal:
 * 64K main RAM (`bytearray`). Aux RAM and bank-switched language card
   pages will land alongside the SMC / hi-res work; the AUTO.S combat
   pilot only touches zero-page and the soft-switch image in main RAM.
-* Pseudo-registers `a`, `x`, `y` (8-bit). Flags `z`, `n`, `c`, `v` are
-  exposed but updated only by the small set of opcodes that actually
-  define them in pass 1's IR. The pilot needs none of them.
+* Pseudo-registers `a`, `x`, `y` (8-bit). The pilot doesn't read flags,
+  so `z`/`n`/`c`/`v` are not yet modelled on `Trace`; they land in the
+  next slice along with `cmp` and conditional branches.
 * No call stack — `jsr` lifts in a later slice. `jmp` to another routine
   is treated as a tail call: the interpreter switches routines and
   inherits the eventual `rts`.
@@ -103,7 +103,7 @@ def run(
     body = routine.body
 
     while True:
-        if trace.steps > max_steps:
+        if trace.steps >= max_steps:
             raise InterpError(
                 f"step limit ({max_steps}) reached in {routine.name!r}; "
                 f"likely an unterminated loop"

@@ -50,7 +50,11 @@ class SourceRef:
     raw: str
 
     def short(self) -> str:
-        return f"{self.file.split('/')[-1]}:{self.line}"
+        # Normalise both separators by hand: on POSIX hosts `PurePath`
+        # doesn't recognise `\\` as a separator, so a path produced on
+        # a Windows checkout would otherwise come through verbatim.
+        normalised = self.file.replace("\\", "/")
+        return f"{normalised.rsplit('/', 1)[-1]}:{self.line}"
 
 
 # ---------------------------------------------------------------- operands
@@ -251,12 +255,18 @@ def format_routine(r: Routine) -> str:
 def _portable_path(file: str) -> str:
     """Strip everything up to and including `vendor/pop-apple2/` so the
     dumped path matches across machines/CI checkouts. Falls back to the
-    basename if the marker isn't present."""
+    basename if the marker isn't present.
+
+    We replace backslashes with forward slashes before applying the
+    marker logic so Windows-style inputs are handled even when the
+    interpreter is running on POSIX (where `PurePath` won't recognise
+    `\\` as a separator)."""
+    posix = file.replace("\\", "/")
     marker = "vendor/pop-apple2/"
-    idx = file.find(marker)
+    idx = posix.find(marker)
     if idx >= 0:
-        return file[idx + len(marker):]
-    return file.rsplit("/", 1)[-1]
+        return posix[idx + len(marker):]
+    return posix.rsplit("/", 1)[-1]
 
 
 def format_module(m: ModuleIR1) -> str:

@@ -69,16 +69,21 @@ class ProgramAST:
 
     def to_json(self) -> str:
         # File paths are rewritten to be repo-relative so the JSON dump
-        # diffs cleanly across checkouts. The marker is the submodule
-        # mount point under `vendor/pop-apple2/`; anything outside that
-        # tree falls back to the basename, which is good enough for
-        # ad-hoc test fixtures created in tmp dirs.
+        # diffs cleanly across checkouts and platforms. The marker is
+        # the submodule mount point under `vendor/pop-apple2/`; anything
+        # outside that tree falls back to the basename, which is good
+        # enough for ad-hoc test fixtures created in tmp dirs.
         def _portable(s: str) -> str:
+            # Normalise backslashes to forward slashes by hand. On POSIX
+            # hosts `PurePath` won't recognise `\\` as a separator, so a
+            # path produced on a Windows checkout (or a test fixture
+            # that injected one) would otherwise pass through verbatim.
+            posix = s.replace("\\", "/")
             marker = "vendor/pop-apple2/"
-            idx = s.find(marker)
+            idx = posix.find(marker)
             if idx >= 0:
-                return s[idx + len(marker):]
-            return s.rsplit("/", 1)[-1]
+                return posix[idx + len(marker):]
+            return posix.rsplit("/", 1)[-1]
 
         def _default(obj: object) -> object:
             if isinstance(obj, Path):
