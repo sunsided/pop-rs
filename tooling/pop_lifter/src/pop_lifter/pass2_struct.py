@@ -19,12 +19,30 @@ performs two transformations:
    consumed the flags, and nothing else on the linear path between
    that `cmp` and the next flag-setter reads Z/N/C. A backward
    sweep finds those pure flag-defining instructions (`CmpImm`,
-   `CmpAbs`, `Clc`, `Sec`) and drops them. The sweep handles forward
-   local branches by remembering each label's live-in; backward
-   branches (loops) defeat the single-pass analysis, so the routine
-   bails out of elision in that case rather than risk an unsound
-   delete. Unsupported items are treated as read-everything,
-   write-everything.
+   `CmpAbs`, `Clc`, `Sec`) and drops them.
+
+   Routine boundaries are handled by an explicit call-graph fixed
+   point: ``flag_demand[R]`` is the set of flags some caller of R
+   observes after R returns. At a `Return` site the liveness sweep
+   uses `flag_demand[R]` as the live set; at a `tail_call X` site
+   we propagate `flag_demand[X] ⊇ flag_demand[R]`; at a non-tail
+   `call X` site we propagate `flag_demand[X] ⊇ live-OUT[call]`.
+   The iteration starts with every routine's demand at `∅` and
+   only grows monotonically, bounded by `{Z,N,C,V}`, so it
+   terminates after a handful of rounds for any module.
+
+   Cross-module call targets are treated optimistically: the
+   propagation simply has no effect on a `flag_demand` entry that
+   doesn't exist. Once those callees are themselves lifted into a
+   later pass-2 run the same iteration will pick up their demands.
+   Pass 2 still assumes callees don't *read* flag inputs (no
+   `clc;jsr` carry-passing convention in POP) — that part is the
+   one remaining hand-waved assumption.
+
+   Backward branches (loops) defeat the single-pass per-routine
+   sweep, so the routine bails out of elision in that case rather
+   than risk an unsound delete. Unsupported items are treated as
+   read-everything, write-everything.
 
 Both transformations produce IR that lives in the same `Routine` /
 `ModuleIR1` types — the only IR2-specific node is `ir1.If`. That
@@ -262,34 +280,58 @@ def _has_backward_local_jump(body: list[Item]) -> bool:
     return False
 
 
-def _eliminate_dead_flags(routine: Routine) -> Routine:
+def _backward_sweep(
+    routine: Routine,
+    flag_demand: dict[str, frozenset[str]],
+) -> tuple[set[int], list[tuple[str, frozenset[str]]]]:
+    """Run the backward liveness sweep over `routine.body` and return:
+
+    * the set of body indices eligible for elision (pure flag-writers
+      whose flags are all dead at their exit), and
+    * a list of `(callee_name, demanded_flags)` propagations the
+      fixed-point loop should fold into the global `flag_demand`.
+
+    `flag_demand[R]` carries each in-module routine's currently-known
+    return-flag liveness. Routines not present in the map are treated
+    as cross-module — propagations to them are still emitted, the
+    fixed-point loop just drops them.
+
+    The sweep bails entirely (returns `(set(), [])`) when the routine
+    contains a backward local jump, since the single-pass analysis
+    can't soundly reason across loop back-edges yet.
+    """
     body = routine.body
     if _has_backward_local_jump(body):
-        # Loops present — bail conservatively. The fusion done earlier
-        # is still safe; we just keep the cmps.
-        return routine
+        return set(), []
 
     label_idx = {
         item.name: i for i, item in enumerate(body) if isinstance(item, Label)
     }
-    # Live-IN at each label, populated as the backward sweep walks
-    # past the label.
     label_live_in: dict[str, frozenset[str]] = {}
+
+    # `Return` and `tail_call` leave the routine — the flags arriving
+    # there are observed by whoever wants R's output. That's exactly
+    # `flag_demand[R]`.
+    exit_live = flag_demand.get(routine.name, frozenset())
 
     live: set[str] = set()
     drop: set[int] = set()
+    propagations: list[tuple[str, frozenset[str]]] = []
 
     for i in range(len(body) - 1, -1, -1):
         item = body[i]
 
         if isinstance(item, Return):
-            live = set()
+            live = set(exit_live)
             continue
 
         if isinstance(item, Goto):
             if item.kind == "tail_call":
-                # Control leaves the routine; nothing local depends on
-                # flags from here on.
+                # Executing `R` via tail_call to X delivers X's return
+                # flags to R's caller, so X inherits R's demand.
+                propagations.append((item.target, frozenset(exit_live)))
+                # Live IN at the tail_call site: assume X doesn't read
+                # flag inputs (POP convention), so ∅ — see module doc.
                 live = set()
                 continue
             # kind == "local"
@@ -297,9 +339,6 @@ def _eliminate_dead_flags(routine: Routine) -> Routine:
             if ti is not None and ti > i:
                 live = set(label_live_in.get(item.target, _UNIVERSE))
             else:
-                # Forward jump out of routine (cross-module local-ish?
-                # shouldn't happen given our backward-jump bail-out, but
-                # be safe).
                 live = set(_UNIVERSE)
             continue
 
@@ -308,12 +347,11 @@ def _eliminate_dead_flags(routine: Routine) -> Routine:
             if ti is not None and ti > i:
                 taken = set(label_live_in.get(item.target, _UNIVERSE))
             else:
-                # Cross-routine conditional tail call. The taken edge
-                # leaves the routine; its live contribution is empty.
+                # Cross-routine conditional tail call — same shape as
+                # a tail_call on the taken edge.
+                propagations.append((item.target, frozenset(exit_live)))
                 taken = set()
-            # Live OUT = union of fall-through-live and taken-live.
             live = live | taken
-            # Branch reads the condition's flags.
             live |= _COND_READS.get(item.cond, _UNIVERSE)
             continue
 
@@ -322,15 +360,20 @@ def _eliminate_dead_flags(routine: Routine) -> Routine:
             if ti is not None and ti > i:
                 taken = set(label_live_in.get(item.target, _UNIVERSE))
             else:
+                # Cross-module conditional tail call.
+                propagations.append((item.target, frozenset(exit_live)))
                 taken = set()
             live = live | taken
-            # `If` does NOT read flags — its Compare is self-contained.
+            # `If` itself does NOT read flags — its Compare is
+            # self-contained.
             continue
 
         if isinstance(item, Call):
-            # Callee clobbers all flags; JSR doesn't take flag args by
-            # convention. So nothing before the call can keep a flag
-            # alive through the call.
+            # The callee delivers `live` (live-OUT at the call) to us,
+            # so it inherits that demand. Then the callee clobbers all
+            # flags and (by POP convention) reads none — live IN at
+            # the call site is `∅`.
+            propagations.append((item.target, frozenset(live)))
             live = set()
             continue
 
@@ -343,9 +386,6 @@ def _eliminate_dead_flags(routine: Routine) -> Routine:
             defines = {"Z", "N", "C"}
             if not (live & defines):
                 drop.add(i)
-                # The cmp didn't satisfy any demand; live-in == live-out
-                # (no flags consumed, no flags produced from this site's
-                # perspective). Don't touch `live`.
             else:
                 live -= defines
             continue
@@ -382,16 +422,54 @@ def _eliminate_dead_flags(routine: Routine) -> Routine:
             continue
 
         if isinstance(item, Label):
-            # Transparent for fall-through; remember its live-in for
-            # forward branches that target it.
             label_live_in[item.name] = frozenset(live)
             continue
 
         # StoreAbs, StoreIndexed: neutral.
 
+    return drop, propagations
+
+
+def _solve_flag_demand(
+    routines: list[Routine],
+) -> dict[str, frozenset[str]]:
+    """Iterate the per-routine backward sweep until `flag_demand`
+    reaches a fixed point. Each iteration only grows demands
+    monotonically (bounded by `{Z,N,C,V}`), so convergence is
+    guaranteed in O(|routines| × |flags|) rounds.
+
+    Returns the final `flag_demand` mapping, including entries only
+    for routines visible in this module. Entries for cross-module
+    callees referenced by `call`/`tail_call`/conditional-tail edges
+    aren't tracked here — propagations to them are silently dropped,
+    matching the optimistic "external callers don't observe flags"
+    assumption documented at module top.
+    """
+    in_module = {r.name for r in routines}
+    flag_demand: dict[str, frozenset[str]] = {
+        name: frozenset() for name in in_module
+    }
+
+    while True:
+        new_demand = dict(flag_demand)
+        for r in routines:
+            _, propagations = _backward_sweep(r, flag_demand)
+            for callee, demanded in propagations:
+                if callee in new_demand:
+                    new_demand[callee] = new_demand[callee] | demanded
+        if new_demand == flag_demand:
+            return flag_demand
+        flag_demand = new_demand
+
+
+def _eliminate_dead_flags(
+    routine: Routine,
+    flag_demand: dict[str, frozenset[str]],
+) -> Routine:
+    drop, _ = _backward_sweep(routine, flag_demand)
     if not drop:
         return routine
-    new_body = [it for i, it in enumerate(body) if i not in drop]
+    new_body = [it for i, it in enumerate(routine.body) if i not in drop]
     return replace(routine, body=new_body)
 
 
@@ -399,16 +477,26 @@ def structure_module(module: ModuleIR1) -> ModuleIR1:
     """Apply fusion and flag-liveness elision to every routine in
     `module`. Returns a new `ModuleIR1`; the input is not mutated.
 
-    The two transformations are sequenced per routine: fusion runs
-    first (so the `If` consumers are visible to the liveness sweep),
-    elision second (so any `cmp` whose `Branch` got absorbed and
-    whose flags die before reaching another reader is dropped).
+    Sequencing per module:
+
+    1. Fuse `cmp + branch` pairs (so the `If` consumers are visible
+       to the liveness sweep).
+    2. Solve the call-graph fixed-point for `flag_demand[R]` — which
+       flags each routine must deliver to its callers.
+    3. Run the elision sweep with that demand map, dropping any pure
+       flag-writer whose flags are dead at its exit.
+
+    Entry routines (no in-module callers) have `flag_demand[R] = ∅`,
+    matching the optimistic stance that external callers don't
+    observe returned flag state. Routines whose callers in the same
+    module read return flags (e.g. `cmpspace`'s `Z` consumed by an
+    `if ne goto ...` immediately after a `call cmpspace`) get the
+    appropriate demand propagated in and keep their terminal cmps.
     """
-    out: list[Routine] = []
-    for r in module.routines:
-        fused = structure_routine(r)
-        out.append(_eliminate_dead_flags(fused))
-    return ModuleIR1(name=module.name, file=module.file, routines=out)
+    fused = [structure_routine(r) for r in module.routines]
+    flag_demand = _solve_flag_demand(fused)
+    final = [_eliminate_dead_flags(r, flag_demand) for r in fused]
+    return ModuleIR1(name=module.name, file=module.file, routines=final)
 
 
 def elision_stats(module: ModuleIR1) -> tuple[int, int]:
