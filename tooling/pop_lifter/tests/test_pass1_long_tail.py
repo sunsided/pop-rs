@@ -9,12 +9,10 @@ from pop_lifter.ir1 import (
     Abs,
     Bitwise,
     Branch,
-    Compare,
     DecTarget,
     If,
     Imm,
     IncTarget,
-    LoadImm,
     Reg,
     Return,
     Routine,
@@ -159,6 +157,22 @@ def test_ora_abs_combines_a_with_memory():
     src = SourceRef(file="syn", line=0, raw="")
     exec_atom(Bitwise(op="or", source=Abs(name="m", addr=0x200), src=src), t, t.ram)
     assert t.a == 0x3f
+
+
+def test_inctarget_on_reg_a_raises_interperror():
+    """`ina`/`dea` don't exist on stock NMOS 6502, so a hand-built
+    IncTarget(Reg.A) must surface a clear InterpError rather than
+    a KeyError into a register-lookup dict."""
+    import pytest
+
+    from pop_lifter.interp_ir1 import InterpError
+
+    src = SourceRef(file="syn", line=0, raw="")
+    t = _trace()
+    with pytest.raises(InterpError, match="Reg.A is not a valid"):
+        exec_atom(IncTarget(target=Reg.A, src=src), t, t.ram)
+    with pytest.raises(InterpError, match="Reg.A is not a valid"):
+        exec_atom(DecTarget(target=Reg.A, src=src), t, t.ram)
 
 
 # ---- pass-2 fusion coverage

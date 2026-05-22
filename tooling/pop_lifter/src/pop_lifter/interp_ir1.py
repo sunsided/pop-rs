@@ -291,10 +291,24 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         trace.c = 1 if reg_val >= rhs else 0
         _set_zn(trace, diff)
         return True
-    if isinstance(item, IncTarget):
+    if isinstance(item, (IncTarget, DecTarget)):
+        delta = 1 if isinstance(item, IncTarget) else -1
         if isinstance(item.target, Reg):
-            cur = {Reg.X: trace.x, Reg.Y: trace.y}[item.target]
-            new = (cur + 1) & 0xff
+            # Only X and Y are valid 6502 inc/dec targets — there is
+            # no `ina`/`dea` on the stock NMOS chip. The lifter only
+            # emits these for X/Y, but if a future caller hand-builds
+            # a node with `Reg.A` we want a clean InterpError rather
+            # than a KeyError into a register-lookup dict.
+            if item.target is Reg.X:
+                cur = trace.x
+            elif item.target is Reg.Y:
+                cur = trace.y
+            else:
+                raise InterpError(
+                    f"{type(item).__name__} on Reg.A is not a valid "
+                    f"6502 operation (no ina/dea on NMOS)"
+                )
+            new = (cur + delta) & 0xff
             if item.target is Reg.X:
                 trace.x = new
             else:
@@ -302,23 +316,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
             _set_zn(trace, new)
         else:
             addr = item.target.addr & 0xffff
-            new = (ram[addr] + 1) & 0xff
-            ram[addr] = new
-            trace.writes[addr] = new
-            _set_zn(trace, new)
-        return True
-    if isinstance(item, DecTarget):
-        if isinstance(item.target, Reg):
-            cur = {Reg.X: trace.x, Reg.Y: trace.y}[item.target]
-            new = (cur - 1) & 0xff
-            if item.target is Reg.X:
-                trace.x = new
-            else:
-                trace.y = new
-            _set_zn(trace, new)
-        else:
-            addr = item.target.addr & 0xffff
-            new = (ram[addr] - 1) & 0xff
+            new = (ram[addr] + delta) & 0xff
             ram[addr] = new
             trace.writes[addr] = new
             _set_zn(trace, new)

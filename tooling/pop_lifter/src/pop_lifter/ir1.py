@@ -251,9 +251,21 @@ class Transfer:
 class Bitwise:
     """`and` / `ora` / `eor` against A. `op` ∈ {"and", "or", "eor"}.
     `source` is `Imm` (immediate operand) or `Abs` (memory). Updates
-    A and Z/N; does NOT touch C. (POP uses these heavily for flag-
-    mask tests like `and #fcheckmark; beq ]rts`, which now lifts to
-    a fused `if a & fcheckmark == 0 goto ]rts`.)"""
+    A and Z/N; does NOT touch C.
+
+    POP uses these heavily for flag-mask tests. The classic
+    `and #fcheckmark ; beq ]rts` lowers to two IR items in order:
+
+        a = a & fcheckmark            # Bitwise (mutates A, sets Z/N)
+        if a == 0 goto ]rts           # If (reads Z of post-and A)
+
+    Pass 2's fuser collapses the `Bitwise + Branch` pair into the
+    structured `If` shown above. The fused Compare always tests
+    against `0`; the mask is preserved by the prior `Bitwise` body
+    item (still visible in the dump). Semantically this is the
+    same as `if (a & fcheckmark) == 0 goto ]rts`, just expressed
+    as two statements because pass-2's Compare doesn't have an
+    embedded-expression form."""
 
     op: str
     source: "Imm | Abs"

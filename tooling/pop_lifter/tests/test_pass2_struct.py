@@ -79,11 +79,12 @@ def test_bitwise_and_branch_fuses(source_dir):
     tail slice lifts `and` as `Bitwise`, which `pass2_struct` treats
     as a flag-setter (Z/N reflect A's post-and value). The branch
     must fuse into `if a == 0 goto ]rts`."""
+    from pop_lifter.ir1 import Bitwise, If, Imm, Reg
+
     ir2 = structure_module(_ir1_module(source_dir, "CTRL.S", ["CHECKFLOOR"]))
     onground = ir2.find("onground")
     assert onground is not None
     # Find the If immediately following an `and` against fcheckmark.
-    from pop_lifter.ir1 import Bitwise, If
     for prev, item in zip(onground.body, onground.body[1:]):
         if (
             isinstance(prev, Bitwise)
@@ -91,8 +92,16 @@ def test_bitwise_and_branch_fuses(source_dir):
             and isinstance(item, If)
             and item.target == "]rts"
         ):
+            # The structured Compare must read A (not X/Y) — pinning
+            # this protects against `_affected_register` regressing
+            # the dst-register selection for Bitwise.
+            assert item.cond.reg is Reg.A
             assert item.cond.op == "=="
             assert item.cond.rhs.value == 0
+            # And the preceding Bitwise must carry an immediate mask
+            # so a future "Bitwise lifted from `and abs`" doesn't
+            # silently change what's being tested.
+            assert isinstance(prev.source, Imm)
             return
     raise AssertionError(
         "no `and ; beq ]rts` pair fused in onground — fusion regression?"
