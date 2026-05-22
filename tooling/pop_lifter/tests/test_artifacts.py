@@ -263,13 +263,17 @@ def test_pass2_chgshadposn_ir3_artifact_matches(source_dir):
 
 
 def _regen_raw_lift(source_dir: Path) -> dict[str, str]:
-    """Reproduce what `pop-lifter lift-all` writes — one IR1 dump per
-    code file, keyed by output filename (e.g. `AUTO.ir1`)."""
+    """Reproduce what `pop-lifter lift-all` writes — one IR1 dump and
+    one IR2 dump per code file, keyed by output filename (e.g.
+    `AUTO.ir1` / `AUTO.ir2`)."""
+    from pop_lifter.pass2_struct import structure_module
+
     files = sorted(source_dir.glob("*.S"))
     base_order = [source_dir / "EQ.S", source_dir / "GAMEEQ.S"]
     base = [p for p in base_order if p.exists()]
     others = [p for p in files if p not in base]
     ast = parse_files([*base, *others], search_paths=[source_dir])
+    symbols = ast.symbols()
 
     out: dict[str, str] = {}
     for src_path in files:
@@ -282,10 +286,15 @@ def _regen_raw_lift(source_dir: Path) -> dict[str, str]:
         entries = discover_entries(file_ast)
         if not entries:
             continue
-        report = lift_file(file_ast, ast.symbols(), entries)
+        report = lift_file(file_ast, symbols, entries)
         if not report.module.routines:
             continue
-        out[f"{src_path.stem.upper()}.ir1"] = ir1_mod.format_module(report.module)
+        stem = src_path.stem.upper()
+        out[f"{stem}.ir1"] = ir1_mod.format_module(report.module)
+        # Mirror the CLI's pass-2 follow-up so `.ir2` artifacts stay
+        # in sync with the same structurer pipeline reviewers actually
+        # invoke.
+        out[f"{stem}.ir2"] = ir1_mod.format_module(structure_module(report.module))
     return out
 
 
@@ -300,9 +309,12 @@ def test_pass1_raw_artifacts_match(source_dir):
         )
 
     actual = _regen_raw_lift(source_dir)
+    # Pick up both `.ir1` (raw) and `.ir2` (fused) variants — `lift-
+    # all` writes one of each per module.
     expected = {
         p.name: p.read_text(encoding="utf-8")
-        for p in IR_RAW.glob("*.ir1")
+        for p in IR_RAW.iterdir()
+        if p.suffix in (".ir1", ".ir2")
     }
 
     extra_on_disk = set(expected) - set(actual)

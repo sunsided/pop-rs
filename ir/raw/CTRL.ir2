@@ -1,0 +1,1845 @@
+; module CTRL from 01 POP Source/Source/CTRL.S
+
+fn falling {
+  a = *CharY@0x0042        ; CTRL.S:77
+  x = *CharBlockY@0x0045        ; CTRL.S:79
+  x += 1                         ; CTRL.S:80
+  ??? cmp FloorY,x            ; CTRL.S:81
+  if cs goto :1       ; CTRL.S:82
+  tail_call fallon                ; CTRL.S:84
+:1:
+  call getunderft                  ; CTRL.S:88
+  if a != #block goto :2  ; CTRL.S:91
+  call InsideBlock                  ; CTRL.S:92
+:2:
+  call cmpspace                  ; CTRL.S:94
+  if ne goto hitflr       ; CTRL.S:95
+  *CharBlockY@0x0045 += 1                         ; CTRL.S:97
+]rts:
+  return                           ; CTRL.S:99
+}
+
+fn CHECKFLOOR {
+  a = *CharAction@0x0046        ; CTRL.S:107
+  if a == #0x06 goto ]rts  ; CTRL.S:109
+  if a != #0x05 goto :2  ; CTRL.S:112
+  a = *CharPosn@0x0040        ; CTRL.S:113
+  if a == #0x6d goto :ong  ; CTRL.S:115
+  if a != #0xb9 goto ]rts  ; CTRL.S:117
+:ong:
+  tail_call onground                ; CTRL.S:118
+:2:
+  if a == #0x04 goto falling  ; CTRL.S:121
+  if a != #0x03 goto :1  ; CTRL.S:123
+  a = *CharPosn@0x0040        ; CTRL.S:124
+  if a < #0x66 goto ]rts  ; CTRL.S:126
+  if a >= #0x6a goto ]rts  ; CTRL.S:128
+  tail_call fallon                ; CTRL.S:129
+:1:
+  if a == #0x02 goto ]rts  ; CTRL.S:132
+  tail_call onground                ; CTRL.S:133
+]rts:
+  return                           ; CTRL.S:99
+}
+
+fn hitflr {
+  x = *CharBlockY@0x0045        ; CTRL.S:141
+  x += 1                         ; CTRL.S:142
+  a = *(FloorY@0x127e + x)   ; CTRL.S:143
+  *CharY@0x0042 = a            ; CTRL.S:144
+  call getunderft                  ; CTRL.S:146
+  cmp a, #spikes              ; CTRL.S:147
+  if a == #spikes goto :hitspikes  ; CTRL.S:148
+  call getinfront                  ; CTRL.S:152
+  call cmpspace                  ; CTRL.S:153
+  if ne goto :cont       ; CTRL.S:154
+  call getdist                  ; CTRL.S:156
+  cmp a, #0x04              ; CTRL.S:157
+  if a >= #0x04 goto :cont  ; CTRL.S:158
+  a = #0xfd                  ; CTRL.S:160
+  call addcharx                  ; CTRL.S:161
+  *CharX@0x0041 = a            ; CTRL.S:162
+:cont:
+  call addslicers                  ; CTRL.S:164
+  a = *CharLife@0x004f        ; CTRL.S:166
+  if a >=0 goto :hardland  ; CTRL.S:167
+  call getdist                  ; CTRL.S:169
+  cmp a, #0x0c              ; CTRL.S:170
+  if a < #0x0c goto :nc  ; CTRL.S:171
+  call getbehind                  ; CTRL.S:172
+  cmp a, #spikes              ; CTRL.S:173
+  if a == #spikes goto :hitspikes  ; CTRL.S:174
+:nc:
+  call getunderft                  ; CTRL.S:176
+  cmp a, #spikes              ; CTRL.S:177
+  if a != #spikes goto :notspikes  ; CTRL.S:178
+:hitspikes:
+  call getspikes                  ; CTRL.S:181
+  if ne goto :impale       ; CTRL.S:182
+:notspikes:
+  a = *CharYVel@0x0048        ; CTRL.S:185
+  cmp a, #OofVelocity              ; CTRL.S:186
+  if a < #OofVelocity goto :softland  ; CTRL.S:187
+  cmp a, #DeathVelocity              ; CTRL.S:189
+  if a < #DeathVelocity goto :medland  ; CTRL.S:190
+:hardland:
+  a = #0x64                  ; CTRL.S:193
+  call decstr                  ; CTRL.S:194
+:hdland1:
+  a = #Splat                  ; CTRL.S:196
+  call addsound                  ; CTRL.S:197
+  a = #hardland                  ; CTRL.S:199
+  if a != #0x00 goto :doland  ; CTRL.S:200
+:medland:
+  a = *CharID@0x004d        ; CTRL.S:203
+  cmp a, #0x01              ; CTRL.S:204
+  if a == #0x01 goto :softland  ; CTRL.S:205
+  cmp a, #0x02              ; CTRL.S:206
+  if a >= #0x02 goto :hardland  ; CTRL.S:207
+  a = #0x01                  ; CTRL.S:209
+  call decstr                  ; CTRL.S:210
+  if eq goto :hdland1       ; CTRL.S:211
+  a = #Splat                  ; CTRL.S:213
+  call addsound                  ; CTRL.S:214
+  a = #medland                  ; CTRL.S:216
+  if a != #0x00 goto :doland  ; CTRL.S:217
+:softland:
+  a = *CharID@0x004d        ; CTRL.S:220
+  cmp a, #0x02              ; CTRL.S:221
+  if a >= #0x02 goto :gd  ; CTRL.S:222
+  a = *CharSword@0x004e        ; CTRL.S:223
+  cmp a, #0x02              ; CTRL.S:224
+  if a != #0x02 goto :1  ; CTRL.S:225
+:gd:
+  a = #0x02                  ; CTRL.S:226
+  *CharSword@0x004e = a            ; CTRL.S:227
+  a = #landengarde                  ; CTRL.S:228
+  if a != #0x00 goto :doland  ; CTRL.S:229
+:1:
+  a = #softland                  ; CTRL.S:231
+  if a != #0x00 goto :doland  ; CTRL.S:232
+:impale:
+  tail_call DoImpale                ; CTRL.S:234
+:doland:
+  call jumpseq                  ; CTRL.S:236
+  call animchar                  ; CTRL.S:237
+  a = #0x00                  ; CTRL.S:239
+  *CharYVel@0x0048 = a            ; CTRL.S:240
+]rts:
+  return                           ; CTRL.S:241
+}
+
+fn fallon {
+  a = *btn@0x003d        ; CTRL.S:249
+  a = a & *CharLife@0x004f              ; CTRL.S:250
+  if a >=0 goto ]rts  ; CTRL.S:251
+  a = *CharYVel@0x0048        ; CTRL.S:253
+  if a >= #grabspeed goto ]rts  ; CTRL.S:255
+  a = *CharY@0x0042        ; CTRL.S:257
+  c = 0                            ; CTRL.S:258
+  a = a + #grablead + c              ; CTRL.S:259
+  x = *CharBlockY@0x0045        ; CTRL.S:260
+  x += 1                         ; CTRL.S:261
+  ??? cmp FloorY,x            ; CTRL.S:262
+  if cc goto ]rts       ; CTRL.S:263
+  a = *CharX@0x0041        ; CTRL.S:268
+  *savekidx@0x00af = a            ; CTRL.S:269
+  a = #grabreach                  ; CTRL.S:270
+  call addcharx                  ; CTRL.S:271
+  *CharX@0x0041 = a            ; CTRL.S:272
+  call rereadblocks                  ; CTRL.S:273
+  call :test                  ; CTRL.S:275
+  if ne goto :ok       ; CTRL.S:276
+  a = *savekidx@0x00af        ; CTRL.S:277
+  *CharX@0x0041 = a            ; CTRL.S:278
+  tail_call rereadblocks                ; CTRL.S:279
+:ok:
+  call getdist                  ; CTRL.S:284
+  call addcharx                  ; CTRL.S:286
+  *CharX@0x0041 = a            ; CTRL.S:287
+  x = *CharBlockY@0x0045        ; CTRL.S:289
+  x += 1                         ; CTRL.S:290
+  a = *(FloorY@0x127e + x)   ; CTRL.S:291
+  *CharY@0x0042 = a            ; CTRL.S:292
+  a = #0x00                  ; CTRL.S:294
+  *CharYVel@0x0048 = a            ; CTRL.S:295
+  a = #fallhang                  ; CTRL.S:297
+  call jumpseq                  ; CTRL.S:298
+  call animchar                  ; CTRL.S:299
+  a = #stuntime                  ; CTRL.S:301
+  *stunned@0x00e6 = a            ; CTRL.S:302
+]rts:
+  return                           ; CTRL.S:303
+:test:
+  call getabove                  ; CTRL.S:305
+  *blockid@0x008b = a            ; CTRL.S:306
+  call getaboveinf                  ; CTRL.S:307
+  tail_call checkledge                ; CTRL.S:308
+}
+
+fn onground {
+  a = *Fcheck@0x0085        ; CTRL.S:314
+  a = a & #fcheckmark              ; CTRL.S:315
+  if a == #0x00 goto ]rts  ; CTRL.S:316
+  call getunderft                  ; CTRL.S:318
+  cmp a, #block              ; CTRL.S:319
+  if a != #block goto :1  ; CTRL.S:320
+  call InsideBlock                  ; CTRL.S:321
+:1:
+  call cmpspace                  ; CTRL.S:323
+  if ne goto ]rts       ; CTRL.S:324
+  a = *level@0x03f4        ; CTRL.S:328
+  cmp a, #0x0c              ; CTRL.S:329
+  if a != #0x0c goto :no  ; CTRL.S:330
+  a = *mergetimer@0x00df        ; CTRL.S:331
+  if a >=0 goto :no  ; CTRL.S:332
+  a = *CharBlockY@0x0045        ; CTRL.S:333
+  if a != #0x00 goto :no  ; CTRL.S:334
+  a = *CharScrn@0x004b        ; CTRL.S:335
+  cmp a, #0x02              ; CTRL.S:336
+  if a == #0x02 goto :yes  ; CTRL.S:337
+  cmp a, #0x0d              ; CTRL.S:338
+  if a != #0x0d goto :no  ; CTRL.S:339
+  a = *tempblockx@0x0091        ; CTRL.S:340
+  cmp a, #0x06              ; CTRL.S:341
+  if a < #0x06 goto :no  ; CTRL.S:342
+:yes:
+  a = #floor                  ; CTRL.S:344
+  *(BlueType@0x0024)[y] = a   ; CTRL.S:345
+  call indexblock                  ; CTRL.S:346
+  a = #0x02                  ; CTRL.S:347
+  call :sub                  ; CTRL.S:348
+  y += 1                         ; CTRL.S:349
+:sub:
+  call markwipe                  ; CTRL.S:350
+  tail_call markred                ; CTRL.S:351
+:no:
+startfall:
+  a = #0x00                  ; CTRL.S:357
+  *rjumpflag@0x023a = a            ; CTRL.S:358
+  *CharSword@0x004e = a            ; CTRL.S:359
+  *CharBlockY@0x0045 += 1                         ; CTRL.S:361
+  call addslicers                  ; CTRL.S:362
+  a = *CharPosn@0x0040        ; CTRL.S:364
+  *rjumpflag@0x023a = a            ; CTRL.S:367
+  cmp a, #0x09              ; CTRL.S:369
+  if a == #0x09 goto :stepfall  ; CTRL.S:370
+  cmp a, #0x0d              ; CTRL.S:371
+  if a == #0x0d goto :stepfall2  ; CTRL.S:372
+  cmp a, #0x1a              ; CTRL.S:373
+  if a == #0x1a goto :jumpfall  ; CTRL.S:374
+  cmp a, #0x2c              ; CTRL.S:375
+  if a == #0x2c goto :rjumpfall  ; CTRL.S:376
+  cmp a, #0x51              ; CTRL.S:377
+  if a < #0x51 goto :2  ; CTRL.S:378
+  cmp a, #0x56              ; CTRL.S:379
+  if a < #0x56 goto :hdropfall  ; CTRL.S:380
+:2:
+  cmp a, #0x96              ; CTRL.S:381
+  if a < #0x96 goto :1  ; CTRL.S:382
+  cmp a, #0xb4              ; CTRL.S:383
+  if a < #0xb4 goto :fightfall  ; CTRL.S:384
+:1:
+:stepfall:
+  a = #stepfall                  ; CTRL.S:387
+  if a != #0x00 goto :doit  ; CTRL.S:388
+:stepfall2:
+  a = #stepfall2                  ; CTRL.S:390
+  if a != #0x00 goto :doit  ; CTRL.S:391
+:jumpfall:
+  a = #jumpfall                  ; CTRL.S:393
+  if a != #0x00 goto :doit  ; CTRL.S:394
+:rjumpfall:
+  a = #rjumpfall                  ; CTRL.S:396
+  if a != #0x00 goto :doit  ; CTRL.S:397
+:hdropfall:
+  a = #0x05                  ; CTRL.S:400
+  call addcharx                  ; CTRL.S:401
+  *CharX@0x0041 = a            ; CTRL.S:402
+  call rereadblocks                  ; CTRL.S:403
+  goto :stepfall2                ; CTRL.S:404
+]rts:
+  return                           ; CTRL.S:405
+:fightfall:
+  a = *CharID@0x004d        ; CTRL.S:407
+  cmp a, #0x02              ; CTRL.S:408
+  if a < #0x02 goto :player  ; CTRL.S:409
+  a = *CharXVel@0x0047        ; CTRL.S:410
+  if a <0 goto :fb  ; CTRL.S:411
+  a = #0x00                  ; CTRL.S:412
+  *droppedout@0x00e7 = a            ; CTRL.S:413
+  a = #efightfallfwd                  ; CTRL.S:414
+  if a != #0x00 goto :doit  ; CTRL.S:415
+:fb:
+  a = #efightfall                  ; CTRL.S:416
+  if a != #0x00 goto :doit  ; CTRL.S:417
+:player:
+  a = #0x01                  ; CTRL.S:418
+  *droppedout@0x00e7 = a            ; CTRL.S:419
+  a = #fightfall                  ; CTRL.S:420
+  if a != #0x00 goto :doit  ; CTRL.S:421
+:doit:
+  call jumpseq                  ; CTRL.S:424
+  call animchar                  ; CTRL.S:425
+  call rereadblocks                  ; CTRL.S:427
+  call getunderft                  ; CTRL.S:428
+  call cmpwall                  ; CTRL.S:429
+  if eq goto :bump       ; CTRL.S:430
+  call getinfront                  ; CTRL.S:431
+  call cmpwall                  ; CTRL.S:432
+  if ne goto ]rts       ; CTRL.S:433
+  tail_call CDpatch                ; CTRL.S:434
+:bump:
+  tail_call InsideBlock                ; CTRL.S:436
+}
+
+fn :no  (aka startfall) {
+  a = #0x00                  ; CTRL.S:357
+  *rjumpflag@0x023a = a            ; CTRL.S:358
+  *CharSword@0x004e = a            ; CTRL.S:359
+  *CharBlockY@0x0045 += 1                         ; CTRL.S:361
+  call addslicers                  ; CTRL.S:362
+  a = *CharPosn@0x0040        ; CTRL.S:364
+  *rjumpflag@0x023a = a            ; CTRL.S:367
+  cmp a, #0x09              ; CTRL.S:369
+  if a == #0x09 goto :stepfall  ; CTRL.S:370
+  cmp a, #0x0d              ; CTRL.S:371
+  if a == #0x0d goto :stepfall2  ; CTRL.S:372
+  cmp a, #0x1a              ; CTRL.S:373
+  if a == #0x1a goto :jumpfall  ; CTRL.S:374
+  cmp a, #0x2c              ; CTRL.S:375
+  if a == #0x2c goto :rjumpfall  ; CTRL.S:376
+  cmp a, #0x51              ; CTRL.S:377
+  if a < #0x51 goto :2  ; CTRL.S:378
+  cmp a, #0x56              ; CTRL.S:379
+  if a < #0x56 goto :hdropfall  ; CTRL.S:380
+:2:
+  cmp a, #0x96              ; CTRL.S:381
+  if a < #0x96 goto :1  ; CTRL.S:382
+  cmp a, #0xb4              ; CTRL.S:383
+  if a < #0xb4 goto :fightfall  ; CTRL.S:384
+:1:
+:stepfall:
+  a = #stepfall                  ; CTRL.S:387
+  if a != #0x00 goto :doit  ; CTRL.S:388
+:stepfall2:
+  a = #stepfall2                  ; CTRL.S:390
+  if a != #0x00 goto :doit  ; CTRL.S:391
+:jumpfall:
+  a = #jumpfall                  ; CTRL.S:393
+  if a != #0x00 goto :doit  ; CTRL.S:394
+:rjumpfall:
+  a = #rjumpfall                  ; CTRL.S:396
+  if a != #0x00 goto :doit  ; CTRL.S:397
+:hdropfall:
+  a = #0x05                  ; CTRL.S:400
+  call addcharx                  ; CTRL.S:401
+  *CharX@0x0041 = a            ; CTRL.S:402
+  call rereadblocks                  ; CTRL.S:403
+  goto :stepfall2                ; CTRL.S:404
+]rts:
+  return                           ; CTRL.S:405
+:fightfall:
+  a = *CharID@0x004d        ; CTRL.S:407
+  cmp a, #0x02              ; CTRL.S:408
+  if a < #0x02 goto :player  ; CTRL.S:409
+  a = *CharXVel@0x0047        ; CTRL.S:410
+  if a <0 goto :fb  ; CTRL.S:411
+  a = #0x00                  ; CTRL.S:412
+  *droppedout@0x00e7 = a            ; CTRL.S:413
+  a = #efightfallfwd                  ; CTRL.S:414
+  if a != #0x00 goto :doit  ; CTRL.S:415
+:fb:
+  a = #efightfall                  ; CTRL.S:416
+  if a != #0x00 goto :doit  ; CTRL.S:417
+:player:
+  a = #0x01                  ; CTRL.S:418
+  *droppedout@0x00e7 = a            ; CTRL.S:419
+  a = #fightfall                  ; CTRL.S:420
+  if a != #0x00 goto :doit  ; CTRL.S:421
+:doit:
+  call jumpseq                  ; CTRL.S:424
+  call animchar                  ; CTRL.S:425
+  call rereadblocks                  ; CTRL.S:427
+  call getunderft                  ; CTRL.S:428
+  call cmpwall                  ; CTRL.S:429
+  if eq goto :bump       ; CTRL.S:430
+  call getinfront                  ; CTRL.S:431
+  call cmpwall                  ; CTRL.S:432
+  if ne goto ]rts       ; CTRL.S:433
+  tail_call CDpatch                ; CTRL.S:434
+:bump:
+  tail_call InsideBlock                ; CTRL.S:436
+}
+
+fn CDpatch {
+  a = *rjumpflag@0x023a        ; CTRL.S:439
+  if a != #0x2c goto :patchX  ; CTRL.S:441
+  call getdist                  ; CTRL.S:443
+  if a >= #0x06 goto :patchX  ; CTRL.S:445
+  a = #patchfall                  ; CTRL.S:447
+  call jumpseq                  ; CTRL.S:448
+  call animchar                  ; CTRL.S:449
+  tail_call rereadblocks                ; CTRL.S:450
+:patchX:
+  a = #0xff                  ; CTRL.S:452
+:1:
+  call addcharx                  ; CTRL.S:453
+  *CharX@0x0041 = a            ; CTRL.S:454
+  tail_call rereadblocks                ; CTRL.S:455
+}
+
+fn InsideBlock {
+  call getdist                  ; CTRL.S:466
+  cmp a, #0x08              ; CTRL.S:467
+  if a >= #0x08 goto :bumpback  ; CTRL.S:468
+:bumpfwd:
+  call getinfront                  ; CTRL.S:471
+  cmp a, #block              ; CTRL.S:472
+  if a == #block goto :bumpback  ; CTRL.S:473
+  call getdist                  ; CTRL.S:475
+  c = 0                            ; CTRL.S:476
+  a = a + #0x04 + c              ; CTRL.S:477
+:reland:
+  call addcharx                  ; CTRL.S:479
+  *CharX@0x0041 = a            ; CTRL.S:480
+  call rereadblocks                  ; CTRL.S:481
+  tail_call getunderft                ; CTRL.S:482
+:bumpback:
+  call getbehind                  ; CTRL.S:485
+  cmp a, #block              ; CTRL.S:486
+  if a != #block goto :1  ; CTRL.S:487
+  call getdist                  ; CTRL.S:490
+  c = 0                            ; CTRL.S:491
+  a = a + #0x0e + c              ; CTRL.S:492
+  a = a ^ #0xff              ; CTRL.S:493
+  c = 0                            ; CTRL.S:494
+  a = a + #0x08 + c              ; CTRL.S:495
+  goto :reland                ; CTRL.S:496
+:1:
+  call getdist                  ; CTRL.S:498
+  a = a ^ #0xff              ; CTRL.S:499
+  c = 0                            ; CTRL.S:500
+  a = a + #0x08 + c              ; CTRL.S:501
+  goto :reland                ; CTRL.S:502
+}
+
+fn SHADCTRL {
+  a = *CharID@0x004d        ; CTRL.S:510
+  if a != #0x18 goto :1  ; CTRL.S:512
+  tail_call AutoCtrl                ; CTRL.S:513
+:1:
+  a = *CharLife@0x004f        ; CTRL.S:515
+  if a >=0 goto :dead  ; CTRL.S:516
+  a = *OppStrength@0x00cc        ; CTRL.S:518
+  if a != #0x00 goto :cont  ; CTRL.S:519
+  a = #0x00                  ; CTRL.S:520
+  *CharLife@0x004f = a            ; CTRL.S:521
+  call deadenemy                  ; CTRL.S:522
+:dead:
+  a = *CharID@0x004d        ; CTRL.S:524
+  if a != #0x01 goto :cont  ; CTRL.S:526
+  tail_call VanishChar                ; CTRL.S:527
+:cont:
+  a = *ManCtrl@0x00de        ; CTRL.S:529
+  if a != #0x00 goto :manualctrl  ; CTRL.S:530
+  call AutoCtrl                  ; CTRL.S:532
+  tail_call GenCtrl                ; CTRL.S:534
+:manualctrl:
+  call LoadDesel                  ; CTRL.S:539
+  call getdesel                  ; CTRL.S:541
+  call clrjstk                  ; CTRL.S:543
+  call UserCtrl                  ; CTRL.S:545
+  tail_call SaveDesel                ; CTRL.S:547
+}
+
+fn PLAYERCTRL {
+  a = *CharLife@0x004f        ; CTRL.S:555
+  if a >=0 goto :cont1  ; CTRL.S:556
+  a = *KidStrength@0x00ce        ; CTRL.S:557
+  if a != #0x00 goto :cont1  ; CTRL.S:558
+  a = #0x00                  ; CTRL.S:559
+  *CharLife@0x004f = a            ; CTRL.S:560
+:cont1:
+  a = *stunned@0x00e6        ; CTRL.S:562
+  if a == #0x00 goto :cont  ; CTRL.S:563
+  *stunned@0x00e6 -= 1                         ; CTRL.S:564
+:cont:
+  a = *level@0x03f4        ; CTRL.S:566
+  if a != #0x00 goto :game  ; CTRL.S:567
+:demo:
+  call DemoCtrl                  ; CTRL.S:568
+  tail_call GenCtrl                ; CTRL.S:569
+:game:
+  call LoadSelect                  ; CTRL.S:573
+  call getselect                  ; CTRL.S:575
+  call clrjstk                  ; CTRL.S:577
+  a = #0x02                  ; CTRL.S:579
+  call UserCtrl                  ; CTRL.S:580
+  tail_call SaveSelect                ; CTRL.S:582
+}
+
+fn DemoCtrl {
+  a = *milestone@0x0212        ; CTRL.S:588
+  if a != #0x00 goto :finish  ; CTRL.S:589
+  a = *CharSword@0x004e        ; CTRL.S:590
+  if a == #0x00 goto :preprog  ; CTRL.S:591
+  a = #0x0a                  ; CTRL.S:593
+  *guardprog@0x00dd = a            ; CTRL.S:594
+  call AutoCtrl                  ; CTRL.S:595
+  a = #0x0b                  ; CTRL.S:596
+  *guardprog@0x00dd = a            ; CTRL.S:597
+  return                           ; CTRL.S:598
+:preprog:
+  tail_call demo                ; CTRL.S:600
+:finish:
+  call clrall                  ; CTRL.S:602
+  *clrbtn@0x00d8 = a            ; CTRL.S:603
+  a = #0xff                  ; CTRL.S:604
+  *clrF@0x00d4 = a            ; CTRL.S:605
+  *JSTKX@0x0018 = a            ; CTRL.S:606
+]rts:
+  return                           ; CTRL.S:607
+}
+
+fn UserCtrl {
+  a = *CharFace@0x0043        ; CTRL.S:611
+  if a >=0 goto :faceL  ; CTRL.S:612
+  tail_call GenCtrl                ; CTRL.S:614
+:faceL:
+  call facejstk                  ; CTRL.S:618
+  call GenCtrl                  ; CTRL.S:620
+  tail_call facejstk                ; CTRL.S:622
+}
+
+fn clrall {
+  a = #0x00                  ; CTRL.S:626
+  *clrB@0x00d5 = a            ; CTRL.S:627
+  *clrF@0x00d4 = a            ; CTRL.S:628
+  *clrU@0x00d6 = a            ; CTRL.S:629
+  *clrD@0x00d7 = a            ; CTRL.S:630
+  a = #0x01                  ; CTRL.S:631
+]rts:
+  return                           ; CTRL.S:632
+}
+
+fn GENCTRL {
+  a = *CharLife@0x004f        ; CTRL.S:649
+  if a <0 goto :alive  ; CTRL.S:650
+:dead:
+  a = *CharPosn@0x0040        ; CTRL.S:654
+  if a == #0x0f goto :drop  ; CTRL.S:656
+  if a == #0xa6 goto :drop  ; CTRL.S:658
+  if a == #0x9e goto :drop  ; CTRL.S:660
+  if a != #0xab goto ]rts  ; CTRL.S:662
+:drop:
+  a = #dropdead                  ; CTRL.S:663
+  tail_call jumpseq                ; CTRL.S:664
+:alive:
+  a = *CharAction@0x0046        ; CTRL.S:668
+  if a == #0x05 goto :clr  ; CTRL.S:670
+  cmp a, #0x04              ; CTRL.S:671
+  if a == #0x04 goto :clr  ; CTRL.S:672
+  if ne goto :underctrl       ; CTRL.S:673
+:clr:
+]clr:
+  tail_call clrall                ; CTRL.S:675
+:underctrl:
+  a = *CharSword@0x004e        ; CTRL.S:678
+  if a == #0x02 goto FightCtrl  ; CTRL.S:680
+  a = *CharID@0x004d        ; CTRL.S:682
+  if a < #0x02 goto :cont  ; CTRL.S:684
+  tail_call GuardCtrl                ; CTRL.S:685
+:cont:
+  x = *CharPosn@0x0040        ; CTRL.S:689
+  if x == #0x0f goto :standing  ; CTRL.S:692
+  if x == #0x30 goto :turning  ; CTRL.S:695
+  if x < #0x32 goto :0  ; CTRL.S:698
+  if x < #0x35 goto :standing  ; CTRL.S:700
+:0:
+  if x < #0x04 goto :starting  ; CTRL.S:703
+  if x < #0x43 goto :4  ; CTRL.S:706
+  if x < #0x46 goto :stjumpup  ; CTRL.S:708
+:4:
+  if x >= #0x0f goto :2  ; CTRL.S:711
+  goto :running                ; CTRL.S:712
+:2:
+  if x < #0x57 goto :1  ; CTRL.S:715
+  if x >= #0x64 goto :1  ; CTRL.S:717
+  goto :hanging                ; CTRL.S:718
+:1:
+  if x == #0x6d goto :crouching  ; CTRL.S:721
+:3:
+]rts:
+  return                           ; CTRL.S:723
+:standing:
+  tail_call standing                ; CTRL.S:725
+:starting:
+  tail_call starting                ; CTRL.S:726
+:stjumpup:
+  tail_call stjumpup                ; CTRL.S:727
+:running:
+  tail_call arunning                ; CTRL.S:728
+:hanging:
+  tail_call hanging                ; CTRL.S:729
+:turning:
+  tail_call turning                ; CTRL.S:730
+:crouching:
+  tail_call crouching                ; CTRL.S:731
+}
+
+fn GuardCtrl {
+  x = *CharPosn@0x0040        ; CTRL.S:737
+  cmp x, #0xa6              ; CTRL.S:738
+  if x == #0xa6 goto :alert  ; CTRL.S:739
+]rts:
+  return                           ; CTRL.S:740
+:alert:
+  a = *clrD@0x00d7        ; CTRL.S:743
+  if a >=0 goto ]rts  ; CTRL.S:744
+  a = *clrF@0x00d4        ; CTRL.S:745
+  if a <0 goto :engarde  ; CTRL.S:746
+  if pl goto :turn       ; CTRL.S:747
+:engarde:
+  tail_call DoEngarde                ; CTRL.S:749
+:turn:
+  a = #0x01                  ; CTRL.S:751
+  *clrD@0x00d7 = a            ; CTRL.S:752
+  a = #alertturn                  ; CTRL.S:753
+  tail_call jumpseq                ; CTRL.S:754
+}
+
+fn FightCtrl {
+  a = *CharAction@0x0046        ; CTRL.S:760
+  if a >= #0x02 goto ]rts  ; CTRL.S:762
+  call getunderft                  ; CTRL.S:766
+  if a == #loose goto :skip  ; CTRL.S:768
+  a = *EnemyAlert@0x00d1        ; CTRL.S:770
+  if a < #0x02 goto :dropgd  ; CTRL.S:772
+:skip:
+  call getopdist                  ; CTRL.S:776
+  if a < #swordthres goto :onalert  ; CTRL.S:778
+  if a < #0x80 goto :dropgd  ; CTRL.S:780
+  if a >= #0xfc goto :onalert  ; CTRL.S:782
+  tail_call DoTurnEng                ; CTRL.S:783
+:dropgd:
+  a = *CharID@0x004d        ; CTRL.S:788
+  if a != #0x00 goto :1  ; CTRL.S:789
+  *heroic@0x00d3 = a            ; CTRL.S:790
+  if eq goto :2       ; CTRL.S:791
+:1:
+  if a >= #0x02 goto :onalert  ; CTRL.S:793
+:2:
+  x = *CharPosn@0x0040        ; CTRL.S:795
+  if x != #0xab goto ]rts  ; CTRL.S:797
+  a = #0x00                  ; CTRL.S:799
+  *CharSword@0x004e = a            ; CTRL.S:800
+  a = #resheathe                  ; CTRL.S:802
+  tail_call jumpseq                ; CTRL.S:803
+]rts:
+  return                           ; CTRL.S:804
+:onalert:
+  x = *CharPosn@0x0040        ; CTRL.S:810
+  if x != #0xa1 goto :nobloc  ; CTRL.S:812
+  a = *clrbtn@0x00d8        ; CTRL.S:813
+  if a <0 goto :bts  ; CTRL.S:814
+  a = #retreat                  ; CTRL.S:815
+  tail_call jumpseq                ; CTRL.S:816
+:nobloc:
+  a = *clrbtn@0x00d8        ; CTRL.S:820
+  if a >=0 goto :10  ; CTRL.S:821
+:bts:
+  a = *CharID@0x004d        ; CTRL.S:823
+  if a != #0x00 goto :11  ; CTRL.S:824
+  a = #gdpatience                  ; CTRL.S:825
+  *gdtimer@0x007f = a            ; CTRL.S:826
+:11:
+  call DoStrike                  ; CTRL.S:828
+  a = *clrbtn@0x00d8        ; CTRL.S:830
+  if a == #0x01 goto ]rts  ; CTRL.S:832
+:10:
+  a = *clrD@0x00d7        ; CTRL.S:837
+  if a >=0 goto :nodrop  ; CTRL.S:838
+  x = *CharPosn@0x0040        ; CTRL.S:840
+  if x == #0x9e goto :ready1  ; CTRL.S:842
+  if x == #0xaa goto :ready1  ; CTRL.S:844
+  if x != #0xab goto ]rts  ; CTRL.S:846
+:ready1:
+  a = #0x01                  ; CTRL.S:848
+  *clrD@0x00d7 = a            ; CTRL.S:849
+  a = #0x00                  ; CTRL.S:851
+  *CharSword@0x004e = a            ; CTRL.S:852
+  a = *CharID@0x004d        ; CTRL.S:854
+  if a == #0x00 goto :drop  ; CTRL.S:855
+  if a == #0x01 goto :sstand  ; CTRL.S:857
+:alert:
+  a = #goalertstand                  ; CTRL.S:859
+  tail_call jumpseq                ; CTRL.S:860
+:drop:
+  a = #0x01                  ; CTRL.S:862
+  *offguard@0x008a = a            ; CTRL.S:863
+  a = #graceperiod                  ; CTRL.S:864
+  *refract@0x00a1 = a            ; CTRL.S:865
+  a = #0x00                  ; CTRL.S:866
+  *heroic@0x00d3 = a            ; CTRL.S:867
+  a = #fastsheathe                  ; CTRL.S:868
+  tail_call jumpseq                ; CTRL.S:869
+:sstand:
+  a = #resheathe                  ; CTRL.S:871
+  tail_call jumpseq                ; CTRL.S:872
+:nodrop:
+  a = *clrU@0x00d6        ; CTRL.S:877
+  if a <0 goto :up  ; CTRL.S:878
+  a = *clrF@0x00d4        ; CTRL.S:879
+  if a <0 goto :fwd  ; CTRL.S:880
+  a = *clrB@0x00d5        ; CTRL.S:881
+  if a <0 goto :back  ; CTRL.S:882
+]rts:
+  return                           ; CTRL.S:884
+:fwd:
+  tail_call DoAdvance                ; CTRL.S:886
+:up:
+  tail_call DoBlock                ; CTRL.S:887
+:back:
+  tail_call DoRetreat                ; CTRL.S:888
+}
+
+fn DoTurnEng {
+  a = #turnengarde                  ; CTRL.S:892
+  tail_call jumpseq                ; CTRL.S:893
+}
+
+fn DoBlock {
+  x = *CharPosn@0x0040        ; CTRL.S:897
+  cmp x, #0x9e              ; CTRL.S:898
+  if x == #0x9e goto :2  ; CTRL.S:899
+  cmp x, #0xaa              ; CTRL.S:900
+  if x == #0xaa goto :2  ; CTRL.S:901
+  cmp x, #0xab              ; CTRL.S:902
+  if x == #0xab goto :2  ; CTRL.S:903
+  cmp x, #0xa8              ; CTRL.S:904
+  if x == #0xa8 goto :2  ; CTRL.S:905
+  cmp x, #0xa5              ; CTRL.S:907
+  if x == #0xa5 goto :2  ; CTRL.S:908
+  cmp x, #0xa7              ; CTRL.S:909
+  if x == #0xa7 goto :3  ; CTRL.S:910
+]rts:
+  return                           ; CTRL.S:912
+:2:
+  call getopdist                  ; CTRL.S:916
+  cmp a, #blockthres              ; CTRL.S:917
+  if a >= #blockthres goto :blockmiss  ; CTRL.S:918
+  a = #readyblock                  ; CTRL.S:920
+  x = *CharID@0x004d        ; CTRL.S:921
+  if x == #0x00 goto :kid  ; CTRL.S:922
+  x = *OpPosn@0x039c        ; CTRL.S:923
+  cmp x, #0x98              ; CTRL.S:924
+  if x == #0x98 goto :doit  ; CTRL.S:925
+]rts:
+  return                           ; CTRL.S:926
+:kid:
+  x = *OpPosn@0x039c        ; CTRL.S:928
+  cmp x, #0xa8              ; CTRL.S:929
+  if x == #0xa8 goto ]rts  ; CTRL.S:930
+  cmp x, #0x97              ; CTRL.S:932
+  if x == #0x97 goto :doit  ; CTRL.S:933
+  cmp x, #0x98              ; CTRL.S:934
+  if x == #0x98 goto :doit  ; CTRL.S:935
+  cmp x, #0xa2              ; CTRL.S:936
+  if x == #0xa2 goto :doit  ; CTRL.S:937
+  cmp x, #0x99              ; CTRL.S:939
+  if x != #0x99 goto :blockmiss  ; CTRL.S:940
+  call :doit                  ; CTRL.S:942
+  tail_call animchar                ; CTRL.S:943
+:3:
+  a = #strikeblock                  ; CTRL.S:947
+:doit:
+  x = #0x01                  ; CTRL.S:948
+  *clrU@0x00d6 = x            ; CTRL.S:949
+  tail_call jumpseq                ; CTRL.S:950
+:blockmiss:
+  a = *CharID@0x004d        ; CTRL.S:952
+  if a != #0x00 goto DoRetreat  ; CTRL.S:953
+  a = #readyblock                  ; CTRL.S:954
+  if a != #0x00 goto :doit  ; CTRL.S:955
+DoStrike:
+  cmp x, #0x9d              ; CTRL.S:959
+  if x == #0x9d goto :1  ; CTRL.S:960
+  cmp x, #0x9e              ; CTRL.S:961
+  if x == #0x9e goto :1  ; CTRL.S:962
+  cmp x, #0xaa              ; CTRL.S:963
+  if x == #0xaa goto :1  ; CTRL.S:964
+  cmp x, #0xab              ; CTRL.S:965
+  if x == #0xab goto :1  ; CTRL.S:966
+  cmp x, #0xa5              ; CTRL.S:967
+  if x == #0xa5 goto :1  ; CTRL.S:968
+  cmp x, #0x96              ; CTRL.S:969
+  if x == #0x96 goto :2  ; CTRL.S:970
+  cmp x, #0xa1              ; CTRL.S:971
+  if x == #0xa1 goto :2  ; CTRL.S:972
+]rts:
+  return                           ; CTRL.S:974
+:1:
+  a = *CharID@0x004d        ; CTRL.S:976
+  if a != #0x00 goto :slo  ; CTRL.S:977
+  a = #faststrike                  ; CTRL.S:979
+  if a != #0x00 goto :dostr  ; CTRL.S:980
+:slo:
+  a = #strike                  ; CTRL.S:982
+:dostr:
+  x = #0x01                  ; CTRL.S:983
+  *clrbtn@0x00d8 = x            ; CTRL.S:984
+  tail_call jumpseq                ; CTRL.S:985
+:2:
+  a = #blocktostrike                  ; CTRL.S:987
+  if a != #0x00 goto :dostr  ; CTRL.S:988
+DoRetreat:
+  x = *CharPosn@0x0040        ; CTRL.S:992
+  cmp x, #0x9e              ; CTRL.S:993
+  if x == #0x9e goto :1  ; CTRL.S:994
+  cmp x, #0xaa              ; CTRL.S:995
+  if x == #0xaa goto :1  ; CTRL.S:996
+  cmp x, #0xab              ; CTRL.S:997
+  if x == #0xab goto :1  ; CTRL.S:998
+]rts:
+  return                           ; CTRL.S:999
+:1:
+  a = #retreat                  ; CTRL.S:1001
+  x = #0x01                  ; CTRL.S:1002
+  *clrB@0x00d5 = x            ; CTRL.S:1003
+  tail_call jumpseq                ; CTRL.S:1004
+}
+
+fn DoStrike {
+  cmp x, #0x9d              ; CTRL.S:959
+  if x == #0x9d goto :1  ; CTRL.S:960
+  cmp x, #0x9e              ; CTRL.S:961
+  if x == #0x9e goto :1  ; CTRL.S:962
+  cmp x, #0xaa              ; CTRL.S:963
+  if x == #0xaa goto :1  ; CTRL.S:964
+  cmp x, #0xab              ; CTRL.S:965
+  if x == #0xab goto :1  ; CTRL.S:966
+  cmp x, #0xa5              ; CTRL.S:967
+  if x == #0xa5 goto :1  ; CTRL.S:968
+  cmp x, #0x96              ; CTRL.S:969
+  if x == #0x96 goto :2  ; CTRL.S:970
+  cmp x, #0xa1              ; CTRL.S:971
+  if x == #0xa1 goto :2  ; CTRL.S:972
+]rts:
+  return                           ; CTRL.S:974
+:1:
+  a = *CharID@0x004d        ; CTRL.S:976
+  if a != #0x00 goto :slo  ; CTRL.S:977
+  a = #faststrike                  ; CTRL.S:979
+  if a != #0x00 goto :dostr  ; CTRL.S:980
+:slo:
+  a = #strike                  ; CTRL.S:982
+:dostr:
+  x = #0x01                  ; CTRL.S:983
+  *clrbtn@0x00d8 = x            ; CTRL.S:984
+  tail_call jumpseq                ; CTRL.S:985
+:2:
+  a = #blocktostrike                  ; CTRL.S:987
+  if a != #0x00 goto :dostr  ; CTRL.S:988
+DoRetreat:
+  x = *CharPosn@0x0040        ; CTRL.S:992
+  cmp x, #0x9e              ; CTRL.S:993
+  if x == #0x9e goto :1  ; CTRL.S:994
+  cmp x, #0xaa              ; CTRL.S:995
+  if x == #0xaa goto :1  ; CTRL.S:996
+  cmp x, #0xab              ; CTRL.S:997
+  if x == #0xab goto :1  ; CTRL.S:998
+]rts:
+  return                           ; CTRL.S:999
+:1:
+  a = #retreat                  ; CTRL.S:1001
+  x = #0x01                  ; CTRL.S:1002
+  *clrB@0x00d5 = x            ; CTRL.S:1003
+  tail_call jumpseq                ; CTRL.S:1004
+}
+
+fn DoRetreat {
+  x = *CharPosn@0x0040        ; CTRL.S:992
+  if x == #0x9e goto :1  ; CTRL.S:994
+  if x == #0xaa goto :1  ; CTRL.S:996
+  if x == #0xab goto :1  ; CTRL.S:998
+]rts:
+  return                           ; CTRL.S:999
+:1:
+  a = #retreat                  ; CTRL.S:1001
+  x = #0x01                  ; CTRL.S:1002
+  *clrB@0x00d5 = x            ; CTRL.S:1003
+  tail_call jumpseq                ; CTRL.S:1004
+}
+
+fn DoAdvance {
+  x = *CharPosn@0x0040        ; CTRL.S:1008
+  if x == #0x9e goto :1  ; CTRL.S:1010
+  if x == #0xaa goto :1  ; CTRL.S:1012
+  if x == #0xab goto :1  ; CTRL.S:1014
+]rts:
+  return                           ; CTRL.S:1015
+:1:
+  a = *CharID@0x004d        ; CTRL.S:1017
+  if a != #0x00 goto :slo  ; CTRL.S:1018
+  a = #fastadvance                  ; CTRL.S:1019
+  if a != #0x00 goto :doit  ; CTRL.S:1020
+:slo:
+  a = #advance                  ; CTRL.S:1021
+:doit:
+  x = #0x01                  ; CTRL.S:1022
+  *clrF@0x00d4 = x            ; CTRL.S:1023
+  tail_call jumpseq                ; CTRL.S:1024
+}
+
+fn standing {
+  a = *clrbtn@0x00d8        ; CTRL.S:1035
+  if a >=0 goto :noclick  ; CTRL.S:1036
+  a = *btn@0x003d        ; CTRL.S:1037
+  if a >=0 goto :noclick  ; CTRL.S:1038
+  call TryPickup                  ; CTRL.S:1039
+  if ne goto ]rts       ; CTRL.S:1040
+:noclick:
+  a = *CharID@0x004d        ; CTRL.S:1045
+  if a == #0x00 goto :kid  ; CTRL.S:1046
+  a = *clrD@0x00d7        ; CTRL.S:1047
+  if a >=0 goto :1  ; CTRL.S:1048
+  a = *clrF@0x00d4        ; CTRL.S:1049
+  if a >=0 goto :1  ; CTRL.S:1050
+  tail_call DoEngarde                ; CTRL.S:1051
+:kid:
+  a = *gotsword@0x030a        ; CTRL.S:1056
+  if a == #0x00 goto :1  ; CTRL.S:1057
+  a = *offguard@0x008a        ; CTRL.S:1059
+  if a == #0x00 goto :notoffg  ; CTRL.S:1060
+  a = *btn@0x003d        ; CTRL.S:1061
+  if a >=0 goto :btnup  ; CTRL.S:1062
+:notoffg:
+  a = *EnemyAlert@0x00d1        ; CTRL.S:1064
+  cmp a, #0x02              ; CTRL.S:1065
+  if a < #0x02 goto :safe  ; CTRL.S:1066
+  call getopdist                  ; CTRL.S:1067
+  cmp a, #swordthresN              ; CTRL.S:1068
+  if a >= #swordthresN goto :danger  ; CTRL.S:1069
+  cmp a, #swordthres              ; CTRL.S:1070
+  if a >= #swordthres goto :safe  ; CTRL.S:1071
+:danger:
+  x = #0x01                  ; CTRL.S:1073
+  *heroic@0x00d3 = x            ; CTRL.S:1074
+  cmp a, #0xfa              ; CTRL.S:1075
+  if a >= #0xfa goto :behindyou  ; CTRL.S:1076
+  a = *OpID@0x03a9        ; CTRL.S:1078
+  cmp a, #0x01              ; CTRL.S:1079
+  if a != #0x01 goto :engarde  ; CTRL.S:1080
+  a = *OpAction@0x03a2        ; CTRL.S:1081
+  cmp a, #0x03              ; CTRL.S:1082
+  if a == #0x03 goto :safe  ; CTRL.S:1083
+  a = *OpPosn@0x039c        ; CTRL.S:1084
+  cmp a, #0x6b              ; CTRL.S:1085
+  if a < #0x6b goto :engarde  ; CTRL.S:1086
+  cmp a, #0x76              ; CTRL.S:1087
+  if a < #0x76 goto :safe  ; CTRL.S:1088
+:engarde:
+  tail_call DoEngarde                ; CTRL.S:1089
+:behindyou:
+  tail_call DoTurn                ; CTRL.S:1091
+:safe:
+  a = #0x00                  ; CTRL.S:1093
+  *offguard@0x008a = a            ; CTRL.S:1094
+:1:
+  a = *btn@0x003d        ; CTRL.S:1096
+  if a >=0 goto :btnup  ; CTRL.S:1097
+:2:
+  a = *clrB@0x00d5        ; CTRL.S:1102
+  if a <0 goto :backB  ; CTRL.S:1103
+  a = *clrU@0x00d6        ; CTRL.S:1105
+  if a <0 goto :up  ; CTRL.S:1106
+  a = *clrD@0x00d7        ; CTRL.S:1108
+  if a <0 goto :down  ; CTRL.S:1109
+  a = *JSTKX@0x0018        ; CTRL.S:1111
+  if a >=0 goto :rts  ; CTRL.S:1112
+  a = *clrF@0x00d4        ; CTRL.S:1114
+  if a <0 goto :fwdB  ; CTRL.S:1115
+:rts:
+]rts:
+  return                           ; CTRL.S:1117
+:btnup:
+  a = *clrF@0x00d4        ; CTRL.S:1123
+  if a <0 goto :fwd  ; CTRL.S:1124
+  a = *clrB@0x00d5        ; CTRL.S:1125
+  if a <0 goto :back  ; CTRL.S:1126
+  a = *clrU@0x00d6        ; CTRL.S:1127
+  if a <0 goto :up  ; CTRL.S:1128
+  a = *clrD@0x00d7        ; CTRL.S:1129
+  if a <0 goto :down  ; CTRL.S:1130
+  a = *JSTKX@0x0018        ; CTRL.S:1132
+  if a <0 goto :fwd  ; CTRL.S:1133
+]rts:
+  return                           ; CTRL.S:1135
+:fwd:
+  tail_call DoStartrun                ; CTRL.S:1137
+:fwdB:
+  tail_call DoStepfwd                ; CTRL.S:1138
+:back:
+  tail_call DoTurn                ; CTRL.S:1140
+:backB:
+  tail_call DoTurn                ; CTRL.S:1141
+:fwdup:
+  tail_call DoStandjump                ; CTRL.S:1143
+:up:
+  call getunderft                  ; CTRL.S:1152
+  cmp a, #exit              ; CTRL.S:1153
+  if a == #exit goto :stairs  ; CTRL.S:1154
+  call getbehind                  ; CTRL.S:1155
+  cmp a, #exit              ; CTRL.S:1156
+  if a == #exit goto :stairs  ; CTRL.S:1157
+  call getinfront                  ; CTRL.S:1158
+  cmp a, #exit              ; CTRL.S:1159
+  if a != #exit goto :nostairs  ; CTRL.S:1160
+:stairs:
+  a = *(BlueSpec@0x0026)[y]   ; CTRL.S:1162
+  a = a >> 1                       ; CTRL.S:1163
+  a = a >> 1                       ; CTRL.S:1164
+  cmp a, #stairthres              ; CTRL.S:1165
+  if a < #stairthres goto :nostairs  ; CTRL.S:1166
+  tail_call Stairs                ; CTRL.S:1168
+:nostairs:
+  a = *JSTKX@0x0018        ; CTRL.S:1173
+  if a <0 goto :fwdup  ; CTRL.S:1174
+  tail_call DoJumpup                ; CTRL.S:1178
+:down:
+  a = #0x01                  ; CTRL.S:1184
+  *clrD@0x00d7 = a            ; CTRL.S:1185
+  call getinfront                  ; CTRL.S:1192
+  call cmpspace                  ; CTRL.S:1193
+  if ne goto :notfwd       ; CTRL.S:1194
+  call getdist                  ; CTRL.S:1196
+  cmp a, #StepOffFwd              ; CTRL.S:1197
+  if a >= #StepOffFwd goto :notfwd  ; CTRL.S:1198
+  a = #0x05                  ; CTRL.S:1199
+  call addcharx                  ; CTRL.S:1200
+  *CharX@0x0041 = a            ; CTRL.S:1201
+  tail_call rereadblocks                ; CTRL.S:1202
+:notfwd:
+  call getbehind                  ; CTRL.S:1204
+  call cmpspace                  ; CTRL.S:1205
+  if ne goto :no       ; CTRL.S:1206
+  call getdist                  ; CTRL.S:1208
+  cmp a, #StepOffBack              ; CTRL.S:1209
+  if a < #StepOffBack goto :no  ; CTRL.S:1210
+  call getbehind                  ; CTRL.S:1214
+  *blockid@0x008b = a            ; CTRL.S:1215
+  call getunderft                  ; CTRL.S:1216
+  call checkledge                  ; CTRL.S:1217
+  if eq goto :no       ; CTRL.S:1218
+  x = *CharFace@0x0043        ; CTRL.S:1220
+  if x >=0 goto :succeed  ; CTRL.S:1221
+  call getunderft                  ; CTRL.S:1222
+  cmp a, #gate              ; CTRL.S:1223
+  if a != #gate goto :succeed  ; CTRL.S:1224
+  a = *(BlueSpec@0x0026)[y]   ; CTRL.S:1226
+  a = a >> 1                       ; CTRL.S:1227
+  a = a >> 1                       ; CTRL.S:1228
+  cmp a, #gclimbthres              ; CTRL.S:1229
+  if a < #gclimbthres goto :no  ; CTRL.S:1230
+:succeed:
+  call getdist                  ; CTRL.S:1232
+  c = 1                            ; CTRL.S:1233
+  a = a - #0x09 - (1 - c)        ; CTRL.S:1234
+  call addcharx                  ; CTRL.S:1236
+  *CharX@0x0041 = a            ; CTRL.S:1237
+  a = #climbdown                  ; CTRL.S:1239
+  tail_call jumpseq                ; CTRL.S:1240
+:no:
+  tail_call DoCrouch                ; CTRL.S:1244
+}
+
+fn Stairs {
+  a = *tempblockx@0x0091        ; CTRL.S:1250
+  call getblockej                  ; CTRL.S:1251
+  c = 0                            ; CTRL.S:1252
+  a = a + #0x0a + c              ; CTRL.S:1253
+  *CharX@0x0041 = a            ; CTRL.S:1254
+  a = #0xff                  ; CTRL.S:1255
+  *CharFace@0x0043 = a            ; CTRL.S:1256
+  a = #climbstairs                  ; CTRL.S:1258
+  tail_call jumpseq                ; CTRL.S:1259
+]rts:
+  return                           ; CTRL.S:1261
+}
+
+fn crouching {
+  a = *clrbtn@0x00d8        ; CTRL.S:1272
+  if a >=0 goto :noclick  ; CTRL.S:1273
+  call TryPickup                  ; CTRL.S:1275
+  if ne goto ]rts       ; CTRL.S:1276
+:noclick:
+  a = *JSTKY@0x0019        ; CTRL.S:1281
+  if a == #0x01 goto :1  ; CTRL.S:1283
+  a = #standup                  ; CTRL.S:1284
+  tail_call jumpseq                ; CTRL.S:1285
+:1:
+  a = *clrF@0x00d4        ; CTRL.S:1287
+  if a >=0 goto ]rts  ; CTRL.S:1288
+  a = #0x01                  ; CTRL.S:1289
+  *clrF@0x00d4 = a            ; CTRL.S:1290
+  a = #crawl                  ; CTRL.S:1291
+  tail_call jumpseq                ; CTRL.S:1292
+]rts:
+  return                           ; CTRL.S:1261
+}
+
+fn starting {
+  a = *JSTKY@0x0019        ; CTRL.S:1302
+  if a <0 goto :jump  ; CTRL.S:1303
+]rts:
+  return                           ; CTRL.S:1304
+:jump:
+  a = *JSTKX@0x0018        ; CTRL.S:1307
+  if a >=0 goto ]rts  ; CTRL.S:1308
+  tail_call DoStandjump                ; CTRL.S:1310
+}
+
+fn stjumpup {
+  a = *JSTKX@0x0018        ; CTRL.S:1316
+  if a <0 goto :fwd  ; CTRL.S:1317
+  a = *clrF@0x00d4        ; CTRL.S:1318
+  if a <0 goto :fwd  ; CTRL.S:1319
+]rts:
+  return                           ; CTRL.S:1320
+:fwd:
+  tail_call DoStandjump                ; CTRL.S:1321
+}
+
+fn turning {
+  a = *btn@0x003d        ; CTRL.S:1329
+  if a <0 goto ]rts  ; CTRL.S:1330
+  a = *JSTKX@0x0018        ; CTRL.S:1332
+  if a >=0 goto ]rts  ; CTRL.S:1333
+  a = *JSTKY@0x0019        ; CTRL.S:1335
+  if a <0 goto ]rts  ; CTRL.S:1336
+  a = #turnrun                  ; CTRL.S:1340
+  tail_call jumpseq                ; CTRL.S:1341
+]rts:
+  return                           ; CTRL.S:1320
+}
+
+fn arunning {
+  a = *JSTKX@0x0018        ; CTRL.S:1349
+  if a == #0x00 goto :runstop  ; CTRL.S:1350
+  if pl goto :runturn       ; CTRL.S:1351
+  a = *JSTKY@0x0019        ; CTRL.S:1356
+  if a <0 goto :runjump  ; CTRL.S:1357
+  a = *clrD@0x00d7        ; CTRL.S:1359
+  if a <0 goto :diveroll  ; CTRL.S:1360
+]rts:
+  return                           ; CTRL.S:1362
+:diveroll:
+  a = #0x01                  ; CTRL.S:1366
+  *clrD@0x00d7 = a            ; CTRL.S:1367
+  a = #rdiveroll                  ; CTRL.S:1369
+  tail_call jumpseq                ; CTRL.S:1370
+:runjump:
+  a = *clrU@0x00d6        ; CTRL.S:1375
+  if a >=0 goto ]rts  ; CTRL.S:1376
+  tail_call DoRunjump                ; CTRL.S:1378
+:runstop:
+  a = *CharPosn@0x0040        ; CTRL.S:1382
+  cmp a, #0x07              ; CTRL.S:1383
+  if a == #0x07 goto :rs  ; CTRL.S:1384
+  cmp a, #0x0b              ; CTRL.S:1385
+  if a != #0x0b goto ]rts  ; CTRL.S:1386
+:rs:
+  call ]clr                  ; CTRL.S:1388
+  *clrF@0x00d4 = a            ; CTRL.S:1389
+  a = #runstop                  ; CTRL.S:1391
+  tail_call jumpseq                ; CTRL.S:1392
+:runturn:
+  call ]clr                  ; CTRL.S:1397
+  *clrB@0x00d5 = a            ; CTRL.S:1398
+  a = #runturn                  ; CTRL.S:1400
+  tail_call jumpseq                ; CTRL.S:1401
+}
+
+fn hanging {
+  a = *stunned@0x00e6        ; CTRL.S:1409
+  if a != #0x00 goto :9  ; CTRL.S:1410
+  a = *JSTKY@0x0019        ; CTRL.S:1412
+  if a <0 goto :climbup  ; CTRL.S:1413
+:9:
+  a = *btn@0x003d        ; CTRL.S:1415
+  if a >=0 goto :drop  ; CTRL.S:1416
+  a = *CharAction@0x0046        ; CTRL.S:1422
+  if a == #0x06 goto :cont  ; CTRL.S:1424
+  call getunderft                  ; CTRL.S:1426
+  if a == #block goto :hangstrt  ; CTRL.S:1428
+  x = *CharFace@0x0043        ; CTRL.S:1430
+  if x != #0xff goto :cont  ; CTRL.S:1432
+  if a == #panelwif goto :hangstrt  ; CTRL.S:1435
+  if a == #panelwof goto :hangstrt  ; CTRL.S:1437
+:cont:
+  call getabove                  ; CTRL.S:1442
+  call cmpspace                  ; CTRL.S:1444
+  if eq goto :drop       ; CTRL.S:1445
+:rts:
+]rts:
+  return                           ; CTRL.S:1450
+:hangstrt:
+  a = #hangstraight                  ; CTRL.S:1452
+  tail_call jumpseq                ; CTRL.S:1453
+:climbup:
+  call ]clr                  ; CTRL.S:1459
+  *clrU@0x00d6 = a            ; CTRL.S:1460
+  *clrbtn@0x00d8 = a            ; CTRL.S:1461
+  call getabove                  ; CTRL.S:1463
+  if a == #mirror goto :10  ; CTRL.S:1466
+  if a != #slicer goto :1  ; CTRL.S:1468
+:10:
+  x = *CharFace@0x0043        ; CTRL.S:1470
+  if x == #0x00 goto :fail  ; CTRL.S:1471
+  if ne goto :succeed       ; CTRL.S:1472
+:1:
+  if a != #gate goto :2  ; CTRL.S:1475
+  x = *CharFace@0x0043        ; CTRL.S:1477
+  if x == #0x00 goto :succeed  ; CTRL.S:1478
+  a = *(BlueSpec@0x0026)[y]   ; CTRL.S:1480
+  a = a >> 1                       ; CTRL.S:1481
+  a = a >> 1                       ; CTRL.S:1482
+  cmp a, #gclimbthres              ; CTRL.S:1483
+  if a < #gclimbthres goto :fail  ; CTRL.S:1484
+  if cs goto :succeed       ; CTRL.S:1485
+:2:
+:succeed:
+  a = #climbup                  ; CTRL.S:1488
+  tail_call jumpseq                ; CTRL.S:1489
+:fail:
+  a = #climbfail                  ; CTRL.S:1491
+  tail_call jumpseq                ; CTRL.S:1492
+:drop:
+  call ]clr                  ; CTRL.S:1497
+  *clrD@0x00d7 = a            ; CTRL.S:1498
+  call getbehind                  ; CTRL.S:1500
+  call cmpspace                  ; CTRL.S:1501
+  if ne goto :hangdrop       ; CTRL.S:1502
+  call getunderft                  ; CTRL.S:1504
+  call cmpspace                  ; CTRL.S:1505
+  if eq goto :hangfall       ; CTRL.S:1506
+:hangdrop:
+  call getunderft                  ; CTRL.S:1509
+  if a == #block goto :sheer  ; CTRL.S:1511
+  x = *CharFace@0x0043        ; CTRL.S:1513
+  if x >=0 goto :clear  ; CTRL.S:1514
+  if a == #panelwof goto :sheer  ; CTRL.S:1516
+  if a != #panelwif goto :clear  ; CTRL.S:1518
+:sheer:
+  a = #0xf9                  ; CTRL.S:1520
+  call addcharx                  ; CTRL.S:1521
+  *CharX@0x0041 = a            ; CTRL.S:1522
+:clear:
+  a = #hangdrop                  ; CTRL.S:1524
+  tail_call jumpseq                ; CTRL.S:1525
+:hangfall:
+  a = #hangfall                  ; CTRL.S:1528
+  tail_call jumpseq                ; CTRL.S:1529
+]rts:
+  return                           ; CTRL.S:1530
+}
+
+fn DoStartrun {
+  call getfwddist                  ; CTRL.S:1542
+  if x != #0x01 goto :startrun  ; CTRL.S:1544
+  if y == #slicer goto :startrun  ; CTRL.S:1547
+:solidbarr:
+  call getfwddist                  ; CTRL.S:1550
+  if a >= #0x08 goto :startrun  ; CTRL.S:1552
+  a = *clrF@0x00d4        ; CTRL.S:1554
+  if a >=0 goto ]rts  ; CTRL.S:1555
+  tail_call DoStepfwd                ; CTRL.S:1557
+:startrun:
+  a = #startrun                  ; CTRL.S:1560
+  tail_call jumpseq                ; CTRL.S:1561
+]rts:
+  return                           ; CTRL.S:1530
+}
+
+fn DoTurn {
+  call ]clr                  ; CTRL.S:1563
+  *clrB@0x00d5 = a            ; CTRL.S:1564
+  a = *gotsword@0x030a        ; CTRL.S:1566
+  if a == #0x00 goto :1  ; CTRL.S:1567
+  a = *EnemyAlert@0x00d1        ; CTRL.S:1568
+  if a < #0x02 goto :1  ; CTRL.S:1570
+  call getopdist                  ; CTRL.S:1571
+  if pl goto :1       ; CTRL.S:1572
+  call getdist                  ; CTRL.S:1573
+  if a < #0x02 goto :1  ; CTRL.S:1575
+  a = #0x02                  ; CTRL.S:1577
+  *CharSword@0x004e = a            ; CTRL.S:1578
+  a = #0x00                  ; CTRL.S:1579
+  *offguard@0x008a = a            ; CTRL.S:1580
+  a = #turndraw                  ; CTRL.S:1581
+  if a != #0x00 goto :2  ; CTRL.S:1582
+:1:
+  a = #turn                  ; CTRL.S:1583
+:2:
+  tail_call jumpseq                ; CTRL.S:1584
+}
+
+fn DoStandjump {
+  a = #0x01                  ; CTRL.S:1586
+  *clrU@0x00d6 = a            ; CTRL.S:1587
+  *clrF@0x00d4 = a            ; CTRL.S:1588
+  a = #standjump                  ; CTRL.S:1590
+  tail_call jumpseq                ; CTRL.S:1591
+}
+
+fn DoSdiveroll {
+  a = #0x01                  ; CTRL.S:1593
+  *clrD@0x00d7 = a            ; CTRL.S:1594
+  a = #sdiveroll                  ; CTRL.S:1596
+  tail_call jumpseq                ; CTRL.S:1597
+}
+
+fn DoCrouch {
+  a = #stoop                  ; CTRL.S:1600
+  call jumpseq                  ; CTRL.S:1601
+  call ]clr                  ; CTRL.S:1603
+  *clrD@0x00d7 = a            ; CTRL.S:1604
+  return                           ; CTRL.S:1605
+}
+
+fn DoEngarde {
+  call ]clr                  ; CTRL.S:1608
+  *clrF@0x00d4 = a            ; CTRL.S:1609
+  *clrbtn@0x00d8 = a            ; CTRL.S:1610
+  a = #0x02                  ; CTRL.S:1612
+  *CharSword@0x004e = a            ; CTRL.S:1613
+  a = *CharID@0x004d        ; CTRL.S:1615
+  if a == #0x00 goto :1  ; CTRL.S:1616
+  if a == #0x01 goto :3  ; CTRL.S:1618
+  a = #guardengarde                  ; CTRL.S:1619
+  if a != #0x00 goto :2  ; CTRL.S:1620
+:1:
+  a = #0x00                  ; CTRL.S:1621
+  *offguard@0x008a = a            ; CTRL.S:1622
+:3:
+  a = #engarde                  ; CTRL.S:1623
+:2:
+  tail_call jumpseq                ; CTRL.S:1624
+}
+
+fn DoJumpup {
+  call ]clr                  ; CTRL.S:1634
+  *clrU@0x00d6 = a            ; CTRL.S:1635
+  call getabove                  ; CTRL.S:1637
+  *blockid@0x008b = a            ; CTRL.S:1638
+  call getaboveinf                  ; CTRL.S:1640
+  call checkledge                  ; CTRL.S:1642
+  if ne goto DoJumphang       ; CTRL.S:1644
+  call getabovebeh                  ; CTRL.S:1646
+  *blockid@0x008b = a            ; CTRL.S:1647
+  call getabove                  ; CTRL.S:1649
+  call checkledge                  ; CTRL.S:1651
+  if ne goto :jumpback       ; CTRL.S:1652
+:jumphi:
+  tail_call DoJumphigh                ; CTRL.S:1654
+:jumpback:
+  call getdist                  ; CTRL.S:1660
+  cmp a, #JumpBackThres              ; CTRL.S:1661
+  if a < #JumpBackThres goto :jumphi  ; CTRL.S:1662
+  call getbehind                  ; CTRL.S:1664
+  call cmpspace                  ; CTRL.S:1665
+  if eq goto DoJumpedge       ; CTRL.S:1666
+  call getdist                  ; CTRL.S:1670
+  c = 1                            ; CTRL.S:1671
+  a = a - #0x0e - (1 - c)        ; CTRL.S:1672
+  call addcharx                  ; CTRL.S:1673
+  *CharX@0x0041 = a            ; CTRL.S:1674
+  call rereadblocks                  ; CTRL.S:1676
+  tail_call DoJumphang                ; CTRL.S:1678
+}
+
+fn DoJumpedge {
+  call getabove                  ; CTRL.S:1684
+  call getdist                  ; CTRL.S:1688
+  c = 1                            ; CTRL.S:1689
+  a = a - #0x0a - (1 - c)        ; CTRL.S:1690
+  call addcharx                  ; CTRL.S:1692
+  *CharX@0x0041 = a            ; CTRL.S:1693
+  a = #jumpbackhang                  ; CTRL.S:1697
+  tail_call jumpseq                ; CTRL.S:1698
+}
+
+fn DoJumphang {
+  call getaboveinf                  ; CTRL.S:1702
+  call getdist                  ; CTRL.S:1708
+  *atemp@0x00f4 = a            ; CTRL.S:1709
+  cmp a, #0x04              ; CTRL.S:1711
+  if a < #0x04 goto :Med  ; CTRL.S:1712
+:Long:
+  a = *atemp@0x00f4        ; CTRL.S:1714
+  c = 1                            ; CTRL.S:1715
+  a = a - #0x04 - (1 - c)        ; CTRL.S:1716
+  call addcharx                  ; CTRL.S:1717
+  *CharX@0x0041 = a            ; CTRL.S:1718
+  a = #jumphangLong                  ; CTRL.S:1720
+  tail_call jumpseq                ; CTRL.S:1721
+:Med:
+  call getfwddist                  ; CTRL.S:1723
+  cmp a, #0x04              ; CTRL.S:1724
+  if a >= #0x04 goto :okMed  ; CTRL.S:1725
+  cmp x, #0x01              ; CTRL.S:1727
+  if x == #0x01 goto :Long  ; CTRL.S:1728
+:okMed:
+  a = *atemp@0x00f4        ; CTRL.S:1730
+  call addcharx                  ; CTRL.S:1731
+  *CharX@0x0041 = a            ; CTRL.S:1732
+  a = #jumphangMed                  ; CTRL.S:1734
+  tail_call jumpseq                ; CTRL.S:1735
+]rts:
+  return                           ; CTRL.S:1737
+}
+
+fn DoRunjump {
+  a = *CharPosn@0x0040        ; CTRL.S:1753
+  cmp a, #0x07              ; CTRL.S:1754
+  if a < #0x07 goto ]rts  ; CTRL.S:1755
+  a = #0x00                  ; CTRL.S:1760
+  *bufindex@0x00c1 = a            ; CTRL.S:1761
+  a = #RJChange                  ; CTRL.S:1763
+  call addcharx                  ; CTRL.S:1764
+  *ztemp@0x00e9 = a            ; CTRL.S:1765
+  call getblockxp                  ; CTRL.S:1767
+  *blockx@0x008c = a            ; CTRL.S:1768
+:loop:
+  a = *blockx@0x008c        ; CTRL.S:1770
+  x = *CharFace@0x0043        ; CTRL.S:1771
+  x += 1                         ; CTRL.S:1772
+  c = 0                            ; CTRL.S:1773
+  ??? adc plus1,x            ; CTRL.S:1774
+  *blockx@0x008c = a            ; CTRL.S:1775
+  x = a                            ; CTRL.S:1777
+  y = *CharBlockY@0x0045        ; CTRL.S:1778
+  a = *CharScrn@0x004b        ; CTRL.S:1779
+  call rdblock                  ; CTRL.S:1780
+  cmp a, #spikes              ; CTRL.S:1782
+  if a == #spikes goto :done  ; CTRL.S:1783
+  call cmpspace                  ; CTRL.S:1785
+  if eq goto :done       ; CTRL.S:1786
+  *bufindex@0x00c1 += 1                         ; CTRL.S:1788
+  a = *bufindex@0x00c1        ; CTRL.S:1790
+  cmp a, #RJLookahead+1              ; CTRL.S:1791
+  if a < #RJLookahead+1 goto :loop  ; CTRL.S:1792
+  if cs goto :noedge       ; CTRL.S:1793
+:done:
+  a = *ztemp@0x00e9        ; CTRL.S:1798
+  call getdist1                  ; CTRL.S:1799
+  x = *bufindex@0x00c1        ; CTRL.S:1801
+  c = 0                            ; CTRL.S:1802
+  ??? adc Mult7,x            ; CTRL.S:1803
+  c = 0                            ; CTRL.S:1804
+  ??? adc Mult7,x            ; CTRL.S:1805
+  c = 1                            ; CTRL.S:1807
+  a = a - #RJLeadDist - (1 - c)        ; CTRL.S:1808
+  cmp a, #-RJMaxFujBak              ; CTRL.S:1811
+  if a >= #-RJMaxFujBak goto :ok  ; CTRL.S:1812
+  cmp a, #RJMaxFujFwd              ; CTRL.S:1814
+  if a < #RJMaxFujFwd goto :ok  ; CTRL.S:1815
+  cmp a, #0x80              ; CTRL.S:1817
+  if a < #0x80 goto ]rts  ; CTRL.S:1818
+  a = #0xfd                  ; CTRL.S:1820
+:ok:
+  c = 0                            ; CTRL.S:1822
+  a = a + #RJChange + c              ; CTRL.S:1823
+  call addcharx                  ; CTRL.S:1825
+  *CharX@0x0041 = a            ; CTRL.S:1826
+:noedge:
+  call ]clr                  ; CTRL.S:1831
+  *clrU@0x00d6 = a            ; CTRL.S:1832
+  a = #runjump                  ; CTRL.S:1834
+  tail_call jumpseq                ; CTRL.S:1835
+]rts:
+  return                           ; CTRL.S:1837
+}
+
+fn DoStepfwd {
+  a = #0x01                  ; CTRL.S:1846
+  *clrF@0x00d4 = a            ; CTRL.S:1847
+  *clrbtn@0x00d8 = a            ; CTRL.S:1848
+  call getfwddist                  ; CTRL.S:1850
+  cmp a, #0x00              ; CTRL.S:1852
+  if a == #0x00 goto :1  ; CTRL.S:1853
+:2:
+  *CharRepeat@0x004c = a            ; CTRL.S:1855
+  c = 0                            ; CTRL.S:1857
+  a = a + #stepfwd1-1 + c              ; CTRL.S:1858
+  tail_call jumpseq                ; CTRL.S:1859
+:1:
+  cmp x, #0x01              ; CTRL.S:1861
+  if x == #0x01 goto :thru  ; CTRL.S:1862
+  cmp a, *CharRepeat@0x004c    ; CTRL.S:1864
+  if a != *CharRepeat@0x004c goto :3  ; CTRL.S:1865
+:thru:
+  a = #0x0b                  ; CTRL.S:1867
+  if a != #0x00 goto :2  ; CTRL.S:1868
+:3:
+  *CharRepeat@0x004c = a            ; CTRL.S:1870
+  a = #testfoot                  ; CTRL.S:1872
+  tail_call jumpseq                ; CTRL.S:1873
+}
+
+fn DoJumphigh {
+  call ]clr                  ; CTRL.S:1881
+  *clrU@0x00d6 = a            ; CTRL.S:1882
+  call getfwddist                  ; CTRL.S:1884
+  if a >= #0x04 goto :ok  ; CTRL.S:1886
+  if x != #0x01 goto :ok  ; CTRL.S:1888
+  c = 1                            ; CTRL.S:1890
+  a = a - #0x03 - (1 - c)        ; CTRL.S:1891
+  call addcharx                  ; CTRL.S:1892
+  *CharX@0x0041 = a            ; CTRL.S:1893
+:ok:
+  a = #jumpupreach                  ; CTRL.S:1895
+  call facedx                  ; CTRL.S:1896
+  *ztemp@0x00e9 = a            ; CTRL.S:1897
+  call getbasex                  ; CTRL.S:1899
+  c = 0                            ; CTRL.S:1900
+  a = a + #jumpupangle + c              ; CTRL.S:1901
+  c = 0                            ; CTRL.S:1902
+  a = a + *ztemp@0x00e9 + c    ; CTRL.S:1903
+  call getblockx                  ; CTRL.S:1905
+  x = a                            ; CTRL.S:1906
+  y = *CharBlockY@0x0045        ; CTRL.S:1908
+  y -= 1                         ; CTRL.S:1909
+  a = *CharScrn@0x004b        ; CTRL.S:1911
+  call rdblock                  ; CTRL.S:1912
+  if a == #block goto :jumpup  ; CTRL.S:1915
+  call cmpspace                  ; CTRL.S:1916
+  if ne goto :jumpup       ; CTRL.S:1917
+  a = #highjump                  ; CTRL.S:1919
+  tail_call jumpseq                ; CTRL.S:1920
+:jumpup:
+  a = #jumpup                  ; CTRL.S:1922
+  call jumpseq                  ; CTRL.S:1923
+]rts:
+  return                           ; CTRL.S:1924
+}
+
+fn REREADBLOCKS {
+  call GetFrameInfo                  ; CTRL.S:1930
+  tail_call GetBaseBlock                ; CTRL.S:1931
+}
+
+fn CHECKPRESS {
+  a = *CharPosn@0x0040        ; CTRL.S:1940
+  cmp a, #0x57              ; CTRL.S:1941
+  if a < #0x57 goto :1  ; CTRL.S:1942
+  cmp a, #0x64              ; CTRL.S:1943
+  if a < #0x64 goto :hanging  ; CTRL.S:1944
+  cmp a, #0x87              ; CTRL.S:1945
+  if a < #0x87 goto :1  ; CTRL.S:1946
+  cmp a, #0x8d              ; CTRL.S:1947
+  if a < #0x8d goto :hanging  ; CTRL.S:1948
+:1:
+  a = *CharAction@0x0046        ; CTRL.S:1950
+  cmp a, #0x07              ; CTRL.S:1951
+  if a == #0x07 goto :ground  ; CTRL.S:1952
+  cmp a, #0x05              ; CTRL.S:1953
+  if a == #0x05 goto :ground  ; CTRL.S:1954
+  cmp a, #0x02              ; CTRL.S:1955
+  if a >= #0x02 goto ]rts  ; CTRL.S:1956
+:ground:
+  a = *CharPosn@0x0040        ; CTRL.S:1961
+  cmp a, #0x4f              ; CTRL.S:1962
+  if a == #0x4f goto :touchceil  ; CTRL.S:1963
+  a = *Fcheck@0x0085        ; CTRL.S:1965
+  a = a & #fcheckmark              ; CTRL.S:1966
+  if a == #0x00 goto ]rts  ; CTRL.S:1967
+  call getunderft                  ; CTRL.S:1971
+:checkit:
+  cmp a, #upressplate              ; CTRL.S:1973
+  if a == #upressplate goto :PP  ; CTRL.S:1974
+  cmp a, #pressplate              ; CTRL.S:1975
+  if a != #pressplate goto :notPP  ; CTRL.S:1976
+:PP:
+  a = *CharLife@0x004f        ; CTRL.S:1978
+  if a <0 goto :push  ; CTRL.S:1979
+  tail_call jampp                ; CTRL.S:1980
+:push:
+  tail_call pushpp                ; CTRL.S:1981
+:notPP:
+  cmp a, #loose              ; CTRL.S:1983
+  if a != #loose goto ]rts  ; CTRL.S:1984
+  a = #0x01                  ; CTRL.S:1986
+  *alertguard@0x00e4 = a            ; CTRL.S:1987
+  tail_call breakloose                ; CTRL.S:1988
+:hanging:
+  call getabove                  ; CTRL.S:1993
+  goto :checkit                ; CTRL.S:1994
+]rts:
+  return                           ; CTRL.S:1995
+:touchceil:
+  call getabove                  ; CTRL.S:2000
+  cmp a, #loose              ; CTRL.S:2002
+  if a != #loose goto ]rts  ; CTRL.S:2003
+  tail_call breakloose                ; CTRL.S:2005
+}
+
+fn CHECKIMPALE {
+  x = *CharBlockX@0x0044        ; CTRL.S:2017
+  y = *CharBlockY@0x0045        ; CTRL.S:2018
+  a = *CharScrn@0x004b        ; CTRL.S:2019
+  call rdblock                  ; CTRL.S:2020
+  cmp a, #spikes              ; CTRL.S:2021
+  if a != #spikes goto ]rts  ; CTRL.S:2022
+  x = *CharPosn@0x0040        ; CTRL.S:2024
+  cmp x, #0x07              ; CTRL.S:2026
+  if x < #0x07 goto ]rts  ; CTRL.S:2027
+  cmp x, #0x0f              ; CTRL.S:2029
+  if x >= #0x0f goto :2  ; CTRL.S:2030
+  goto :running                ; CTRL.S:2031
+:2:
+  cmp x, #0x2b              ; CTRL.S:2033
+  if x == #0x2b goto :jumpland  ; CTRL.S:2034
+  cmp x, #0x1a              ; CTRL.S:2036
+  if x == #0x1a goto :jumpland  ; CTRL.S:2037
+]rts:
+  return                           ; CTRL.S:2039
+:running:
+  call getspikes                  ; CTRL.S:2042
+  cmp a, #0x02              ; CTRL.S:2043
+  if a < #0x02 goto ]rts  ; CTRL.S:2044
+  if cs goto :impale       ; CTRL.S:2045
+:jumpland:
+  call getspikes                  ; CTRL.S:2048
+  if eq goto ]rts       ; CTRL.S:2049
+:impale:
+  tail_call DoImpale                ; CTRL.S:2051
+}
+
+fn DOIMPALE {
+  call jamspikes                  ; CTRL.S:2059
+  x = *CharBlockY@0x0045        ; CTRL.S:2061
+  x += 1                         ; CTRL.S:2062
+  a = *(FloorY@0x127e + x)   ; CTRL.S:2063
+  *CharY@0x0042 = a            ; CTRL.S:2064
+  a = *tempblockx@0x0091        ; CTRL.S:2066
+  call getblockej                  ; CTRL.S:2067
+  c = 0                            ; CTRL.S:2068
+  a = a + #0x0a + c              ; CTRL.S:2069
+  *CharX@0x0041 = a            ; CTRL.S:2070
+  a = #0x08                  ; CTRL.S:2071
+  call addcharx                  ; CTRL.S:2072
+  *CharX@0x0041 = a            ; CTRL.S:2073
+  a = #0x00                  ; CTRL.S:2075
+  *CharYVel@0x0048 = a            ; CTRL.S:2076
+  a = #Impaled                  ; CTRL.S:2078
+  call addsound                  ; CTRL.S:2079
+  a = #0x64                  ; CTRL.S:2081
+  call decstr                  ; CTRL.S:2082
+  a = #impale                  ; CTRL.S:2084
+  call jumpseq                  ; CTRL.S:2085
+  tail_call animchar                ; CTRL.S:2086
+}
+
+fn TryPickup {
+  call getunderft                  ; CTRL.S:2095
+  if a == #flask goto :2  ; CTRL.S:2097
+  if a != #sword goto :1  ; CTRL.S:2099
+:2:
+  call getbehind                  ; CTRL.S:2100
+  call cmpspace                  ; CTRL.S:2101
+  if eq goto :no       ; CTRL.S:2102
+  a = *CharX@0x0041        ; CTRL.S:2103
+  a = #0xf2                  ; CTRL.S:2104
+  call addcharx                  ; CTRL.S:2105
+  *CharX@0x0041 = a            ; CTRL.S:2106
+  call rereadblocks                  ; CTRL.S:2107
+:1:
+  call getinfront                  ; CTRL.S:2108
+  if a == #flask goto :pickup  ; CTRL.S:2110
+  if a == #sword goto :pickup  ; CTRL.S:2112
+:no:
+  a = #0x00                  ; CTRL.S:2113
+  return                           ; CTRL.S:2114
+:pickup:
+  call PickItUp                  ; CTRL.S:2116
+  a = #0x01                  ; CTRL.S:2117
+  return                           ; CTRL.S:2118
+}
+
+fn PickItUp {
+  x = *CharPosn@0x0040        ; CTRL.S:2128
+  if x == #0x6d goto :ok  ; CTRL.S:2130
+  call getfwddist                  ; CTRL.S:2131
+  if x == #0x02 goto :0  ; CTRL.S:2133
+  call addcharx                  ; CTRL.S:2134
+  *CharX@0x0041 = a            ; CTRL.S:2135
+:0:
+  a = *CharFace@0x0043        ; CTRL.S:2136
+  if a <0 goto :1  ; CTRL.S:2137
+  a = #0xfe                  ; CTRL.S:2138
+  call addcharx                  ; CTRL.S:2139
+  *CharX@0x0041 = a            ; CTRL.S:2140
+:1:
+  tail_call DoCrouch                ; CTRL.S:2141
+:ok:
+  if a == #sword goto :PickupSword  ; CTRL.S:2144
+  a = *(BlueSpec@0x0026)[y]   ; CTRL.S:2146
+  a = a >> 1                       ; CTRL.S:2147
+  a = a >> 1                       ; CTRL.S:2148
+  a = a >> 1                       ; CTRL.S:2149
+  a = a >> 1                       ; CTRL.S:2150
+  a = a >> 1                       ; CTRL.S:2151
+  call RemoveObj                  ; CTRL.S:2152
+  a = #drinkpotion                  ; CTRL.S:2154
+  tail_call jumpseq                ; CTRL.S:2155
+:PickupSword:
+  a = #0xff                  ; CTRL.S:2158
+  call RemoveObj                  ; CTRL.S:2159
+  a = #pickupsword                  ; CTRL.S:2161
+  tail_call jumpseq                ; CTRL.S:2162
+  ??? usr $a9,16,$00,*-org            ; CTRL.S:2167
+}
+
+fn :test {
+  call getabove                  ; CTRL.S:305
+  *blockid@0x008b = a            ; CTRL.S:306
+  call getaboveinf                  ; CTRL.S:307
+  tail_call checkledge                ; CTRL.S:308
+}
+
+fn :sub {
+  call markwipe                  ; CTRL.S:350
+  tail_call markred                ; CTRL.S:351
+:no:
+startfall:
+  a = #0x00                  ; CTRL.S:357
+  *rjumpflag@0x023a = a            ; CTRL.S:358
+  *CharSword@0x004e = a            ; CTRL.S:359
+  *CharBlockY@0x0045 += 1                         ; CTRL.S:361
+  call addslicers                  ; CTRL.S:362
+  a = *CharPosn@0x0040        ; CTRL.S:364
+  *rjumpflag@0x023a = a            ; CTRL.S:367
+  cmp a, #0x09              ; CTRL.S:369
+  if a == #0x09 goto :stepfall  ; CTRL.S:370
+  cmp a, #0x0d              ; CTRL.S:371
+  if a == #0x0d goto :stepfall2  ; CTRL.S:372
+  cmp a, #0x1a              ; CTRL.S:373
+  if a == #0x1a goto :jumpfall  ; CTRL.S:374
+  cmp a, #0x2c              ; CTRL.S:375
+  if a == #0x2c goto :rjumpfall  ; CTRL.S:376
+  cmp a, #0x51              ; CTRL.S:377
+  if a < #0x51 goto :2  ; CTRL.S:378
+  cmp a, #0x56              ; CTRL.S:379
+  if a < #0x56 goto :hdropfall  ; CTRL.S:380
+:2:
+  cmp a, #0x96              ; CTRL.S:381
+  if a < #0x96 goto :1  ; CTRL.S:382
+  cmp a, #0xb4              ; CTRL.S:383
+  if a < #0xb4 goto :fightfall  ; CTRL.S:384
+:1:
+:stepfall:
+  a = #stepfall                  ; CTRL.S:387
+  if a != #0x00 goto :doit  ; CTRL.S:388
+:stepfall2:
+  a = #stepfall2                  ; CTRL.S:390
+  if a != #0x00 goto :doit  ; CTRL.S:391
+:jumpfall:
+  a = #jumpfall                  ; CTRL.S:393
+  if a != #0x00 goto :doit  ; CTRL.S:394
+:rjumpfall:
+  a = #rjumpfall                  ; CTRL.S:396
+  if a != #0x00 goto :doit  ; CTRL.S:397
+:hdropfall:
+  a = #0x05                  ; CTRL.S:400
+  call addcharx                  ; CTRL.S:401
+  *CharX@0x0041 = a            ; CTRL.S:402
+  call rereadblocks                  ; CTRL.S:403
+  goto :stepfall2                ; CTRL.S:404
+]rts:
+  return                           ; CTRL.S:405
+:fightfall:
+  a = *CharID@0x004d        ; CTRL.S:407
+  cmp a, #0x02              ; CTRL.S:408
+  if a < #0x02 goto :player  ; CTRL.S:409
+  a = *CharXVel@0x0047        ; CTRL.S:410
+  if a <0 goto :fb  ; CTRL.S:411
+  a = #0x00                  ; CTRL.S:412
+  *droppedout@0x00e7 = a            ; CTRL.S:413
+  a = #efightfallfwd                  ; CTRL.S:414
+  if a != #0x00 goto :doit  ; CTRL.S:415
+:fb:
+  a = #efightfall                  ; CTRL.S:416
+  if a != #0x00 goto :doit  ; CTRL.S:417
+:player:
+  a = #0x01                  ; CTRL.S:418
+  *droppedout@0x00e7 = a            ; CTRL.S:419
+  a = #fightfall                  ; CTRL.S:420
+  if a != #0x00 goto :doit  ; CTRL.S:421
+:doit:
+  call jumpseq                  ; CTRL.S:424
+  call animchar                  ; CTRL.S:425
+  call rereadblocks                  ; CTRL.S:427
+  call getunderft                  ; CTRL.S:428
+  call cmpwall                  ; CTRL.S:429
+  if eq goto :bump       ; CTRL.S:430
+  call getinfront                  ; CTRL.S:431
+  call cmpwall                  ; CTRL.S:432
+  if ne goto ]rts       ; CTRL.S:433
+  tail_call CDpatch                ; CTRL.S:434
+:bump:
+  tail_call InsideBlock                ; CTRL.S:436
+}
+
+fn :doit {
+  x = #0x01                  ; CTRL.S:1022
+  *clrF@0x00d4 = x            ; CTRL.S:1023
+  tail_call jumpseq                ; CTRL.S:1024
+}
+
+fn :clr  (aka ]clr) {
+  tail_call clrall                ; CTRL.S:675
+:underctrl:
+  a = *CharSword@0x004e        ; CTRL.S:678
+  if a == #0x02 goto FightCtrl  ; CTRL.S:680
+  a = *CharID@0x004d        ; CTRL.S:682
+  if a < #0x02 goto :cont  ; CTRL.S:684
+  tail_call GuardCtrl                ; CTRL.S:685
+:cont:
+  x = *CharPosn@0x0040        ; CTRL.S:689
+  if x == #0x0f goto :standing  ; CTRL.S:692
+  if x == #0x30 goto :turning  ; CTRL.S:695
+  if x < #0x32 goto :0  ; CTRL.S:698
+  if x < #0x35 goto :standing  ; CTRL.S:700
+:0:
+  if x < #0x04 goto :starting  ; CTRL.S:703
+  if x < #0x43 goto :4  ; CTRL.S:706
+  if x < #0x46 goto :stjumpup  ; CTRL.S:708
+:4:
+  if x >= #0x0f goto :2  ; CTRL.S:711
+  goto :running                ; CTRL.S:712
+:2:
+  if x < #0x57 goto :1  ; CTRL.S:715
+  if x >= #0x64 goto :1  ; CTRL.S:717
+  goto :hanging                ; CTRL.S:718
+:1:
+  if x == #0x6d goto :crouching  ; CTRL.S:721
+:3:
+]rts:
+  return                           ; CTRL.S:723
+:standing:
+  tail_call standing                ; CTRL.S:725
+:starting:
+  tail_call starting                ; CTRL.S:726
+:stjumpup:
+  tail_call stjumpup                ; CTRL.S:727
+:running:
+  tail_call arunning                ; CTRL.S:728
+:hanging:
+  tail_call hanging                ; CTRL.S:729
+:turning:
+  tail_call turning                ; CTRL.S:730
+:crouching:
+  tail_call crouching                ; CTRL.S:731
+}

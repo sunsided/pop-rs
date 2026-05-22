@@ -1,0 +1,1777 @@
+; module SPECIALK from 01 POP Source/Source/SPECIALK.S
+
+fn KEYS {
+  a = *SINGSTEP@0x0021        ; SPECIALK.S:139
+  if a == #0x00 goto KEYS1  ; SPECIALK.S:140
+freeze:
+  a = *$C000@0xc000        ; SPECIALK.S:142
+  if a >=0 goto freeze  ; SPECIALK.S:143
+  cmp a, #kfreeze              ; SPECIALK.S:145
+  if a == #kfreeze goto :fradv  ; SPECIALK.S:146
+  x = #0x00                  ; SPECIALK.S:148
+  *SINGSTEP@0x0021 = x            ; SPECIALK.S:149
+  a = #0x00                  ; SPECIALK.S:151
+  if a == #0x00 goto KEYS2  ; SPECIALK.S:152
+:fradv:
+  a = #0x01                  ; SPECIALK.S:154
+  *SINGSTEP@0x0021 = a            ; SPECIALK.S:155
+  *$C010@0xc010 = a            ; SPECIALK.S:156
+  *keypress@0x020f = a            ; SPECIALK.S:157
+]rts:
+  return                           ; SPECIALK.S:158
+}
+
+fn freeze {
+  a = *$C000@0xc000        ; SPECIALK.S:142
+  if a >=0 goto freeze  ; SPECIALK.S:143
+  if a == #kfreeze goto :fradv  ; SPECIALK.S:146
+  x = #0x00                  ; SPECIALK.S:148
+  *SINGSTEP@0x0021 = x            ; SPECIALK.S:149
+  a = #0x00                  ; SPECIALK.S:151
+  if a == #0x00 goto KEYS2  ; SPECIALK.S:152
+:fradv:
+  a = #0x01                  ; SPECIALK.S:154
+  *SINGSTEP@0x0021 = a            ; SPECIALK.S:155
+  *$C010@0xc010 = a            ; SPECIALK.S:156
+  *keypress@0x020f = a            ; SPECIALK.S:157
+]rts:
+  return                           ; SPECIALK.S:158
+}
+
+fn KEYS1 {
+  a = *$C000@0xc000        ; SPECIALK.S:160
+KEYS2:
+  *keypress@0x020f = a            ; SPECIALK.S:162
+  a = *$C010@0xc010        ; SPECIALK.S:164
+  *keydown@0x0210 = a            ; SPECIALK.S:166
+  call KREAD                  ; SPECIALK.S:168
+  a = *keypress@0x020f        ; SPECIALK.S:170
+  if a >=0 goto ]rts  ; SPECIALK.S:171
+  x = *develment@0x020e        ; SPECIALK.S:175
+  if x == #0x00 goto :nogo  ; SPECIALK.S:176
+  cmp a, #"0"              ; SPECIALK.S:177
+  if a < #"0" goto :nogo  ; SPECIALK.S:178
+  cmp a, #"9"+1              ; SPECIALK.S:179
+  if a >= #"9"+1 goto :nogo  ; SPECIALK.S:180
+  a = #C_go0                  ; SPECIALK.S:185
+  x = #>C_go0                  ; SPECIALK.S:186
+  call checkcode                  ; SPECIALK.S:187
+  if ne goto :nogo0       ; SPECIALK.S:188
+  a = #0x00                  ; SPECIALK.S:189
+:golevel:
+  c = 0                            ; SPECIALK.S:190
+  a = a + *keypress@0x020f + c    ; SPECIALK.S:191
+  c = 1                            ; SPECIALK.S:192
+  a = a - #"0" - (1 - c)        ; SPECIALK.S:193
+  cmp a, #0x04              ; SPECIALK.S:195
+  if a < #0x04 goto ]rts  ; SPECIALK.S:196
+  cmp a, #0x0d              ; SPECIALK.S:197
+  if a >= #0x0d goto ]rts  ; SPECIALK.S:198
+  *NextLevel@0x031c = a            ; SPECIALK.S:199
+  call shortentime                  ; SPECIALK.S:200
+]rts:
+  return                           ; SPECIALK.S:201
+:nogo0:
+  a = #C_go1                  ; SPECIALK.S:203
+  x = #>C_go1                  ; SPECIALK.S:204
+  call checkcode                  ; SPECIALK.S:205
+  if ne goto :nogo       ; SPECIALK.S:206
+  a = #0x0a                  ; SPECIALK.S:207
+  if a != #0x00 goto :golevel  ; SPECIALK.S:208
+:nogo:
+  a = *keypress@0x020f        ; SPECIALK.S:214
+  call addkey                  ; SPECIALK.S:215
+  a = #C_devel                  ; SPECIALK.S:222
+  x = #>C_devel                  ; SPECIALK.S:223
+  call checkcode                  ; SPECIALK.S:224
+  if ne goto :1       ; SPECIALK.S:225
+  a = #0x01                  ; SPECIALK.S:226
+  *develment@0x020e = a            ; SPECIALK.S:227
+  tail_call gtone                ; SPECIALK.S:228
+:1:
+  a = #C_skip                  ; SPECIALK.S:234
+  x = #>C_skip                  ; SPECIALK.S:235
+  call checkcode                  ; SPECIALK.S:236
+  if ne goto :2       ; SPECIALK.S:237
+  a = #0x03                  ; SPECIALK.S:238
+  x = *develment@0x020e        ; SPECIALK.S:239
+  if x == #0x00 goto :limit  ; SPECIALK.S:240
+  a = #0x0b                  ; SPECIALK.S:241
+:limit:
+  cmp a, *level@0x03f4    ; SPECIALK.S:242
+  if a < *level@0x03f4 goto :2  ; SPECIALK.S:243
+  *NextLevel@0x031c += 1                         ; SPECIALK.S:244
+  call shortentime                  ; SPECIALK.S:246
+:2:
+  call LegitKeys                  ; SPECIALK.S:252
+  call DevelKeys                  ; SPECIALK.S:254
+  call TempDevel                  ; SPECIALK.S:256
+]rts:
+  return                           ; SPECIALK.S:258
+}
+
+fn KEYS2 {
+  *keypress@0x020f = a            ; SPECIALK.S:162
+  a = *$C010@0xc010        ; SPECIALK.S:164
+  *keydown@0x0210 = a            ; SPECIALK.S:166
+  call KREAD                  ; SPECIALK.S:168
+  a = *keypress@0x020f        ; SPECIALK.S:170
+  if a >=0 goto ]rts  ; SPECIALK.S:171
+  x = *develment@0x020e        ; SPECIALK.S:175
+  if x == #0x00 goto :nogo  ; SPECIALK.S:176
+  cmp a, #"0"              ; SPECIALK.S:177
+  if a < #"0" goto :nogo  ; SPECIALK.S:178
+  cmp a, #"9"+1              ; SPECIALK.S:179
+  if a >= #"9"+1 goto :nogo  ; SPECIALK.S:180
+  a = #C_go0                  ; SPECIALK.S:185
+  x = #>C_go0                  ; SPECIALK.S:186
+  call checkcode                  ; SPECIALK.S:187
+  if ne goto :nogo0       ; SPECIALK.S:188
+  a = #0x00                  ; SPECIALK.S:189
+:golevel:
+  c = 0                            ; SPECIALK.S:190
+  a = a + *keypress@0x020f + c    ; SPECIALK.S:191
+  c = 1                            ; SPECIALK.S:192
+  a = a - #"0" - (1 - c)        ; SPECIALK.S:193
+  cmp a, #0x04              ; SPECIALK.S:195
+  if a < #0x04 goto ]rts  ; SPECIALK.S:196
+  cmp a, #0x0d              ; SPECIALK.S:197
+  if a >= #0x0d goto ]rts  ; SPECIALK.S:198
+  *NextLevel@0x031c = a            ; SPECIALK.S:199
+  call shortentime                  ; SPECIALK.S:200
+]rts:
+  return                           ; SPECIALK.S:201
+:nogo0:
+  a = #C_go1                  ; SPECIALK.S:203
+  x = #>C_go1                  ; SPECIALK.S:204
+  call checkcode                  ; SPECIALK.S:205
+  if ne goto :nogo       ; SPECIALK.S:206
+  a = #0x0a                  ; SPECIALK.S:207
+  if a != #0x00 goto :golevel  ; SPECIALK.S:208
+:nogo:
+  a = *keypress@0x020f        ; SPECIALK.S:214
+  call addkey                  ; SPECIALK.S:215
+  a = #C_devel                  ; SPECIALK.S:222
+  x = #>C_devel                  ; SPECIALK.S:223
+  call checkcode                  ; SPECIALK.S:224
+  if ne goto :1       ; SPECIALK.S:225
+  a = #0x01                  ; SPECIALK.S:226
+  *develment@0x020e = a            ; SPECIALK.S:227
+  tail_call gtone                ; SPECIALK.S:228
+:1:
+  a = #C_skip                  ; SPECIALK.S:234
+  x = #>C_skip                  ; SPECIALK.S:235
+  call checkcode                  ; SPECIALK.S:236
+  if ne goto :2       ; SPECIALK.S:237
+  a = #0x03                  ; SPECIALK.S:238
+  x = *develment@0x020e        ; SPECIALK.S:239
+  if x == #0x00 goto :limit  ; SPECIALK.S:240
+  a = #0x0b                  ; SPECIALK.S:241
+:limit:
+  cmp a, *level@0x03f4    ; SPECIALK.S:242
+  if a < *level@0x03f4 goto :2  ; SPECIALK.S:243
+  *NextLevel@0x031c += 1                         ; SPECIALK.S:244
+  call shortentime                  ; SPECIALK.S:246
+:2:
+  call LegitKeys                  ; SPECIALK.S:252
+  call DevelKeys                  ; SPECIALK.S:254
+  call TempDevel                  ; SPECIALK.S:256
+]rts:
+  return                           ; SPECIALK.S:258
+}
+
+fn LegitKeys {
+  a = *keypress@0x020f        ; SPECIALK.S:266
+  cmp a, #kfreeze              ; SPECIALK.S:267
+  if a != #kfreeze goto :1  ; SPECIALK.S:268
+  tail_call freeze                ; SPECIALK.S:269
+:1:
+  cmp a, #krestart              ; SPECIALK.S:271
+  if a != #krestart goto :1a  ; SPECIALK.S:272
+  tail_call goattract                ; SPECIALK.S:273
+:1a:
+  cmp a, #kabort              ; SPECIALK.S:275
+  if a != #kabort goto :1b  ; SPECIALK.S:276
+  tail_call restart                ; SPECIALK.S:277
+  cmp a, #kreturn              ; SPECIALK.S:280
+  if a != #kreturn goto :2  ; SPECIALK.S:281
+  tail_call gobuild                ; SPECIALK.S:282
+:2:
+  cmp a, #ksetkbd              ; SPECIALK.S:287
+  if a != #ksetkbd goto :30  ; SPECIALK.S:288
+  a = #0x00                  ; SPECIALK.S:289
+  *joyon@0x020d = a            ; SPECIALK.S:290
+]sk1:
+  tail_call gtone                ; SPECIALK.S:291
+:30:
+  cmp a, #ksetjstk              ; SPECIALK.S:293
+  if a != #ksetjstk goto :31  ; SPECIALK.S:294
+  call setcenter                  ; SPECIALK.S:295
+  goto ]sk1                ; SPECIALK.S:296
+:31:
+  cmp a, #kflipx              ; SPECIALK.S:298
+  if a != #kflipx goto :32  ; SPECIALK.S:299
+  a = *jhoriz@0x020b        ; SPECIALK.S:300
+  a = a ^ #0x01              ; SPECIALK.S:301
+  *jhoriz@0x020b = a            ; SPECIALK.S:302
+  if pl goto ]sk1       ; SPECIALK.S:303
+:32:
+  cmp a, #kflipy              ; SPECIALK.S:305
+  if a != #kflipy goto :3  ; SPECIALK.S:306
+  a = *jvert@0x020a        ; SPECIALK.S:307
+  a = a ^ #0x01              ; SPECIALK.S:308
+  *jvert@0x020a = a            ; SPECIALK.S:309
+  if pl goto ]sk1       ; SPECIALK.S:310
+:3:
+  cmp a, #ksound              ; SPECIALK.S:314
+  if a != #ksound goto :16  ; SPECIALK.S:315
+]togsound:
+  call zerosound                  ; SPECIALK.S:317
+  a = *soundon@0x0203        ; SPECIALK.S:318
+  a = a ^ #0x01              ; SPECIALK.S:319
+  *soundon@0x0203 = a            ; SPECIALK.S:320
+  if ne goto ]sk1       ; SPECIALK.S:321
+  return                           ; SPECIALK.S:322
+:16:
+  cmp a, #kmusic              ; SPECIALK.S:324
+  if a != #kmusic goto :26  ; SPECIALK.S:325
+  a = *musicon@0x031a        ; SPECIALK.S:326
+  a = a ^ #0x01              ; SPECIALK.S:327
+  *musicon@0x031a = a            ; SPECIALK.S:328
+  if ne goto ]sk1       ; SPECIALK.S:329
+  return                           ; SPECIALK.S:330
+:26:
+  cmp a, #kversion              ; SPECIALK.S:332
+  if a != #kversion goto :17  ; SPECIALK.S:333
+  tail_call dispversion                ; SPECIALK.S:334
+:17:
+  cmp a, #ksavegame              ; SPECIALK.S:338
+  if a != #ksavegame goto :18  ; SPECIALK.S:339
+  a = *level@0x03f4        ; SPECIALK.S:340
+  *SavLevel@0xb6f0 = a            ; SPECIALK.S:341
+  tail_call DoSaveGame                ; SPECIALK.S:342
+:18:
+  cmp a, #kshowtime              ; SPECIALK.S:346
+  if a != #kshowtime goto :19  ; SPECIALK.S:347
+  a = #0x03                  ; SPECIALK.S:348
+  *timerequest@0x031f = a            ; SPECIALK.S:349
+  return                           ; SPECIALK.S:350
+:19:
+]rts:
+  return                           ; SPECIALK.S:353
+}
+
+fn DevelKeys {
+  a = *develment@0x020e        ; SPECIALK.S:361
+  if a == #0x00 goto ]rts  ; SPECIALK.S:362
+  call checkcodes                  ; SPECIALK.S:364
+  a = *keypress@0x020f        ; SPECIALK.S:366
+  if a != #kclean goto :1  ; SPECIALK.S:368
+  a = #0x00                  ; SPECIALK.S:369
+  *develment@0x020e = a            ; SPECIALK.S:370
+  return                           ; SPECIALK.S:371
+:1:
+]rts:
+  return                           ; SPECIALK.S:373
+}
+
+fn postload  (aka ]sm) {
+  a = #0xa9                  ; SPECIALK.S:549
+  *BBundID@0x03f5 = a            ; SPECIALK.S:550
+  return                           ; SPECIALK.S:551
+}
+
+fn preload {
+  a = *BBundID@0x03f5        ; SPECIALK.S:554
+  ??? sta ]sm+1            ; SPECIALK.S:555
+  a = #POPside1                  ; SPECIALK.S:556
+  *BBundID@0x03f5 = a            ; SPECIALK.S:557
+  return                           ; SPECIALK.S:558
+}
+
+fn addkey {
+  x = *keybufptr@0x00ca        ; SPECIALK.S:568
+  x += 1                         ; SPECIALK.S:569
+  if x < #keybuflen goto :ok  ; SPECIALK.S:571
+  x = #0x00                  ; SPECIALK.S:572
+:ok:
+  *keybufptr@0x00ca = x            ; SPECIALK.S:573
+  *(keybuf@0x03ac + x) = a   ; SPECIALK.S:575
+]rts:
+  return                           ; SPECIALK.S:576
+}
+
+fn checkcode {
+  ??? sta :smod+1            ; SPECIALK.S:648
+  ??? stx :smod+2            ; SPECIALK.S:649
+  x = *keybufptr@0x00ca        ; SPECIALK.S:651
+  y = #0x00                  ; SPECIALK.S:652
+:loop:
+:smod:
+  a = *($ffff@0xffff + y)   ; SPECIALK.S:654
+  if a == #0x00 goto ]rts  ; SPECIALK.S:655
+  ??? cmp keybuf,x            ; SPECIALK.S:656
+  if eq goto :match       ; SPECIALK.S:657
+  cmp a, #"A"              ; SPECIALK.S:658
+  if a < #"A" goto :fail  ; SPECIALK.S:659
+  cmp a, #"Z"+1              ; SPECIALK.S:660
+  if a >= #"Z"+1 goto :fail  ; SPECIALK.S:661
+  a = a | #0x20              ; SPECIALK.S:662
+  ??? cmp keybuf,x            ; SPECIALK.S:663
+  if ne goto :fail       ; SPECIALK.S:664
+:match:
+  y += 1                         ; SPECIALK.S:666
+  x -= 1                         ; SPECIALK.S:667
+  if x >=0 goto :loop  ; SPECIALK.S:668
+  x = #keybuflen-1                  ; SPECIALK.S:669
+  if x >=0 goto :loop  ; SPECIALK.S:670
+:fail:
+  a = #0xff                  ; SPECIALK.S:672
+]rts:
+  return                           ; SPECIALK.S:673
+}
+
+fn C_skip {
+  ??? rev "SKIP"            ; SPECIALK.S:682
+C_devel:
+  ??? rev "POP"            ; SPECIALK.S:688
+C_go0:
+  ??? rev "GO0"            ; SPECIALK.S:690
+C_go1:
+  ??? rev "GO1"            ; SPECIALK.S:692
+C_zap2:
+  ??? rev "ZAP"            ; SPECIALK.S:694
+C_boost:
+  ??? rev "BOOST"            ; SPECIALK.S:696
+C_restore:
+  ??? rev "R"            ; SPECIALK.S:698
+C_zap1:
+  ??? rev "Z"            ; SPECIALK.S:700
+C_tina:
+  ??? rev "TINA"            ; SPECIALK.S:702
+KREAD:
+  a = #0x00                  ; SPECIALK.S:719
+  *kbdX@0x0039 = a            ; SPECIALK.S:720
+  *kbdY@0x003a = a            ; SPECIALK.S:721
+  a = *keypress@0x020f        ; SPECIALK.S:723
+  if a <0 goto :cont  ; SPECIALK.S:724
+  x = *keydown@0x0210        ; SPECIALK.S:726
+  if x >=0 goto ]rts  ; SPECIALK.S:727
+  a = a | #0x80              ; SPECIALK.S:729
+:cont:
+  cmp a, #kleft              ; SPECIALK.S:731
+  if a == #kleft goto :left  ; SPECIALK.S:732
+  cmp a, #kleft-SHIFT              ; SPECIALK.S:733
+  if a != #kleft-SHIFT goto :1  ; SPECIALK.S:734
+:left:
+  a = #0xff                  ; SPECIALK.S:736
+:setx:
+  *kbdX@0x0039 = a            ; SPECIALK.S:737
+  return                           ; SPECIALK.S:738
+:1:
+  cmp a, #kright              ; SPECIALK.S:740
+  if a == #kright goto :right  ; SPECIALK.S:741
+  cmp a, #kright-SHIFT              ; SPECIALK.S:742
+  if a != #kright-SHIFT goto :2  ; SPECIALK.S:743
+:right:
+  a = #0x01                  ; SPECIALK.S:745
+  if a != #0x00 goto :setx  ; SPECIALK.S:746
+:2:
+  cmp a, #kup              ; SPECIALK.S:748
+  if a == #kup goto :up  ; SPECIALK.S:749
+  cmp a, #kup-SHIFT              ; SPECIALK.S:750
+  if a != #kup-SHIFT goto :3  ; SPECIALK.S:751
+:up:
+  a = #0xff                  ; SPECIALK.S:753
+:sety:
+  *kbdY@0x003a = a            ; SPECIALK.S:754
+  return                           ; SPECIALK.S:755
+:3:
+  cmp a, #kdown              ; SPECIALK.S:757
+  if a == #kdown goto :down  ; SPECIALK.S:758
+  cmp a, #kdown-SHIFT              ; SPECIALK.S:759
+  if a != #kdown-SHIFT goto :4  ; SPECIALK.S:760
+:down:
+  a = #0x01                  ; SPECIALK.S:762
+  if a != #0x00 goto :sety  ; SPECIALK.S:763
+:4:
+  cmp a, #kupleft              ; SPECIALK.S:765
+  if a == #kupleft goto :ul  ; SPECIALK.S:766
+  cmp a, #kupleft-SHIFT              ; SPECIALK.S:767
+  if a != #kupleft-SHIFT goto :5  ; SPECIALK.S:768
+:ul:
+  a = #0xff                  ; SPECIALK.S:770
+  *kbdX@0x0039 = a            ; SPECIALK.S:771
+  if ne goto :sety       ; SPECIALK.S:772
+:5:
+  cmp a, #kupright              ; SPECIALK.S:774
+  if a == #kupright goto :ur  ; SPECIALK.S:775
+  cmp a, #kupright-SHIFT              ; SPECIALK.S:776
+  if a != #kupright-SHIFT goto :6  ; SPECIALK.S:777
+:ur:
+  a = #0x01                  ; SPECIALK.S:779
+  *kbdX@0x0039 = a            ; SPECIALK.S:780
+  a = #0xff                  ; SPECIALK.S:781
+  *kbdY@0x003a = a            ; SPECIALK.S:782
+  if ne goto :sety       ; SPECIALK.S:783
+:6:
+]rts:
+  return                           ; SPECIALK.S:786
+}
+
+fn C_devel {
+  ??? rev "POP"            ; SPECIALK.S:688
+C_go0:
+  ??? rev "GO0"            ; SPECIALK.S:690
+C_go1:
+  ??? rev "GO1"            ; SPECIALK.S:692
+C_zap2:
+  ??? rev "ZAP"            ; SPECIALK.S:694
+C_boost:
+  ??? rev "BOOST"            ; SPECIALK.S:696
+C_restore:
+  ??? rev "R"            ; SPECIALK.S:698
+C_zap1:
+  ??? rev "Z"            ; SPECIALK.S:700
+C_tina:
+  ??? rev "TINA"            ; SPECIALK.S:702
+KREAD:
+  a = #0x00                  ; SPECIALK.S:719
+  *kbdX@0x0039 = a            ; SPECIALK.S:720
+  *kbdY@0x003a = a            ; SPECIALK.S:721
+  a = *keypress@0x020f        ; SPECIALK.S:723
+  if a <0 goto :cont  ; SPECIALK.S:724
+  x = *keydown@0x0210        ; SPECIALK.S:726
+  if x >=0 goto ]rts  ; SPECIALK.S:727
+  a = a | #0x80              ; SPECIALK.S:729
+:cont:
+  cmp a, #kleft              ; SPECIALK.S:731
+  if a == #kleft goto :left  ; SPECIALK.S:732
+  cmp a, #kleft-SHIFT              ; SPECIALK.S:733
+  if a != #kleft-SHIFT goto :1  ; SPECIALK.S:734
+:left:
+  a = #0xff                  ; SPECIALK.S:736
+:setx:
+  *kbdX@0x0039 = a            ; SPECIALK.S:737
+  return                           ; SPECIALK.S:738
+:1:
+  cmp a, #kright              ; SPECIALK.S:740
+  if a == #kright goto :right  ; SPECIALK.S:741
+  cmp a, #kright-SHIFT              ; SPECIALK.S:742
+  if a != #kright-SHIFT goto :2  ; SPECIALK.S:743
+:right:
+  a = #0x01                  ; SPECIALK.S:745
+  if a != #0x00 goto :setx  ; SPECIALK.S:746
+:2:
+  cmp a, #kup              ; SPECIALK.S:748
+  if a == #kup goto :up  ; SPECIALK.S:749
+  cmp a, #kup-SHIFT              ; SPECIALK.S:750
+  if a != #kup-SHIFT goto :3  ; SPECIALK.S:751
+:up:
+  a = #0xff                  ; SPECIALK.S:753
+:sety:
+  *kbdY@0x003a = a            ; SPECIALK.S:754
+  return                           ; SPECIALK.S:755
+:3:
+  cmp a, #kdown              ; SPECIALK.S:757
+  if a == #kdown goto :down  ; SPECIALK.S:758
+  cmp a, #kdown-SHIFT              ; SPECIALK.S:759
+  if a != #kdown-SHIFT goto :4  ; SPECIALK.S:760
+:down:
+  a = #0x01                  ; SPECIALK.S:762
+  if a != #0x00 goto :sety  ; SPECIALK.S:763
+:4:
+  cmp a, #kupleft              ; SPECIALK.S:765
+  if a == #kupleft goto :ul  ; SPECIALK.S:766
+  cmp a, #kupleft-SHIFT              ; SPECIALK.S:767
+  if a != #kupleft-SHIFT goto :5  ; SPECIALK.S:768
+:ul:
+  a = #0xff                  ; SPECIALK.S:770
+  *kbdX@0x0039 = a            ; SPECIALK.S:771
+  if ne goto :sety       ; SPECIALK.S:772
+:5:
+  cmp a, #kupright              ; SPECIALK.S:774
+  if a == #kupright goto :ur  ; SPECIALK.S:775
+  cmp a, #kupright-SHIFT              ; SPECIALK.S:776
+  if a != #kupright-SHIFT goto :6  ; SPECIALK.S:777
+:ur:
+  a = #0x01                  ; SPECIALK.S:779
+  *kbdX@0x0039 = a            ; SPECIALK.S:780
+  a = #0xff                  ; SPECIALK.S:781
+  *kbdY@0x003a = a            ; SPECIALK.S:782
+  if ne goto :sety       ; SPECIALK.S:783
+:6:
+]rts:
+  return                           ; SPECIALK.S:786
+}
+
+fn C_go0 {
+  ??? rev "GO0"            ; SPECIALK.S:690
+C_go1:
+  ??? rev "GO1"            ; SPECIALK.S:692
+C_zap2:
+  ??? rev "ZAP"            ; SPECIALK.S:694
+C_boost:
+  ??? rev "BOOST"            ; SPECIALK.S:696
+C_restore:
+  ??? rev "R"            ; SPECIALK.S:698
+C_zap1:
+  ??? rev "Z"            ; SPECIALK.S:700
+C_tina:
+  ??? rev "TINA"            ; SPECIALK.S:702
+KREAD:
+  a = #0x00                  ; SPECIALK.S:719
+  *kbdX@0x0039 = a            ; SPECIALK.S:720
+  *kbdY@0x003a = a            ; SPECIALK.S:721
+  a = *keypress@0x020f        ; SPECIALK.S:723
+  if a <0 goto :cont  ; SPECIALK.S:724
+  x = *keydown@0x0210        ; SPECIALK.S:726
+  if x >=0 goto ]rts  ; SPECIALK.S:727
+  a = a | #0x80              ; SPECIALK.S:729
+:cont:
+  cmp a, #kleft              ; SPECIALK.S:731
+  if a == #kleft goto :left  ; SPECIALK.S:732
+  cmp a, #kleft-SHIFT              ; SPECIALK.S:733
+  if a != #kleft-SHIFT goto :1  ; SPECIALK.S:734
+:left:
+  a = #0xff                  ; SPECIALK.S:736
+:setx:
+  *kbdX@0x0039 = a            ; SPECIALK.S:737
+  return                           ; SPECIALK.S:738
+:1:
+  cmp a, #kright              ; SPECIALK.S:740
+  if a == #kright goto :right  ; SPECIALK.S:741
+  cmp a, #kright-SHIFT              ; SPECIALK.S:742
+  if a != #kright-SHIFT goto :2  ; SPECIALK.S:743
+:right:
+  a = #0x01                  ; SPECIALK.S:745
+  if a != #0x00 goto :setx  ; SPECIALK.S:746
+:2:
+  cmp a, #kup              ; SPECIALK.S:748
+  if a == #kup goto :up  ; SPECIALK.S:749
+  cmp a, #kup-SHIFT              ; SPECIALK.S:750
+  if a != #kup-SHIFT goto :3  ; SPECIALK.S:751
+:up:
+  a = #0xff                  ; SPECIALK.S:753
+:sety:
+  *kbdY@0x003a = a            ; SPECIALK.S:754
+  return                           ; SPECIALK.S:755
+:3:
+  cmp a, #kdown              ; SPECIALK.S:757
+  if a == #kdown goto :down  ; SPECIALK.S:758
+  cmp a, #kdown-SHIFT              ; SPECIALK.S:759
+  if a != #kdown-SHIFT goto :4  ; SPECIALK.S:760
+:down:
+  a = #0x01                  ; SPECIALK.S:762
+  if a != #0x00 goto :sety  ; SPECIALK.S:763
+:4:
+  cmp a, #kupleft              ; SPECIALK.S:765
+  if a == #kupleft goto :ul  ; SPECIALK.S:766
+  cmp a, #kupleft-SHIFT              ; SPECIALK.S:767
+  if a != #kupleft-SHIFT goto :5  ; SPECIALK.S:768
+:ul:
+  a = #0xff                  ; SPECIALK.S:770
+  *kbdX@0x0039 = a            ; SPECIALK.S:771
+  if ne goto :sety       ; SPECIALK.S:772
+:5:
+  cmp a, #kupright              ; SPECIALK.S:774
+  if a == #kupright goto :ur  ; SPECIALK.S:775
+  cmp a, #kupright-SHIFT              ; SPECIALK.S:776
+  if a != #kupright-SHIFT goto :6  ; SPECIALK.S:777
+:ur:
+  a = #0x01                  ; SPECIALK.S:779
+  *kbdX@0x0039 = a            ; SPECIALK.S:780
+  a = #0xff                  ; SPECIALK.S:781
+  *kbdY@0x003a = a            ; SPECIALK.S:782
+  if ne goto :sety       ; SPECIALK.S:783
+:6:
+]rts:
+  return                           ; SPECIALK.S:786
+}
+
+fn C_go1 {
+  ??? rev "GO1"            ; SPECIALK.S:692
+C_zap2:
+  ??? rev "ZAP"            ; SPECIALK.S:694
+C_boost:
+  ??? rev "BOOST"            ; SPECIALK.S:696
+C_restore:
+  ??? rev "R"            ; SPECIALK.S:698
+C_zap1:
+  ??? rev "Z"            ; SPECIALK.S:700
+C_tina:
+  ??? rev "TINA"            ; SPECIALK.S:702
+KREAD:
+  a = #0x00                  ; SPECIALK.S:719
+  *kbdX@0x0039 = a            ; SPECIALK.S:720
+  *kbdY@0x003a = a            ; SPECIALK.S:721
+  a = *keypress@0x020f        ; SPECIALK.S:723
+  if a <0 goto :cont  ; SPECIALK.S:724
+  x = *keydown@0x0210        ; SPECIALK.S:726
+  if x >=0 goto ]rts  ; SPECIALK.S:727
+  a = a | #0x80              ; SPECIALK.S:729
+:cont:
+  cmp a, #kleft              ; SPECIALK.S:731
+  if a == #kleft goto :left  ; SPECIALK.S:732
+  cmp a, #kleft-SHIFT              ; SPECIALK.S:733
+  if a != #kleft-SHIFT goto :1  ; SPECIALK.S:734
+:left:
+  a = #0xff                  ; SPECIALK.S:736
+:setx:
+  *kbdX@0x0039 = a            ; SPECIALK.S:737
+  return                           ; SPECIALK.S:738
+:1:
+  cmp a, #kright              ; SPECIALK.S:740
+  if a == #kright goto :right  ; SPECIALK.S:741
+  cmp a, #kright-SHIFT              ; SPECIALK.S:742
+  if a != #kright-SHIFT goto :2  ; SPECIALK.S:743
+:right:
+  a = #0x01                  ; SPECIALK.S:745
+  if a != #0x00 goto :setx  ; SPECIALK.S:746
+:2:
+  cmp a, #kup              ; SPECIALK.S:748
+  if a == #kup goto :up  ; SPECIALK.S:749
+  cmp a, #kup-SHIFT              ; SPECIALK.S:750
+  if a != #kup-SHIFT goto :3  ; SPECIALK.S:751
+:up:
+  a = #0xff                  ; SPECIALK.S:753
+:sety:
+  *kbdY@0x003a = a            ; SPECIALK.S:754
+  return                           ; SPECIALK.S:755
+:3:
+  cmp a, #kdown              ; SPECIALK.S:757
+  if a == #kdown goto :down  ; SPECIALK.S:758
+  cmp a, #kdown-SHIFT              ; SPECIALK.S:759
+  if a != #kdown-SHIFT goto :4  ; SPECIALK.S:760
+:down:
+  a = #0x01                  ; SPECIALK.S:762
+  if a != #0x00 goto :sety  ; SPECIALK.S:763
+:4:
+  cmp a, #kupleft              ; SPECIALK.S:765
+  if a == #kupleft goto :ul  ; SPECIALK.S:766
+  cmp a, #kupleft-SHIFT              ; SPECIALK.S:767
+  if a != #kupleft-SHIFT goto :5  ; SPECIALK.S:768
+:ul:
+  a = #0xff                  ; SPECIALK.S:770
+  *kbdX@0x0039 = a            ; SPECIALK.S:771
+  if ne goto :sety       ; SPECIALK.S:772
+:5:
+  cmp a, #kupright              ; SPECIALK.S:774
+  if a == #kupright goto :ur  ; SPECIALK.S:775
+  cmp a, #kupright-SHIFT              ; SPECIALK.S:776
+  if a != #kupright-SHIFT goto :6  ; SPECIALK.S:777
+:ur:
+  a = #0x01                  ; SPECIALK.S:779
+  *kbdX@0x0039 = a            ; SPECIALK.S:780
+  a = #0xff                  ; SPECIALK.S:781
+  *kbdY@0x003a = a            ; SPECIALK.S:782
+  if ne goto :sety       ; SPECIALK.S:783
+:6:
+]rts:
+  return                           ; SPECIALK.S:786
+}
+
+fn C_zap2 {
+  ??? rev "ZAP"            ; SPECIALK.S:694
+C_boost:
+  ??? rev "BOOST"            ; SPECIALK.S:696
+C_restore:
+  ??? rev "R"            ; SPECIALK.S:698
+C_zap1:
+  ??? rev "Z"            ; SPECIALK.S:700
+C_tina:
+  ??? rev "TINA"            ; SPECIALK.S:702
+KREAD:
+  a = #0x00                  ; SPECIALK.S:719
+  *kbdX@0x0039 = a            ; SPECIALK.S:720
+  *kbdY@0x003a = a            ; SPECIALK.S:721
+  a = *keypress@0x020f        ; SPECIALK.S:723
+  if a <0 goto :cont  ; SPECIALK.S:724
+  x = *keydown@0x0210        ; SPECIALK.S:726
+  if x >=0 goto ]rts  ; SPECIALK.S:727
+  a = a | #0x80              ; SPECIALK.S:729
+:cont:
+  cmp a, #kleft              ; SPECIALK.S:731
+  if a == #kleft goto :left  ; SPECIALK.S:732
+  cmp a, #kleft-SHIFT              ; SPECIALK.S:733
+  if a != #kleft-SHIFT goto :1  ; SPECIALK.S:734
+:left:
+  a = #0xff                  ; SPECIALK.S:736
+:setx:
+  *kbdX@0x0039 = a            ; SPECIALK.S:737
+  return                           ; SPECIALK.S:738
+:1:
+  cmp a, #kright              ; SPECIALK.S:740
+  if a == #kright goto :right  ; SPECIALK.S:741
+  cmp a, #kright-SHIFT              ; SPECIALK.S:742
+  if a != #kright-SHIFT goto :2  ; SPECIALK.S:743
+:right:
+  a = #0x01                  ; SPECIALK.S:745
+  if a != #0x00 goto :setx  ; SPECIALK.S:746
+:2:
+  cmp a, #kup              ; SPECIALK.S:748
+  if a == #kup goto :up  ; SPECIALK.S:749
+  cmp a, #kup-SHIFT              ; SPECIALK.S:750
+  if a != #kup-SHIFT goto :3  ; SPECIALK.S:751
+:up:
+  a = #0xff                  ; SPECIALK.S:753
+:sety:
+  *kbdY@0x003a = a            ; SPECIALK.S:754
+  return                           ; SPECIALK.S:755
+:3:
+  cmp a, #kdown              ; SPECIALK.S:757
+  if a == #kdown goto :down  ; SPECIALK.S:758
+  cmp a, #kdown-SHIFT              ; SPECIALK.S:759
+  if a != #kdown-SHIFT goto :4  ; SPECIALK.S:760
+:down:
+  a = #0x01                  ; SPECIALK.S:762
+  if a != #0x00 goto :sety  ; SPECIALK.S:763
+:4:
+  cmp a, #kupleft              ; SPECIALK.S:765
+  if a == #kupleft goto :ul  ; SPECIALK.S:766
+  cmp a, #kupleft-SHIFT              ; SPECIALK.S:767
+  if a != #kupleft-SHIFT goto :5  ; SPECIALK.S:768
+:ul:
+  a = #0xff                  ; SPECIALK.S:770
+  *kbdX@0x0039 = a            ; SPECIALK.S:771
+  if ne goto :sety       ; SPECIALK.S:772
+:5:
+  cmp a, #kupright              ; SPECIALK.S:774
+  if a == #kupright goto :ur  ; SPECIALK.S:775
+  cmp a, #kupright-SHIFT              ; SPECIALK.S:776
+  if a != #kupright-SHIFT goto :6  ; SPECIALK.S:777
+:ur:
+  a = #0x01                  ; SPECIALK.S:779
+  *kbdX@0x0039 = a            ; SPECIALK.S:780
+  a = #0xff                  ; SPECIALK.S:781
+  *kbdY@0x003a = a            ; SPECIALK.S:782
+  if ne goto :sety       ; SPECIALK.S:783
+:6:
+]rts:
+  return                           ; SPECIALK.S:786
+}
+
+fn C_boost {
+  ??? rev "BOOST"            ; SPECIALK.S:696
+C_restore:
+  ??? rev "R"            ; SPECIALK.S:698
+C_zap1:
+  ??? rev "Z"            ; SPECIALK.S:700
+C_tina:
+  ??? rev "TINA"            ; SPECIALK.S:702
+KREAD:
+  a = #0x00                  ; SPECIALK.S:719
+  *kbdX@0x0039 = a            ; SPECIALK.S:720
+  *kbdY@0x003a = a            ; SPECIALK.S:721
+  a = *keypress@0x020f        ; SPECIALK.S:723
+  if a <0 goto :cont  ; SPECIALK.S:724
+  x = *keydown@0x0210        ; SPECIALK.S:726
+  if x >=0 goto ]rts  ; SPECIALK.S:727
+  a = a | #0x80              ; SPECIALK.S:729
+:cont:
+  cmp a, #kleft              ; SPECIALK.S:731
+  if a == #kleft goto :left  ; SPECIALK.S:732
+  cmp a, #kleft-SHIFT              ; SPECIALK.S:733
+  if a != #kleft-SHIFT goto :1  ; SPECIALK.S:734
+:left:
+  a = #0xff                  ; SPECIALK.S:736
+:setx:
+  *kbdX@0x0039 = a            ; SPECIALK.S:737
+  return                           ; SPECIALK.S:738
+:1:
+  cmp a, #kright              ; SPECIALK.S:740
+  if a == #kright goto :right  ; SPECIALK.S:741
+  cmp a, #kright-SHIFT              ; SPECIALK.S:742
+  if a != #kright-SHIFT goto :2  ; SPECIALK.S:743
+:right:
+  a = #0x01                  ; SPECIALK.S:745
+  if a != #0x00 goto :setx  ; SPECIALK.S:746
+:2:
+  cmp a, #kup              ; SPECIALK.S:748
+  if a == #kup goto :up  ; SPECIALK.S:749
+  cmp a, #kup-SHIFT              ; SPECIALK.S:750
+  if a != #kup-SHIFT goto :3  ; SPECIALK.S:751
+:up:
+  a = #0xff                  ; SPECIALK.S:753
+:sety:
+  *kbdY@0x003a = a            ; SPECIALK.S:754
+  return                           ; SPECIALK.S:755
+:3:
+  cmp a, #kdown              ; SPECIALK.S:757
+  if a == #kdown goto :down  ; SPECIALK.S:758
+  cmp a, #kdown-SHIFT              ; SPECIALK.S:759
+  if a != #kdown-SHIFT goto :4  ; SPECIALK.S:760
+:down:
+  a = #0x01                  ; SPECIALK.S:762
+  if a != #0x00 goto :sety  ; SPECIALK.S:763
+:4:
+  cmp a, #kupleft              ; SPECIALK.S:765
+  if a == #kupleft goto :ul  ; SPECIALK.S:766
+  cmp a, #kupleft-SHIFT              ; SPECIALK.S:767
+  if a != #kupleft-SHIFT goto :5  ; SPECIALK.S:768
+:ul:
+  a = #0xff                  ; SPECIALK.S:770
+  *kbdX@0x0039 = a            ; SPECIALK.S:771
+  if ne goto :sety       ; SPECIALK.S:772
+:5:
+  cmp a, #kupright              ; SPECIALK.S:774
+  if a == #kupright goto :ur  ; SPECIALK.S:775
+  cmp a, #kupright-SHIFT              ; SPECIALK.S:776
+  if a != #kupright-SHIFT goto :6  ; SPECIALK.S:777
+:ur:
+  a = #0x01                  ; SPECIALK.S:779
+  *kbdX@0x0039 = a            ; SPECIALK.S:780
+  a = #0xff                  ; SPECIALK.S:781
+  *kbdY@0x003a = a            ; SPECIALK.S:782
+  if ne goto :sety       ; SPECIALK.S:783
+:6:
+]rts:
+  return                           ; SPECIALK.S:786
+}
+
+fn C_restore {
+  ??? rev "R"            ; SPECIALK.S:698
+C_zap1:
+  ??? rev "Z"            ; SPECIALK.S:700
+C_tina:
+  ??? rev "TINA"            ; SPECIALK.S:702
+KREAD:
+  a = #0x00                  ; SPECIALK.S:719
+  *kbdX@0x0039 = a            ; SPECIALK.S:720
+  *kbdY@0x003a = a            ; SPECIALK.S:721
+  a = *keypress@0x020f        ; SPECIALK.S:723
+  if a <0 goto :cont  ; SPECIALK.S:724
+  x = *keydown@0x0210        ; SPECIALK.S:726
+  if x >=0 goto ]rts  ; SPECIALK.S:727
+  a = a | #0x80              ; SPECIALK.S:729
+:cont:
+  cmp a, #kleft              ; SPECIALK.S:731
+  if a == #kleft goto :left  ; SPECIALK.S:732
+  cmp a, #kleft-SHIFT              ; SPECIALK.S:733
+  if a != #kleft-SHIFT goto :1  ; SPECIALK.S:734
+:left:
+  a = #0xff                  ; SPECIALK.S:736
+:setx:
+  *kbdX@0x0039 = a            ; SPECIALK.S:737
+  return                           ; SPECIALK.S:738
+:1:
+  cmp a, #kright              ; SPECIALK.S:740
+  if a == #kright goto :right  ; SPECIALK.S:741
+  cmp a, #kright-SHIFT              ; SPECIALK.S:742
+  if a != #kright-SHIFT goto :2  ; SPECIALK.S:743
+:right:
+  a = #0x01                  ; SPECIALK.S:745
+  if a != #0x00 goto :setx  ; SPECIALK.S:746
+:2:
+  cmp a, #kup              ; SPECIALK.S:748
+  if a == #kup goto :up  ; SPECIALK.S:749
+  cmp a, #kup-SHIFT              ; SPECIALK.S:750
+  if a != #kup-SHIFT goto :3  ; SPECIALK.S:751
+:up:
+  a = #0xff                  ; SPECIALK.S:753
+:sety:
+  *kbdY@0x003a = a            ; SPECIALK.S:754
+  return                           ; SPECIALK.S:755
+:3:
+  cmp a, #kdown              ; SPECIALK.S:757
+  if a == #kdown goto :down  ; SPECIALK.S:758
+  cmp a, #kdown-SHIFT              ; SPECIALK.S:759
+  if a != #kdown-SHIFT goto :4  ; SPECIALK.S:760
+:down:
+  a = #0x01                  ; SPECIALK.S:762
+  if a != #0x00 goto :sety  ; SPECIALK.S:763
+:4:
+  cmp a, #kupleft              ; SPECIALK.S:765
+  if a == #kupleft goto :ul  ; SPECIALK.S:766
+  cmp a, #kupleft-SHIFT              ; SPECIALK.S:767
+  if a != #kupleft-SHIFT goto :5  ; SPECIALK.S:768
+:ul:
+  a = #0xff                  ; SPECIALK.S:770
+  *kbdX@0x0039 = a            ; SPECIALK.S:771
+  if ne goto :sety       ; SPECIALK.S:772
+:5:
+  cmp a, #kupright              ; SPECIALK.S:774
+  if a == #kupright goto :ur  ; SPECIALK.S:775
+  cmp a, #kupright-SHIFT              ; SPECIALK.S:776
+  if a != #kupright-SHIFT goto :6  ; SPECIALK.S:777
+:ur:
+  a = #0x01                  ; SPECIALK.S:779
+  *kbdX@0x0039 = a            ; SPECIALK.S:780
+  a = #0xff                  ; SPECIALK.S:781
+  *kbdY@0x003a = a            ; SPECIALK.S:782
+  if ne goto :sety       ; SPECIALK.S:783
+:6:
+]rts:
+  return                           ; SPECIALK.S:786
+}
+
+fn C_zap1 {
+  ??? rev "Z"            ; SPECIALK.S:700
+C_tina:
+  ??? rev "TINA"            ; SPECIALK.S:702
+KREAD:
+  a = #0x00                  ; SPECIALK.S:719
+  *kbdX@0x0039 = a            ; SPECIALK.S:720
+  *kbdY@0x003a = a            ; SPECIALK.S:721
+  a = *keypress@0x020f        ; SPECIALK.S:723
+  if a <0 goto :cont  ; SPECIALK.S:724
+  x = *keydown@0x0210        ; SPECIALK.S:726
+  if x >=0 goto ]rts  ; SPECIALK.S:727
+  a = a | #0x80              ; SPECIALK.S:729
+:cont:
+  cmp a, #kleft              ; SPECIALK.S:731
+  if a == #kleft goto :left  ; SPECIALK.S:732
+  cmp a, #kleft-SHIFT              ; SPECIALK.S:733
+  if a != #kleft-SHIFT goto :1  ; SPECIALK.S:734
+:left:
+  a = #0xff                  ; SPECIALK.S:736
+:setx:
+  *kbdX@0x0039 = a            ; SPECIALK.S:737
+  return                           ; SPECIALK.S:738
+:1:
+  cmp a, #kright              ; SPECIALK.S:740
+  if a == #kright goto :right  ; SPECIALK.S:741
+  cmp a, #kright-SHIFT              ; SPECIALK.S:742
+  if a != #kright-SHIFT goto :2  ; SPECIALK.S:743
+:right:
+  a = #0x01                  ; SPECIALK.S:745
+  if a != #0x00 goto :setx  ; SPECIALK.S:746
+:2:
+  cmp a, #kup              ; SPECIALK.S:748
+  if a == #kup goto :up  ; SPECIALK.S:749
+  cmp a, #kup-SHIFT              ; SPECIALK.S:750
+  if a != #kup-SHIFT goto :3  ; SPECIALK.S:751
+:up:
+  a = #0xff                  ; SPECIALK.S:753
+:sety:
+  *kbdY@0x003a = a            ; SPECIALK.S:754
+  return                           ; SPECIALK.S:755
+:3:
+  cmp a, #kdown              ; SPECIALK.S:757
+  if a == #kdown goto :down  ; SPECIALK.S:758
+  cmp a, #kdown-SHIFT              ; SPECIALK.S:759
+  if a != #kdown-SHIFT goto :4  ; SPECIALK.S:760
+:down:
+  a = #0x01                  ; SPECIALK.S:762
+  if a != #0x00 goto :sety  ; SPECIALK.S:763
+:4:
+  cmp a, #kupleft              ; SPECIALK.S:765
+  if a == #kupleft goto :ul  ; SPECIALK.S:766
+  cmp a, #kupleft-SHIFT              ; SPECIALK.S:767
+  if a != #kupleft-SHIFT goto :5  ; SPECIALK.S:768
+:ul:
+  a = #0xff                  ; SPECIALK.S:770
+  *kbdX@0x0039 = a            ; SPECIALK.S:771
+  if ne goto :sety       ; SPECIALK.S:772
+:5:
+  cmp a, #kupright              ; SPECIALK.S:774
+  if a == #kupright goto :ur  ; SPECIALK.S:775
+  cmp a, #kupright-SHIFT              ; SPECIALK.S:776
+  if a != #kupright-SHIFT goto :6  ; SPECIALK.S:777
+:ur:
+  a = #0x01                  ; SPECIALK.S:779
+  *kbdX@0x0039 = a            ; SPECIALK.S:780
+  a = #0xff                  ; SPECIALK.S:781
+  *kbdY@0x003a = a            ; SPECIALK.S:782
+  if ne goto :sety       ; SPECIALK.S:783
+:6:
+]rts:
+  return                           ; SPECIALK.S:786
+}
+
+fn C_tina {
+  ??? rev "TINA"            ; SPECIALK.S:702
+KREAD:
+  a = #0x00                  ; SPECIALK.S:719
+  *kbdX@0x0039 = a            ; SPECIALK.S:720
+  *kbdY@0x003a = a            ; SPECIALK.S:721
+  a = *keypress@0x020f        ; SPECIALK.S:723
+  if a <0 goto :cont  ; SPECIALK.S:724
+  x = *keydown@0x0210        ; SPECIALK.S:726
+  if x >=0 goto ]rts  ; SPECIALK.S:727
+  a = a | #0x80              ; SPECIALK.S:729
+:cont:
+  cmp a, #kleft              ; SPECIALK.S:731
+  if a == #kleft goto :left  ; SPECIALK.S:732
+  cmp a, #kleft-SHIFT              ; SPECIALK.S:733
+  if a != #kleft-SHIFT goto :1  ; SPECIALK.S:734
+:left:
+  a = #0xff                  ; SPECIALK.S:736
+:setx:
+  *kbdX@0x0039 = a            ; SPECIALK.S:737
+  return                           ; SPECIALK.S:738
+:1:
+  cmp a, #kright              ; SPECIALK.S:740
+  if a == #kright goto :right  ; SPECIALK.S:741
+  cmp a, #kright-SHIFT              ; SPECIALK.S:742
+  if a != #kright-SHIFT goto :2  ; SPECIALK.S:743
+:right:
+  a = #0x01                  ; SPECIALK.S:745
+  if a != #0x00 goto :setx  ; SPECIALK.S:746
+:2:
+  cmp a, #kup              ; SPECIALK.S:748
+  if a == #kup goto :up  ; SPECIALK.S:749
+  cmp a, #kup-SHIFT              ; SPECIALK.S:750
+  if a != #kup-SHIFT goto :3  ; SPECIALK.S:751
+:up:
+  a = #0xff                  ; SPECIALK.S:753
+:sety:
+  *kbdY@0x003a = a            ; SPECIALK.S:754
+  return                           ; SPECIALK.S:755
+:3:
+  cmp a, #kdown              ; SPECIALK.S:757
+  if a == #kdown goto :down  ; SPECIALK.S:758
+  cmp a, #kdown-SHIFT              ; SPECIALK.S:759
+  if a != #kdown-SHIFT goto :4  ; SPECIALK.S:760
+:down:
+  a = #0x01                  ; SPECIALK.S:762
+  if a != #0x00 goto :sety  ; SPECIALK.S:763
+:4:
+  cmp a, #kupleft              ; SPECIALK.S:765
+  if a == #kupleft goto :ul  ; SPECIALK.S:766
+  cmp a, #kupleft-SHIFT              ; SPECIALK.S:767
+  if a != #kupleft-SHIFT goto :5  ; SPECIALK.S:768
+:ul:
+  a = #0xff                  ; SPECIALK.S:770
+  *kbdX@0x0039 = a            ; SPECIALK.S:771
+  if ne goto :sety       ; SPECIALK.S:772
+:5:
+  cmp a, #kupright              ; SPECIALK.S:774
+  if a == #kupright goto :ur  ; SPECIALK.S:775
+  cmp a, #kupright-SHIFT              ; SPECIALK.S:776
+  if a != #kupright-SHIFT goto :6  ; SPECIALK.S:777
+:ur:
+  a = #0x01                  ; SPECIALK.S:779
+  *kbdX@0x0039 = a            ; SPECIALK.S:780
+  a = #0xff                  ; SPECIALK.S:781
+  *kbdY@0x003a = a            ; SPECIALK.S:782
+  if ne goto :sety       ; SPECIALK.S:783
+:6:
+]rts:
+  return                           ; SPECIALK.S:786
+}
+
+fn KREAD {
+  a = #0x00                  ; SPECIALK.S:719
+  *kbdX@0x0039 = a            ; SPECIALK.S:720
+  *kbdY@0x003a = a            ; SPECIALK.S:721
+  a = *keypress@0x020f        ; SPECIALK.S:723
+  if a <0 goto :cont  ; SPECIALK.S:724
+  x = *keydown@0x0210        ; SPECIALK.S:726
+  if x >=0 goto ]rts  ; SPECIALK.S:727
+  a = a | #0x80              ; SPECIALK.S:729
+:cont:
+  cmp a, #kleft              ; SPECIALK.S:731
+  if a == #kleft goto :left  ; SPECIALK.S:732
+  cmp a, #kleft-SHIFT              ; SPECIALK.S:733
+  if a != #kleft-SHIFT goto :1  ; SPECIALK.S:734
+:left:
+  a = #0xff                  ; SPECIALK.S:736
+:setx:
+  *kbdX@0x0039 = a            ; SPECIALK.S:737
+  return                           ; SPECIALK.S:738
+:1:
+  cmp a, #kright              ; SPECIALK.S:740
+  if a == #kright goto :right  ; SPECIALK.S:741
+  cmp a, #kright-SHIFT              ; SPECIALK.S:742
+  if a != #kright-SHIFT goto :2  ; SPECIALK.S:743
+:right:
+  a = #0x01                  ; SPECIALK.S:745
+  if a != #0x00 goto :setx  ; SPECIALK.S:746
+:2:
+  cmp a, #kup              ; SPECIALK.S:748
+  if a == #kup goto :up  ; SPECIALK.S:749
+  cmp a, #kup-SHIFT              ; SPECIALK.S:750
+  if a != #kup-SHIFT goto :3  ; SPECIALK.S:751
+:up:
+  a = #0xff                  ; SPECIALK.S:753
+:sety:
+  *kbdY@0x003a = a            ; SPECIALK.S:754
+  return                           ; SPECIALK.S:755
+:3:
+  cmp a, #kdown              ; SPECIALK.S:757
+  if a == #kdown goto :down  ; SPECIALK.S:758
+  cmp a, #kdown-SHIFT              ; SPECIALK.S:759
+  if a != #kdown-SHIFT goto :4  ; SPECIALK.S:760
+:down:
+  a = #0x01                  ; SPECIALK.S:762
+  if a != #0x00 goto :sety  ; SPECIALK.S:763
+:4:
+  cmp a, #kupleft              ; SPECIALK.S:765
+  if a == #kupleft goto :ul  ; SPECIALK.S:766
+  cmp a, #kupleft-SHIFT              ; SPECIALK.S:767
+  if a != #kupleft-SHIFT goto :5  ; SPECIALK.S:768
+:ul:
+  a = #0xff                  ; SPECIALK.S:770
+  *kbdX@0x0039 = a            ; SPECIALK.S:771
+  if ne goto :sety       ; SPECIALK.S:772
+:5:
+  cmp a, #kupright              ; SPECIALK.S:774
+  if a == #kupright goto :ur  ; SPECIALK.S:775
+  cmp a, #kupright-SHIFT              ; SPECIALK.S:776
+  if a != #kupright-SHIFT goto :6  ; SPECIALK.S:777
+:ur:
+  a = #0x01                  ; SPECIALK.S:779
+  *kbdX@0x0039 = a            ; SPECIALK.S:780
+  a = #0xff                  ; SPECIALK.S:781
+  *kbdY@0x003a = a            ; SPECIALK.S:782
+  if ne goto :sety       ; SPECIALK.S:783
+:6:
+]rts:
+  return                           ; SPECIALK.S:786
+}
+
+fn FACEJSTK {
+  a = #0x00                  ; SPECIALK.S:789
+  c = 1                            ; SPECIALK.S:790
+  a = a - *JSTKX@0x0018 - (1 - c) ; SPECIALK.S:791
+  *JSTKX@0x0018 = a            ; SPECIALK.S:792
+  x = *clrF@0x00d4        ; SPECIALK.S:794
+  a = *clrB@0x00d5        ; SPECIALK.S:795
+  *clrF@0x00d4 = a            ; SPECIALK.S:796
+  *clrB@0x00d5 = x            ; SPECIALK.S:797
+]rts:
+  return                           ; SPECIALK.S:799
+}
+
+fn SAVESELECT {
+  x = #0x04                  ; SPECIALK.S:808
+:loop:
+  a = *(clrF@0x00d4 + x)   ; SPECIALK.S:809
+  *(clrSEL@0x030e + x) = a   ; SPECIALK.S:810
+  x -= 1                         ; SPECIALK.S:811
+  if x >=0 goto :loop  ; SPECIALK.S:812
+  return                           ; SPECIALK.S:813
+}
+
+fn LOADSELECT {
+  x = #0x04                  ; SPECIALK.S:817
+:loop:
+  a = *(clrSEL@0x030e + x)   ; SPECIALK.S:818
+  *(clrF@0x00d4 + x) = a   ; SPECIALK.S:819
+  x -= 1                         ; SPECIALK.S:820
+  if x >=0 goto :loop  ; SPECIALK.S:821
+  return                           ; SPECIALK.S:822
+}
+
+fn SAVEDESEL {
+  x = #0x04                  ; SPECIALK.S:826
+:loop:
+  a = *(clrF@0x00d4 + x)   ; SPECIALK.S:827
+  *(clrDESEL@0x0313 + x) = a   ; SPECIALK.S:828
+  x -= 1                         ; SPECIALK.S:829
+  if x >=0 goto :loop  ; SPECIALK.S:830
+  return                           ; SPECIALK.S:831
+}
+
+fn LOADDESEL {
+  x = #0x04                  ; SPECIALK.S:835
+:loop:
+  a = *(clrDESEL@0x0313 + x)   ; SPECIALK.S:836
+  *(clrF@0x00d4 + x) = a   ; SPECIALK.S:837
+  x -= 1                         ; SPECIALK.S:838
+  if x >=0 goto :loop  ; SPECIALK.S:839
+  return                           ; SPECIALK.S:840
+}
+
+fn INITINPUT {
+  a = #0x00                  ; SPECIALK.S:844
+  x = #0x04                  ; SPECIALK.S:846
+:loop:
+  *(clrDESEL@0x0313 + x) = a   ; SPECIALK.S:847
+  *(clrSEL@0x030e + x) = a   ; SPECIALK.S:848
+  x -= 1                         ; SPECIALK.S:849
+  if x >=0 goto :loop  ; SPECIALK.S:850
+]rts:
+  return                           ; SPECIALK.S:851
+}
+
+fn CLRJSTK {
+  a = *clrF@0x00d4        ; SPECIALK.S:884
+  if a <0 goto :1  ; SPECIALK.S:885
+  x = *JSTKX@0x0018        ; SPECIALK.S:887
+  if x <0 goto :yesF  ; SPECIALK.S:888
+  a = #0x00                  ; SPECIALK.S:890
+  if a == #0x00 goto :staF  ; SPECIALK.S:891
+:yesF:
+  if a != #0x00 goto :1  ; SPECIALK.S:894
+  a = #0xff                  ; SPECIALK.S:896
+:staF:
+  *clrF@0x00d4 = a            ; SPECIALK.S:897
+:1:
+  a = *clrB@0x00d5        ; SPECIALK.S:900
+  if a <0 goto :2  ; SPECIALK.S:901
+  x = *JSTKX@0x0018        ; SPECIALK.S:903
+  if x == #0x01 goto :yesB  ; SPECIALK.S:905
+  a = #0x00                  ; SPECIALK.S:907
+  if a == #0x00 goto :staB  ; SPECIALK.S:908
+:yesB:
+  if a != #0x00 goto :2  ; SPECIALK.S:911
+  a = #0xff                  ; SPECIALK.S:913
+:staB:
+  *clrB@0x00d5 = a            ; SPECIALK.S:914
+:2:
+  a = *clrU@0x00d6        ; SPECIALK.S:917
+  if a <0 goto :3  ; SPECIALK.S:918
+  x = *JSTKY@0x0019        ; SPECIALK.S:920
+  if x <0 goto :yesU  ; SPECIALK.S:921
+  a = #0x00                  ; SPECIALK.S:923
+  if a == #0x00 goto :staU  ; SPECIALK.S:924
+:yesU:
+  if a != #0x00 goto :3  ; SPECIALK.S:927
+  a = #0xff                  ; SPECIALK.S:929
+:staU:
+  *clrU@0x00d6 = a            ; SPECIALK.S:930
+:3:
+  a = *clrD@0x00d7        ; SPECIALK.S:933
+  if a <0 goto :4  ; SPECIALK.S:934
+  x = *JSTKY@0x0019        ; SPECIALK.S:936
+  if x == #0x01 goto :yesD  ; SPECIALK.S:938
+  a = #0x00                  ; SPECIALK.S:940
+  if a == #0x00 goto :staD  ; SPECIALK.S:941
+:yesD:
+  if a != #0x00 goto :4  ; SPECIALK.S:944
+  a = #0xff                  ; SPECIALK.S:946
+:staD:
+  *clrD@0x00d7 = a            ; SPECIALK.S:947
+:4:
+  a = *clrbtn@0x00d8        ; SPECIALK.S:950
+  if a <0 goto :5  ; SPECIALK.S:951
+  x = *btn@0x003d        ; SPECIALK.S:953
+  if x <0 goto :yesbtn  ; SPECIALK.S:954
+  a = #0x00                  ; SPECIALK.S:956
+  if a == #0x00 goto :stabtn  ; SPECIALK.S:957
+:yesbtn:
+  if a != #0x00 goto :5  ; SPECIALK.S:960
+  a = #0xff                  ; SPECIALK.S:962
+:stabtn:
+  *clrbtn@0x00d8 = a            ; SPECIALK.S:963
+:5:
+]rts:
+  return                           ; SPECIALK.S:966
+}
+
+fn ZEROSOUND {
+  a = #0x00                  ; SPECIALK.S:976
+  *soundtable@0xb6c0 = a            ; SPECIALK.S:977
+  return                           ; SPECIALK.S:978
+ADDSOUND:
+  ??? stx ]temp1            ; SPECIALK.S:993
+  x = *soundtable@0xb6c0        ; SPECIALK.S:995
+  cmp x, #maxsfx              ; SPECIALK.S:996
+  if x >= #maxsfx goto :rts  ; SPECIALK.S:997
+  x += 1                         ; SPECIALK.S:999
+  *(soundtable@0xb6c0 + x) = a   ; SPECIALK.S:1000
+  *soundtable@0xb6c0 = x            ; SPECIALK.S:1001
+:rts:
+  ??? ldx ]temp1            ; SPECIALK.S:1003
+  return                           ; SPECIALK.S:1004
+}
+
+fn ADDSOUND {
+  ??? stx ]temp1            ; SPECIALK.S:993
+  x = *soundtable@0xb6c0        ; SPECIALK.S:995
+  cmp x, #maxsfx              ; SPECIALK.S:996
+  if x >= #maxsfx goto :rts  ; SPECIALK.S:997
+  x += 1                         ; SPECIALK.S:999
+  *(soundtable@0xb6c0 + x) = a   ; SPECIALK.S:1000
+  *soundtable@0xb6c0 = x            ; SPECIALK.S:1001
+:rts:
+  ??? ldx ]temp1            ; SPECIALK.S:1003
+  return                           ; SPECIALK.S:1004
+}
+
+fn DEMOKEYS {
+  a = *level@0x03f4        ; SPECIALK.S:1016
+  if a != #0x00 goto :cont  ; SPECIALK.S:1017
+  a = *$c061@0xc061        ; SPECIALK.S:1019
+  a = a | *$c062@0xc062              ; SPECIALK.S:1020
+  if a <0 goto :interrupt  ; SPECIALK.S:1021
+  a = *keypress@0x020f        ; SPECIALK.S:1022
+  if a >=0 goto :cont  ; SPECIALK.S:1023
+  if a == #ESC goto :cont  ; SPECIALK.S:1025
+  if a == #ksound goto :cont  ; SPECIALK.S:1027
+:interrupt:
+  a = #0xff                  ; SPECIALK.S:1029
+  return                           ; SPECIALK.S:1030
+:cont:
+  a = #0x00                  ; SPECIALK.S:1031
+  return                           ; SPECIALK.S:1032
+}
+
+fn LISTTORCHES {
+  a = #0x00                  ; SPECIALK.S:1053
+  *]numtorches@0x00f0 = a            ; SPECIALK.S:1054
+  a = *VisScrn@0x00cb        ; SPECIALK.S:1056
+  call calcblue                  ; SPECIALK.S:1057
+  y = #0x1d                  ; SPECIALK.S:1059
+:loop:
+  call :sub                  ; SPECIALK.S:1061
+  x = *]numtorches@0x00f0        ; SPECIALK.S:1063
+  cmp x, #maxtorches              ; SPECIALK.S:1064
+  if x >= #maxtorches goto :max  ; SPECIALK.S:1065
+  y -= 1                         ; SPECIALK.S:1067
+  if y >=0 goto :loop  ; SPECIALK.S:1068
+  x = *]numtorches@0x00f0        ; SPECIALK.S:1070
+:max:
+  a = #0xff                  ; SPECIALK.S:1071
+  *(torchx@0x032a + x) = a   ; SPECIALK.S:1072
+  *torchcount@0x032e = a            ; SPECIALK.S:1073
+]rts:
+  return                           ; SPECIALK.S:1074
+:sub:
+  a = *(BlueType@0x0024)[y]   ; SPECIALK.S:1076
+  a = a & #idmask              ; SPECIALK.S:1077
+  cmp a, #torch              ; SPECIALK.S:1078
+  if a != #torch goto ]rts  ; SPECIALK.S:1079
+  a = *(fredbuf+1@0x5e79 + y)   ; SPECIALK.S:1080
+  *BOTCUT@0x0013 = a            ; SPECIALK.S:1081
+  a = y                            ; SPECIALK.S:1083
+  push a                           ; SPECIALK.S:1084
+  call unindex                  ; SPECIALK.S:1085
+  push a                           ; SPECIALK.S:1087
+  a = x                            ; SPECIALK.S:1088
+  x = *]numtorches@0x00f0        ; SPECIALK.S:1089
+  y = a                            ; SPECIALK.S:1090
+  a = *(BlockBot+1@0x127a + y)   ; SPECIALK.S:1091
+  c = 1                            ; SPECIALK.S:1092
+  a = a - #0x03 - (1 - c)        ; SPECIALK.S:1093
+  *(torchy@0x032b + x) = a   ; SPECIALK.S:1094
+  a = *BOTCUT@0x0013        ; SPECIALK.S:1095
+  *(torchclip@0x032d + x) = a   ; SPECIALK.S:1096
+  a = pop                          ; SPECIALK.S:1097
+  c = 0                            ; SPECIALK.S:1098
+  a = a + #0x01 + c              ; SPECIALK.S:1099
+  cmp a, #0x0a              ; SPECIALK.S:1100
+  if a >= #0x0a goto ]rts  ; SPECIALK.S:1101
+  a = a << 1                       ; SPECIALK.S:1102
+  a = a << 1                       ; SPECIALK.S:1103
+  *(torchx@0x032a + x) = a   ; SPECIALK.S:1104
+  a = pop                          ; SPECIALK.S:1106
+  y = a                            ; SPECIALK.S:1107
+  a = *(BlueSpec@0x0026)[y]   ; SPECIALK.S:1108
+  *(torchstate@0x032c + x) = a   ; SPECIALK.S:1109
+  *]numtorches@0x00f0 += 1                         ; SPECIALK.S:1111
+]rts:
+  return                           ; SPECIALK.S:1112
+}
+
+fn BURN {
+  a = *torchx@0x032a        ; SPECIALK.S:1126
+  if a <0 goto ]rts  ; SPECIALK.S:1127
+  x = *torchcount@0x032e        ; SPECIALK.S:1129
+  x += 1                         ; SPECIALK.S:1130
+  a = *(torchx@0x032a + x)   ; SPECIALK.S:1131
+  if a >=0 goto :ok  ; SPECIALK.S:1132
+  x = #0x00                  ; SPECIALK.S:1133
+:ok:
+  *torchcount@0x032e = x            ; SPECIALK.S:1134
+  a = *(torchx@0x032a + x)   ; SPECIALK.S:1135
+  *XCO@0x0001 = a            ; SPECIALK.S:1136
+  a = *(torchy@0x032b + x)   ; SPECIALK.S:1137
+  *YCO@0x0002 = a            ; SPECIALK.S:1138
+  a = *(torchclip@0x032d + x)   ; SPECIALK.S:1139
+  *BOTCUT@0x0013 = a            ; SPECIALK.S:1140
+  a = *(torchstate@0x032c + x)   ; SPECIALK.S:1141
+  call getflameframe                  ; SPECIALK.S:1142
+  *(torchstate@0x032c + x) = a   ; SPECIALK.S:1143
+  x = a                            ; SPECIALK.S:1144
+  call setupflame                  ; SPECIALK.S:1145
+  a = *BOTCUT@0x0013        ; SPECIALK.S:1146
+  if a != #0x00 goto :partial  ; SPECIALK.S:1147
+:whole:
+  tail_call fastlay                ; SPECIALK.S:1148
+]rts:
+  return                           ; SPECIALK.S:1149
+:partial:
+  call initlay                  ; SPECIALK.S:1155
+  a = #0x00                  ; SPECIALK.S:1156
+  *OFFSET@0x0003 = a            ; SPECIALK.S:1157
+  a = *YCO@0x0002        ; SPECIALK.S:1158
+  c = 1                            ; SPECIALK.S:1159
+  a = a - #0x04 - (1 - c)        ; SPECIALK.S:1160
+  *BOTCUT@0x0013 = a            ; SPECIALK.S:1161
+  tail_call lay                ; SPECIALK.S:1162
+}
+
+fn GETMINLEFT {
+  a = #0x00                  ; SPECIALK.S:1174
+  *]count@0x00f1 = a            ; SPECIALK.S:1175
+  *]count+1@0x00f2 = a            ; SPECIALK.S:1176
+  a = #min                  ; SPECIALK.S:1178
+  ??? sta :sm1+1            ; SPECIALK.S:1179
+  a = #>min                  ; SPECIALK.S:1180
+  ??? sta :sm2+1            ; SPECIALK.S:1181
+  call :sub                  ; SPECIALK.S:1182
+  *MinLeft@0x0300 = y            ; SPECIALK.S:1183
+  cmp y, #0x02              ; SPECIALK.S:1184
+  if y >= #0x02 goto ]rts  ; SPECIALK.S:1185
+  a = #59*min                  ; SPECIALK.S:1189
+  *]count@0x00f1 = a            ; SPECIALK.S:1190
+  a = #>59*min                  ; SPECIALK.S:1191
+  *]count+1@0x00f2 = a            ; SPECIALK.S:1192
+  a = #sec                  ; SPECIALK.S:1194
+  ??? sta :sm1+1            ; SPECIALK.S:1195
+  a = #>sec                  ; SPECIALK.S:1196
+  ??? sta :sm2+1            ; SPECIALK.S:1197
+  call :sub                  ; SPECIALK.S:1198
+  *SecLeft@0x0302 = y            ; SPECIALK.S:1199
+  return                           ; SPECIALK.S:1200
+:sub:
+  y = #0x61                  ; SPECIALK.S:1204
+:loop:
+  a = *]count+1@0x00f2        ; SPECIALK.S:1206
+  cmp a, *FrameCount+1@0x0307    ; SPECIALK.S:1207
+  if a < *FrameCount+1@0x0307 goto :1  ; SPECIALK.S:1208
+  if ne goto ]rts       ; SPECIALK.S:1209
+  a = *]count@0x00f1        ; SPECIALK.S:1210
+  cmp a, *FrameCount@0x0306    ; SPECIALK.S:1211
+  if a >= *FrameCount@0x0306 goto ]rts  ; SPECIALK.S:1212
+:1:
+  a = *]count@0x00f1        ; SPECIALK.S:1214
+  c = 0                            ; SPECIALK.S:1215
+:sm1:
+  a = a + #min + c              ; SPECIALK.S:1216
+  *]count@0x00f1 = a            ; SPECIALK.S:1217
+  a = *]count+1@0x00f2        ; SPECIALK.S:1218
+:sm2:
+  a = a + #>min + c              ; SPECIALK.S:1219
+  *]count+1@0x00f2 = a            ; SPECIALK.S:1220
+  ??? sed             ; SPECIALK.S:1222
+  a = y                            ; SPECIALK.S:1223
+  c = 1                            ; SPECIALK.S:1224
+  a = a - #0x01 - (1 - c)        ; SPECIALK.S:1225
+  ??? cld             ; SPECIALK.S:1226
+  y = a                            ; SPECIALK.S:1227
+  if y >=0 goto :loop  ; SPECIALK.S:1228
+  y = #0x00                  ; SPECIALK.S:1229
+]rts:
+  return                           ; SPECIALK.S:1230
+}
+
+fn KEEPTIME {
+  a = *level@0x03f4        ; SPECIALK.S:1264
+  if a == #0x00 goto ]rts  ; SPECIALK.S:1265
+  a = *KidLife@0x005f        ; SPECIALK.S:1267
+  if a >=0 goto ]rts  ; SPECIALK.S:1268
+  *FrameCount@0x0306 += 1                         ; SPECIALK.S:1272
+  if ne goto :1       ; SPECIALK.S:1273
+  *FrameCount+1@0x0307 += 1                         ; SPECIALK.S:1274
+:1:
+  if ne goto :2       ; SPECIALK.S:1275
+  a = #0xff                  ; SPECIALK.S:1276
+  *FrameCount@0x0306 = a            ; SPECIALK.S:1277
+  *FrameCount+1@0x0307 = a            ; SPECIALK.S:1278
+:2:
+  y = *NextTimeMsg@0x0301        ; SPECIALK.S:1282
+  ??? cpy #nummsg            ; SPECIALK.S:1283
+  if cs goto ]rts       ; SPECIALK.S:1284
+  a = *FrameCount+1@0x0307        ; SPECIALK.S:1285
+  ??? cmp timetable+1,y            ; SPECIALK.S:1286
+  if cc goto ]rts       ; SPECIALK.S:1287
+  a = *FrameCount@0x0306        ; SPECIALK.S:1288
+  ??? cmp timetable,y            ; SPECIALK.S:1289
+  if cc goto ]rts       ; SPECIALK.S:1290
+  a = *msgtimer@0x00db        ; SPECIALK.S:1294
+  if a != #0x00 goto ]rts  ; SPECIALK.S:1295
+  *NextTimeMsg@0x0301 += 1                         ; SPECIALK.S:1299
+  *NextTimeMsg@0x0301 += 1                         ; SPECIALK.S:1300
+  a = #0x02                  ; SPECIALK.S:1302
+  *timerequest@0x031f = a            ; SPECIALK.S:1303
+]rts:
+  return                           ; SPECIALK.S:1304
+}
+
+fn SHORTENTIME {
+  y = *NextTimeMsg@0x0301        ; SPECIALK.S:1313
+  if y >= #0x14 goto ]rts  ; SPECIALK.S:1315
+  y = #0x12                  ; SPECIALK.S:1316
+  *NextTimeMsg@0x0301 = y            ; SPECIALK.S:1317
+  a = *(timetable@0x0332 + y)   ; SPECIALK.S:1318
+  *FrameCount@0x0306 = a            ; SPECIALK.S:1319
+  a = *(timetable+1@0x0333 + y)   ; SPECIALK.S:1320
+  *FrameCount+1@0x0307 = a            ; SPECIALK.S:1321
+]rts:
+  return                           ; SPECIALK.S:1322
+}
+
+fn CUESONG {
+  *SongCue@0x0319 = a            ; SPECIALK.S:1333
+  *SongCount@0x0308 = x            ; SPECIALK.S:1334
+  return                           ; SPECIALK.S:1335
+}
+
+fn DLOOP  (aka STROBE) {
+  call keys                  ; SPECIALK.S:1343
+  call controller                  ; SPECIALK.S:1344
+]rts:
+  return                           ; SPECIALK.S:1345
+  ??? usr $a9,19,$b00,*-org            ; SPECIALK.S:1351
+}
+
+fn TempDevel {
+  a = *develment@0x020e        ; SPECIALK.S:382
+  if a == #0x00 goto ]rts  ; SPECIALK.S:383
+  a = *keypress@0x020f        ; SPECIALK.S:385
+  cmp a, #kforceredraw              ; SPECIALK.S:386
+  if a != #kforceredraw goto :10  ; SPECIALK.S:387
+  a = #0x02                  ; SPECIALK.S:388
+  *redrawflg@0x0097 = a            ; SPECIALK.S:389
+  a = #0x00                  ; SPECIALK.S:390
+  *blackflag@0x0022 = a            ; SPECIALK.S:391
+  return                           ; SPECIALK.S:392
+:10:
+  cmp a, #kblackout              ; SPECIALK.S:394
+  if a != #kblackout goto :9  ; SPECIALK.S:395
+  a = *blackflag@0x0022        ; SPECIALK.S:396
+  a = a ^ #0xff              ; SPECIALK.S:397
+  *blackflag@0x0022 = a            ; SPECIALK.S:398
+]rts:
+  return                           ; SPECIALK.S:399
+:9:
+  cmp a, #kantimatter              ; SPECIALK.S:401
+  if a != #kantimatter goto :17  ; SPECIALK.S:402
+  a = #initAMtimer                  ; SPECIALK.S:403
+  *AMtimer@0x00c7 = a            ; SPECIALK.S:404
+  return                           ; SPECIALK.S:405
+:17:
+  cmp a, #kincstr              ; SPECIALK.S:407
+  if a != #kincstr goto :20  ; SPECIALK.S:408
+  *ChgKidStr@0x00cf += 1                         ; SPECIALK.S:409
+  *ChgOppStr@0x00d2 += 1                         ; SPECIALK.S:410
+  return                           ; SPECIALK.S:411
+:20:
+  cmp a, #kincmax              ; SPECIALK.S:413
+  if a != #kincmax goto :36  ; SPECIALK.S:414
+  tail_call boostmeter                ; SPECIALK.S:415
+:36:
+  cmp a, #knextlevel              ; SPECIALK.S:417
+  if a != #knextlevel goto :28  ; SPECIALK.S:418
+  *NextLevel@0x031c += 1                         ; SPECIALK.S:419
+  return                           ; SPECIALK.S:420
+:28:
+  cmp a, #kskip5              ; SPECIALK.S:422
+  if a != #kskip5 goto :30  ; SPECIALK.S:423
+  a = *level@0x03f4        ; SPECIALK.S:424
+  c = 0                            ; SPECIALK.S:425
+  a = a + #0x05 + c              ; SPECIALK.S:426
+  *NextLevel@0x031c = a            ; SPECIALK.S:427
+  return                           ; SPECIALK.S:428
+:30:
+  a = *keypress@0x020f        ; SPECIALK.S:433
+  cmp a, #"0"              ; SPECIALK.S:434
+  if a < #"0" goto :non  ; SPECIALK.S:435
+  cmp a, #"9"+1              ; SPECIALK.S:436
+  if a >= #"9"+1 goto :non  ; SPECIALK.S:437
+  c = 1                            ; SPECIALK.S:438
+  a = a - #"0" - (1 - c)        ; SPECIALK.S:439
+  *guardprog@0x00dd = a            ; SPECIALK.S:440
+]sk1:
+  tail_call gtone                ; SPECIALK.S:441
+:non:
+  cmp a, #kreload              ; SPECIALK.S:445
+  if a != #kreload goto :8  ; SPECIALK.S:446
+  call preload                  ; SPECIALK.S:447
+  a = #0x02                  ; SPECIALK.S:448
+  *redrawflg@0x0097 = a            ; SPECIALK.S:449
+  call reload                  ; SPECIALK.S:450
+  tail_call postload                ; SPECIALK.S:451
+:8:
+  cmp a, #kspeedup              ; SPECIALK.S:455
+  if a != #kspeedup goto :13  ; SPECIALK.S:456
+  a = *SPEED@0x030c        ; SPECIALK.S:457
+  cmp a, #0x05              ; SPECIALK.S:458
+  if a < #0x05 goto :12  ; SPECIALK.S:459
+  c = 1                            ; SPECIALK.S:460
+  a = a - #0x04 - (1 - c)        ; SPECIALK.S:461
+  *SPEED@0x030c = a            ; SPECIALK.S:462
+  goto ]sk1                ; SPECIALK.S:463
+:12:
+  a = #0x01                  ; SPECIALK.S:464
+  *SPEED@0x030c = a            ; SPECIALK.S:465
+]rts:
+  return                           ; SPECIALK.S:466
+:13:
+  cmp a, #kslowdown              ; SPECIALK.S:468
+  if a != #kslowdown goto :14  ; SPECIALK.S:469
+  call gtone                  ; SPECIALK.S:470
+  a = *SPEED@0x030c        ; SPECIALK.S:471
+  c = 0                            ; SPECIALK.S:472
+  a = a + #0x04 + c              ; SPECIALK.S:473
+  *SPEED@0x030c = a            ; SPECIALK.S:474
+  return                           ; SPECIALK.S:475
+:14:
+  cmp a, #kscreendump              ; SPECIALK.S:479
+  if a != #kscreendump goto :15  ; SPECIALK.S:480
+  a = *PAGE@0x0000        ; SPECIALK.S:481
+  tail_call screendump                ; SPECIALK.S:482
+:15:
+  cmp a, #kupone              ; SPECIALK.S:484
+  if a != #kupone goto :19  ; SPECIALK.S:485
+  a = *KidY@0x0052        ; SPECIALK.S:486
+  c = 1                            ; SPECIALK.S:487
+  a = a - #0x3f - (1 - c)        ; SPECIALK.S:488
+  *KidY@0x0052 = a            ; SPECIALK.S:489
+  *KidBlockY@0x0055 -= 1                         ; SPECIALK.S:490
+  return                           ; SPECIALK.S:491
+:19:
+  cmp a, #kdecstr              ; SPECIALK.S:493
+  if a != #kdecstr goto :21  ; SPECIALK.S:494
+  *ChgKidStr@0x00cf -= 1                         ; SPECIALK.S:495
+]rts:
+  return                           ; SPECIALK.S:496
+:21:
+  cmp a, #kautoman              ; SPECIALK.S:498
+  if a != #kautoman goto :23  ; SPECIALK.S:499
+  a = *ManCtrl@0x00de        ; SPECIALK.S:500
+  a = a ^ #0xff              ; SPECIALK.S:501
+  *ManCtrl@0x00de = a            ; SPECIALK.S:502
+  return                           ; SPECIALK.S:503
+:23:
+  cmp a, #kplayback              ; SPECIALK.S:508
+  if a != #kplayback goto :24  ; SPECIALK.S:509
+  a = #0x01                  ; SPECIALK.S:510
+  *level@0x03f4 = a            ; SPECIALK.S:511
+  a = #0x02                  ; SPECIALK.S:512
+  *NextLevel@0x031c = a            ; SPECIALK.S:513
+  return                           ; SPECIALK.S:514
+:24:
+  cmp a, #ktimeback              ; SPECIALK.S:516
+  if a != #ktimeback goto :31  ; SPECIALK.S:517
+  a = #0xfe                  ; SPECIALK.S:518
+:chgtime:
+  c = 0                            ; SPECIALK.S:519
+  a = a + *FrameCount+1@0x0307 + c    ; SPECIALK.S:520
+  *FrameCount+1@0x0307 = a            ; SPECIALK.S:521
+  return                           ; SPECIALK.S:522
+:31:
+  cmp a, #ktimefwd              ; SPECIALK.S:524
+  if a != #ktimefwd goto :32  ; SPECIALK.S:525
+  a = #0x02                  ; SPECIALK.S:526
+  if a != #0x00 goto :chgtime  ; SPECIALK.S:527
+:32:
+  cmp a, #kerasegame              ; SPECIALK.S:529
+  if a != #kerasegame goto :33  ; SPECIALK.S:530
+  a = #0xff                  ; SPECIALK.S:531
+  *SavLevel@0xb6f0 = a            ; SPECIALK.S:532
+  tail_call DoSaveGame                ; SPECIALK.S:533
+:33:
+  cmp a, #ktimeup              ; SPECIALK.S:535
+  if a != #ktimeup goto :34  ; SPECIALK.S:536
+  a = #0xff                  ; SPECIALK.S:537
+  *FrameCount+1@0x0307 = a            ; SPECIALK.S:538
+  return                           ; SPECIALK.S:539
+:34:
+]rts:
+  return                           ; SPECIALK.S:543
+}
+
+fn checkcodes {
+  return                           ; SPECIALK.S:587
+  a = #C_boost                  ; SPECIALK.S:590
+  x = #>C_boost                  ; SPECIALK.S:591
+  call checkcode                  ; SPECIALK.S:592
+  if ne goto :1       ; SPECIALK.S:593
+  call boostmeter                  ; SPECIALK.S:594
+  a = *MaxKidStr@0x00d0        ; SPECIALK.S:595
+  *origstrength@0x00e1 = a            ; SPECIALK.S:596
+  return                           ; SPECIALK.S:597
+:1:
+  a = #C_restore                  ; SPECIALK.S:599
+  x = #>C_restore                  ; SPECIALK.S:600
+  call checkcode                  ; SPECIALK.S:601
+  if ne goto :2       ; SPECIALK.S:602
+  tail_call rechargemeter                ; SPECIALK.S:603
+:2:
+  a = #C_zap2                  ; SPECIALK.S:605
+  x = #>C_zap2                  ; SPECIALK.S:606
+  call checkcode                  ; SPECIALK.S:607
+  if ne goto :3       ; SPECIALK.S:608
+  a = #0x00                  ; SPECIALK.S:610
+  c = 1                            ; SPECIALK.S:611
+  a = a - *OppStrength@0x00cc - (1 - c) ; SPECIALK.S:612
+  *ChgOppStr@0x00d2 = a            ; SPECIALK.S:613
+  return                           ; SPECIALK.S:614
+:3:
+  a = #C_zap1                  ; SPECIALK.S:616
+  x = #>C_zap1                  ; SPECIALK.S:617
+  call checkcode                  ; SPECIALK.S:618
+  if ne goto :4       ; SPECIALK.S:619
+  a = #0x01                  ; SPECIALK.S:621
+  c = 1                            ; SPECIALK.S:622
+  a = a - *OppStrength@0x00cc - (1 - c) ; SPECIALK.S:623
+  *ChgOppStr@0x00d2 = a            ; SPECIALK.S:624
+  return                           ; SPECIALK.S:625
+:4:
+  a = #C_tina                  ; SPECIALK.S:627
+  x = #>C_tina                  ; SPECIALK.S:628
+  call checkcode                  ; SPECIALK.S:629
+  if mi goto :5       ; SPECIALK.S:630
+  a = #0x0e                  ; SPECIALK.S:631
+  *NextLevel@0x031c = a            ; SPECIALK.S:632
+  call shortentime                  ; SPECIALK.S:633
+  return                           ; SPECIALK.S:634
+:5:
+]rts:
+  return                           ; SPECIALK.S:636
+checkcode:
+  ??? sta :smod+1            ; SPECIALK.S:648
+  ??? stx :smod+2            ; SPECIALK.S:649
+  x = *keybufptr@0x00ca        ; SPECIALK.S:651
+  y = #0x00                  ; SPECIALK.S:652
+:loop:
+:smod:
+  a = *($ffff@0xffff + y)   ; SPECIALK.S:654
+  if a == #0x00 goto ]rts  ; SPECIALK.S:655
+  ??? cmp keybuf,x            ; SPECIALK.S:656
+  if eq goto :match       ; SPECIALK.S:657
+  cmp a, #"A"              ; SPECIALK.S:658
+  if a < #"A" goto :fail  ; SPECIALK.S:659
+  cmp a, #"Z"+1              ; SPECIALK.S:660
+  if a >= #"Z"+1 goto :fail  ; SPECIALK.S:661
+  a = a | #0x20              ; SPECIALK.S:662
+  ??? cmp keybuf,x            ; SPECIALK.S:663
+  if ne goto :fail       ; SPECIALK.S:664
+:match:
+  y += 1                         ; SPECIALK.S:666
+  x -= 1                         ; SPECIALK.S:667
+  if x >=0 goto :loop  ; SPECIALK.S:668
+  x = #keybuflen-1                  ; SPECIALK.S:669
+  if x >=0 goto :loop  ; SPECIALK.S:670
+:fail:
+  a = #0xff                  ; SPECIALK.S:672
+]rts:
+  return                           ; SPECIALK.S:673
+}
+
+fn :sub {
+  y = #0x61                  ; SPECIALK.S:1204
+:loop:
+  a = *]count+1@0x00f2        ; SPECIALK.S:1206
+  cmp a, *FrameCount+1@0x0307    ; SPECIALK.S:1207
+  if a < *FrameCount+1@0x0307 goto :1  ; SPECIALK.S:1208
+  if ne goto ]rts       ; SPECIALK.S:1209
+  a = *]count@0x00f1        ; SPECIALK.S:1210
+  cmp a, *FrameCount@0x0306    ; SPECIALK.S:1211
+  if a >= *FrameCount@0x0306 goto ]rts  ; SPECIALK.S:1212
+:1:
+  a = *]count@0x00f1        ; SPECIALK.S:1214
+  c = 0                            ; SPECIALK.S:1215
+:sm1:
+  a = a + #min + c              ; SPECIALK.S:1216
+  *]count@0x00f1 = a            ; SPECIALK.S:1217
+  a = *]count+1@0x00f2        ; SPECIALK.S:1218
+:sm2:
+  a = a + #>min + c              ; SPECIALK.S:1219
+  *]count+1@0x00f2 = a            ; SPECIALK.S:1220
+  ??? sed             ; SPECIALK.S:1222
+  a = y                            ; SPECIALK.S:1223
+  c = 1                            ; SPECIALK.S:1224
+  a = a - #0x01 - (1 - c)        ; SPECIALK.S:1225
+  ??? cld             ; SPECIALK.S:1226
+  y = a                            ; SPECIALK.S:1227
+  if y >=0 goto :loop  ; SPECIALK.S:1228
+  y = #0x00                  ; SPECIALK.S:1229
+]rts:
+  return                           ; SPECIALK.S:1230
+}

@@ -1,0 +1,1486 @@
+; module AUTO from 01 POP Source/Source/AUTO.S
+
+fn AUTOCTRL {
+  call DoRelease                  ; AUTO.S:161
+  a = *CharID@0x004d        ; AUTO.S:163
+  if a == #0x00 goto :5  ; AUTO.S:164
+  a = *justblocked@0x007e        ; AUTO.S:166
+  if a == #0x00 goto :jb0  ; AUTO.S:167
+  *justblocked@0x007e -= 1                         ; AUTO.S:168
+:jb0:
+  a = *gdtimer@0x007f        ; AUTO.S:170
+  if a == #0x00 goto :gt0  ; AUTO.S:171
+  *gdtimer@0x007f -= 1                         ; AUTO.S:172
+:gt0:
+  a = *refract@0x00a1        ; AUTO.S:174
+  if a == #0x00 goto :2  ; AUTO.S:175
+  *refract@0x00a1 -= 1                         ; AUTO.S:176
+:2:
+  a = *CharID@0x004d        ; AUTO.S:178
+  if a == #0x18 goto :6  ; AUTO.S:180
+  if a == #0x04 goto :3  ; AUTO.S:182
+  if a < #0x02 goto :1  ; AUTO.S:184
+  a = *level@0x03f4        ; AUTO.S:185
+  if a == #0x0d goto :4  ; AUTO.S:187
+  tail_call GuardProg                ; AUTO.S:188
+:1:
+  tail_call ShadowProg                ; AUTO.S:189
+:3:
+  tail_call SkelProg                ; AUTO.S:190
+:4:
+  tail_call VizierProg                ; AUTO.S:191
+:5:
+  tail_call KidProg                ; AUTO.S:192
+:6:
+  tail_call MouseProg                ; AUTO.S:193
+}
+
+fn MouseProg {
+  a = *CharFace@0x0043        ; AUTO.S:199
+  if a == #0x56 goto ]rts  ; AUTO.S:201
+  a = *CharAction@0x0046        ; AUTO.S:202
+  if a == #0x00 goto :1  ; AUTO.S:203
+  a = *CharX@0x0041        ; AUTO.S:204
+  if a >= #0xa6 goto ]rts  ; AUTO.S:206
+  a = #Mleave                  ; AUTO.S:207
+  call jumpseq                  ; AUTO.S:208
+  tail_call animchar                ; AUTO.S:209
+:1:
+  a = *CharX@0x0041        ; AUTO.S:211
+  if a < #0xc8 goto ]rts  ; AUTO.S:213
+  tail_call VanishChar                ; AUTO.S:214
+ShadowProg:
+SkelProg:
+VizierProg:
+  ??? brk             ; AUTO.S:223
+ShadowProg:
+  a = *level@0x03f4        ; AUTO.S:227
+  if a != #0x04 goto :0  ; AUTO.S:229
+  tail_call ShadLevel4                ; AUTO.S:230
+:0:
+  if a != #0x05 goto :1  ; AUTO.S:233
+  tail_call ShadLevel5                ; AUTO.S:234
+:1:
+  if a != #0x06 goto :2  ; AUTO.S:237
+  tail_call ShadLevel6                ; AUTO.S:238
+:2:
+  if a != #0x0c goto :3  ; AUTO.S:241
+  tail_call FinalShad                ; AUTO.S:242
+:3:
+]rts:
+  return                           ; AUTO.S:244
+}
+
+fn ShadowProg {
+  a = *level@0x03f4        ; AUTO.S:227
+  if a != #0x04 goto :0  ; AUTO.S:229
+  tail_call ShadLevel4                ; AUTO.S:230
+:0:
+  if a != #0x05 goto :1  ; AUTO.S:233
+  tail_call ShadLevel5                ; AUTO.S:234
+:1:
+  if a != #0x06 goto :2  ; AUTO.S:237
+  tail_call ShadLevel6                ; AUTO.S:238
+:2:
+  if a != #0x0c goto :3  ; AUTO.S:241
+  tail_call FinalShad                ; AUTO.S:242
+:3:
+]rts:
+  return                           ; AUTO.S:244
+}
+
+fn SkelProg {
+  a = #0x02                  ; AUTO.S:434
+  *CharSword@0x004e = a            ; AUTO.S:435
+  tail_call GuardProg                ; AUTO.S:436
+}
+
+fn VizierProg {
+  tail_call GuardProg                ; AUTO.S:442
+KidProg:
+  tail_call GuardProg                ; AUTO.S:450
+}
+
+fn ShadLevel6 {
+  a = *CharScrn@0x004b        ; AUTO.S:251
+  if a == #0x01 goto Shad6a  ; AUTO.S:253
+  return                           ; AUTO.S:254
+}
+
+fn Shad6a {
+  a = *KidPosn@0x0050        ; AUTO.S:260
+  if a != #0x2b goto ]rts  ; AUTO.S:262
+  a = *KidX@0x0051        ; AUTO.S:263
+  if a >= #0x80 goto ]rts  ; AUTO.S:265
+  call DoPress                  ; AUTO.S:266
+  tail_call DoFwd                ; AUTO.S:267
+]rts:
+  return                           ; AUTO.S:244
+}
+
+fn ShadLevel5 {
+  a = *CharScrn@0x004b        ; AUTO.S:273
+  if a == #flaskscrn goto Shad5  ; AUTO.S:275
+]rts:
+  return                           ; AUTO.S:276
+}
+
+fn Shad5 {
+  a = *PlayCount@0x00a0        ; AUTO.S:282
+  if a != #0x00 goto :1  ; AUTO.S:283
+  a = #flaskscrn                  ; AUTO.S:285
+  x = #0x01                  ; AUTO.S:286
+  y = #0x00                  ; AUTO.S:287
+  call rdblock                  ; AUTO.S:288
+  a = *(BlueSpec@0x0026)[y]   ; AUTO.S:289
+  if a < #0x14 goto ]rts  ; AUTO.S:291
+  a = #0x00                  ; AUTO.S:293
+  *PreRecPtr@0x0309 = a            ; AUTO.S:294
+:1:
+  a = #ShadProg5                  ; AUTO.S:296
+  x = #>ShadProg5                  ; AUTO.S:297
+  call AutoPlayback                  ; AUTO.S:298
+  a = *CharX@0x0041        ; AUTO.S:300
+  if a >= #0x0f goto ]rts  ; AUTO.S:302
+  tail_call VanishChar                ; AUTO.S:303
+]rts:
+  return                           ; AUTO.S:276
+}
+
+fn ShadLevel4 {
+  a = *CharScrn@0x004b        ; AUTO.S:309
+  if a != #0x04 goto ]rts  ; AUTO.S:311
+  a = *CharX@0x0041        ; AUTO.S:312
+  if a < #0x50 goto :gone  ; AUTO.S:314
+  tail_call DoFwd                ; AUTO.S:315
+:gone:
+  tail_call VanishChar                ; AUTO.S:316
+]rts:
+  return                           ; AUTO.S:276
+}
+
+fn FinalShad {
+  a = *CharScrn@0x004b        ; AUTO.S:325
+  if a != #swordscrn goto :cont  ; AUTO.S:327
+  a = *shadowaction@0x0217        ; AUTO.S:328
+  if a != #0x00 goto :cont  ; AUTO.S:329
+  a = *OpX@0x039d        ; AUTO.S:330
+  if a >= #0x96 goto :hold  ; AUTO.S:332
+  a = #0x01                  ; AUTO.S:334
+  *shadowaction@0x0217 = a            ; AUTO.S:335
+  if ne goto :cont       ; AUTO.S:336
+:hold:
+  a = #shadpos12                  ; AUTO.S:338
+  x = #>shadpos12                  ; AUTO.S:339
+  tail_call csps                ; AUTO.S:340
+]rts:
+  return                           ; AUTO.S:341
+:cont:
+  a = *CharSword@0x004e        ; AUTO.S:345
+  if a >= #0x02 goto :fight  ; AUTO.S:347
+  a = *OpSword@0x03aa        ; AUTO.S:348
+  if a >= #0x02 goto :hostile  ; AUTO.S:350
+  a = *offguard@0x008a        ; AUTO.S:351
+  if a != #0x00 goto :face  ; AUTO.S:352
+:hostile:
+  a = *EnemyAlert@0x00d1        ; AUTO.S:354
+  if a < #0x02 goto :2  ; AUTO.S:356
+  call getopdist                  ; AUTO.S:357
+  if a >= #swordthres goto :2  ; AUTO.S:359
+  a = *CharPosn@0x0040        ; AUTO.S:361
+  if a != #0x0f goto ]rts  ; AUTO.S:363
+  tail_call DoEngarde                ; AUTO.S:364
+:2:
+  call getopdist                  ; AUTO.S:368
+  if pl goto ]rts       ; AUTO.S:369
+  tail_call DoBack                ; AUTO.S:370
+:fight:
+  a = *offguard@0x008a        ; AUTO.S:375
+  if a == #0x00 goto :1  ; AUTO.S:376
+  a = *refract@0x00a1        ; AUTO.S:377
+  if a != #0x00 goto :1  ; AUTO.S:378
+  tail_call DoDown                ; AUTO.S:379
+:1:
+  tail_call EnGarde                ; AUTO.S:381
+:face:
+  call getopdist                  ; AUTO.S:385
+  if mi goto :merge       ; AUTO.S:386
+  a = *EnemyAlert@0x00d1        ; AUTO.S:388
+  if a != #0x02 goto :wait  ; AUTO.S:390
+  a = *OpPosn@0x039c        ; AUTO.S:391
+  if a < #0x03 goto :wait  ; AUTO.S:393
+  if a < #0x0f goto :go  ; AUTO.S:395
+  if a < #0x7f goto :wait  ; AUTO.S:397
+  if a >= #0x85 goto :wait  ; AUTO.S:399
+:go:
+  tail_call DoFwd                ; AUTO.S:404
+:merge:
+  a = #0xff                  ; AUTO.S:409
+  *lightcolor@0x0089 = a            ; AUTO.S:410
+  a = #0x0a                  ; AUTO.S:411
+  *lightning@0x0088 = a            ; AUTO.S:412
+  call boostmeter                  ; AUTO.S:414
+  a = #s_Rejoin                  ; AUTO.S:416
+  x = #0x55                  ; AUTO.S:417
+  call cuesong                  ; AUTO.S:418
+  a = #0x2a                  ; AUTO.S:420
+  *mergetimer@0x00df = a            ; AUTO.S:421
+  a = #0x00                  ; AUTO.S:423
+  *CharID@0x004d = a            ; AUTO.S:424
+  call SaveKid                  ; AUTO.S:425
+  tail_call VanishChar                ; AUTO.S:426
+:wait:
+]rts:
+  return                           ; AUTO.S:428
+}
+
+fn KidProg {
+  tail_call GuardProg                ; AUTO.S:450
+}
+
+fn GuardProg {
+  a = *CharSword@0x004e        ; AUTO.S:456
+  if a < #0x02 goto Alert  ; AUTO.S:458
+  tail_call EnGarde                ; AUTO.S:459
+]rts:
+  return                           ; AUTO.S:460
+}
+
+fn Alert {
+  a = *KidLife@0x005f        ; AUTO.S:468
+  if a >=0 goto ]rts  ; AUTO.S:469
+  call getopdist                  ; AUTO.S:473
+  x = *OpBlockY@0x03a1        ; AUTO.S:474
+  if x != *CharBlockY@0x0045 goto :difflevel  ; AUTO.S:476
+  if a >= #0xf8 goto :eng  ; AUTO.S:478
+:difflevel:
+  x = *alertguard@0x00e4        ; AUTO.S:480
+  if x == #0x00 goto :ok  ; AUTO.S:481
+  x = #0x00                  ; AUTO.S:482
+  *alertguard@0x00e4 = x            ; AUTO.S:483
+:alert:
+  if a < #0x80 goto :eng  ; AUTO.S:486
+  if a >= #0xfc goto :ok  ; AUTO.S:488
+  tail_call DoTurn                ; AUTO.S:489
+:ok:
+  if a >= #0x80 goto ]rts  ; AUTO.S:494
+:eng:
+  a = *EnemyAlert@0x00d1        ; AUTO.S:496
+  if a == #0x00 goto ]rts  ; AUTO.S:497
+  a = *level@0x03f4        ; AUTO.S:499
+  if a != #0x0d goto :1  ; AUTO.S:501
+  a = *SongCue@0x0319        ; AUTO.S:502
+  if a != #0x00 goto ]rts  ; AUTO.S:503
+:1:
+  tail_call DoEngarde                ; AUTO.S:505
+]rts:
+  return                           ; AUTO.S:506
+}
+
+fn EnGarde {
+  a = *CharPosn@0x0040        ; AUTO.S:514
+  cmp a, #0xa6              ; AUTO.S:515
+  if a == #0xa6 goto ]rts  ; AUTO.S:516
+  cmp a, #0x96              ; AUTO.S:517
+  if a < #0x96 goto ]rts  ; AUTO.S:518
+  a = *EnemyAlert@0x00d1        ; AUTO.S:520
+  cmp a, #0x02              ; AUTO.S:521
+  if a >= #0x02 goto :ea2  ; AUTO.S:522
+  cmp a, #0x01              ; AUTO.S:523
+  if a == #0x01 goto ]rts  ; AUTO.S:524
+  a = *droppedout@0x00e7        ; AUTO.S:529
+  if a == #0x00 goto :1  ; AUTO.S:530
+  tail_call FollowKid                ; AUTO.S:531
+:1:
+  a = *CharID@0x004d        ; AUTO.S:535
+  cmp a, #0x04              ; AUTO.S:536
+  if a == #0x04 goto ]rts  ; AUTO.S:537
+  tail_call DoDropguard                ; AUTO.S:538
+:ea2:
+  call getopdist                  ; AUTO.S:544
+  if mi goto :norec       ; AUTO.S:545
+  cmp a, #0x0c              ; AUTO.S:546
+  if a < #0x0c goto :norec  ; AUTO.S:547
+  a = *OpPosn@0x039c        ; AUTO.S:548
+  cmp a, #0x66              ; AUTO.S:549
+  if a < #0x66 goto :norec  ; AUTO.S:550
+  cmp a, #0x76              ; AUTO.S:551
+  if a >= #0x76 goto :norec  ; AUTO.S:552
+  a = *OpAction@0x03a2        ; AUTO.S:553
+  cmp a, #0x05              ; AUTO.S:554
+  if a == #0x05 goto ]rts  ; AUTO.S:555
+:norec:
+  call getopdist                  ; AUTO.S:560
+  cmp a, #toofar              ; AUTO.S:561
+  if a >= #toofar goto :outofrange  ; AUTO.S:562
+  x = *CharSword@0x004e        ; AUTO.S:564
+  cmp x, #0x02              ; AUTO.S:565
+  if x < #0x02 goto :offg  ; AUTO.S:566
+  cmp a, #tooclose              ; AUTO.S:568
+  if a < #tooclose goto :tooclose  ; AUTO.S:569
+  tail_call InRange                ; AUTO.S:570
+:offg:
+  cmp a, #offguardthres              ; AUTO.S:572
+  if a < #offguardthres goto :tooclose  ; AUTO.S:573
+  tail_call InRange                ; AUTO.S:574
+]rts:
+  return                           ; AUTO.S:575
+:outofrange:
+  a = *refract@0x00a1        ; AUTO.S:580
+  if a != #0x00 goto ]rts  ; AUTO.S:581
+  a = *CharFace@0x0043        ; AUTO.S:583
+  cmp a, *OpFace@0x039f    ; AUTO.S:584
+  if a == *OpFace@0x039f goto :nojump  ; AUTO.S:585
+  a = *OpPosn@0x039c        ; AUTO.S:587
+  cmp a, #0x07              ; AUTO.S:588
+  if a < #0x07 goto :norun  ; AUTO.S:589
+  cmp a, #0x0f              ; AUTO.S:590
+  if a < #0x0f goto :runwait  ; AUTO.S:591
+:norun:
+  cmp a, #0x22              ; AUTO.S:593
+  if a < #0x22 goto :nojump  ; AUTO.S:594
+  cmp a, #0x2c              ; AUTO.S:595
+  if a < #0x2c goto :jumpwait  ; AUTO.S:596
+:nojump:
+  call getinfront                  ; AUTO.S:598
+  call cmpspace                  ; AUTO.S:599
+  if eq goto :gap       ; AUTO.S:600
+  call get2infront                  ; AUTO.S:601
+  call cmpspace                  ; AUTO.S:602
+  if ne goto :solid       ; AUTO.S:603
+:gap:
+  tail_call DoRetreat                ; AUTO.S:605
+:solid:
+  tail_call DoAdvance                ; AUTO.S:606
+:jumpwait:
+  call getopdist                  ; AUTO.S:611
+  cmp a, #jumpthres              ; AUTO.S:612
+  if a >= #jumpthres goto ]rts  ; AUTO.S:613
+  tail_call DoStrike                ; AUTO.S:614
+:runwait:
+  call getopdist                  ; AUTO.S:617
+  cmp a, #runthres              ; AUTO.S:618
+  if a >= #runthres goto ]rts  ; AUTO.S:619
+:strike:
+  tail_call DoStrike                ; AUTO.S:620
+:tooclose:
+  a = *CharFace@0x0043        ; AUTO.S:625
+  cmp a, *OpFace@0x039f    ; AUTO.S:626
+  if a == *OpFace@0x039f goto :ret  ; AUTO.S:627
+  tail_call DoAdvance                ; AUTO.S:628
+:ret:
+  tail_call DoRetreat                ; AUTO.S:629
+}
+
+fn FollowKid {
+  a = *OpAction@0x03a2        ; AUTO.S:639
+  if a == #0x02 goto :hanging  ; AUTO.S:641
+  if a == #0x06 goto :hanging  ; AUTO.S:643
+  call getinfront                  ; AUTO.S:645
+  *ztemp@0x00e9 = a            ; AUTO.S:646
+  call cmpbarr                  ; AUTO.S:647
+  if ne goto :stopped       ; AUTO.S:648
+  a = *ztemp@0x00e9        ; AUTO.S:649
+  call cmpspace                  ; AUTO.S:650
+  if eq goto :atedge       ; AUTO.S:651
+  tail_call DoAdvance                ; AUTO.S:652
+:atedge:
+  call getinfront                  ; AUTO.S:659
+  *tempblocky@0x0092 += 1                         ; AUTO.S:660
+  call rdblock1                  ; AUTO.S:661
+  *ztemp@0x00e9 = a            ; AUTO.S:662
+  if a == #spikes goto :stopped  ; AUTO.S:664
+  if a == #loose goto :stopped  ; AUTO.S:666
+  call cmpbarr                  ; AUTO.S:667
+  if ne goto :stopped       ; AUTO.S:668
+  a = *ztemp@0x00e9        ; AUTO.S:669
+  call cmpspace                  ; AUTO.S:670
+  if eq goto :stopped       ; AUTO.S:671
+  a = *CharBlockY@0x0045        ; AUTO.S:673
+  c = 0                            ; AUTO.S:674
+  a = a + #0x01 + c              ; AUTO.S:675
+  if a != *OpBlockY@0x03a1 goto :stopped  ; AUTO.S:677
+  tail_call DoAdvance                ; AUTO.S:681
+:stopped:
+  a = #0x00                  ; AUTO.S:683
+  *droppedout@0x00e7 = a            ; AUTO.S:684
+  tail_call DoRetreat                ; AUTO.S:685
+:hanging:
+]rts:
+  return                           ; AUTO.S:687
+}
+
+fn InRange {
+  a = *OpSword@0x03aa        ; AUTO.S:695
+  if a == #0x02 goto :fight  ; AUTO.S:697
+  a = *refract@0x00a1        ; AUTO.S:701
+  if a != #0x00 goto ]rts  ; AUTO.S:702
+  call getopdist                  ; AUTO.S:704
+  if a < #strikethres2 goto :1  ; AUTO.S:706
+  tail_call DoAdvance                ; AUTO.S:707
+:1:
+  tail_call DoStrike                ; AUTO.S:708
+:fight:
+  tail_call GenFight                ; AUTO.S:713
+]rts:
+  return                           ; AUTO.S:687
+}
+
+fn GenFight {
+  call getopdist                  ; AUTO.S:724
+  if a < #blockthres1 goto :outofrange  ; AUTO.S:726
+  if a >= #blockthres2 goto :outofrange  ; AUTO.S:728
+  call MaybeBlock                  ; AUTO.S:730
+  a = *refract@0x00a1        ; AUTO.S:732
+  if a != #0x00 goto ]rts  ; AUTO.S:733
+  call getopdist                  ; AUTO.S:735
+  if a < #strikethres1 goto :outofrange  ; AUTO.S:737
+  if a >= #strikethres2 goto :outofrange  ; AUTO.S:739
+  tail_call MaybeStrike                ; AUTO.S:741
+:outofrange:
+  tail_call MaybeAdvance                ; AUTO.S:744
+]rts:
+  return                           ; AUTO.S:745
+}
+
+fn MaybeAdvance {
+  a = *guardprog@0x00dd        ; AUTO.S:754
+  if a == #0x00 goto :dumb  ; AUTO.S:755
+  a = *gdtimer@0x007f        ; AUTO.S:756
+  if a != #0x00 goto ]rts  ; AUTO.S:757
+:dumb:
+  call rndp                  ; AUTO.S:759
+  ??? cmp advprob,x            ; AUTO.S:760
+  if cs goto ]rts       ; AUTO.S:761
+  tail_call DoAdvance                ; AUTO.S:763
+]rts:
+  return                           ; AUTO.S:745
+}
+
+fn MaybeBlock {
+  a = *OpPosn@0x039c        ; AUTO.S:771
+  cmp a, #0x98              ; AUTO.S:772
+  if a == #0x98 goto :99  ; AUTO.S:773
+  cmp a, #0x99              ; AUTO.S:774
+  if a == #0x99 goto :99  ; AUTO.S:775
+  cmp a, #0xa2              ; AUTO.S:776
+  if a != #0xa2 goto ]rts  ; AUTO.S:777
+:99:
+  a = *justblocked@0x007e        ; AUTO.S:779
+  if a != #0x00 goto :impaired  ; AUTO.S:780
+  call rndp                  ; AUTO.S:781
+  ??? cmp blockprob,x            ; AUTO.S:782
+  if cc goto :block       ; AUTO.S:783
+]rts:
+  return                           ; AUTO.S:784
+:impaired:
+  call rndp                  ; AUTO.S:787
+  ??? cmp impblockprob,x            ; AUTO.S:788
+  if cs goto ]rts       ; AUTO.S:789
+:block:
+  tail_call DoBlock                ; AUTO.S:790
+}
+
+fn MaybeStrike {
+  x = *OpPosn@0x039c        ; AUTO.S:798
+  if x == #0xa9 goto ]rts  ; AUTO.S:800
+  if x == #0x97 goto ]rts  ; AUTO.S:802
+  x = *CharPosn@0x0040        ; AUTO.S:804
+  if x == #0xa1 goto :restrike  ; AUTO.S:806
+  if x == #0x96 goto :restrike  ; AUTO.S:808
+  call rndp                  ; AUTO.S:810
+  ??? cmp strikeprob,x            ; AUTO.S:811
+  if cs goto ]rts       ; AUTO.S:812
+  tail_call DoStrike                ; AUTO.S:813
+:restrike:
+  call rndp                  ; AUTO.S:816
+  ??? cmp restrikeprob,x            ; AUTO.S:817
+  if cs goto ]rts       ; AUTO.S:818
+  tail_call DoStrike                ; AUTO.S:819
+]rts:
+  return                           ; AUTO.S:784
+}
+
+fn DoRelease {
+  a = #0x00                  ; AUTO.S:823
+  *clrF@0x00d4 = a            ; AUTO.S:824
+  *clrB@0x00d5 = a            ; AUTO.S:825
+  *clrU@0x00d6 = a            ; AUTO.S:826
+  *clrD@0x00d7 = a            ; AUTO.S:827
+  *clrbtn@0x00d8 = a            ; AUTO.S:828
+  *JSTKX@0x0018 = a            ; AUTO.S:829
+  *JSTKY@0x0019 = a            ; AUTO.S:830
+  *btn@0x003d = a            ; AUTO.S:831
+  return                           ; AUTO.S:832
+}
+
+fn DoAdvance  (aka DoFwd) {
+  a = #0xff                  ; AUTO.S:836
+  *clrF@0x00d4 = a            ; AUTO.S:837
+  *JSTKX@0x0018 = a            ; AUTO.S:838
+  return                           ; AUTO.S:839
+}
+
+fn DoRetreat  (aka DoBack) {
+  a = #0xff                  ; AUTO.S:843
+  *clrB@0x00d5 = a            ; AUTO.S:844
+  a = #0x01                  ; AUTO.S:845
+  *JSTKX@0x0018 = a            ; AUTO.S:846
+  return                           ; AUTO.S:847
+}
+
+fn DoBlock  (aka DoUp) {
+  a = #0xff                  ; AUTO.S:850
+  *clrU@0x00d6 = a            ; AUTO.S:851
+  *JSTKY@0x0019 = a            ; AUTO.S:852
+  return                           ; AUTO.S:853
+}
+
+fn DoTurn  (aka DoDown) {
+  a = #0xff                  ; AUTO.S:856
+  *clrD@0x00d7 = a            ; AUTO.S:857
+  a = #0x01                  ; AUTO.S:858
+  *JSTKY@0x0019 = a            ; AUTO.S:859
+  return                           ; AUTO.S:860
+}
+
+fn DoStandup {
+  a = #0xff                  ; AUTO.S:863
+  *clrU@0x00d6 = a            ; AUTO.S:864
+  tail_call DoBack                ; AUTO.S:865
+}
+
+fn DoDropguard  (aka DoRunaway) {
+  a = #0xff                  ; AUTO.S:869
+  *clrD@0x00d7 = a            ; AUTO.S:870
+  tail_call DoBack                ; AUTO.S:871
+}
+
+fn DoEngarde {
+  a = #0xff                  ; AUTO.S:874
+  *clrD@0x00d7 = a            ; AUTO.S:875
+  tail_call DoFwd                ; AUTO.S:876
+}
+
+fn DoStrike  (aka DoPress) {
+  a = #0xff                  ; AUTO.S:880
+  *clrbtn@0x00d8 = a            ; AUTO.S:881
+  *btn@0x003d = a            ; AUTO.S:882
+  return                           ; AUTO.S:883
+}
+
+fn DoRelBtn {
+  a = #0x00                  ; AUTO.S:886
+  *btn@0x003d = a            ; AUTO.S:887
+]rts:
+  return                           ; AUTO.S:888
+}
+
+fn rndp {
+  x = *guardprog@0x00dd        ; AUTO.S:898
+  tail_call rnd                ; AUTO.S:899
+}
+
+fn CHECKSTRIKE {
+  a = *KidPosn@0x0050        ; AUTO.S:915
+  if a == #0x00 goto ]rts  ; AUTO.S:916
+  if a < #0xdb goto :noclimb  ; AUTO.S:918
+  if a < #0xe5 goto ]rts  ; AUTO.S:920
+:noclimb:
+  call LoadShadwOp                  ; AUTO.S:922
+  call TestStrike                  ; AUTO.S:923
+  call SaveShadwOp                  ; AUTO.S:924
+  call LoadKidwOp                  ; AUTO.S:926
+  call TestStrike                  ; AUTO.S:927
+  call SaveKidwOp                  ; AUTO.S:928
+]rts:
+  return                           ; AUTO.S:930
+}
+
+fn TestStrike {
+  a = *CharSword@0x004e        ; AUTO.S:935
+  if a != #0x02 goto ]rts  ; AUTO.S:937
+  a = *CharBlockY@0x0045        ; AUTO.S:939
+  if a != *OpBlockY@0x03a1 goto ]rts  ; AUTO.S:941
+  a = *CharPosn@0x0040        ; AUTO.S:945
+  if a == #0x99 goto :test  ; AUTO.S:947
+  if a != #0x9a goto ]rts  ; AUTO.S:949
+:test:
+  call getopdist                  ; AUTO.S:954
+  if a < #blockrange1 goto :nobloc  ; AUTO.S:956
+  if a >= #blockrange2 goto :nobloc  ; AUTO.S:959
+  a = *OpPosn@0x039c        ; AUTO.S:961
+  if a == #0xa1 goto :11  ; AUTO.S:963
+  if a != #0x96 goto :nobloc  ; AUTO.S:965
+:1:
+  a = #0xa1                  ; AUTO.S:969
+  *OpPosn@0x039c = a            ; AUTO.S:970
+:11:
+  a = *CharID@0x004d        ; AUTO.S:972
+  if a == #0x00 goto :12  ; AUTO.S:973
+  a = #blocktime                  ; AUTO.S:974
+  *justblocked@0x007e = a            ; AUTO.S:975
+:12:
+  a = #blockedstrike                  ; AUTO.S:977
+  call jumpseq                  ; AUTO.S:978
+  tail_call animchar                ; AUTO.S:979
+:nobloc:
+  a = *CharPosn@0x0040        ; AUTO.S:984
+  if a != #0x9a goto ]rts  ; AUTO.S:986
+  call getopdist                  ; AUTO.S:988
+  x = *OpSword@0x03aa        ; AUTO.S:990
+  if x >= #0x02 goto :ong  ; AUTO.S:992
+  if a >= #offguardthres goto :cont1  ; AUTO.S:994
+  return                           ; AUTO.S:995
+:ong:
+  if a < #strikerange1 goto ]rts  ; AUTO.S:997
+:cont1:
+  cmp a, #strikerange2              ; AUTO.S:999
+  if a >= #strikerange2 goto ]rts  ; AUTO.S:1000
+  ??? lda #99 "stabbed"            ; AUTO.S:1002
+  *OpAction@0x03a2 = a            ; AUTO.S:1003
+]rts:
+  return                           ; AUTO.S:1004
+}
+
+fn CHECKSTAB {
+  a = *ShadAction@0x0066        ; AUTO.S:1010
+  cmp a, #0x63              ; AUTO.S:1011
+  if a != #0x63 goto :1  ; AUTO.S:1012
+  a = *KidAction@0x0056        ; AUTO.S:1014
+  cmp a, #0x63              ; AUTO.S:1015
+  if a == #0x63 goto :doublestab  ; AUTO.S:1016
+:2:
+  call LoadShad                  ; AUTO.S:1018
+  call StabChar                  ; AUTO.S:1019
+  call SaveShad                  ; AUTO.S:1020
+  call rndp                  ; AUTO.S:1022
+  a = *(refractimer@0x0007 + x)   ; AUTO.S:1023
+  *refract@0x00a1 = a            ; AUTO.S:1024
+:1:
+  a = *KidAction@0x0056        ; AUTO.S:1026
+  cmp a, #0x63              ; AUTO.S:1027
+  if a != #0x63 goto ]rts  ; AUTO.S:1028
+  call LoadKid                  ; AUTO.S:1030
+  call StabChar                  ; AUTO.S:1031
+  tail_call SaveKid                ; AUTO.S:1032
+:doublestab:
+  a = #0x01                  ; AUTO.S:1037
+  *KidAction@0x0056 = a            ; AUTO.S:1038
+  if ne goto :2       ; AUTO.S:1039
+]rts:
+  return                           ; AUTO.S:1040
+}
+
+fn chgshadposn {
+  *ztemp@0x00e9 = a            ; AUTO.S:1048
+  *ztemp+1@0x00ea = x            ; AUTO.S:1049
+  y = #0x06                  ; AUTO.S:1050
+:loop:
+  a = *(ztemp@0x00e9)[y]   ; AUTO.S:1051
+  *(Char@0x0040 + y) = a   ; AUTO.S:1052
+  y -= 1                         ; AUTO.S:1053
+  if y >=0 goto :loop  ; AUTO.S:1054
+  y = #0x07                  ; AUTO.S:1056
+  a = *(ztemp@0x00e9)[y]   ; AUTO.S:1057
+  call jumpseq                  ; AUTO.S:1058
+  a = #0x01                  ; AUTO.S:1060
+  *CharID@0x004d = a            ; AUTO.S:1061
+  a = #0x00                  ; AUTO.S:1063
+  *PlayCount@0x00a0 = a            ; AUTO.S:1064
+  return                           ; AUTO.S:1065
+}
+
+fn csps {
+  call chgshadposn                  ; AUTO.S:1069
+  a = #0x03                  ; AUTO.S:1071
+  *guardprog@0x00dd = a            ; AUTO.S:1072
+  a = #shadstrength                  ; AUTO.S:1074
+  *MaxOppStr@0x00dc = a            ; AUTO.S:1075
+  *OppStrength@0x00cc = a            ; AUTO.S:1076
+  tail_call SaveShad                ; AUTO.S:1078
+}
+
+fn AUTOPLAYBACK {
+  *ProgStart@0x00f3 = a            ; AUTO.S:1150
+  *ProgStart+1@0x00f4 = x            ; AUTO.S:1151
+  a = *PlayCount@0x00a0        ; AUTO.S:1155
+  cmp a, #0xfe              ; AUTO.S:1156
+  if a >= #0xfe goto :rts  ; AUTO.S:1157
+  *PlayCount@0x00a0 += 1                         ; AUTO.S:1158
+  y = *PreRecPtr@0x0309        ; AUTO.S:1162
+  a = *PlayCount@0x00a0        ; AUTO.S:1164
+  cmp a, *(ProgStart@0x00f3)[y]   ; AUTO.S:1165
+  if cs goto :next       ; AUTO.S:1166
+  y -= 1                         ; AUTO.S:1170
+  a = *(ProgStart@0x00f3)[y]   ; AUTO.S:1171
+  goto :ex                ; AUTO.S:1172
+:next:
+  y += 1                         ; AUTO.S:1176
+  a = *(ProgStart@0x00f3)[y]   ; AUTO.S:1177
+  y += 1                         ; AUTO.S:1178
+  *PreRecPtr@0x0309 = y            ; AUTO.S:1179
+:ex:
+  cmp a, #0xff              ; AUTO.S:1183
+  if a == #0xff goto :enddemo  ; AUTO.S:1184
+  cmp a, #0x00              ; AUTO.S:1185
+  if a == #0x00 goto :ctr  ; AUTO.S:1186
+  cmp a, #0x01              ; AUTO.S:1187
+  if a == #0x01 goto :fwd  ; AUTO.S:1188
+  cmp a, #0x02              ; AUTO.S:1189
+  if a == #0x02 goto :back  ; AUTO.S:1190
+  cmp a, #0x03              ; AUTO.S:1191
+  if a == #0x03 goto :up  ; AUTO.S:1192
+  cmp a, #0x04              ; AUTO.S:1193
+  if a == #0x04 goto :down  ; AUTO.S:1194
+  cmp a, #0x05              ; AUTO.S:1195
+  if a == #0x05 goto :upfwd  ; AUTO.S:1196
+  cmp a, #0x06              ; AUTO.S:1197
+  if a == #0x06 goto :press  ; AUTO.S:1198
+  cmp a, #0x07              ; AUTO.S:1199
+  if a == #0x07 goto :release  ; AUTO.S:1200
+:rts:
+]rts:
+  return                           ; AUTO.S:1202
+:ctr:
+  tail_call DoRelease                ; AUTO.S:1206
+:fwd:
+  tail_call DoFwd                ; AUTO.S:1207
+:back:
+  tail_call DoBack                ; AUTO.S:1208
+:up:
+  tail_call DoUp                ; AUTO.S:1209
+:down:
+  tail_call DoDown                ; AUTO.S:1210
+:upfwd:
+  call DoUp                  ; AUTO.S:1211
+  tail_call DoFwd                ; AUTO.S:1212
+:press:
+  tail_call DoPress                ; AUTO.S:1213
+:release:
+  tail_call DoRelBtn                ; AUTO.S:1214
+:enddemo:
+  tail_call attractmode                ; AUTO.S:1218
+:endpb:
+CUTCHECK:
+  a = *CUTTIMER@0x0028        ; AUTO.S:1231
+  if a == #0x00 goto :ok  ; AUTO.S:1232
+  *CUTTIMER@0x0028 -= 1                         ; AUTO.S:1234
+]rts:
+  return                           ; AUTO.S:1235
+:ok:
+  call LoadKid                  ; AUTO.S:1238
+  call setupchar                  ; AUTO.S:1239
+  call getedges                  ; AUTO.S:1240
+  call cutchar                  ; AUTO.S:1241
+  if mi goto ]rts       ; AUTO.S:1242
+  *]cutdir@0x00ec = a            ; AUTO.S:1243
+  call SaveKid                  ; AUTO.S:1245
+  a = *CharScrn@0x004b        ; AUTO.S:1247
+  *cutscrn@0x00a6 = a            ; AUTO.S:1248
+  a = *ShadFace@0x0063        ; AUTO.S:1250
+  cmp a, #0x56              ; AUTO.S:1251
+  if a == #0x56 goto ]rts  ; AUTO.S:1252
+  a = *ShadLife@0x006f        ; AUTO.S:1261
+  if a >=0 goto :update  ; AUTO.S:1262
+  a = *ShadSword@0x006e        ; AUTO.S:1264
+  cmp a, #0x02              ; AUTO.S:1265
+  if a != #0x02 goto :update  ; AUTO.S:1266
+  x = *KidScrn@0x005b        ; AUTO.S:1270
+  a = *(GdStartBlock-1@0xbf46 + x)   ; AUTO.S:1271
+  cmp a, #0x1e              ; AUTO.S:1272
+  if a >= #0x1e goto :nonew  ; AUTO.S:1273
+  a = *(GdStartSeqH-1@0xbfbe + x)   ; AUTO.S:1275
+  if a == #0x00 goto :update  ; AUTO.S:1276
+:nonew:
+  a = *]cutdir@0x00ec        ; AUTO.S:1281
+  if a == #0x00 goto :left  ; AUTO.S:1282
+  cmp a, #0x01              ; AUTO.S:1283
+  if a == #0x01 goto :right  ; AUTO.S:1284
+  cmp a, #0x02              ; AUTO.S:1285
+  if a == #0x02 goto :up  ; AUTO.S:1286
+:down:
+  a = *ShadBlockY@0x0065        ; AUTO.S:1288
+  cmp a, #0x03              ; AUTO.S:1289
+  if a >= #0x03 goto :transfer  ; AUTO.S:1290
+  if cc goto :update       ; AUTO.S:1291
+:up:
+  a = *ShadBlockY@0x0065        ; AUTO.S:1293
+  if a <0 goto :transfer  ; AUTO.S:1294
+  if pl goto :update       ; AUTO.S:1295
+:right:
+  a = *ShadX@0x0061        ; AUTO.S:1297
+  cmp a, #ScrnWidth+25              ; AUTO.S:1298
+  if a < #ScrnWidth+25 goto :update  ; AUTO.S:1299
+  if cs goto :transfer       ; AUTO.S:1300
+:left:
+  a = *ShadX@0x0061        ; AUTO.S:1302
+  cmp a, #256-ScrnWidth-25              ; AUTO.S:1303
+  if a >= #256-ScrnWidth-25 goto :update  ; AUTO.S:1304
+:transfer:
+  tail_call transferguard                ; AUTO.S:1308
+:update:
+  tail_call updateguard                ; AUTO.S:1312
+}
+
+fn :endpb  (aka CUTCHECK) {
+  a = *CUTTIMER@0x0028        ; AUTO.S:1231
+  if a == #0x00 goto :ok  ; AUTO.S:1232
+  *CUTTIMER@0x0028 -= 1                         ; AUTO.S:1234
+]rts:
+  return                           ; AUTO.S:1235
+:ok:
+  call LoadKid                  ; AUTO.S:1238
+  call setupchar                  ; AUTO.S:1239
+  call getedges                  ; AUTO.S:1240
+  call cutchar                  ; AUTO.S:1241
+  if mi goto ]rts       ; AUTO.S:1242
+  *]cutdir@0x00ec = a            ; AUTO.S:1243
+  call SaveKid                  ; AUTO.S:1245
+  a = *CharScrn@0x004b        ; AUTO.S:1247
+  *cutscrn@0x00a6 = a            ; AUTO.S:1248
+  a = *ShadFace@0x0063        ; AUTO.S:1250
+  cmp a, #0x56              ; AUTO.S:1251
+  if a == #0x56 goto ]rts  ; AUTO.S:1252
+  a = *ShadLife@0x006f        ; AUTO.S:1261
+  if a >=0 goto :update  ; AUTO.S:1262
+  a = *ShadSword@0x006e        ; AUTO.S:1264
+  cmp a, #0x02              ; AUTO.S:1265
+  if a != #0x02 goto :update  ; AUTO.S:1266
+  x = *KidScrn@0x005b        ; AUTO.S:1270
+  a = *(GdStartBlock-1@0xbf46 + x)   ; AUTO.S:1271
+  cmp a, #0x1e              ; AUTO.S:1272
+  if a >= #0x1e goto :nonew  ; AUTO.S:1273
+  a = *(GdStartSeqH-1@0xbfbe + x)   ; AUTO.S:1275
+  if a == #0x00 goto :update  ; AUTO.S:1276
+:nonew:
+  a = *]cutdir@0x00ec        ; AUTO.S:1281
+  if a == #0x00 goto :left  ; AUTO.S:1282
+  cmp a, #0x01              ; AUTO.S:1283
+  if a == #0x01 goto :right  ; AUTO.S:1284
+  cmp a, #0x02              ; AUTO.S:1285
+  if a == #0x02 goto :up  ; AUTO.S:1286
+:down:
+  a = *ShadBlockY@0x0065        ; AUTO.S:1288
+  cmp a, #0x03              ; AUTO.S:1289
+  if a >= #0x03 goto :transfer  ; AUTO.S:1290
+  if cc goto :update       ; AUTO.S:1291
+:up:
+  a = *ShadBlockY@0x0065        ; AUTO.S:1293
+  if a <0 goto :transfer  ; AUTO.S:1294
+  if pl goto :update       ; AUTO.S:1295
+:right:
+  a = *ShadX@0x0061        ; AUTO.S:1297
+  cmp a, #ScrnWidth+25              ; AUTO.S:1298
+  if a < #ScrnWidth+25 goto :update  ; AUTO.S:1299
+  if cs goto :transfer       ; AUTO.S:1300
+:left:
+  a = *ShadX@0x0061        ; AUTO.S:1302
+  cmp a, #256-ScrnWidth-25              ; AUTO.S:1303
+  if a >= #256-ScrnWidth-25 goto :update  ; AUTO.S:1304
+:transfer:
+  tail_call transferguard                ; AUTO.S:1308
+:update:
+  tail_call updateguard                ; AUTO.S:1312
+}
+
+fn transferguard {
+  a = #0xff                  ; AUTO.S:1321
+  x = *KidScrn@0x005b        ; AUTO.S:1322
+  *(GdStartBlock-1@0xbf46 + x) = a   ; AUTO.S:1323
+  x = *ShadScrn@0x006b        ; AUTO.S:1324
+  *(GdStartBlock-1@0xbf46 + x) = a   ; AUTO.S:1325
+  call LoadShad                  ; AUTO.S:1327
+  a = *]cutdir@0x00ec        ; AUTO.S:1329
+  call cut                  ; AUTO.S:1330
+  tail_call SaveShad                ; AUTO.S:1332
+]rts:
+  return                           ; AUTO.S:1334
+}
+
+fn updateguard {
+  a = *ShadFace@0x0063        ; AUTO.S:1344
+  if a == #0x56 goto ]rts  ; AUTO.S:1346
+  a = *ShadID@0x006d        ; AUTO.S:1347
+  if a == #0x01 goto ]rts  ; AUTO.S:1349
+  if a == #0x18 goto ]rts  ; AUTO.S:1351
+:gd:
+  a = #0x00                  ; AUTO.S:1353
+  *tempblockx@0x0091 = a            ; AUTO.S:1354
+  a = *ShadBlockY@0x0065        ; AUTO.S:1355
+  *tempblocky@0x0092 = a            ; AUTO.S:1356
+  call indexblock                  ; AUTO.S:1357
+  a = y                            ; AUTO.S:1358
+  x = *ShadScrn@0x006b        ; AUTO.S:1359
+  *(GdStartBlock-1@0xbf46 + x) = a   ; AUTO.S:1360
+  a = *ShadX@0x0061        ; AUTO.S:1362
+  *(GdStartX-1@0xbf76 + x) = a   ; AUTO.S:1363
+  a = *ShadFace@0x0063        ; AUTO.S:1365
+  *(GdStartFace-1@0xbf5e + x) = a   ; AUTO.S:1366
+  a = *guardprog@0x00dd        ; AUTO.S:1368
+  *(GdStartProg-1@0xbfa6 + x) = a   ; AUTO.S:1369
+  a = *ShadLife@0x006f        ; AUTO.S:1371
+  if a >=0 goto :ok  ; AUTO.S:1372
+  a = #0x00                  ; AUTO.S:1373
+  *(GdStartSeqH-1@0xbfbe + x) = a   ; AUTO.S:1374
+  if eq goto :cont       ; AUTO.S:1375
+:ok:
+  a = *ShadSeq@0x0069        ; AUTO.S:1377
+  *(GdStartSeqL-1@0xbf8e + x) = a   ; AUTO.S:1378
+  a = *ShadSeq+1@0x006a        ; AUTO.S:1379
+  *(GdStartSeqH-1@0xbfbe + x) = a   ; AUTO.S:1380
+:cont:
+  a = #0x56                  ; AUTO.S:1384
+  *ShadFace@0x0063 = a            ; AUTO.S:1385
+  a = #0x00                  ; AUTO.S:1387
+  *OppStrength@0x00cc = a            ; AUTO.S:1388
+]rts:
+  return                           ; AUTO.S:1389
+}
+
+fn CUTGUARD {
+  a = *ShadFace@0x0063        ; AUTO.S:1398
+  cmp a, #0x56              ; AUTO.S:1399
+  if a == #0x56 goto ]rts  ; AUTO.S:1400
+  a = *ShadY@0x0062        ; AUTO.S:1402
+  cmp a, #BotCutEdge              ; AUTO.S:1403
+  if a < #BotCutEdge goto ]rts  ; AUTO.S:1404
+  a = *ShadID@0x006d        ; AUTO.S:1408
+  cmp a, #0x04              ; AUTO.S:1409
+  if a == #0x04 goto :skel  ; AUTO.S:1410
+  cmp a, #0x01              ; AUTO.S:1411
+  if a == #0x01 goto :shad  ; AUTO.S:1412
+]RemoveGd:
+  call deadenemy                  ; AUTO.S:1415
+  x = *VisScrn@0x00cb        ; AUTO.S:1417
+  a = #0xff                  ; AUTO.S:1418
+  *(GdStartBlock-1@0xbf46 + x) = a   ; AUTO.S:1419
+  a = #0x56                  ; AUTO.S:1420
+  *ShadFace@0x0063 = a            ; AUTO.S:1421
+  a = #0x00                  ; AUTO.S:1422
+  *OppStrength@0x00cc = a            ; AUTO.S:1423
+  a = #0xff                  ; AUTO.S:1424
+  *ChgOppStr@0x00d2 = a            ; AUTO.S:1425
+]rts:
+  return                           ; AUTO.S:1426
+:shad:
+  a = *ShadAction@0x0066        ; AUTO.S:1430
+  cmp a, #0x04              ; AUTO.S:1431
+  if a != #0x04 goto ]rts  ; AUTO.S:1432
+  call LoadShad                  ; AUTO.S:1433
+  call VanishChar                  ; AUTO.S:1434
+  tail_call SaveShad                ; AUTO.S:1435
+:skel:
+  a = *ShadScrn@0x006b        ; AUTO.S:1439
+  call getdown                  ; AUTO.S:1440
+  *ShadScrn@0x006b = a            ; AUTO.S:1441
+  cmp a, #0x03              ; AUTO.S:1442
+  if a != #0x03 goto ]RemoveGd  ; AUTO.S:1443
+  a = #Splat                  ; AUTO.S:1447
+  call addsound                  ; AUTO.S:1448
+  a = #0x85                  ; AUTO.S:1449
+  *ShadX@0x0061 = a            ; AUTO.S:1450
+  a = #0x01                  ; AUTO.S:1451
+  *ShadBlockY@0x0065 = a            ; AUTO.S:1452
+  a = #0x00                  ; AUTO.S:1453
+  *ShadFace@0x0063 = a            ; AUTO.S:1454
+  a = #0xff                  ; AUTO.S:1455
+  *ShadLife@0x006f = a            ; AUTO.S:1456
+  tail_call updateguard                ; AUTO.S:1457
+}
+
+fn cutchar {
+  a = *CharY@0x0042        ; AUTO.S:1471
+  x = *CharAction@0x0046        ; AUTO.S:1473
+  cmp x, #0x05              ; AUTO.S:1474
+  if x == #0x05 goto :notup  ; AUTO.S:1475
+  cmp x, #0x04              ; AUTO.S:1476
+  if x == #0x04 goto :notup  ; AUTO.S:1477
+  cmp x, #0x03              ; AUTO.S:1478
+  if x == #0x03 goto :notup  ; AUTO.S:1479
+  cmp a, #TopCutEdgePl              ; AUTO.S:1483
+  if a < #TopCutEdgePl goto :CUTUP  ; AUTO.S:1484
+  cmp a, #TopCutEdgeMi              ; AUTO.S:1486
+  if a >= #TopCutEdgeMi goto :CUTUP  ; AUTO.S:1487
+:notup:
+  cmp a, #BotCutEdge              ; AUTO.S:1489
+  if a >= #BotCutEdge goto :CUTDOWN  ; AUTO.S:1490
+  x = *CharPosn@0x0040        ; AUTO.S:1494
+  cmp x, #0x87              ; AUTO.S:1495
+  if x < #0x87 goto :nocu  ; AUTO.S:1496
+  cmp x, #0x96              ; AUTO.S:1497
+  if x < #0x96 goto :nocut  ; AUTO.S:1498
+:nocu:
+  cmp x, #0x6e              ; AUTO.S:1499
+  if x < #0x6e goto :nosu  ; AUTO.S:1500
+  cmp x, #0x78              ; AUTO.S:1501
+  if x < #0x78 goto :nocut  ; AUTO.S:1502
+:nosu:
+  cmp x, #0x96              ; AUTO.S:1503
+  if x < #0x96 goto :nost  ; AUTO.S:1504
+  cmp x, #0xa3              ; AUTO.S:1505
+  if x < #0xa3 goto :nocut  ; AUTO.S:1506
+  cmp x, #0xa6              ; AUTO.S:1507
+  if x < #0xa6 goto :nost  ; AUTO.S:1508
+  cmp x, #0xa9              ; AUTO.S:1509
+  if x < #0xa9 goto :nocut  ; AUTO.S:1510
+:nost:
+  a = *CharAction@0x0046        ; AUTO.S:1511
+  cmp a, #0x07              ; AUTO.S:1512
+  if a == #0x07 goto :nocut  ; AUTO.S:1513
+  x = *CharFace@0x0043        ; AUTO.S:1515
+  if x == #0x00 goto :faceR  ; AUTO.S:1516
+  a = *leftej@0x00b7        ; AUTO.S:1518
+  cmp a, #LeftCutEdge              ; AUTO.S:1519
+  if a < #LeftCutEdge goto :CUTLEFT  ; AUTO.S:1520
+  if eq goto :CUTLEFT       ; AUTO.S:1521
+  cmp a, #ScrnRight+1              ; AUTO.S:1523
+  if a >= #ScrnRight+1 goto :CUTRIGHT  ; AUTO.S:1524
+  if cc goto :nocut       ; AUTO.S:1525
+:faceR:
+  a = *CharScrn@0x004b        ; AUTO.S:1528
+  x = #0x09                  ; AUTO.S:1529
+  y = *CharBlockY@0x0045        ; AUTO.S:1530
+  call rdblock                  ; AUTO.S:1531
+  cmp a, #panelwif              ; AUTO.S:1533
+  if a == #panelwif goto :nocutr  ; AUTO.S:1534
+  cmp a, #panelwof              ; AUTO.S:1535
+  if a == #panelwof goto :nocutr  ; AUTO.S:1536
+  a = *rightej@0x00b8        ; AUTO.S:1538
+  cmp a, #RightCutEdge              ; AUTO.S:1539
+  if a >= #RightCutEdge goto :CUTRIGHT  ; AUTO.S:1540
+:nocutr:
+  a = *rightej@0x00b8        ; AUTO.S:1542
+  cmp a, #ScrnLeft-1              ; AUTO.S:1543
+  if a < #ScrnLeft-1 goto :CUTLEFT  ; AUTO.S:1544
+  if eq goto :CUTLEFT       ; AUTO.S:1545
+:nocut:
+  a = #0xff                  ; AUTO.S:1547
+  return                           ; AUTO.S:1548
+:CUTLEFT:
+  call mirrmusic                  ; AUTO.S:1550
+  call milestone3                  ; AUTO.S:1551
+  a = #0x00                  ; AUTO.S:1552
+  if a >=0 goto :cut  ; AUTO.S:1553
+:CUTRIGHT:
+  call stealsword                  ; AUTO.S:1555
+  call jaffmusic                  ; AUTO.S:1556
+  a = #0x01                  ; AUTO.S:1557
+  if a >=0 goto :cut  ; AUTO.S:1558
+:CUTUP:
+  a = #0x02                  ; AUTO.S:1560
+  if a >=0 goto :cut  ; AUTO.S:1561
+:CUTDOWN:
+  call infinity                  ; AUTO.S:1566
+  a = *level@0x03f4        ; AUTO.S:1568
+  cmp a, #0x06              ; AUTO.S:1569
+  if a != #0x06 goto :no6  ; AUTO.S:1570
+  a = *CharScrn@0x004b        ; AUTO.S:1571
+  cmp a, #0x01              ; AUTO.S:1572
+  if a == #0x01 goto :nocut  ; AUTO.S:1573
+:no6:
+  a = #0x03                  ; AUTO.S:1575
+:cut:
+  push a                           ; AUTO.S:1576
+  call cut                  ; AUTO.S:1577
+  a = pop                          ; AUTO.S:1578
+]rts:
+  return                           ; AUTO.S:1579
+}
+
+fn infinity {
+  return                           ; AUTO.S:1584
+}
+
+fn milestone3 {
+  a = *level@0x03f4        ; AUTO.S:1590
+  if a != #0x03 goto ]rts  ; AUTO.S:1592
+  a = #0x07                  ; AUTO.S:1593
+]mcheck:
+  if a != *CharScrn@0x004b goto ]rts  ; AUTO.S:1595
+  a = #0x01                  ; AUTO.S:1596
+  *milestone@0x0212 = a            ; AUTO.S:1597
+  a = *MaxKidStr@0x00d0        ; AUTO.S:1598
+  *origstrength@0x00e1 = a            ; AUTO.S:1599
+  return                           ; AUTO.S:1600
+]rts:
+  return                           ; AUTO.S:1579
+}
+
+fn stealsword {
+  a = *level@0x03f4        ; AUTO.S:1606
+  if a != #0x0c goto ]rts  ; AUTO.S:1608
+  a = *CharScrn@0x004b        ; AUTO.S:1609
+  if a != #0x12 goto ]rts  ; AUTO.S:1611
+  a = #swordscrn                  ; AUTO.S:1612
+  x = #swordx                  ; AUTO.S:1613
+  y = #swordy                  ; AUTO.S:1614
+  call rdblock                  ; AUTO.S:1615
+  a = #floor                  ; AUTO.S:1616
+  *(BlueType@0x0024)[y] = a   ; AUTO.S:1617
+  return                           ; AUTO.S:1618
+]rts:
+  return                           ; AUTO.S:1579
+}
+
+fn jaffmusic {
+  a = *level@0x03f4        ; AUTO.S:1624
+  if a != #0x0d goto ]rts  ; AUTO.S:1626
+  a = *exitopen@0x0086        ; AUTO.S:1627
+  if a != #0x00 goto ]rts  ; AUTO.S:1628
+  a = *CharScrn@0x004b        ; AUTO.S:1629
+  if a != #0x03 goto ]rts  ; AUTO.S:1631
+  a = #s_Jaffar                  ; AUTO.S:1632
+  x = #0x19                  ; AUTO.S:1633
+  tail_call cuesong                ; AUTO.S:1634
+]rts:
+  return                           ; AUTO.S:1579
+}
+
+fn mirrmusic {
+  a = *exitopen@0x0086        ; AUTO.S:1640
+  if a == #0x00 goto :no4  ; AUTO.S:1641
+  if a == #0x4d goto :no4  ; AUTO.S:1643
+  a = *level@0x03f4        ; AUTO.S:1644
+  if a != #0x04 goto :no4  ; AUTO.S:1646
+  a = *CharBlockY@0x0045        ; AUTO.S:1647
+  if a != #miry goto :no4  ; AUTO.S:1649
+  a = *CharScrn@0x004b        ; AUTO.S:1650
+  if a != #0x0b goto :no4  ; AUTO.S:1652
+  a = #s_Danger                  ; AUTO.S:1653
+  x = #0x32                  ; AUTO.S:1654
+  call cuesong                  ; AUTO.S:1655
+  a = #0x4d                  ; AUTO.S:1656
+  *exitopen@0x0086 = a            ; AUTO.S:1657
+:no4:
+]rts:
+  return                           ; AUTO.S:1659
+}
+
+fn CUT {
+  if a == #0x03 goto Cdown  ; AUTO.S:1672
+  if a == #0x01 goto Cright  ; AUTO.S:1674
+  if a == #0x02 goto Cup  ; AUTO.S:1676
+Cleft:
+  a = *CharScrn@0x004b        ; AUTO.S:1679
+  call getleft                  ; AUTO.S:1680
+  *CharScrn@0x004b = a            ; AUTO.S:1681
+  a = #0x8c                  ; AUTO.S:1683
+  c = 0                            ; AUTO.S:1684
+  a = a + *CharX@0x0041 + c    ; AUTO.S:1685
+  *CharX@0x0041 = a            ; AUTO.S:1686
+  x = #0x01                  ; AUTO.S:1688
+  return                           ; AUTO.S:1689
+}
+
+fn Cleft {
+  a = *CharScrn@0x004b        ; AUTO.S:1679
+  call getleft                  ; AUTO.S:1680
+  *CharScrn@0x004b = a            ; AUTO.S:1681
+  a = #0x8c                  ; AUTO.S:1683
+  c = 0                            ; AUTO.S:1684
+  a = a + *CharX@0x0041 + c    ; AUTO.S:1685
+  *CharX@0x0041 = a            ; AUTO.S:1686
+  x = #0x01                  ; AUTO.S:1688
+  return                           ; AUTO.S:1689
+}
+
+fn Cright {
+  a = *CharScrn@0x004b        ; AUTO.S:1692
+  call getright                  ; AUTO.S:1693
+  *CharScrn@0x004b = a            ; AUTO.S:1694
+  a = *CharX@0x0041        ; AUTO.S:1696
+  c = 1                            ; AUTO.S:1697
+  a = a - #0x8c - (1 - c)        ; AUTO.S:1698
+  *CharX@0x0041 = a            ; AUTO.S:1699
+  x = #0x00                  ; AUTO.S:1701
+  return                           ; AUTO.S:1702
+}
+
+fn Cup {
+  a = *CharScrn@0x004b        ; AUTO.S:1705
+  call getup                  ; AUTO.S:1706
+  *CharScrn@0x004b = a            ; AUTO.S:1707
+  a = *CharBlockY@0x0045        ; AUTO.S:1709
+  c = 0                            ; AUTO.S:1710
+  a = a + #0x03 + c              ; AUTO.S:1711
+  *CharBlockY@0x0045 = a            ; AUTO.S:1712
+  a = *CharY@0x0042        ; AUTO.S:1714
+  c = 0                            ; AUTO.S:1715
+  a = a + #0xbd + c              ; AUTO.S:1716
+  *CharY@0x0042 = a            ; AUTO.S:1717
+  x = #0x03                  ; AUTO.S:1719
+  return                           ; AUTO.S:1720
+}
+
+fn Cdown {
+  a = *CharScrn@0x004b        ; AUTO.S:1723
+  call getdown                  ; AUTO.S:1724
+  *CharScrn@0x004b = a            ; AUTO.S:1725
+  a = *CharBlockY@0x0045        ; AUTO.S:1727
+  c = 1                            ; AUTO.S:1728
+  a = a - #0x03 - (1 - c)        ; AUTO.S:1729
+  *CharBlockY@0x0045 = a            ; AUTO.S:1730
+  a = *CharY@0x0042        ; AUTO.S:1732
+  c = 1                            ; AUTO.S:1733
+  a = a - #0xbd - (1 - c)        ; AUTO.S:1734
+  *CharY@0x0042 = a            ; AUTO.S:1735
+  x = #0x02                  ; AUTO.S:1737
+]rts:
+  return                           ; AUTO.S:1738
+}
+
+fn ADDGUARD {
+  a = #0x00                  ; AUTO.S:1751
+  *offguard@0x008a = a            ; AUTO.S:1752
+  a = *level@0x03f4        ; AUTO.S:1756
+  cmp a, #0x0c              ; AUTO.S:1757
+  if a != #0x0c goto :not12  ; AUTO.S:1758
+  a = *exitopen@0x0086        ; AUTO.S:1759
+  if a != #0x00 goto ]rts  ; AUTO.S:1760
+  a = *mergetimer@0x00df        ; AUTO.S:1761
+  if a != #0x00 goto :1  ; AUTO.S:1762
+  a = *VisScrn@0x00cb        ; AUTO.S:1763
+  cmp a, #swordscrn              ; AUTO.S:1764
+:1:
+  if ne goto ]rts       ; AUTO.S:1765
+  *CharScrn@0x004b = a            ; AUTO.S:1766
+  x = #swordx                  ; AUTO.S:1768
+  y = #swordy                  ; AUTO.S:1769
+  call rdblock                  ; AUTO.S:1770
+  cmp a, #sword              ; AUTO.S:1771
+  if a == #sword goto ]rts  ; AUTO.S:1772
+  a = #0x00                  ; AUTO.S:1773
+  *shadowaction@0x0217 = a            ; AUTO.S:1774
+  a = #0x01                  ; AUTO.S:1775
+  *exitopen@0x0086 = a            ; AUTO.S:1776
+  a = #shadpos12                  ; AUTO.S:1777
+  x = #>shadpos12                  ; AUTO.S:1778
+  tail_call csps                ; AUTO.S:1779
+:not12:
+  a = *level@0x03f4        ; AUTO.S:1784
+  cmp a, #0x06              ; AUTO.S:1785
+  if a != #0x06 goto :not6  ; AUTO.S:1786
+  a = *VisScrn@0x00cb        ; AUTO.S:1788
+  *CharScrn@0x004b = a            ; AUTO.S:1789
+  cmp a, #0x01              ; AUTO.S:1790
+  if a != #0x01 goto AddNormalGd  ; AUTO.S:1791
+  a = *exitopen@0x0086        ; AUTO.S:1793
+  cmp a, #0x4d              ; AUTO.S:1794
+  if a == #0x4d goto :norepeat  ; AUTO.S:1795
+  a = #s_Danger                  ; AUTO.S:1796
+  x = #0x32                  ; AUTO.S:1797
+  call cuesong                  ; AUTO.S:1798
+  a = #0x4d                  ; AUTO.S:1799
+  *exitopen@0x0086 = a            ; AUTO.S:1800
+:norepeat:
+  a = #shadpos6a                  ; AUTO.S:1802
+  x = #>shadpos6a                  ; AUTO.S:1803
+  tail_call csps                ; AUTO.S:1804
+:not6:
+  a = *level@0x03f4        ; AUTO.S:1808
+  cmp a, #0x05              ; AUTO.S:1809
+  if a != #0x05 goto :not5  ; AUTO.S:1810
+  a = *VisScrn@0x00cb        ; AUTO.S:1812
+  *CharScrn@0x004b = a            ; AUTO.S:1813
+  cmp a, #flaskscrn              ; AUTO.S:1814
+  if a != #flaskscrn goto AddNormalGd  ; AUTO.S:1815
+  x = #flaskx                  ; AUTO.S:1817
+  y = #flasky                  ; AUTO.S:1818
+  call rdblock                  ; AUTO.S:1819
+  cmp a, #flask              ; AUTO.S:1820
+  if a != #flask goto ]rts  ; AUTO.S:1821
+  a = #shadpos5                  ; AUTO.S:1823
+  x = #>shadpos5                  ; AUTO.S:1824
+  tail_call csps                ; AUTO.S:1825
+]rts:
+  return                           ; AUTO.S:1826
+:not5:
+AddNormalGd:
+  x = *VisScrn@0x00cb        ; AUTO.S:1831
+  a = *(GdStartBlock-1@0xbf46 + x)   ; AUTO.S:1832
+  cmp a, #0x1e              ; AUTO.S:1833
+  if a >= #0x1e goto ]rts  ; AUTO.S:1834
+  *CharScrn@0x004b = x            ; AUTO.S:1838
+  call unindex                  ; AUTO.S:1840
+  *CharBlockY@0x0045 = x            ; AUTO.S:1841
+  a = *(FloorY+1@0x127f + x)   ; AUTO.S:1843
+  *CharY@0x0042 = a            ; AUTO.S:1844
+  x = *VisScrn@0x00cb        ; AUTO.S:1846
+  a = *(GdStartX-1@0xbf76 + x)   ; AUTO.S:1847
+  *CharX@0x0041 = a            ; AUTO.S:1848
+  call getblockxp                  ; AUTO.S:1849
+  *CharBlockX@0x0044 = a            ; AUTO.S:1850
+  x = *VisScrn@0x00cb        ; AUTO.S:1852
+  a = *(GdStartFace-1@0xbf5e + x)   ; AUTO.S:1853
+  *CharFace@0x0043 = a            ; AUTO.S:1854
+  a = *level@0x03f4        ; AUTO.S:1856
+  cmp a, #0x03              ; AUTO.S:1857
+  if a != #0x03 goto :3  ; AUTO.S:1858
+  a = #0x04                  ; AUTO.S:1860
+  if a != #0x00 goto :4  ; AUTO.S:1861
+:3:
+  a = #0x02                  ; AUTO.S:1862
+:4:
+  *CharID@0x004d = a            ; AUTO.S:1863
+  a = *(GdStartSeqH-1@0xbfbe + x)   ; AUTO.S:1865
+  if a != #0x00 goto :1  ; AUTO.S:1866
+  a = *CharID@0x004d        ; AUTO.S:1868
+  cmp a, #0x04              ; AUTO.S:1869
+  if a != #0x04 goto :5  ; AUTO.S:1870
+  a = #0x02                  ; AUTO.S:1871
+  *CharSword@0x004e = a            ; AUTO.S:1872
+  a = #landengarde                  ; AUTO.S:1873
+  if a != #0x00 goto :6  ; AUTO.S:1874
+:5:
+  a = #0x00                  ; AUTO.S:1875
+  *CharSword@0x004e = a            ; AUTO.S:1876
+  a = #alertstand                  ; AUTO.S:1877
+:6:
+  call jumpseq                  ; AUTO.S:1878
+  goto :2                ; AUTO.S:1879
+:1:
+  *CharSeq+1@0x004a = a            ; AUTO.S:1881
+  a = *(GdStartSeqL-1@0xbf8e + x)   ; AUTO.S:1882
+  *CharSeq@0x0049 = a            ; AUTO.S:1883
+:2:
+  call animchar                  ; AUTO.S:1885
+  a = *CharPosn@0x0040        ; AUTO.S:1887
+  cmp a, #0xb9              ; AUTO.S:1888
+  if a == #0xb9 goto :dead  ; AUTO.S:1889
+  cmp a, #0xb1              ; AUTO.S:1890
+  if a == #0xb1 goto :dead  ; AUTO.S:1891
+  cmp a, #0xb2              ; AUTO.S:1892
+  if a == #0xb2 goto :dead  ; AUTO.S:1893
+  a = #0xff                  ; AUTO.S:1897
+  *CharLife@0x004f = a            ; AUTO.S:1898
+  a = #0x00                  ; AUTO.S:1900
+  *alertguard@0x00e4 = a            ; AUTO.S:1901
+  *refract@0x00a1 = a            ; AUTO.S:1902
+  *justblocked@0x007e = a            ; AUTO.S:1903
+  call getgdstrength                  ; AUTO.S:1905
+  goto :cont                ; AUTO.S:1906
+:dead:
+  a = #0x01                  ; AUTO.S:1910
+  *CharLife@0x004f = a            ; AUTO.S:1911
+  a = #0x00                  ; AUTO.S:1912
+  *OppStrength@0x00cc = a            ; AUTO.S:1913
+:cont:
+  a = #0x00                  ; AUTO.S:1917
+  *CharXVel@0x0047 = a            ; AUTO.S:1918
+  *CharYVel@0x0048 = a            ; AUTO.S:1919
+  a = #0x01                  ; AUTO.S:1920
+  *CharAction@0x0046 = a            ; AUTO.S:1921
+  x = *VisScrn@0x00cb        ; AUTO.S:1923
+  a = *(GdStartProg-1@0xbfa6 + x)   ; AUTO.S:1924
+  cmp a, #numprogs              ; AUTO.S:1925
+  if a < #numprogs goto :ok  ; AUTO.S:1926
+  a = #0x03                  ; AUTO.S:1927
+:ok:
+  *guardprog@0x00dd = a            ; AUTO.S:1928
+  x = *level@0x03f4        ; AUTO.S:1930
+  a = *(basiccolor@0x000b + x)   ; AUTO.S:1931
+  x = *guardprog@0x00dd        ; AUTO.S:1932
+  ??? eor specialcolor,x            ; AUTO.S:1933
+  *GuardColor@0x0216 = a            ; AUTO.S:1934
+  tail_call SaveShad                ; AUTO.S:1936
+}
+
+fn :not5  (aka AddNormalGd) {
+  x = *VisScrn@0x00cb        ; AUTO.S:1831
+  a = *(GdStartBlock-1@0xbf46 + x)   ; AUTO.S:1832
+  if a >= #0x1e goto ]rts  ; AUTO.S:1834
+  *CharScrn@0x004b = x            ; AUTO.S:1838
+  call unindex                  ; AUTO.S:1840
+  *CharBlockY@0x0045 = x            ; AUTO.S:1841
+  a = *(FloorY+1@0x127f + x)   ; AUTO.S:1843
+  *CharY@0x0042 = a            ; AUTO.S:1844
+  x = *VisScrn@0x00cb        ; AUTO.S:1846
+  a = *(GdStartX-1@0xbf76 + x)   ; AUTO.S:1847
+  *CharX@0x0041 = a            ; AUTO.S:1848
+  call getblockxp                  ; AUTO.S:1849
+  *CharBlockX@0x0044 = a            ; AUTO.S:1850
+  x = *VisScrn@0x00cb        ; AUTO.S:1852
+  a = *(GdStartFace-1@0xbf5e + x)   ; AUTO.S:1853
+  *CharFace@0x0043 = a            ; AUTO.S:1854
+  a = *level@0x03f4        ; AUTO.S:1856
+  if a != #0x03 goto :3  ; AUTO.S:1858
+  a = #0x04                  ; AUTO.S:1860
+  if a != #0x00 goto :4  ; AUTO.S:1861
+:3:
+  a = #0x02                  ; AUTO.S:1862
+:4:
+  *CharID@0x004d = a            ; AUTO.S:1863
+  a = *(GdStartSeqH-1@0xbfbe + x)   ; AUTO.S:1865
+  if a != #0x00 goto :1  ; AUTO.S:1866
+  a = *CharID@0x004d        ; AUTO.S:1868
+  if a != #0x04 goto :5  ; AUTO.S:1870
+  a = #0x02                  ; AUTO.S:1871
+  *CharSword@0x004e = a            ; AUTO.S:1872
+  a = #landengarde                  ; AUTO.S:1873
+  if a != #0x00 goto :6  ; AUTO.S:1874
+:5:
+  a = #0x00                  ; AUTO.S:1875
+  *CharSword@0x004e = a            ; AUTO.S:1876
+  a = #alertstand                  ; AUTO.S:1877
+:6:
+  call jumpseq                  ; AUTO.S:1878
+  goto :2                ; AUTO.S:1879
+:1:
+  *CharSeq+1@0x004a = a            ; AUTO.S:1881
+  a = *(GdStartSeqL-1@0xbf8e + x)   ; AUTO.S:1882
+  *CharSeq@0x0049 = a            ; AUTO.S:1883
+:2:
+  call animchar                  ; AUTO.S:1885
+  a = *CharPosn@0x0040        ; AUTO.S:1887
+  if a == #0xb9 goto :dead  ; AUTO.S:1889
+  if a == #0xb1 goto :dead  ; AUTO.S:1891
+  if a == #0xb2 goto :dead  ; AUTO.S:1893
+  a = #0xff                  ; AUTO.S:1897
+  *CharLife@0x004f = a            ; AUTO.S:1898
+  a = #0x00                  ; AUTO.S:1900
+  *alertguard@0x00e4 = a            ; AUTO.S:1901
+  *refract@0x00a1 = a            ; AUTO.S:1902
+  *justblocked@0x007e = a            ; AUTO.S:1903
+  call getgdstrength                  ; AUTO.S:1905
+  goto :cont                ; AUTO.S:1906
+:dead:
+  a = #0x01                  ; AUTO.S:1910
+  *CharLife@0x004f = a            ; AUTO.S:1911
+  a = #0x00                  ; AUTO.S:1912
+  *OppStrength@0x00cc = a            ; AUTO.S:1913
+:cont:
+  a = #0x00                  ; AUTO.S:1917
+  *CharXVel@0x0047 = a            ; AUTO.S:1918
+  *CharYVel@0x0048 = a            ; AUTO.S:1919
+  a = #0x01                  ; AUTO.S:1920
+  *CharAction@0x0046 = a            ; AUTO.S:1921
+  x = *VisScrn@0x00cb        ; AUTO.S:1923
+  a = *(GdStartProg-1@0xbfa6 + x)   ; AUTO.S:1924
+  cmp a, #numprogs              ; AUTO.S:1925
+  if a < #numprogs goto :ok  ; AUTO.S:1926
+  a = #0x03                  ; AUTO.S:1927
+:ok:
+  *guardprog@0x00dd = a            ; AUTO.S:1928
+  x = *level@0x03f4        ; AUTO.S:1930
+  a = *(basiccolor@0x000b + x)   ; AUTO.S:1931
+  x = *guardprog@0x00dd        ; AUTO.S:1932
+  ??? eor specialcolor,x            ; AUTO.S:1933
+  *GuardColor@0x0216 = a            ; AUTO.S:1934
+  tail_call SaveShad                ; AUTO.S:1936
+]rts:
+  return                           ; AUTO.S:1826
+}
+
+fn getgdstrength {
+  x = *level@0x03f4        ; AUTO.S:1942
+  a = *(basicstrength@0x000a + x)   ; AUTO.S:1943
+  x = *guardprog@0x00dd        ; AUTO.S:1944
+  c = 0                            ; AUTO.S:1945
+  ??? adc extrastrength,x            ; AUTO.S:1946
+  *MaxOppStr@0x00dc = a            ; AUTO.S:1947
+  *OppStrength@0x00cc = a            ; AUTO.S:1948
+]rts:
+  return                           ; AUTO.S:1949
+  ??? usr $a9,17,$800,*-org            ; AUTO.S:1954
+}

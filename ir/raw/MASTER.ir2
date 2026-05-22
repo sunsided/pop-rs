@@ -1,0 +1,912 @@
+; module MASTER from 01 POP Source/Source/MASTER.S
+
+fn FIRSTBOOT {
+  a = *MIXEDoff@0xc052        ; MASTER.S:187
+  call setaux                  ; MASTER.S:188
+  a = #POPside1                  ; MASTER.S:192
+  *BBundID@0x03f5 = a            ; MASTER.S:193
+  *RAMWRTmain@0xc004 = a            ; MASTER.S:197
+  a = #0x02                  ; MASTER.S:198
+  *track@0x00fe = a            ; MASTER.S:199
+  call rw18                  ; MASTER.S:200
+  call loadperm                  ; MASTER.S:207
+  call driveoff                  ; MASTER.S:211
+  call checkIIGS                  ; MASTER.S:215
+  call initsystem                  ; MASTER.S:219
+  a = #0x00                  ; MASTER.S:221
+  *invert@0x009f = a            ; MASTER.S:222
+  a = #0x01                  ; MASTER.S:224
+  *soundon@0x0203 = a            ; MASTER.S:225
+  tail_call AttractLoop                ; MASTER.S:227
+}
+
+fn loadmusic1 {
+  call setmain                  ; MASTER.S:255
+  a = #0x22                  ; MASTER.S:256
+  *track@0x00fe = a            ; MASTER.S:257
+  call rw18                  ; MASTER.S:258
+]mm:
+  call setaux                  ; MASTER.S:260
+  tail_call xmovemusic                ; MASTER.S:261
+}
+
+fn loadmusic2 {
+  call setmain                  ; MASTER.S:267
+  a = #0x14                  ; MASTER.S:268
+  *track@0x00fe = a            ; MASTER.S:269
+  call rw18                  ; MASTER.S:270
+  goto ]mm                ; MASTER.S:274
+}
+
+fn loadmusic3 {
+  tail_call loadmusic1                ; MASTER.S:280
+}
+
+fn setaux {
+  *RAMRDaux@0xc003 = a            ; MASTER.S:283
+  *RAMWRTaux@0xc005 = a            ; MASTER.S:284
+  return                           ; MASTER.S:285
+}
+
+fn setmain {
+  *RAMRDmain@0xc002 = a            ; MASTER.S:287
+  *RAMWRTmain@0xc004 = a            ; MASTER.S:288
+  return                           ; MASTER.S:289
+}
+
+fn driveon {
+  a = #0x00                  ; MASTER.S:301
+driveon1:
+  ??? sta :delay            ; MASTER.S:302
+  call setaux                  ; MASTER.S:304
+  bit *RWBANK1@0xc08b                ; MASTER.S:308
+  bit *RWBANK1@0xc08b                ; MASTER.S:309
+  a = *BBundID@0x03f5        ; MASTER.S:313
+  ??? sta :IDbyte            ; MASTER.S:314
+  call rw18                  ; MASTER.S:316
+  call rw18                  ; MASTER.S:322
+  return                           ; MASTER.S:326
+}
+
+fn driveon1 {
+  ??? sta :delay            ; MASTER.S:302
+  call setaux                  ; MASTER.S:304
+  bit *RWBANK1@0xc08b                ; MASTER.S:308
+  bit *RWBANK1@0xc08b                ; MASTER.S:309
+  a = *BBundID@0x03f5        ; MASTER.S:313
+  ??? sta :IDbyte            ; MASTER.S:314
+  call rw18                  ; MASTER.S:316
+  call rw18                  ; MASTER.S:322
+  return                           ; MASTER.S:326
+}
+
+fn driveoff {
+  call rw18                  ; MASTER.S:333
+  bit *RWBANK2@0xc083                ; MASTER.S:338
+  bit *RWBANK2@0xc083                ; MASTER.S:339
+  *$c010@0xc010 = a            ; MASTER.S:341
+  tail_call setaux                ; MASTER.S:343
+}
+
+fn set1stlevel {
+  a = *firstlevel@0x021b        ; MASTER.S:351
+  x = *firstlevel+1@0x021c        ; MASTER.S:352
+SetLevel:
+  *params@0x03f0 = a            ; MASTER.S:353
+  *params+1@0x03f1 = x            ; MASTER.S:354
+]rts:
+  return                           ; MASTER.S:355
+}
+
+fn SetLevel {
+  *params@0x03f0 = a            ; MASTER.S:353
+  *params+1@0x03f1 = x            ; MASTER.S:354
+]rts:
+  return                           ; MASTER.S:355
+}
+
+fn setdemolevel {
+  a = *demolevel@0x021a        ; MASTER.S:358
+  x = *demolevel+1@0x021b        ; MASTER.S:359
+  tail_call SetLevel                ; MASTER.S:360
+}
+
+fn checkdisk {
+  call setaux                  ; MASTER.S:370
+  x = #POPside2                  ; MASTER.S:371
+  *BBundID@0x03f5 = x            ; MASTER.S:372
+  call driveon                  ; MASTER.S:374
+:loop:
+  call setmain                  ; MASTER.S:375
+  a = #0x16                  ; MASTER.S:376
+  *track@0x00fe = a            ; MASTER.S:377
+  call rw18                  ; MASTER.S:378
+  if cc goto ]rts       ; MASTER.S:382
+  call error                  ; MASTER.S:383
+  goto :loop                ; MASTER.S:384
+]rts:
+  return                           ; MASTER.S:355
+}
+
+fn SAVEGAME {
+  call checkdisk                  ; MASTER.S:395
+  *RAMRDaux@0xc003 = a            ; MASTER.S:397
+  x = #0x0f                  ; MASTER.S:398
+:loop:
+  a = *(savedgame@0xb6f0 + x)   ; MASTER.S:399
+  *($200@0x0200 + x) = a   ; MASTER.S:400
+  x -= 1                         ; MASTER.S:401
+  if x >=0 goto :loop  ; MASTER.S:402
+  *RAMRDmain@0xc002 = a            ; MASTER.S:403
+  a = #0x17                  ; MASTER.S:405
+  *track@0x00fe = a            ; MASTER.S:406
+  call rw18                  ; MASTER.S:407
+  if cc goto :ok       ; MASTER.S:411
+  call whoop                  ; MASTER.S:412
+:ok:
+  tail_call driveoff                ; MASTER.S:413
+}
+
+fn LOADGAME {
+  call checkdisk                  ; MASTER.S:417
+  a = #0x17                  ; MASTER.S:419
+  *track@0x00fe = a            ; MASTER.S:420
+  call rw18                  ; MASTER.S:421
+  *RAMWRTaux@0xc005 = a            ; MASTER.S:426
+  x = #0x0f                  ; MASTER.S:427
+:loop:
+  a = *($200@0x0200 + x)   ; MASTER.S:428
+  *(savedgame@0xb6f0 + x) = a   ; MASTER.S:429
+  x -= 1                         ; MASTER.S:430
+  if x >=0 goto :loop  ; MASTER.S:431
+  tail_call driveoff                ; MASTER.S:433
+}
+
+fn LOADALTSET {
+  *newCHset@0x00f8 = y            ; MASTER.S:443
+  call driveon                  ; MASTER.S:445
+  call rdch4                  ; MASTER.S:447
+  tail_call driveoff                ; MASTER.S:449
+}
+
+fn LOADLEVEL {
+  *newBGset1@0x00f6 = a            ; MASTER.S:468
+  *newBGset2@0x00f7 = x            ; MASTER.S:469
+  *newCHset@0x00f8 = y            ; MASTER.S:470
+  call driveon                  ; MASTER.S:472
+  call rdbluep                  ; MASTER.S:474
+  call rdbg1                  ; MASTER.S:475
+  call rdbg2                  ; MASTER.S:476
+  call rdch4                  ; MASTER.S:477
+  call vidstuff                  ; MASTER.S:479
+  tail_call driveoff                ; MASTER.S:481
+}
+
+fn setbluep {
+  a = *bluepTRK@0x03f0        ; MASTER.S:485
+  *track@0x00fe = a            ; MASTER.S:486
+  a = *bluepREG@0x03f1        ; MASTER.S:487
+]rts:
+  return                           ; MASTER.S:488
+}
+
+fn vidstuff {
+  a = *BBundID@0x03f5        ; MASTER.S:492
+  cmp a, #POPside2              ; MASTER.S:493
+  if a != #POPside2 goto ]rts  ; MASTER.S:494
+  a = *$c000@0xc000        ; MASTER.S:495
+  cmp a, #"^"              ; MASTER.S:496
+  if a != #"^" goto ]rts  ; MASTER.S:497
+  call setmain                  ; MASTER.S:499
+  a = #0x0c                  ; MASTER.S:500
+  *track@0x00fe = a            ; MASTER.S:501
+  call rw18                  ; MASTER.S:502
+:loop:
+  call rw18                  ; MASTER.S:506
+  ??? lda :sm            ; MASTER.S:509
+  c = 0                            ; MASTER.S:510
+  a = a + #0x12 + c              ; MASTER.S:511
+  ??? sta :sm            ; MASTER.S:512
+  cmp a, #0x6c              ; MASTER.S:513
+  if a < #0x6c goto :loop  ; MASTER.S:514
+  call driveoff                  ; MASTER.S:515
+  call setmain                  ; MASTER.S:516
+  tail_call $c00                ; MASTER.S:517
+]rts:
+  return                           ; MASTER.S:488
+}
+
+fn rdbg1 {
+  x = *newBGset1@0x00f6        ; MASTER.S:530
+  if x == *BGset1@0x0303 goto :rts  ; MASTER.S:532
+  *BGset1@0x0303 = x            ; MASTER.S:533
+  a = *(bg1trk@0x022b + x)   ; MASTER.S:534
+  *track@0x00fe = a            ; MASTER.S:535
+  call rw18                  ; MASTER.S:536
+  call rw18                  ; MASTER.S:538
+]rts:
+:rts:
+  return                           ; MASTER.S:541
+}
+
+fn rdbg2 {
+  x = *newBGset2@0x00f7        ; MASTER.S:543
+  if x == *BGset2@0x0304 goto ]rts  ; MASTER.S:545
+  *BGset2@0x0304 = x            ; MASTER.S:546
+  a = *(bg2trk@0x022c + x)   ; MASTER.S:547
+  *track@0x00fe = a            ; MASTER.S:548
+  call rw18                  ; MASTER.S:549
+  return                           ; MASTER.S:551
+]rts:
+  return                           ; MASTER.S:488
+}
+
+fn rdch4 {
+  x = *newCHset@0x00f8        ; MASTER.S:553
+  if x == *CHset@0x0305 goto ]rts  ; MASTER.S:555
+  *CHset@0x0305 = x            ; MASTER.S:556
+  a = *(ch4trk@0x022d + x)   ; MASTER.S:557
+  *track@0x00fe = a            ; MASTER.S:558
+  a = *(ch4off@0x022e + x)   ; MASTER.S:559
+  if a == #0x00 goto :off0  ; MASTER.S:560
+  if a == #0x06 goto :off6  ; MASTER.S:562
+  if a == #0x0c goto :off12  ; MASTER.S:564
+  return                           ; MASTER.S:565
+:off12:
+  call rw18                  ; MASTER.S:567
+  call rw18                  ; MASTER.S:571
+  return                           ; MASTER.S:573
+:off6:
+  call rw18                  ; MASTER.S:575
+  call rw18                  ; MASTER.S:579
+  return                           ; MASTER.S:583
+:off0:
+  call rw18                  ; MASTER.S:585
+  call rw18                  ; MASTER.S:587
+]rts:
+  return                           ; MASTER.S:591
+}
+
+fn rdbluep {
+  call setbluep                  ; MASTER.S:599
+  if ne goto :reg1       ; MASTER.S:600
+:reg0:
+  call rw18                  ; MASTER.S:602
+  if cc goto ]rts       ; MASTER.S:606
+  call error                  ; MASTER.S:607
+  goto :reg0                ; MASTER.S:608
+:reg1:
+  call rw18                  ; MASTER.S:610
+  if cc goto ]rts       ; MASTER.S:614
+  call error                  ; MASTER.S:615
+  goto :reg1                ; MASTER.S:616
+]rts:
+  return                           ; MASTER.S:591
+}
+
+fn copy1to2 {
+  a = #0x40                  ; MASTER.S:624
+  x = #0x20                  ; MASTER.S:625
+  if x != #0x00 goto copydhires  ; MASTER.S:626
+copy2to1:
+  a = #0x20                  ; MASTER.S:629
+  x = #0x40                  ; MASTER.S:630
+copydhires:
+  *IMAGE+1@0x0005 = a            ; MASTER.S:633
+  *IMAGE@0x0004 = x            ; MASTER.S:634
+  call _copy2000aux                  ; MASTER.S:636
+  tail_call _copy2000                ; MASTER.S:637
+}
+
+fn copy2to1 {
+  a = #0x20                  ; MASTER.S:629
+  x = #0x40                  ; MASTER.S:630
+copydhires:
+  *IMAGE+1@0x0005 = a            ; MASTER.S:633
+  *IMAGE@0x0004 = x            ; MASTER.S:634
+  call _copy2000aux                  ; MASTER.S:636
+  tail_call _copy2000                ; MASTER.S:637
+}
+
+fn copydhires {
+  *IMAGE+1@0x0005 = a            ; MASTER.S:633
+  *IMAGE@0x0004 = x            ; MASTER.S:634
+  call _copy2000aux                  ; MASTER.S:636
+  tail_call _copy2000                ; MASTER.S:637
+}
+
+fn CUTPRINCESS {
+  call blackout                  ; MASTER.S:645
+  a = #0x01                  ; MASTER.S:646
+cutprincess1:
+  call LoadStage2                  ; MASTER.S:648
+  a = #pacProom                  ; MASTER.S:650
+  call SngExpand                  ; MASTER.S:651
+  a = #0x40                  ; MASTER.S:653
+  *IMAGE+1@0x0005 = a            ; MASTER.S:654
+  a = #0x20                  ; MASTER.S:655
+  *IMAGE@0x0004 = a            ; MASTER.S:656
+  tail_call _copy2000                ; MASTER.S:657
+}
+
+fn cutprincess1 {
+  call LoadStage2                  ; MASTER.S:648
+  a = #pacProom                  ; MASTER.S:650
+  call SngExpand                  ; MASTER.S:651
+  a = #0x40                  ; MASTER.S:653
+  *IMAGE+1@0x0005 = a            ; MASTER.S:654
+  a = #0x20                  ; MASTER.S:655
+  *IMAGE@0x0004 = a            ; MASTER.S:656
+  tail_call _copy2000                ; MASTER.S:657
+}
+
+fn EPILOG {
+  a = #0x01                  ; MASTER.S:665
+  *soundon@0x0203 = a            ; MASTER.S:666
+  *musicon@0x031a = a            ; MASTER.S:667
+  call blackout                  ; MASTER.S:668
+  call LoadStage1B                  ; MASTER.S:669
+  call Epilog                  ; MASTER.S:671
+  a = #POPside1                  ; MASTER.S:673
+  *BBundID@0x03f5 = a            ; MASTER.S:674
+  *$c010@0xc010 = a            ; MASTER.S:675
+:loop:
+  a = *$c000@0xc000        ; MASTER.S:676
+  if a >=0 goto :loop  ; MASTER.S:677
+ATTRACTMODE:
+AttractLoop:
+  a = #0x01                  ; MASTER.S:688
+  *musicon@0x031a = a            ; MASTER.S:689
+  call SetupDHires                  ; MASTER.S:691
+  call PubCredit                  ; MASTER.S:693
+  call AuthorCredit                  ; MASTER.S:695
+  call TitleScreen                  ; MASTER.S:697
+  call Prolog1                  ; MASTER.S:699
+]princess:
+  call PrincessScene                  ; MASTER.S:701
+  call SetupDHires                  ; MASTER.S:703
+  call Prolog2                  ; MASTER.S:705
+  call SilentTitle                  ; MASTER.S:707
+  tail_call Demo                ; MASTER.S:709
+}
+
+fn ATTRACTMODE  (aka AttractLoop) {
+  a = #0x01                  ; MASTER.S:688
+  *musicon@0x031a = a            ; MASTER.S:689
+  call SetupDHires                  ; MASTER.S:691
+  call PubCredit                  ; MASTER.S:693
+  call AuthorCredit                  ; MASTER.S:695
+  call TitleScreen                  ; MASTER.S:697
+  call Prolog1                  ; MASTER.S:699
+]princess:
+  call PrincessScene                  ; MASTER.S:701
+  call SetupDHires                  ; MASTER.S:703
+  call Prolog2                  ; MASTER.S:705
+  call SilentTitle                  ; MASTER.S:707
+  tail_call Demo                ; MASTER.S:709
+}
+
+fn SetupDHires {
+  call blackout                  ; MASTER.S:720
+  tail_call LoadStage1A                ; MASTER.S:724
+}
+
+fn PubCredit {
+  call unpacksplash                  ; MASTER.S:735
+  call setdhires                  ; MASTER.S:739
+  call copy1to2                  ; MASTER.S:743
+  a = #0x2c                  ; MASTER.S:745
+  call tpause                  ; MASTER.S:746
+  a = #delPresents                  ; MASTER.S:750
+  call DeltaExpPop                  ; MASTER.S:751
+  x = #0x50                  ; MASTER.S:753
+  a = #s_Presents                  ; MASTER.S:754
+  call PlaySongI                  ; MASTER.S:755
+  tail_call CleanScreen                ; MASTER.S:757
+}
+
+fn CleanScreen {
+  a = *PAGE2on@0xc055        ; MASTER.S:769
+  call copy2to1                  ; MASTER.S:773
+  a = *PAGE2off@0xc054        ; MASTER.S:777
+]rts:
+  return                           ; MASTER.S:778
+}
+
+fn AuthorCredit {
+  a = #0x2a                  ; MASTER.S:787
+  call tpause                  ; MASTER.S:788
+  a = #delByline                  ; MASTER.S:792
+  call DeltaExpPop                  ; MASTER.S:793
+  x = #0x50                  ; MASTER.S:795
+  a = #s_Byline                  ; MASTER.S:796
+  call PlaySongI                  ; MASTER.S:797
+  tail_call CleanScreen                ; MASTER.S:801
+}
+
+fn SilentTitle {
+  call unpacksplash                  ; MASTER.S:809
+  call copy1to2                  ; MASTER.S:811
+  a = #0x14                  ; MASTER.S:813
+  call tpause                  ; MASTER.S:814
+  a = #delTitle                  ; MASTER.S:816
+  call DeltaExpPop                  ; MASTER.S:817
+  a = #0xa0                  ; MASTER.S:819
+  tail_call tpause                ; MASTER.S:820
+}
+
+fn TitleScreen {
+  a = #0x26                  ; MASTER.S:824
+  call tpause                  ; MASTER.S:825
+  a = #delTitle                  ; MASTER.S:829
+  call DeltaExpPop                  ; MASTER.S:830
+  x = #0x8c                  ; MASTER.S:832
+  a = #s_Title                  ; MASTER.S:833
+  call PlaySongI                  ; MASTER.S:834
+  tail_call CleanScreen                ; MASTER.S:838
+}
+
+fn Prolog1 {
+  a = #pacProlog                  ; MASTER.S:846
+  *RAMRDaux@0xc003 = a            ; MASTER.S:847
+  call DblExpand                  ; MASTER.S:848
+  x = #0xfa                  ; MASTER.S:850
+  a = #s_Prolog                  ; MASTER.S:851
+  tail_call PlaySongI                ; MASTER.S:852
+}
+
+fn PrincessScene {
+  call blackout                  ; MASTER.S:860
+  call ReloadStuff                  ; MASTER.S:862
+  a = #0x00                  ; MASTER.S:864
+  call cutprincess1                  ; MASTER.S:865
+  a = #0x00                  ; MASTER.S:867
+  tail_call xplaycut                ; MASTER.S:868
+}
+
+fn Prolog2 {
+  a = #pacSumup                  ; MASTER.S:876
+  *RAMRDmain@0xc002 = a            ; MASTER.S:877
+  call DblExpand                  ; MASTER.S:878
+  call setdhires                  ; MASTER.S:880
+  x = #0xfa                  ; MASTER.S:882
+  a = #s_Sumup                  ; MASTER.S:883
+  tail_call PlaySongI                ; MASTER.S:884
+}
+
+fn Epilog {
+  a = *IIGS@0x0211        ; MASTER.S:892
+  if a != #0x00 goto SuperEpilog  ; MASTER.S:893
+  a = #pacEpilog                  ; MASTER.S:895
+  *RAMRDaux@0xc003 = a            ; MASTER.S:896
+  call DblExpand                  ; MASTER.S:897
+  call setdhires                  ; MASTER.S:899
+  a = #s_Epilog                  ; MASTER.S:901
+  call PlaySongNI                  ; MASTER.S:902
+  a = #0x0f                  ; MASTER.S:903
+  call pauseNI                  ; MASTER.S:904
+  call unpacksplash                  ; MASTER.S:905
+  a = #0x4b                  ; MASTER.S:906
+  call pauseNI                  ; MASTER.S:907
+  a = #s_Curtain                  ; MASTER.S:909
+  call PlaySongNI                  ; MASTER.S:910
+  a = #0x3c                  ; MASTER.S:911
+  call pauseNI                  ; MASTER.S:912
+  tail_call blackout                ; MASTER.S:914
+}
+
+fn unpacksplash {
+  a = #pacSplash                  ; MASTER.S:917
+  *RAMRDaux@0xc003 = a            ; MASTER.S:918
+  tail_call DblExpand                ; MASTER.S:919
+}
+
+fn SuperEpilog {
+  a = #0x01                  ; MASTER.S:927
+  call fadein                  ; MASTER.S:928
+  call setaux                  ; MASTER.S:929
+  a = #s_Epilog                  ; MASTER.S:931
+  call PlaySongNI                  ; MASTER.S:932
+  call fadeout                  ; MASTER.S:934
+  a = #0x00                  ; MASTER.S:935
+  call fadein                  ; MASTER.S:936
+  call setaux                  ; MASTER.S:937
+  a = #0x50                  ; MASTER.S:939
+  call pauseNI                  ; MASTER.S:940
+  a = #s_Curtain                  ; MASTER.S:942
+  call PlaySongNI                  ; MASTER.S:943
+  a = #0xff                  ; MASTER.S:945
+  call pauseNI                  ; MASTER.S:946
+  call fadeout                  ; MASTER.S:948
+  tail_call *                ; MASTER.S:950
+}
+
+fn Demo {
+  call blackout                  ; MASTER.S:959
+  call LoadStage3                  ; MASTER.S:961
+  call setdemolevel                  ; MASTER.S:963
+  call rdbluep                  ; MASTER.S:964
+  call driveoff                  ; MASTER.S:966
+  a = #0x00                  ; MASTER.S:970
+  tail_call start                ; MASTER.S:971
+}
+
+fn pauseNI  (aka :loop) {
+  *pausetemp@0x03f7 = a            ; MASTER.S:977
+  y = #0x14                  ; MASTER.S:978
+:loop1:
+  x = #0x00                  ; MASTER.S:979
+:loop2:
+  x -= 1                         ; MASTER.S:980
+  if x != #0x00 goto :loop2  ; MASTER.S:981
+  y -= 1                         ; MASTER.S:982
+  if y != #0x00 goto :loop1  ; MASTER.S:983
+  a = *pausetemp@0x03f7        ; MASTER.S:985
+  c = 1                            ; MASTER.S:986
+  a = a - #0x01 - (1 - c)        ; MASTER.S:987
+  if a != #0x00 goto :loop  ; MASTER.S:988
+]rts:
+  return                           ; MASTER.S:989
+}
+
+fn StartGame? {
+  call musickeys                  ; MASTER.S:997
+  if a < #0x80 goto ]rts  ; MASTER.S:999
+  if a != #kdemo goto :1  ; MASTER.S:1004
+  tail_call Demo                ; MASTER.S:1005
+:1:
+  cmp a, #kprincess              ; MASTER.S:1006
+  if a != #kprincess goto :2  ; MASTER.S:1007
+  goto ]princess                ; MASTER.S:1008
+:2:
+  if a != #krestart goto :3  ; MASTER.S:1012
+  tail_call AttractLoop                ; MASTER.S:1013
+:3:
+DOSTARTGAME:
+  call blackout                  ; MASTER.S:1021
+:1:
+  call LoadStage3                  ; MASTER.S:1025
+  call set1stlevel                  ; MASTER.S:1029
+  call rdbluep                  ; MASTER.S:1031
+  call driveoff                  ; MASTER.S:1035
+  a = #0x01                  ; MASTER.S:1039
+  *musicon@0x031a = a            ; MASTER.S:1040
+  a = *keypress@0x020f        ; MASTER.S:1045
+  if a != #kresume goto :newgame  ; MASTER.S:1047
+  a = #0x04                  ; MASTER.S:1051
+  tail_call startresume                ; MASTER.S:1052
+:newgame:
+  a = #0x01                  ; MASTER.S:1059
+  tail_call start                ; MASTER.S:1060
+]rts:
+  return                           ; MASTER.S:989
+}
+
+fn :3  (aka DOSTARTGAME) {
+  call blackout                  ; MASTER.S:1021
+:1:
+  call LoadStage3                  ; MASTER.S:1025
+  call set1stlevel                  ; MASTER.S:1029
+  call rdbluep                  ; MASTER.S:1031
+  call driveoff                  ; MASTER.S:1035
+  a = #0x01                  ; MASTER.S:1039
+  *musicon@0x031a = a            ; MASTER.S:1040
+  a = *keypress@0x020f        ; MASTER.S:1045
+  if a != #kresume goto :newgame  ; MASTER.S:1047
+  a = #0x04                  ; MASTER.S:1051
+  tail_call startresume                ; MASTER.S:1052
+:newgame:
+  a = #0x01                  ; MASTER.S:1059
+  tail_call start                ; MASTER.S:1060
+}
+
+fn loadperm {
+  a = #0x03                  ; MASTER.S:1069
+  *track@0x00fe = a            ; MASTER.S:1070
+  call setaux                  ; MASTER.S:1072
+  call rw18                  ; MASTER.S:1074
+  call rw18                  ; MASTER.S:1077
+  call setmain                  ; MASTER.S:1082
+  a = #0x09                  ; MASTER.S:1083
+  *track@0x00fe = a            ; MASTER.S:1084
+  call rw18                  ; MASTER.S:1085
+  call rw18                  ; MASTER.S:1087
+  call rw18                  ; MASTER.S:1090
+  call rw18                  ; MASTER.S:1093
+  call rw18                  ; MASTER.S:1098
+  a = #0x13                  ; MASTER.S:1111
+  *track@0x00fe = a            ; MASTER.S:1112
+  call rw18                  ; MASTER.S:1114
+  call rw18                  ; MASTER.S:1119
+  call rw18                  ; MASTER.S:1123
+  a = #0x22                  ; MASTER.S:1126
+  *track@0x00fe = a            ; MASTER.S:1127
+  call rw18                  ; MASTER.S:1128
+  call setaux                  ; MASTER.S:1133
+  a = #0x01                  ; MASTER.S:1134
+  *MSset@0x0239 = a            ; MASTER.S:1135
+  call setmain                  ; MASTER.S:1137
+  tail_call Tmoveauxlc                ; MASTER.S:1138
+]lsub:
+  *track@0x00fe = a            ; MASTER.S:1151
+:test:
+  call rw18                  ; MASTER.S:1152
+  if cc goto :ok       ; MASTER.S:1154
+  call error                  ; MASTER.S:1155
+  goto :test                ; MASTER.S:1156
+:ok:
+  call rw18                  ; MASTER.S:1158
+  call rw18                  ; MASTER.S:1160
+  call rw18                  ; MASTER.S:1162
+  call rw18                  ; MASTER.S:1164
+  return                           ; MASTER.S:1166
+}
+
+fn LoadStage1A {
+  call driveon                  ; MASTER.S:1169
+  a = #0x16                  ; MASTER.S:1171
+  call ]lsub                  ; MASTER.S:1172
+  call setmain                  ; MASTER.S:1174
+  call rw18                  ; MASTER.S:1175
+  call rw18                  ; MASTER.S:1177
+  call loadmusic1                  ; MASTER.S:1180
+  call setaux                  ; MASTER.S:1182
+  a = #0xff                  ; MASTER.S:1183
+  *BGset1@0x0303 = a            ; MASTER.S:1184
+  *BGset2@0x0304 = a            ; MASTER.S:1185
+  *CHset@0x0305 = a            ; MASTER.S:1186
+  tail_call driveoff                ; MASTER.S:1188
+}
+
+fn LoadStage1B {
+  call driveon                  ; MASTER.S:1196
+  call loadmusic3                  ; MASTER.S:1198
+  a = *IIGS@0x0211        ; MASTER.S:1200
+  if a != #0x00 goto :shires  ; MASTER.S:1201
+  a = #0x12                  ; MASTER.S:1203
+  call ]lsub                  ; MASTER.S:1204
+  tail_call driveoff                ; MASTER.S:1205
+:shires:
+  call loadsuper                  ; MASTER.S:1207
+  tail_call driveoff                ; MASTER.S:1208
+}
+
+fn ReloadStuff {
+  call driveon                  ; MASTER.S:1217
+:test:
+  a = #0x04                  ; MASTER.S:1219
+  *track@0x00fe = a            ; MASTER.S:1220
+  call rw18                  ; MASTER.S:1221
+  if cc goto :ok       ; MASTER.S:1225
+  call error                  ; MASTER.S:1226
+  goto :test                ; MASTER.S:1227
+:ok:
+  a = #0x0f                  ; MASTER.S:1229
+  *track@0x00fe = a            ; MASTER.S:1230
+  call rw18                  ; MASTER.S:1231
+  call rw18                  ; MASTER.S:1233
+  call rw18                  ; MASTER.S:1235
+  tail_call driveoff                ; MASTER.S:1238
+}
+
+fn LoadStage2 {
+  x = *BBundID@0x03f5        ; MASTER.S:1246
+  cmp x, #POPside2              ; MASTER.S:1247
+  if x == #POPside2 goto LoadStage2B  ; MASTER.S:1248
+LoadStage2A:
+  call driveon                  ; MASTER.S:1251
+  a = #0x00                  ; MASTER.S:1253
+  call loadch7                  ; MASTER.S:1254
+  a = #0x1d                  ; MASTER.S:1256
+]ls2:
+  *track@0x00fe = a            ; MASTER.S:1257
+:test:
+  call rw18                  ; MASTER.S:1259
+  if cc goto :ok       ; MASTER.S:1261
+  call error                  ; MASTER.S:1262
+  goto :test                ; MASTER.S:1263
+:ok:
+  call rw18                  ; MASTER.S:1265
+  call rw18                  ; MASTER.S:1267
+  call rw18                  ; MASTER.S:1269
+  a = #0xff                  ; MASTER.S:1274
+  *BGset1@0x0303 = a            ; MASTER.S:1275
+  *BGset2@0x0304 = a            ; MASTER.S:1276
+  *CHset@0x0305 = a            ; MASTER.S:1277
+  tail_call driveoff                ; MASTER.S:1279
+}
+
+fn LoadStage2A {
+  call driveon                  ; MASTER.S:1251
+  a = #0x00                  ; MASTER.S:1253
+  call loadch7                  ; MASTER.S:1254
+  a = #0x1d                  ; MASTER.S:1256
+]ls2:
+  *track@0x00fe = a            ; MASTER.S:1257
+:test:
+  call rw18                  ; MASTER.S:1259
+  if cc goto :ok       ; MASTER.S:1261
+  call error                  ; MASTER.S:1262
+  goto :test                ; MASTER.S:1263
+:ok:
+  call rw18                  ; MASTER.S:1265
+  call rw18                  ; MASTER.S:1267
+  call rw18                  ; MASTER.S:1269
+  a = #0xff                  ; MASTER.S:1274
+  *BGset1@0x0303 = a            ; MASTER.S:1275
+  *BGset2@0x0304 = a            ; MASTER.S:1276
+  *CHset@0x0305 = a            ; MASTER.S:1277
+  tail_call driveoff                ; MASTER.S:1279
+}
+
+fn loadch7 {
+  *recheck0@0x03f8 = a            ; MASTER.S:1284
+:test:
+  a = #0x1c                  ; MASTER.S:1285
+  *track@0x00fe = a            ; MASTER.S:1286
+  call rw18                  ; MASTER.S:1287
+  if cc goto :ok       ; MASTER.S:1291
+  call error                  ; MASTER.S:1292
+  goto :test                ; MASTER.S:1293
+:ok:
+]rts:
+  return                           ; MASTER.S:1295
+}
+
+fn LoadStage2B {
+  call driveon                  ; MASTER.S:1303
+  a = #0x18                  ; MASTER.S:1305
+  if a != #0x00 goto ]ls2  ; MASTER.S:1306
+LoadStage3:
+  call driveon                  ; MASTER.S:1317
+  a = #0x04                  ; MASTER.S:1319
+  *track@0x00fe = a            ; MASTER.S:1320
+:loop:
+  call rw18                  ; MASTER.S:1322
+  if cc goto :ok       ; MASTER.S:1326
+  call error                  ; MASTER.S:1327
+  goto :loop                ; MASTER.S:1328
+:ok:
+  call rw18                  ; MASTER.S:1330
+  call rw18                  ; MASTER.S:1332
+  call setmain                  ; MASTER.S:1335
+  call rw18                  ; MASTER.S:1336
+  call rw18                  ; MASTER.S:1338
+  call setaux                  ; MASTER.S:1341
+  a = #0x0d                  ; MASTER.S:1343
+  *track@0x00fe = a            ; MASTER.S:1344
+  call rw18                  ; MASTER.S:1345
+  call rw18                  ; MASTER.S:1349
+  call rw18                  ; MASTER.S:1351
+  call rw18                  ; MASTER.S:1353
+  call rw18                  ; MASTER.S:1355
+  call rw18                  ; MASTER.S:1357
+  a = #0x00                  ; MASTER.S:1360
+  *BGset1@0x0303 = a            ; MASTER.S:1361
+  *BGset2@0x0304 = a            ; MASTER.S:1362
+  *CHset@0x0305 = a            ; MASTER.S:1363
+  call loadmusic2                  ; MASTER.S:1365
+  tail_call setaux                ; MASTER.S:1367
+}
+
+fn LoadStage3 {
+  call driveon                  ; MASTER.S:1317
+  a = #0x04                  ; MASTER.S:1319
+  *track@0x00fe = a            ; MASTER.S:1320
+:loop:
+  call rw18                  ; MASTER.S:1322
+  if cc goto :ok       ; MASTER.S:1326
+  call error                  ; MASTER.S:1327
+  goto :loop                ; MASTER.S:1328
+:ok:
+  call rw18                  ; MASTER.S:1330
+  call rw18                  ; MASTER.S:1332
+  call setmain                  ; MASTER.S:1335
+  call rw18                  ; MASTER.S:1336
+  call rw18                  ; MASTER.S:1338
+  call setaux                  ; MASTER.S:1341
+  a = #0x0d                  ; MASTER.S:1343
+  *track@0x00fe = a            ; MASTER.S:1344
+  call rw18                  ; MASTER.S:1345
+  call rw18                  ; MASTER.S:1349
+  call rw18                  ; MASTER.S:1351
+  call rw18                  ; MASTER.S:1353
+  call rw18                  ; MASTER.S:1355
+  call rw18                  ; MASTER.S:1357
+  a = #0x00                  ; MASTER.S:1360
+  *BGset1@0x0303 = a            ; MASTER.S:1361
+  *BGset2@0x0304 = a            ; MASTER.S:1362
+  *CHset@0x0305 = a            ; MASTER.S:1363
+  call loadmusic2                  ; MASTER.S:1365
+  tail_call setaux                ; MASTER.S:1367
+}
+
+fn PlaySongNI {
+  call setaux                  ; MASTER.S:1381
+  call xminit                  ; MASTER.S:1382
+:loop:
+  call xmplay                  ; MASTER.S:1383
+  cmp a, #0x00              ; MASTER.S:1384
+  if a != #0x00 goto :loop  ; MASTER.S:1385
+]rts:
+  return                           ; MASTER.S:1386
+}
+
+fn PlaySongI {
+  call setaux                  ; MASTER.S:1390
+  if eq goto ]rts       ; MASTER.S:1391
+  y = a                            ; MASTER.S:1393
+  a = *musicon@0x031a        ; MASTER.S:1394
+  a = a & *soundon@0x0203              ; MASTER.S:1395
+  if a == #0x00 goto :pause  ; MASTER.S:1396
+  a = y                            ; MASTER.S:1398
+  call xminit                  ; MASTER.S:1399
+:loop:
+  call StartGame?                  ; MASTER.S:1400
+  call xmplay                  ; MASTER.S:1401
+  cmp a, #0x00              ; MASTER.S:1402
+  if a != #0x00 goto :loop  ; MASTER.S:1403
+]rts:
+  return                           ; MASTER.S:1404
+:pause:
+  a = x                            ; MASTER.S:1406
+tpause:
+:loop:
+  *pausetemp@0x03f7 = a            ; MASTER.S:1413
+  y = #0x02                  ; MASTER.S:1415
+:loop1:
+  x = #0x00                  ; MASTER.S:1416
+:loop2:
+  call StartGame?                  ; MASTER.S:1417
+  x -= 1                         ; MASTER.S:1418
+  if x != #0x00 goto :loop2  ; MASTER.S:1419
+  y -= 1                         ; MASTER.S:1420
+  if y != #0x00 goto :loop1  ; MASTER.S:1421
+  a = *pausetemp@0x03f7        ; MASTER.S:1423
+  c = 1                            ; MASTER.S:1424
+  a = a - #0x01 - (1 - c)        ; MASTER.S:1425
+  if a != #0x00 goto :loop  ; MASTER.S:1426
+]rts:
+  return                           ; MASTER.S:1427
+}
+
+fn tpause  (aka :loop) {
+  *pausetemp@0x03f7 = a            ; MASTER.S:1413
+  y = #0x02                  ; MASTER.S:1415
+:loop1:
+  x = #0x00                  ; MASTER.S:1416
+:loop2:
+  call StartGame?                  ; MASTER.S:1417
+  x -= 1                         ; MASTER.S:1418
+  if x != #0x00 goto :loop2  ; MASTER.S:1419
+  y -= 1                         ; MASTER.S:1420
+  if y != #0x00 goto :loop1  ; MASTER.S:1421
+  a = *pausetemp@0x03f7        ; MASTER.S:1423
+  c = 1                            ; MASTER.S:1424
+  a = a - #0x01 - (1 - c)        ; MASTER.S:1425
+  if a != #0x00 goto :loop  ; MASTER.S:1426
+]rts:
+  return                           ; MASTER.S:1427
+}
+
+fn error {
+  call driveoff                  ; MASTER.S:1437
+  call prompt                  ; MASTER.S:1439
+  tail_call driveon                ; MASTER.S:1441
+  ??? usr $a9,1,$a80,*-org            ; MASTER.S:1446
+}
+
+fn ]lsub {
+  *track@0x00fe = a            ; MASTER.S:1151
+:test:
+  call rw18                  ; MASTER.S:1152
+  if cc goto :ok       ; MASTER.S:1154
+  call error                  ; MASTER.S:1155
+  goto :test                ; MASTER.S:1156
+:ok:
+  call rw18                  ; MASTER.S:1158
+  call rw18                  ; MASTER.S:1160
+  call rw18                  ; MASTER.S:1162
+  call rw18                  ; MASTER.S:1164
+  return                           ; MASTER.S:1166
+}
