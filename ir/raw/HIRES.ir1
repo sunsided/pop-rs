@@ -133,10 +133,10 @@ fn setimage {
   c = 1                            ; HIRES.S:266
   ??? sbc #1            ; HIRES.S:267
   y = a                            ; HIRES.S:269
-  ??? lda (TABLE),y            ; HIRES.S:270
+  a = *(TABLE@0x0007)[y]   ; HIRES.S:270
   *IMAGE@0x0004 = a            ; HIRES.S:271
   y += 1                         ; HIRES.S:273
-  ??? lda (TABLE),y            ; HIRES.S:274
+  a = *(TABLE@0x0007)[y]   ; HIRES.S:274
   *IMAGE+1@0x0005 = a            ; HIRES.S:275
   return                           ; HIRES.S:277
 }
@@ -148,10 +148,10 @@ fn GETWIDTH {
   *$c003@0xc003 = a            ; HIRES.S:291
   call setimage                  ; HIRES.S:293
   y = #0x01                  ; HIRES.S:295
-  ??? lda (IMAGE),y            ; HIRES.S:296
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:296
   x = a                            ; HIRES.S:297
   y -= 1                         ; HIRES.S:299
-  ??? lda (IMAGE),y            ; HIRES.S:300
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:300
   return                           ; HIRES.S:301
 }
 
@@ -168,10 +168,10 @@ fn PREPREP {
   *$c003@0xc003 = a            ; HIRES.S:327
   call setimage                  ; HIRES.S:329
   y = #0x00                  ; HIRES.S:333
-  ??? lda (IMAGE),Y            ; HIRES.S:334
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:334
   *WIDTH@0x00f6 = a            ; HIRES.S:335
   y += 1                         ; HIRES.S:337
-  ??? lda (IMAGE),Y            ; HIRES.S:338
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:338
   *HEIGHT@0x00f7 = a            ; HIRES.S:339
   a = *IMAGE@0x0004        ; HIRES.S:341
   c = 0                            ; HIRES.S:342
@@ -323,7 +323,7 @@ fn LAYRSAVE {
   y = #0x00                  ; HIRES.S:574
   a = *VISWIDTH@0x001a        ; HIRES.S:576
   if eq goto SKIPIT       ; HIRES.S:577
-  ??? sta (PEELBUF),y            ; HIRES.S:578
+  *(PEELBUF@0x0009)[y] = a   ; HIRES.S:578
   ??? sta :smWIDTH+1            ; HIRES.S:579
   c = 1                            ; HIRES.S:581
   ??? sbc #1            ; HIRES.S:582
@@ -333,7 +333,7 @@ fn LAYRSAVE {
   a = *YCO@0x0002        ; HIRES.S:589
   c = 1                            ; HIRES.S:590
   ??? sbc TOPEDGE            ; HIRES.S:591
-  ??? sta (PEELBUF),y            ; HIRES.S:592
+  *(PEELBUF@0x0009)[y] = a   ; HIRES.S:592
   a = *PEELBUF@0x0009        ; HIRES.S:594
   c = 0                            ; HIRES.S:595
   a = a + #0x02 + c              ; HIRES.S:596
@@ -357,7 +357,7 @@ fn LAYRSAVE {
 :inloop:
 :smBASE:
   a = *($2000@0x2000 + y)   ; HIRES.S:618
-  ??? sta (PEELBUF),Y            ; HIRES.S:619
+  *(PEELBUF@0x0009)[y] = a   ; HIRES.S:619
   y -= 1                         ; HIRES.S:621
   if pl goto :inloop       ; HIRES.S:622
 :smWIDTH:
@@ -439,7 +439,7 @@ fn LayGen {
   y -= 1                         ; HIRES.S:736
 :RAMRD1:
   *$c003@0xc003 = a            ; HIRES.S:738
-  ??? lda (IMAGE),y            ; HIRES.S:739
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:739
   *$c002@0xc002 = a            ; HIRES.S:740
   x = a                            ; HIRES.S:742
 :90:
@@ -458,22 +458,22 @@ fn LayGen {
   if ne goto :3       ; HIRES.S:757
   if eq goto :4       ; HIRES.S:758
 :2:
-  ??? lda (BASE),Y            ; HIRES.S:763
+  a = *(BASE@0x00f0)[y]   ; HIRES.S:763
 :AMASK:
   a = a & #0x00              ; HIRES.S:764
   *CARRY@0x00fc = a            ; HIRES.S:765
 :3:
 :RAMRD2:
   *$c003@0xc003 = a            ; HIRES.S:770
-  ??? lda (IMAGE),y            ; HIRES.S:771
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:771
   *$c002@0xc002 = a            ; HIRES.S:772
   x = a                            ; HIRES.S:774
 :91:
   a = *($FFFF@0xffff + x)   ; HIRES.S:775
   a = a | *CARRY@0x00fc              ; HIRES.S:776
 :80:
-  ??? sta (BASE),Y            ; HIRES.S:778
-  ??? sta (BASE),Y            ; HIRES.S:779
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:778
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:779
 :92:
   a = *($FFFF@0xffff + x)   ; HIRES.S:781
   *CARRY@0x00fc = a            ; HIRES.S:782
@@ -483,13 +483,13 @@ fn LayGen {
   a = *OFFRIGHT@0x00fa        ; HIRES.S:790
   if ne goto :5       ; HIRES.S:791
 :4:
-  ??? lda (BASE),Y            ; HIRES.S:793
+  a = *(BASE@0x00f0)[y]   ; HIRES.S:793
 :BMASK:
   a = a & #0x00              ; HIRES.S:795
   a = a | *CARRY@0x00fc              ; HIRES.S:796
 :81:
-  ??? sta (BASE),Y            ; HIRES.S:797
-  ??? sta (BASE),Y            ; HIRES.S:798
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:797
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:798
 :5:
   a = *WIDTH@0x00f6        ; HIRES.S:802
   c = 0                            ; HIRES.S:803
@@ -572,7 +572,7 @@ fn LayMask {
   y -= 1                         ; HIRES.S:894
 :RAMRD1:
   *$c003@0xc003 = a            ; HIRES.S:896
-  ??? lda (IMAGE),y            ; HIRES.S:897
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:897
   *$c002@0xc002 = a            ; HIRES.S:900
   x = a                            ; HIRES.S:902
 :96:
@@ -599,12 +599,12 @@ fn LayMask {
 :AMASK:
   a = #0x00                  ; HIRES.S:929
   *CARRY@0x00fc = a            ; HIRES.S:930
-  ??? and (BASE),y            ; HIRES.S:932
+  a = a & *(BASE@0x00f0)[y]              ; HIRES.S:932
   *carryim@0x001c = a            ; HIRES.S:933
 :inloop:
 :RAMRD2:
   *$c003@0xc003 = a            ; HIRES.S:939
-  ??? lda (IMAGE),y            ; HIRES.S:940
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:940
   *$c002@0xc002 = a            ; HIRES.S:943
   x = a                            ; HIRES.S:945
 :93:
@@ -620,9 +620,9 @@ fn LayMask {
   a = *($FFFF@0xffff + x)   ; HIRES.S:957
   a = a | *CARRY@0x00fc              ; HIRES.S:958
 :masksm1:
-  ??? and (BASE),y            ; HIRES.S:959
+  a = a & *(BASE@0x00f0)[y]              ; HIRES.S:959
   a = a | *imbyte@0x001d              ; HIRES.S:960
-  ??? sta (BASE),y            ; HIRES.S:961
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:961
 :92:
   a = *($FFFF@0xffff + x)   ; HIRES.S:963
   *CARRY@0x00fc = a            ; HIRES.S:964
@@ -636,9 +636,9 @@ fn LayMask {
   a = #0x00                  ; HIRES.S:976
   a = a | *CARRY@0x00fc              ; HIRES.S:977
 :masksm2:
-  ??? and (BASE),y            ; HIRES.S:978
+  a = a & *(BASE@0x00f0)[y]              ; HIRES.S:978
   a = a | *carryim@0x001c              ; HIRES.S:979
-  ??? sta (BASE),y            ; HIRES.S:980
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:980
 :5:
   a = *WIDTH@0x00f6        ; HIRES.S:984
   c = 0                            ; HIRES.S:985
@@ -703,7 +703,7 @@ fn LayXOR {
   y -= 1                         ; HIRES.S:1069
 :RAMRD1:
   *$c003@0xc003 = a            ; HIRES.S:1071
-  ??? lda (IMAGE),y            ; HIRES.S:1072
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:1072
   *$c002@0xc002 = a            ; HIRES.S:1073
   x = a                            ; HIRES.S:1075
 :c2:
@@ -725,7 +725,7 @@ fn LayXOR {
   if ne goto :inloop       ; HIRES.S:1093
   if eq goto :4       ; HIRES.S:1094
 :2:
-  ??? lda (BASE),y            ; HIRES.S:1099
+  a = *(BASE@0x00f0)[y]   ; HIRES.S:1099
 :AMASK:
   a = a & #0x00              ; HIRES.S:1100
   *CARRY@0x00fc = a            ; HIRES.S:1101
@@ -734,7 +734,7 @@ fn LayXOR {
 :inloop:
 :RAMRD2:
   *$c003@0xc003 = a            ; HIRES.S:1110
-  ??? lda (IMAGE),y            ; HIRES.S:1111
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:1111
   *$c002@0xc002 = a            ; HIRES.S:1112
   x = a                            ; HIRES.S:1114
 :s1:
@@ -747,10 +747,10 @@ fn LayXOR {
 :91:
   a = *($FFFF@0xffff + x)   ; HIRES.S:1123
   a = a | *CARRY@0x00fc              ; HIRES.S:1124
-  ??? ora (BASE),y            ; HIRES.S:1126
+  a = a | *(BASE@0x00f0)[y]              ; HIRES.S:1126
   a = a ^ *imbyte@0x001d              ; HIRES.S:1127
   a = a | #0x80              ; HIRES.S:1129
-  ??? sta (BASE),y            ; HIRES.S:1130
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:1130
 :92:
   a = *($FFFF@0xffff + x)   ; HIRES.S:1132
   *CARRY@0x00fc = a            ; HIRES.S:1133
@@ -761,10 +761,10 @@ fn LayXOR {
   if ne goto :5       ; HIRES.S:1142
 :4:
   a = *CARRY@0x00fc        ; HIRES.S:1144
-  ??? ora (BASE),y            ; HIRES.S:1146
+  a = a | *(BASE@0x00f0)[y]              ; HIRES.S:1146
   a = a ^ *carryim@0x001c              ; HIRES.S:1147
   a = a | #0x80              ; HIRES.S:1149
-  ??? sta (BASE),y            ; HIRES.S:1150
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:1150
 :5:
   a = *WIDTH@0x00f6        ; HIRES.S:1154
   c = 0                            ; HIRES.S:1155
@@ -839,7 +839,7 @@ fn MLayGen {
   y = *VISWIDTH@0x001a        ; HIRES.S:1259
 :RAMRD1:
   *$c003@0xc003 = a            ; HIRES.S:1261
-  ??? lda (IMAGE),y            ; HIRES.S:1262
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:1262
   *$c002@0xc002 = a            ; HIRES.S:1263
   x = a                            ; HIRES.S:1265
   a = *(MIRROR-$80@0xe800 + x)   ; HIRES.S:1267
@@ -853,7 +853,7 @@ fn MLayGen {
   if mi goto :4       ; HIRES.S:1275
 :2:
   y = *XCO@0x0001        ; HIRES.S:1279
-  ??? lda (BASE),Y            ; HIRES.S:1280
+  a = *(BASE@0x00f0)[y]   ; HIRES.S:1280
   a = a & *AMASK@0x0018              ; HIRES.S:1281
   *CARRY@0x00fc = a            ; HIRES.S:1282
   y = *WIDTH@0x00f6        ; HIRES.S:1284
@@ -862,7 +862,7 @@ fn MLayGen {
   *YREG@0x00fb = y            ; HIRES.S:1289
 :RAMRD2:
   *$c003@0xc003 = a            ; HIRES.S:1291
-  ??? lda (IMAGE),y            ; HIRES.S:1292
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:1292
   *$c002@0xc002 = a            ; HIRES.S:1293
   x = a                            ; HIRES.S:1295
   a = *(MIRROR-$80@0xe800 + x)   ; HIRES.S:1297
@@ -872,8 +872,8 @@ fn MLayGen {
   a = a | *CARRY@0x00fc              ; HIRES.S:1301
   y = *XCO@0x0001        ; HIRES.S:1303
 :80:
-  ??? sta (BASE),Y            ; HIRES.S:1304
-  ??? sta (BASE),Y            ; HIRES.S:1305
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:1304
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:1305
 :92:
   a = *($FFFF@0xffff + x)   ; HIRES.S:1307
   *CARRY@0x00fc = a            ; HIRES.S:1308
@@ -888,12 +888,12 @@ fn MLayGen {
   if ne goto :5       ; HIRES.S:1322
 :4:
   y = *XCO@0x0001        ; HIRES.S:1324
-  ??? lda (BASE),Y            ; HIRES.S:1325
+  a = *(BASE@0x00f0)[y]   ; HIRES.S:1325
   a = a & *BMASK@0x0019              ; HIRES.S:1327
   a = a | *CARRY@0x00fc              ; HIRES.S:1328
 :81:
-  ??? sta (BASE),Y            ; HIRES.S:1329
-  ??? sta (BASE),Y            ; HIRES.S:1330
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:1329
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:1330
 :5:
   a = *WIDTH@0x00f6        ; HIRES.S:1334
   c = 0                            ; HIRES.S:1335
@@ -962,7 +962,7 @@ fn MLayMask {
   y = *VISWIDTH@0x001a        ; HIRES.S:1422
 :RAMRD1:
   *$c003@0xc003 = a            ; HIRES.S:1424
-  ??? lda (IMAGE),y            ; HIRES.S:1425
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:1425
   *$c002@0xc002 = a            ; HIRES.S:1428
   x = a                            ; HIRES.S:1430
   a = *(MIRROR-$80@0xe800 + x)   ; HIRES.S:1431
@@ -984,7 +984,7 @@ fn MLayMask {
 :AMASK:
   a = #0x00                  ; HIRES.S:1450
   *CARRY@0x00fc = a            ; HIRES.S:1451
-  ??? and (BASE),y            ; HIRES.S:1453
+  a = a & *(BASE@0x00f0)[y]              ; HIRES.S:1453
   *carryim@0x001c = a            ; HIRES.S:1454
   y = *WIDTH@0x00f6        ; HIRES.S:1456
   y -= 1                         ; HIRES.S:1457
@@ -992,7 +992,7 @@ fn MLayMask {
   *YREG@0x00fb = y            ; HIRES.S:1461
 :RAMRD2:
   *$c003@0xc003 = a            ; HIRES.S:1463
-  ??? lda (IMAGE),y            ; HIRES.S:1464
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:1464
   *$c002@0xc002 = a            ; HIRES.S:1467
   x = a                            ; HIRES.S:1469
   a = *(MIRROR-$80@0xe800 + x)   ; HIRES.S:1470
@@ -1011,9 +1011,9 @@ fn MLayMask {
   a = a | *CARRY@0x00fc              ; HIRES.S:1484
   y = *XCO@0x0001        ; HIRES.S:1486
 :masksm1:
-  ??? and (BASE),y            ; HIRES.S:1487
+  a = a & *(BASE@0x00f0)[y]              ; HIRES.S:1487
   a = a | *imbyte@0x001d              ; HIRES.S:1488
-  ??? sta (BASE),Y            ; HIRES.S:1489
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:1489
 :92:
   a = *($FFFF@0xffff + x)   ; HIRES.S:1491
   *CARRY@0x00fc = a            ; HIRES.S:1492
@@ -1028,14 +1028,14 @@ fn MLayMask {
   if ne goto :5       ; HIRES.S:1506
 :4:
   y = *XCO@0x0001        ; HIRES.S:1508
-  ??? lda (BASE),Y            ; HIRES.S:1509
+  a = *(BASE@0x00f0)[y]   ; HIRES.S:1509
 :BMASK:
   a = a & #0x00              ; HIRES.S:1511
   a = a | *CARRY@0x00fc              ; HIRES.S:1512
 :masksm2:
-  ??? and (BASE),y            ; HIRES.S:1513
+  a = a & *(BASE@0x00f0)[y]              ; HIRES.S:1513
   a = a | *carryim@0x001c              ; HIRES.S:1514
-  ??? sta (BASE),Y            ; HIRES.S:1515
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:1515
 :5:
   a = *WIDTH@0x00f6        ; HIRES.S:1519
   c = 0                            ; HIRES.S:1520
@@ -1103,7 +1103,7 @@ fn MLayXOR {
   y = *VISWIDTH@0x001a        ; HIRES.S:1606
 :RAMRD1:
   *$c003@0xc003 = a            ; HIRES.S:1608
-  ??? lda (IMAGE),y            ; HIRES.S:1609
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:1609
   *$c002@0xc002 = a            ; HIRES.S:1610
   x = a                            ; HIRES.S:1612
   a = *(MIRROR-$80@0xe800 + x)   ; HIRES.S:1613
@@ -1122,7 +1122,7 @@ fn MLayXOR {
   y = *XCO@0x0001        ; HIRES.S:1629
 :AMASK:
   a = #0x00                  ; HIRES.S:1630
-  ??? and (BASE),y            ; HIRES.S:1631
+  a = a & *(BASE@0x00f0)[y]              ; HIRES.S:1631
   *CARRY@0x00fc = a            ; HIRES.S:1632
   a = #0x00                  ; HIRES.S:1634
   *carryim@0x001c = a            ; HIRES.S:1635
@@ -1132,7 +1132,7 @@ fn MLayXOR {
   *YREG@0x00fb = y            ; HIRES.S:1642
 :RAMRD2:
   *$c003@0xc003 = a            ; HIRES.S:1644
-  ??? lda (IMAGE),y            ; HIRES.S:1645
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:1645
   *$c002@0xc002 = a            ; HIRES.S:1646
   x = a                            ; HIRES.S:1648
   a = *(MIRROR-$80@0xe800 + x)   ; HIRES.S:1650
@@ -1148,10 +1148,10 @@ fn MLayXOR {
   a = *($FFFF@0xffff + x)   ; HIRES.S:1660
   a = a | *CARRY@0x00fc              ; HIRES.S:1661
   y = *XCO@0x0001        ; HIRES.S:1663
-  ??? ora (BASE),y            ; HIRES.S:1665
+  a = a | *(BASE@0x00f0)[y]              ; HIRES.S:1665
   a = a ^ *imbyte@0x001d              ; HIRES.S:1666
   a = a | #0x80              ; HIRES.S:1668
-  ??? sta (BASE),Y            ; HIRES.S:1669
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:1669
 :92:
   a = *($FFFF@0xffff + x)   ; HIRES.S:1671
   *CARRY@0x00fc = a            ; HIRES.S:1672
@@ -1167,10 +1167,10 @@ fn MLayXOR {
 :4:
   y = *XCO@0x0001        ; HIRES.S:1688
   a = *CARRY@0x00fc        ; HIRES.S:1690
-  ??? ora (BASE),Y            ; HIRES.S:1692
+  a = a | *(BASE@0x00f0)[y]              ; HIRES.S:1692
   a = a ^ *carryim@0x001c              ; HIRES.S:1693
   a = a | #0x80              ; HIRES.S:1695
-  ??? sta (BASE),Y            ; HIRES.S:1696
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:1696
 :5:
   a = *WIDTH@0x00f6        ; HIRES.S:1700
   c = 0                            ; HIRES.S:1701
@@ -1210,7 +1210,7 @@ fn FASTLAY {
   a = *XCO@0x0001        ; HIRES.S:1756
   ??? sta :smXCO+1            ; HIRES.S:1757
   y = #0x00                  ; HIRES.S:1759
-  ??? lda (IMAGE),y            ; HIRES.S:1760
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:1760
   ??? sta :smWIDTH+1            ; HIRES.S:1761
   c = 1                            ; HIRES.S:1763
   ??? sbc #1            ; HIRES.S:1764
@@ -1245,11 +1245,11 @@ fn FASTLAY {
 :inloop:
 ]ramrd3:
   *$c003@0xc003 = a            ; HIRES.S:1796
-  ??? lda (IMAGE),y            ; HIRES.S:1798
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:1798
   *$c002@0xc002 = a            ; HIRES.S:1800
 :smod:
-  ??? ora (BASE),y            ; HIRES.S:1802
-  ??? sta (BASE),y            ; HIRES.S:1803
+  a = a | *(BASE@0x00f0)[y]              ; HIRES.S:1802
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:1803
   y -= 1                         ; HIRES.S:1805
   if pl goto :inloop       ; HIRES.S:1806
 :smWIDTH:
@@ -1272,7 +1272,7 @@ fn fastlaySTA {
   a = *XCO@0x0001        ; HIRES.S:1829
   ??? sta :smXCO+1            ; HIRES.S:1830
   y = #0x00                  ; HIRES.S:1832
-  ??? lda (IMAGE),y            ; HIRES.S:1833
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:1833
   ??? sta :smWIDTH+1            ; HIRES.S:1834
   c = 1                            ; HIRES.S:1836
   ??? sbc #1            ; HIRES.S:1837
@@ -1305,7 +1305,7 @@ fn fastlaySTA {
 :smSTART:
   y = #0x03                  ; HIRES.S:1866
 :inloop:
-  ??? lda (IMAGE),y            ; HIRES.S:1869
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:1869
 :smod:
   *($2000@0x2000 + y) = a   ; HIRES.S:1870
   y -= 1                         ; HIRES.S:1872
@@ -1334,7 +1334,7 @@ fn FASTMASK {
   a = *XCO@0x0001        ; HIRES.S:1901
   ??? sta :smXCO+1            ; HIRES.S:1902
   y = #0x00                  ; HIRES.S:1904
-  ??? lda (IMAGE),y            ; HIRES.S:1905
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:1905
   ??? sta :smWIDTH+1            ; HIRES.S:1906
   c = 1                            ; HIRES.S:1908
   ??? sbc #1            ; HIRES.S:1909
@@ -1370,12 +1370,12 @@ fn FASTMASK {
 :inloop:
 ]ramrd5:
   *$c003@0xc003 = a            ; HIRES.S:1943
-  ??? lda (IMAGE),y            ; HIRES.S:1945
+  a = *(IMAGE@0x0004)[y]   ; HIRES.S:1945
   *$c002@0xc002 = a            ; HIRES.S:1947
   x = a                            ; HIRES.S:1949
   a = *(MASKTAB-$80@0xe880 + x)   ; HIRES.S:1950
-  ??? and (BASE),Y            ; HIRES.S:1952
-  ??? sta (BASE),y            ; HIRES.S:1953
+  a = a & *(BASE@0x00f0)[y]              ; HIRES.S:1952
+  *(BASE@0x00f0)[y] = a   ; HIRES.S:1953
   y -= 1                         ; HIRES.S:1955
   if pl goto :inloop       ; HIRES.S:1956
 :smWIDTH:

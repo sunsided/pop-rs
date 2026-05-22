@@ -151,7 +151,7 @@ fn Shad5 {
   x = #0x01                  ; AUTO.S:286
   y = #0x00                  ; AUTO.S:287
   call rdblock                  ; AUTO.S:288
-  ??? lda (BlueSpec),y            ; AUTO.S:289
+  a = *(BlueSpec@0x0026)[y]   ; AUTO.S:289
   cmp a, #0x14              ; AUTO.S:290
   if cc goto ]rts       ; AUTO.S:291
   a = #0x00                  ; AUTO.S:293
@@ -748,12 +748,12 @@ fn chgshadposn {
   *ztemp+1@0x00ea = x            ; AUTO.S:1049
   y = #0x06                  ; AUTO.S:1050
 :loop:
-  ??? lda (ztemp),y            ; AUTO.S:1051
+  a = *(ztemp@0x00e9)[y]   ; AUTO.S:1051
   *(Char@0x0040 + y) = a   ; AUTO.S:1052
   y -= 1                         ; AUTO.S:1053
   if pl goto :loop       ; AUTO.S:1054
   y = #0x07                  ; AUTO.S:1056
-  ??? lda (ztemp),y            ; AUTO.S:1057
+  a = *(ztemp@0x00e9)[y]   ; AUTO.S:1057
   call jumpseq                  ; AUTO.S:1058
   a = #0x01                  ; AUTO.S:1060
   *CharID@0x004d = a            ; AUTO.S:1061
@@ -781,14 +781,14 @@ fn AUTOPLAYBACK {
   *PlayCount@0x00a0 += 1                         ; AUTO.S:1158
   y = *PreRecPtr@0x0309        ; AUTO.S:1162
   a = *PlayCount@0x00a0        ; AUTO.S:1164
-  ??? cmp (ProgStart),y            ; AUTO.S:1165
+  cmp a, *(ProgStart@0x00f3)[y]   ; AUTO.S:1165
   if cs goto :next       ; AUTO.S:1166
   y -= 1                         ; AUTO.S:1170
-  ??? lda (ProgStart),y            ; AUTO.S:1171
+  a = *(ProgStart@0x00f3)[y]   ; AUTO.S:1171
   goto :ex                ; AUTO.S:1172
 :next:
   y += 1                         ; AUTO.S:1176
-  ??? lda (ProgStart),y            ; AUTO.S:1177
+  a = *(ProgStart@0x00f3)[y]   ; AUTO.S:1177
   y += 1                         ; AUTO.S:1178
   *PreRecPtr@0x0309 = y            ; AUTO.S:1179
 :ex:
@@ -1195,7 +1195,7 @@ fn stealsword {
   y = #0x00                  ; AUTO.S:1614
   call rdblock                  ; AUTO.S:1615
   a = #0x01                  ; AUTO.S:1616
-  ??? sta (BlueType),y            ; AUTO.S:1617
+  *(BlueType@0x0024)[y] = a   ; AUTO.S:1617
   return                           ; AUTO.S:1618
 ]rts:
   return                           ; AUTO.S:1579

@@ -131,8 +131,8 @@ movemem:
   *source@0x0002 = y            ; BOOT.S:215
   *endsourc@0x0004 = y            ; BOOT.S:216
 :loop:
-  ??? lda (source),y            ; BOOT.S:218
-  ??? sta (dest),y            ; BOOT.S:219
+  a = *(source@0x0002)[y]   ; BOOT.S:218
+  *(dest@0x0000)[y] = a   ; BOOT.S:219
   y += 1                         ; BOOT.S:221
   if ne goto :loop       ; BOOT.S:222
   *source+1@0x0003 += 1                         ; BOOT.S:224
@@ -158,8 +158,8 @@ movemem:
   *source@0x0002 = y            ; BOOT.S:215
   *endsourc@0x0004 = y            ; BOOT.S:216
 :loop:
-  ??? lda (source),y            ; BOOT.S:218
-  ??? sta (dest),y            ; BOOT.S:219
+  a = *(source@0x0002)[y]   ; BOOT.S:218
+  *(dest@0x0000)[y] = a   ; BOOT.S:219
   y += 1                         ; BOOT.S:221
   if ne goto :loop       ; BOOT.S:222
   *source+1@0x0003 += 1                         ; BOOT.S:224
@@ -179,8 +179,8 @@ fn movemem {
   *source@0x0002 = y            ; BOOT.S:215
   *endsourc@0x0004 = y            ; BOOT.S:216
 :loop:
-  ??? lda (source),y            ; BOOT.S:218
-  ??? sta (dest),y            ; BOOT.S:219
+  a = *(source@0x0002)[y]   ; BOOT.S:218
+  *(dest@0x0000)[y] = a   ; BOOT.S:219
   y += 1                         ; BOOT.S:221
   if ne goto :loop       ; BOOT.S:222
   *source+1@0x0003 += 1                         ; BOOT.S:224

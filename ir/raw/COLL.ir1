@@ -340,7 +340,7 @@ fn CHECKCOLL {
   c = 0                            ; COLL.S:559
   return                           ; COLL.S:560
 :slicer:
-  ??? lda (BlueSpec),y            ; COLL.S:564
+  a = *(BlueSpec@0x0026)[y]   ; COLL.S:564
   cmp a, #0x02              ; COLL.S:565
   if ne goto :no       ; COLL.S:566
   if eq goto :c1       ; COLL.S:567
@@ -871,7 +871,7 @@ fn CHECKSLICE {
   call rdblock1                  ; COLL.S:1203
   cmp a, #0x12              ; COLL.S:1204
   if ne goto :ok       ; COLL.S:1205
-  ??? lda (BlueSpec),y            ; COLL.S:1207
+  a = *(BlueSpec@0x0026)[y]   ; COLL.S:1207
   a = a & #0x7f              ; COLL.S:1208
   cmp a, #0x02              ; COLL.S:1209
   if eq goto :slice       ; COLL.S:1210
@@ -883,9 +883,9 @@ fn CHECKSLICE {
   return                           ; COLL.S:1217
 :slice:
 ]slice:
-  ??? lda (BlueSpec),y            ; COLL.S:1224
+  a = *(BlueSpec@0x0026)[y]   ; COLL.S:1224
   a = a | #0x80              ; COLL.S:1225
-  ??? sta (BlueSpec),y            ; COLL.S:1226
+  *(BlueSpec@0x0026)[y] = a   ; COLL.S:1226
 :cont:
   a = *CharPosn@0x0040        ; COLL.S:1228
   cmp a, #0xb2              ; COLL.S:1229
@@ -920,7 +920,7 @@ fn CHECKSLICE2 {
 :slice?:
   cmp a, #0x12              ; COLL.S:1275
   if ne goto :safe       ; COLL.S:1276
-  ??? lda (BlueSpec),y            ; COLL.S:1277
+  a = *(BlueSpec@0x0026)[y]   ; COLL.S:1277
   a = a & #0x7f              ; COLL.S:1278
   cmp a, #0x02              ; COLL.S:1279
   if ne goto :safe       ; COLL.S:1280
@@ -1001,7 +1001,7 @@ fn CHECKGATE {
 }
 
 fn gatebarr? {
-  ??? lda (BlueSpec),y            ; COLL.S:1375
+  a = *(BlueSpec@0x0026)[y]   ; COLL.S:1375
   ??? lsr             ; COLL.S:1376
   ??? lsr             ; COLL.S:1377
   c = 0                            ; COLL.S:1378
@@ -1108,7 +1108,7 @@ fn DBarr2 {
 fn :slice? {
   cmp a, #0x12              ; COLL.S:1275
   if ne goto :safe       ; COLL.S:1276
-  ??? lda (BlueSpec),y            ; COLL.S:1277
+  a = *(BlueSpec@0x0026)[y]   ; COLL.S:1277
   a = a & #0x7f              ; COLL.S:1278
   cmp a, #0x02              ; COLL.S:1279
   if ne goto :safe       ; COLL.S:1280
@@ -1141,9 +1141,9 @@ fn :slice? {
 }
 
 fn :slice  (aka ]slice) {
-  ??? lda (BlueSpec),y            ; COLL.S:1224
+  a = *(BlueSpec@0x0026)[y]   ; COLL.S:1224
   a = a | #0x80              ; COLL.S:1225
-  ??? sta (BlueSpec),y            ; COLL.S:1226
+  *(BlueSpec@0x0026)[y] = a   ; COLL.S:1226
 :cont:
   a = *CharPosn@0x0040        ; COLL.S:1228
   cmp a, #0xb2              ; COLL.S:1229

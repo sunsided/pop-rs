@@ -5,7 +5,7 @@ fn chgshadposn {
   *ztemp+1@0x00f1 = x            ; AUTO.S:1049
   y = #0x06                  ; AUTO.S:1050
   loop {                          ; AUTO.S:1054
-    ??? lda (ztemp),y            ; AUTO.S:1051
+    a = *(ztemp@0x00f0)[y]   ; AUTO.S:1051
     *(Char@0x0040 + y) = a   ; AUTO.S:1052
     y -= 1                         ; AUTO.S:1053
     if y <0 {    ; AUTO.S:1054
@@ -13,7 +13,7 @@ fn chgshadposn {
     }
   }
   y = #0x07                  ; AUTO.S:1056
-  ??? lda (ztemp),y            ; AUTO.S:1057
+  a = *(ztemp@0x00f0)[y]   ; AUTO.S:1057
   call jumpseq                ; AUTO.S:1058
   a = #0x01                  ; AUTO.S:1060
   *CharID@0x004d = a            ; AUTO.S:1061

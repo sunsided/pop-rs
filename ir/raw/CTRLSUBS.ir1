@@ -14,7 +14,7 @@ RDBLOCK1:
   c = 0                            ; CTRLSUBS.S:163
   a = a + *tempblockx@0x0091 + c    ; CTRLSUBS.S:164
   y = a                            ; CTRLSUBS.S:165
-  ??? lda (BlueType),y            ; CTRLSUBS.S:166
+  a = *(BlueType@0x0024)[y]   ; CTRLSUBS.S:166
   a = a & #0x1f              ; CTRLSUBS.S:167
   x = a                            ; CTRLSUBS.S:168
   return                           ; CTRLSUBS.S:169
@@ -34,7 +34,7 @@ fn RDBLOCK1 {
   c = 0                            ; CTRLSUBS.S:163
   a = a + *tempblockx@0x0091 + c    ; CTRLSUBS.S:164
   y = a                            ; CTRLSUBS.S:165
-  ??? lda (BlueType),y            ; CTRLSUBS.S:166
+  a = *(BlueType@0x0024)[y]   ; CTRLSUBS.S:166
   a = a & #0x1f              ; CTRLSUBS.S:167
   x = a                            ; CTRLSUBS.S:168
   return                           ; CTRLSUBS.S:169
@@ -583,14 +583,14 @@ fn SETUPSWORD {
   if eq goto ]rts       ; CTRLSUBS.S:869
   call getswordframe                  ; CTRLSUBS.S:871
   y = #0x00                  ; CTRLSUBS.S:873
-  ??? lda (framepoint),y            ; CTRLSUBS.S:874
+  a = *(framepoint@0x0080)[y]   ; CTRLSUBS.S:874
   if eq goto ]rts       ; CTRLSUBS.S:875
   call decodeswim                  ; CTRLSUBS.S:877
   y += 1                         ; CTRLSUBS.S:879
-  ??? lda (framepoint),y            ; CTRLSUBS.S:880
+  a = *(framepoint@0x0080)[y]   ; CTRLSUBS.S:880
   *Fdx@0x0083 = a            ; CTRLSUBS.S:881
   y += 1                         ; CTRLSUBS.S:883
-  ??? lda (framepoint),y            ; CTRLSUBS.S:884
+  a = *(framepoint@0x0080)[y]   ; CTRLSUBS.S:884
   *Fdy@0x0084 = a            ; CTRLSUBS.S:885
   a = *Fdx@0x0083        ; CTRLSUBS.S:887
   call ADDFCHARX                  ; CTRLSUBS.S:888
@@ -1148,7 +1148,7 @@ fn ADDSWORDOBJ {
 
 fn GETSEQ {
   y = #0x00                  ; CTRLSUBS.S:1630
-  ??? lda (CharSeq),y            ; CTRLSUBS.S:1631
+  a = *(CharSeq@0x0049)[y]   ; CTRLSUBS.S:1631
   ??? pha             ; CTRLSUBS.S:1632
   *CharSeq@0x0049 += 1                         ; CTRLSUBS.S:1634
   if ne goto :done       ; CTRLSUBS.S:1635
@@ -1163,19 +1163,19 @@ fn GETFRAMEINFO {
   call GETFRAME                  ; CTRLSUBS.S:1650
   call usealtsets                  ; CTRLSUBS.S:1652
   y = #0x00                  ; CTRLSUBS.S:1654
-  ??? lda (framepoint),y            ; CTRLSUBS.S:1655
+  a = *(framepoint@0x0080)[y]   ; CTRLSUBS.S:1655
   *Fimage@0x0082 = a            ; CTRLSUBS.S:1656
   y += 1                         ; CTRLSUBS.S:1658
-  ??? lda (framepoint),y            ; CTRLSUBS.S:1659
+  a = *(framepoint@0x0080)[y]   ; CTRLSUBS.S:1659
   *Fsword@0x00d9 = a            ; CTRLSUBS.S:1660
   y += 1                         ; CTRLSUBS.S:1662
-  ??? lda (framepoint),y            ; CTRLSUBS.S:1663
+  a = *(framepoint@0x0080)[y]   ; CTRLSUBS.S:1663
   *Fdx@0x0083 = a            ; CTRLSUBS.S:1664
   y += 1                         ; CTRLSUBS.S:1666
-  ??? lda (framepoint),y            ; CTRLSUBS.S:1667
+  a = *(framepoint@0x0080)[y]   ; CTRLSUBS.S:1667
   *Fdy@0x0084 = a            ; CTRLSUBS.S:1668
   y += 1                         ; CTRLSUBS.S:1670
-  ??? lda (framepoint),y            ; CTRLSUBS.S:1671
+  a = *(framepoint@0x0080)[y]   ; CTRLSUBS.S:1671
   *Fcheck@0x0085 = a            ; CTRLSUBS.S:1672
 ]rts:
   return                           ; CTRLSUBS.S:1674
@@ -1292,7 +1292,7 @@ fn ZERORED {
 
 fn CHECKLEDGE {
   *ztemp@0x00e9 = a            ; CTRLSUBS.S:1815
-  ??? lda (BlueSpec),y            ; CTRLSUBS.S:1817
+  a = *(BlueSpec@0x0026)[y]   ; CTRLSUBS.S:1817
   *tempstate@0x00f2 = a            ; CTRLSUBS.S:1818
   a = *blockid@0x008b        ; CTRLSUBS.S:1820
   cmp a, #0x14              ; CTRLSUBS.S:1822

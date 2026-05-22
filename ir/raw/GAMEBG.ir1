@@ -170,16 +170,16 @@ fn setupimage {
   *addr@0x00e9 = a            ; GAMEBG.S:370
   *addr+1@0x00ea = x            ; GAMEBG.S:371
   y = #0x00                  ; GAMEBG.S:373
-  ??? lda (addr),y            ; GAMEBG.S:374
+  a = *(addr@0x00e9)[y]   ; GAMEBG.S:374
   *YCO@0x0002 = a            ; GAMEBG.S:375
   y += 1                         ; GAMEBG.S:376
-  ??? lda (addr),y            ; GAMEBG.S:377
+  a = *(addr@0x00e9)[y]   ; GAMEBG.S:377
   *XCO@0x0001 = a            ; GAMEBG.S:378
   y += 1                         ; GAMEBG.S:379
-  ??? lda (addr),y            ; GAMEBG.S:380
+  a = *(addr@0x00e9)[y]   ; GAMEBG.S:380
   *OFFSET@0x0003 = a            ; GAMEBG.S:381
   y += 1                         ; GAMEBG.S:382
-  ??? lda (addr),y            ; GAMEBG.S:383
+  a = *(addr@0x00e9)[y]   ; GAMEBG.S:383
   *IMAGE@0x0004 = a            ; GAMEBG.S:384
 ]rts:
 :rts:
@@ -602,7 +602,7 @@ fn RECHECKYEL {
   *tempblockx@0x0091 = a            ; GAMEBG.S:900
   *tempblocky@0x0092 = a            ; GAMEBG.S:901
   call indexblock                  ; GAMEBG.S:902
-  ??? lda (locals),y            ; GAMEBG.S:903
+  a = *(locals@0x00f0)[y]   ; GAMEBG.S:903
   if eq goto ]rts       ; GAMEBG.S:904
   x = #0x05                  ; GAMEBG.S:905
   call yellow                  ; GAMEBG.S:906

@@ -900,8 +900,8 @@ fn MOVEMEM {
   *]source@0x00f2 = y            ; GRAFIX.S:1288
   *]endsourc@0x00f4 = y            ; GRAFIX.S:1289
 :loop:
-  ??? lda (]source),y            ; GRAFIX.S:1291
-  ??? sta (]dest),y            ; GRAFIX.S:1292
+  a = *(]source@0x00f2)[y]   ; GRAFIX.S:1291
+  *(]dest@0x00f0)[y] = a   ; GRAFIX.S:1292
   y += 1                         ; GRAFIX.S:1293
   if ne goto :loop       ; GRAFIX.S:1294
   *]source+1@0x00f3 += 1                         ; GRAFIX.S:1296

@@ -216,7 +216,7 @@ fn onground {
   if cc goto :no       ; CTRL.S:342
 :yes:
   a = #0x01                  ; CTRL.S:344
-  ??? sta (BlueType),y            ; CTRL.S:345
+  *(BlueType@0x0024)[y] = a   ; CTRL.S:345
   call indexblock                  ; CTRL.S:346
   a = #0x02                  ; CTRL.S:347
   call :sub                  ; CTRL.S:348
@@ -1050,7 +1050,7 @@ fn standing {
   cmp a, #0x10              ; CTRL.S:1159
   if ne goto :nostairs       ; CTRL.S:1160
 :stairs:
-  ??? lda (BlueSpec),y            ; CTRL.S:1162
+  a = *(BlueSpec@0x0026)[y]   ; CTRL.S:1162
   ??? lsr             ; CTRL.S:1163
   ??? lsr             ; CTRL.S:1164
   cmp a, #0x1e              ; CTRL.S:1165
@@ -1090,7 +1090,7 @@ fn standing {
   call getunderft                  ; CTRL.S:1222
   cmp a, #0x04              ; CTRL.S:1223
   if ne goto :succeed       ; CTRL.S:1224
-  ??? lda (BlueSpec),y            ; CTRL.S:1226
+  a = *(BlueSpec@0x0026)[y]   ; CTRL.S:1226
   ??? lsr             ; CTRL.S:1227
   ??? lsr             ; CTRL.S:1228
   cmp a, #0x06              ; CTRL.S:1229
@@ -1264,7 +1264,7 @@ fn hanging {
   if ne goto :2       ; CTRL.S:1475
   x = *CharFace@0x0043        ; CTRL.S:1477
   if eq goto :succeed       ; CTRL.S:1478
-  ??? lda (BlueSpec),y            ; CTRL.S:1480
+  a = *(BlueSpec@0x0026)[y]   ; CTRL.S:1480
   ??? lsr             ; CTRL.S:1481
   ??? lsr             ; CTRL.S:1482
   cmp a, #0x06              ; CTRL.S:1483
@@ -1766,7 +1766,7 @@ fn PickItUp {
 :ok:
   cmp a, #0x16              ; CTRL.S:2143
   if eq goto :PickupSword       ; CTRL.S:2144
-  ??? lda (BlueSpec),y            ; CTRL.S:2146
+  a = *(BlueSpec@0x0026)[y]   ; CTRL.S:2146
   ??? lsr             ; CTRL.S:2147
   ??? lsr             ; CTRL.S:2148
   ??? lsr             ; CTRL.S:2149
