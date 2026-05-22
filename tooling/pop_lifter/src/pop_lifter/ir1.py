@@ -259,10 +259,18 @@ class Bit:
       leaves `bit ; beq` unfused for now.
     * `N = bit 7 of operand` — *not* of `(A & operand)`. The N flag
       reflects the OPERAND, independent of A.
-    * `V = bit 6 of operand` — same as N but for bit 6.
+    * `V = bit 6 of operand` — same as N but for bit 6. (Like
+      `SbcImm`, V is conceptually written but **not currently
+      tracked** in `Trace`; nothing reads it yet. `bvc`/`bvs` aren't
+      lifted, so a V-dependent test would surface as `Unsupported`
+      rather than silently misbehave.)
 
-    Crucially, `bit` does NOT modify A. It's a pure flag-setter,
-    eligible for elision by `pass2_struct` when its outputs are dead."""
+    Crucially, `bit` does NOT modify A. `Bit(Imm)` is therefore a
+    pure flag-setter, eligible for elision by `pass2_struct` when
+    its outputs are dead. `Bit(Abs)` is **not** elided, because the
+    memory read itself can be side-effecting — `bit $c0xx` is the
+    classic Apple II soft-switch idiom (speaker click, page select,
+    paddle reads)."""
 
     source: "Imm | Abs"
     src: SourceRef

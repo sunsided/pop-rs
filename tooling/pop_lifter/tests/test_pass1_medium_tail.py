@@ -199,17 +199,18 @@ def test_sbc_then_beq_fuses_to_zero_test_on_a():
     assert ifs[0].cond.rhs.value == 0
 
 
-def test_lsr_then_bcc_fuses_to_low_bit_zero():
-    """`lsr ; bcc L` continues while old bit 0 was 0 — i.e. when
-    the next branch reads C after the shift. With our pass-2 fusion
-    rules (`bcs`→`>=`, `bcc`→`<` after `cmp`), only cmp+branch
-    paths fuse on C; lsr+bcc doesn't because `_affected_register`
-    for Lsr returns Reg.A and the LOAD_FUSE_OPS map only handles
-    eq/ne/pl/mi. The branch must therefore remain unfused.
+def test_lsr_then_bcc_stays_unfused():
+    """`lsr ; bcc L` reads C from the shift's lost bit 0 — but our
+    pass-2 fusion rules (`bcs`→`>=`, `bcc`→`<`) only apply after
+    `cmp`, where C carries the no-borrow semantics. `_affected_
+    register` for Lsr returns Reg.A and the LOAD_FUSE_OPS map only
+    handles eq/ne/pl/mi (Z/N reads), so a `bcc` after `lsr` doesn't
+    match any fusion pattern.
 
-    This test pins the conservative-fallback contract so a future
-    over-fusion that conflates Lsr's C-side-effect with cmp's
-    can't slip through."""
+    This test pins the conservative-fallback contract — a future
+    over-fusion that conflated Lsr's C-side-effect with cmp's would
+    silently rewrite `if (a was odd) goto L` as `if a < operand
+    goto L`, which is wrong."""
     src = SourceRef(file="syn", line=0, raw="")
     r = Routine(
         name="f",
@@ -244,15 +245,13 @@ def test_bit_then_beq_does_not_fuse():
     assert not any(isinstance(i, If) for i in out.body)
 
 
-def test_bit_eligible_for_elision_when_flags_dead():
-    """A `bit` with no downstream Z/N/V reader (i.e. flowing into a
-    Return or into another full-flag-writer like a cmp) is dead and
-    must be removed by the elision sweep.
+def test_bit_imm_eligible_for_elision_when_flags_dead():
+    """`Bit(Imm)` has no memory access at all — pure flag setter,
+    elidable when its outputs are dead, same as Cmp/Clc/Sec.
 
     `structure_routine` only fuses cmp+branch — elision is a separate
     backward pass that `structure_module` chains on top. We invoke
-    both here to exercise the full pass-2 pipeline that pop-lifter's
-    CLI runs."""
+    both here to exercise the full pass-2 pipeline."""
     from pop_lifter.pass2_struct import _eliminate_dead_flags
 
     src = SourceRef(file="syn", line=0, raw="")
@@ -265,10 +264,34 @@ def test_bit_eligible_for_elision_when_flags_dead():
         ],
     )
     fused = structure_routine(r)
-    # `_eliminate_dead_flags` takes a `flag_demand` map (per-routine
-    # exit-flag liveness). For a standalone routine with no callers
-    # in the analysis the demand is empty.
     out = _eliminate_dead_flags(fused, flag_demand={})
     assert not any(isinstance(i, Bit) for i in out.body), (
-        "dead Bit should be elided by pass 2's flag-liveness sweep"
+        "dead Bit(Imm) should be elided by pass 2's flag-liveness sweep"
+    )
+
+
+def test_bit_abs_never_elided_even_when_flags_dead():
+    """`Bit(Abs)` reads a byte from memory, and on the Apple II
+    `bit $c0xx` is the canonical soft-switch toggle (speaker, page
+    select, paddle reads) — the read itself is the observable side
+    effect. Eliding it would change program behavior. Even outside
+    $C0xx we can't tell at pass-2 time whether the address is RAM
+    or I/O, so the safe rule is "never elide Bit(Abs)" regardless
+    of flag liveness."""
+    from pop_lifter.pass2_struct import _eliminate_dead_flags
+
+    src = SourceRef(file="syn", line=0, raw="")
+    r = Routine(
+        name="f",
+        body=[
+            # $C030 is the Apple II speaker click soft-switch — the
+            # textbook case for a side-effecting bit read.
+            Bit(source=Abs(name="SPKR", addr=0xc030), src=src),
+            Return(src=src),
+        ],
+    )
+    out = _eliminate_dead_flags(structure_routine(r), flag_demand={})
+    assert any(isinstance(i, Bit) for i in out.body), (
+        "Bit(Abs) must survive elision — its memory read may be "
+        "side-effecting (soft switches)"
     )

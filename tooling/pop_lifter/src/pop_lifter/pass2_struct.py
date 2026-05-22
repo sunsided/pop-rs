@@ -502,13 +502,22 @@ def _backward_sweep(
             continue
 
         if isinstance(item, Bit):
-            # Pure flag-setter (Z,N,V; no register effect). Eligible
-            # for elision when all its outputs are dead — same shape
-            # as Cmp/Clc/Sec. We track V in the universe even though
-            # nothing currently reads it, so a future `bvc`/`bvs`
-            # consumer keeps Bit alive automatically.
+            # `Bit(Imm)` is a pure flag-setter — no memory access at
+            # all — so the normal Cmp-style elision rules apply.
+            #
+            # `Bit(Abs)` reads a byte from memory. On the Apple II,
+            # `bit $c0xx` is the canonical idiom for toggling soft-
+            # switches (speaker, page select, paddle reads, etc.) —
+            # the *read itself* is the observable side effect. Even
+            # outside the $C0xx page we can't tell from pass 2 alone
+            # whether a memory read is to a soft-switch or to plain
+            # RAM, so the safe and uniform rule is "never elide
+            # Bit(Abs)". Future work that knows the soft-switch range
+            # can relax this; for now correctness trumps the loss of
+            # ~43 elisions worst case.
+            from .ir1 import Imm
             defines = {"Z", "N", "V"}
-            if not (live & defines):
+            if isinstance(item.source, Imm) and not (live & defines):
                 drop.add(i)
             else:
                 live -= defines
