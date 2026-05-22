@@ -277,6 +277,43 @@ class Branch:
     src: SourceRef
 
 
+# ---------------------------------------------------------------- IR2 atoms
+#
+# Pass 2 fuses `CmpImm/CmpAbs + Branch` pairs into a single `If` node
+# whose `Compare` carries an explicit operator. Same data, fewer items,
+# and the interpreter can evaluate the condition without consulting
+# flag state. The IR2 nodes live in the same union so a `Routine` can
+# mix fused and unfused items where fusion isn't yet possible.
+
+
+@dataclass(frozen=True)
+class Compare:
+    """Structured comparison: `reg <op> rhs`. `op` is one of `==`, `!=`,
+    `<`, `>=` (unsigned), `<0`, `>=0` (sign tests with no rhs).
+
+    `rhs` carries the right-hand operand. For sign tests (`<0`, `>=0`)
+    it's `None`. For value comparisons it's an `Imm` (`cmp #k`) or an
+    `Abs` (`cmp addr`)."""
+
+    reg: Reg
+    op: str
+    rhs: "Imm | Abs | None"
+
+
+@dataclass(frozen=True)
+class If:
+    """`if Compare goto target` — structured conditional branch.
+
+    Replaces a `CmpImm/CmpAbs` followed immediately by a `Branch` in
+    the lifted body. Semantics are identical to the original 6502
+    sequence but the interpreter doesn't need to read Z/C from prior
+    state — the Compare is self-contained."""
+
+    cond: Compare
+    target: str
+    src: SourceRef
+
+
 @dataclass(frozen=True)
 class Unsupported:
     """An opcode the current lifter does not yet model. We keep it in
@@ -292,6 +329,7 @@ Instr = (
     LoadImm | StoreAbs | Goto | Return | Call
     | LoadAbs | Asl | Clc | Sec | AdcImm | AdcAbs
     | LoadIndexed | StoreIndexed | CmpImm | CmpAbs | Branch
+    | If
     | Unsupported
 )
 Item = Label | Instr
@@ -355,6 +393,15 @@ def _fmt_abs(a: Abs) -> str:
     return f"{a.name}@{a.addr:#06x}"
 
 
+def _fmt_compare(c: Compare) -> str:
+    if c.rhs is None:
+        # Sign test: `a < 0` or `a >= 0`.
+        return f"{c.reg} {c.op}"
+    if isinstance(c.rhs, Imm):
+        return f"{c.reg} {c.op} {_fmt_imm(c.rhs)}"
+    return f"{c.reg} {c.op} *{_fmt_abs(c.rhs)}"
+
+
 def format_item(item: Item) -> str:
     if isinstance(item, Label):
         return f"{item.name}:"
@@ -390,6 +437,8 @@ def format_item(item: Item) -> str:
         return f"  cmp {item.reg}, *{_fmt_abs(item.source)}    ; {item.src.short()}"
     if isinstance(item, Branch):
         return f"  if {item.cond} goto {item.target}       ; {item.src.short()}"
+    if isinstance(item, If):
+        return f"  if {_fmt_compare(item.cond)} goto {item.target}  ; {item.src.short()}"
     if isinstance(item, Call):
         return f"  call {item.target}                  ; {item.src.short()}"
     if isinstance(item, Goto):

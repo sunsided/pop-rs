@@ -36,6 +36,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .ir1 import (
+    Abs,
     AdcAbs,
     AdcImm,
     Asl,
@@ -44,7 +45,10 @@ from .ir1 import (
     Clc,
     CmpAbs,
     CmpImm,
+    Compare,
     Goto,
+    If,
+    Imm,
     Label,
     LoadAbs,
     LoadImm,
@@ -105,6 +109,37 @@ def _set_zn(trace: Trace, value: int) -> None:
     v = value & 0xff
     trace.z = 1 if v == 0 else 0
     trace.n = (v >> 7) & 1
+
+
+def _eval_compare(cond: Compare, trace: Trace, ram: bytearray) -> bool:
+    """Evaluate a structured Compare against the current register/RAM
+    state. The IR2 form is self-contained — no flag inspection needed."""
+    reg_val = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[cond.reg]
+    if cond.op in ("<0", ">=0"):
+        # Sign tests read the value as a signed byte. The 6502 N flag
+        # is just bit 7 of the value, so the structured form mirrors
+        # `(reg & 0x80) != 0`.
+        is_negative = bool(reg_val & 0x80)
+        return is_negative if cond.op == "<0" else not is_negative
+    if cond.rhs is None:
+        raise InterpError(
+            f"Compare op {cond.op!r} requires a rhs but none was supplied"
+        )
+    if isinstance(cond.rhs, Imm):
+        rhs = cond.rhs.value & 0xff
+    elif isinstance(cond.rhs, Abs):
+        rhs = ram[cond.rhs.addr & 0xffff]
+    else:
+        raise InterpError(f"unknown Compare rhs type: {type(cond.rhs).__name__}")
+    if cond.op == "==":
+        return reg_val == rhs
+    if cond.op == "!=":
+        return reg_val != rhs
+    if cond.op == "<":
+        return reg_val < rhs
+    if cond.op == ">=":
+        return reg_val >= rhs
+    raise InterpError(f"unknown Compare op: {cond.op!r}")
 
 
 def _branch_taken(cond: str, trace: Trace) -> bool:
@@ -352,6 +387,29 @@ def run(
                             f"branch target {item.target!r} not found "
                             f"locally in {routine.name!r} or in any "
                             f"loaded module (aliases: {aliases!r})"
+                        )
+                    routine = target_routine
+                    body = routine.body
+                    idx = 0
+            else:
+                idx += 1
+            continue
+
+        if isinstance(item, If):
+            # Structured (pass-2-fused) conditional. Same control-flow
+            # shape as Branch — local label first, then cross-module
+            # tail-call fallback — but the predicate is self-contained.
+            if _eval_compare(item.cond, trace, ram):
+                local = _find_label_index(routine, item.target)
+                if local is not None:
+                    idx = local
+                else:
+                    target_routine = _resolve(modules, aliases, item.target)
+                    if target_routine is None:
+                        raise InterpError(
+                            f"if-target {item.target!r} not found locally "
+                            f"in {routine.name!r} or in any loaded module "
+                            f"(aliases: {aliases!r})"
                         )
                     routine = target_routine
                     body = routine.body

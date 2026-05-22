@@ -20,6 +20,7 @@ IR_PASS0 = REPO_ROOT / "ir" / "pass0" / "equates.json"
 IR_PILOT = REPO_ROOT / "ir" / "pilot" / "auto_combat.ir1"
 IR_PILOT_RNDP = REPO_ROOT / "ir" / "pilot" / "rndp.ir1"
 IR_PILOT_CHECKFLOOR = REPO_ROOT / "ir" / "pilot" / "checkfloor.ir1"
+IR_PILOT_CHECKFLOOR_IR2 = REPO_ROOT / "ir" / "pilot" / "checkfloor.ir2"
 IR_RAW = REPO_ROOT / "ir" / "raw"
 
 PILOT_ENTRIES = [
@@ -150,6 +151,39 @@ def test_pass1_checkfloor_pilot_artifact_matches(source_dir):
         f"regenerate with:\n"
         f"  pop-lifter lift CTRL.S --entry CHECKFLOOR "
         f"--out {IR_PILOT_CHECKFLOOR.relative_to(REPO_ROOT)}"
+    )
+
+
+def _regen_checkfloor_ir2(source_dir: Path) -> str:
+    from pop_lifter.pass2_struct import structure_module
+    ast = parse_files(
+        [
+            source_dir / "EQ.S",
+            source_dir / "GAMEEQ.S",
+            source_dir / "CTRL.S",
+        ],
+        search_paths=[source_dir],
+    )
+    ctrl = next(f for f in ast.files if Path(f.path).name == "CTRL.S")
+    ir1_module = lift_file(ctrl, ast.equates, ["CHECKFLOOR"]).module
+    ir2_module = structure_module(ir1_module)
+    return ir1_mod.format_module(ir2_module)
+
+
+def test_pass2_checkfloor_ir2_artifact_matches(source_dir):
+    if not IR_PILOT_CHECKFLOOR_IR2.exists():
+        raise AssertionError(
+            f"missing artifact {IR_PILOT_CHECKFLOOR_IR2}. regenerate with:\n"
+            f"  pop-lifter struct CTRL.S --entry CHECKFLOOR "
+            f"--out {IR_PILOT_CHECKFLOOR_IR2.relative_to(REPO_ROOT)}"
+        )
+    expected = IR_PILOT_CHECKFLOOR_IR2.read_text(encoding="utf-8")
+    actual = _regen_checkfloor_ir2(source_dir)
+    assert actual == expected, (
+        f"{IR_PILOT_CHECKFLOOR_IR2.relative_to(REPO_ROOT)} is stale. "
+        f"regenerate with:\n"
+        f"  pop-lifter struct CTRL.S --entry CHECKFLOOR "
+        f"--out {IR_PILOT_CHECKFLOOR_IR2.relative_to(REPO_ROOT)}"
     )
 
 

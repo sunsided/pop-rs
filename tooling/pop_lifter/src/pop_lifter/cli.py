@@ -22,6 +22,7 @@ from pathlib import Path
 from . import ir1 as ir1_mod
 from .pass0_parse import ProgramAST, parse_files
 from .pass1_lift import discover_entries, lift_file
+from .pass2_struct import fusion_stats, structure_module
 
 DEFAULT_SOURCE_REL = Path("01 POP Source/Source")
 
@@ -206,6 +207,81 @@ def _cmd_lift(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------- struct (pass 2)
+
+def _cmd_struct(args: argparse.Namespace) -> int:
+    """Run pass 1 on the given files / entries and then pass 2's
+    structurer. Writes the IR2 dump to `--out` (or stdout)."""
+    src_dir = _resolve_source_dir(args)
+    if src_dir is None:
+        return 2
+
+    file_paths: list[Path] = []
+    for raw in args.file:
+        p = Path(raw)
+        if not p.is_absolute():
+            candidate = src_dir / p
+            if candidate.is_file():
+                p = candidate
+        if not p.is_file():
+            print(f"error: input file not found: {raw}", file=sys.stderr)
+            return 2
+        file_paths.append(p)
+
+    base = [src_dir / n for n in ("EQ.S", "GAMEEQ.S") if (src_dir / n).exists()]
+    ast = parse_files([*base, *file_paths], search_paths=[src_dir])
+
+    dumps: list[str] = []
+    total_fused = 0
+    total_unfused = 0
+    total_routines = 0
+    handled: set[str] = set()
+    for file_path in file_paths:
+        file_ast = next(
+            (f for f in ast.files if Path(f.path).resolve() == file_path.resolve()),
+            None,
+        )
+        if file_ast is None:
+            print(
+                f"error: file {file_path} was not loaded by the parser",
+                file=sys.stderr,
+            )
+            return 1
+        defined = set(discover_entries(file_ast))
+        local_entries = [e for e in args.entry if e in defined and e not in handled]
+        if not local_entries:
+            continue
+        ir1_module = lift_file(file_ast, ast.equates, local_entries).module
+        ir2_module = structure_module(ir1_module)
+        f, u = fusion_stats(ir2_module)
+        total_fused += f
+        total_unfused += u
+        total_routines += len(ir2_module.routines)
+        dumps.append(ir1_mod.format_module(ir2_module))
+        handled.update(local_entries)
+
+    missing = [e for e in args.entry if e not in handled]
+    if missing:
+        print(
+            f"error: entries not found in any input file: {missing}",
+            file=sys.stderr,
+        )
+        return 1
+
+    text = "\n".join(dumps)
+    if args.out:
+        out_path = Path(args.out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(text, encoding="utf-8")
+        print(
+            f"wrote {out_path} ({total_routines} routines, "
+            f"{total_fused} fused-if, {total_unfused} unfused-branch)"
+        )
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
 # ---------------------------------------------------------------- lift-all
 
 def _cmd_lift_all(args: argparse.Namespace) -> int:
@@ -375,6 +451,25 @@ def main(argv: list[str] | None = None) -> int:
         help="If given, write IR1 dump here instead of stdout.",
     )
     p_lift.set_defaults(func=_cmd_lift)
+
+    p_struct = sub.add_parser(
+        "struct",
+        help="Pass 2: run pass 1 on the given file(s)/entries, then "
+             "fuse cmp+branch pairs into structured `if` nodes.",
+    )
+    p_struct.add_argument(
+        "file", nargs="+",
+        help=".S file (absolute path or relative to the source dir).",
+    )
+    p_struct.add_argument(
+        "--entry", action="append", required=True,
+        help="Routine entry-point label. May be passed multiple times.",
+    )
+    p_struct.add_argument(
+        "--out", default=None,
+        help="If given, write IR2 dump here instead of stdout.",
+    )
+    p_struct.set_defaults(func=_cmd_struct)
 
     p_lift_all = sub.add_parser(
         "lift-all",
