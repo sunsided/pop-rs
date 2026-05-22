@@ -10,9 +10,11 @@ The original 6502 source is vendored as a git submodule at
 
 ## Status
 
-Pass 0 (Merlin lex/parse) and a first slice of Pass 1 (mechanical lift to IR1
+Pass 0 ([Merlin] lex/parse) and a first slice of Pass 1 (mechanical lift to IR1
 plus a Python interpreter for differential testing) are working on the AUTO.S
 combat-button pilot. Pass 2/3/4 not started.
+
+[Merlin]: https://en.wikipedia.org/wiki/Merlin_(assembler)
 
 Inspectable intermediate artifacts:
 
