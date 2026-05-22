@@ -211,7 +211,7 @@ class AdcAbs:
     src: SourceRef
 
 
-# ---------------------------------------------------------------- new in pass-1 long tail
+# ---------------------------------------------------------------- indirect addressing
 
 
 @dataclass(frozen=True)
@@ -243,8 +243,10 @@ class LoadIndirect:
     """`lda (ptr),y` — load A from the post-indexed indirect address.
     Sets Z/N on the loaded byte. The 6502 only has the `lda` form
     here (no `ldx`/`ldy` against `(ptr),y`), so `reg` is always A;
-    we record it explicitly so pass-2's `_affected_register` logic
-    needs no special-casing."""
+    we record it explicitly so the same `_affected_register` rule
+    that handles `LoadAbs`/`LoadImm`/`LoadIndexed` also accepts this
+    node — `lda (ptr),y ; beq L` fuses into `if a == 0 goto L`
+    exactly like the other loads."""
 
     reg: Reg
     source: IndirectY
@@ -271,6 +273,9 @@ class CmpIndirect:
     reg: Reg
     source: IndirectY
     src: SourceRef
+
+
+# ---------------------------------------------------------------- pass-1 long-tail atoms
 
 
 @dataclass(frozen=True)

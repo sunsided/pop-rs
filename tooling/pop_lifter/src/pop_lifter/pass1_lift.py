@@ -195,12 +195,11 @@ def _parse_indirect_y(
     if close < 0:
         return None
     inner = s[1:close].strip()
-    tail = s[close + 1:].strip().lower()
-    if tail not in (",y", ",y ", ", y"):
-        # Also allow whitespace between `,` and `y`.
-        tail_s = tail.replace(" ", "")
-        if tail_s != ",y":
-            return None
+    # Normalise the tail to drop all whitespace + lowercase before
+    # comparing — handles `,y`, `, y`, `,Y`, etc. in one pass.
+    tail = s[close + 1:].replace(" ", "").replace("\t", "").lower()
+    if tail != ",y":
+        return None
     try:
         addr = eval_expr(inner, equates)
     except ValueError:
@@ -262,10 +261,13 @@ def _lift_instr(
             return LoadIndexed(
                 reg=_reg_of_load(mnemonic), base=base, index=idx_reg, src=src,
             )
-        # `(ptr),y` only exists for `lda` on stock 6502 — `ldx`/`ldy`
-        # don't have an indirect-indexed form. Try it before the
-        # plain-absolute parse so we don't mis-resolve `(name)` as an
-        # absolute expression.
+        # `lda` is the only *load mnemonic* that has a `(zp),y` form
+        # — `ldx`/`ldy` don't. (The addressing mode itself exists for
+        # plenty of other opcodes — `sta`, `cmp`, `adc`, `sbc`,
+        # `and`, `ora`, `eor` — those are dispatched in their own
+        # mnemonic branches below.) Try the indirect parse before
+        # the plain-absolute parse so we don't mis-resolve `(name)`
+        # as an absolute expression.
         if mnemonic == "lda":
             ind = _parse_indirect_y(line.operand, equates)
             if ind is not None:

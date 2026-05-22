@@ -4,14 +4,11 @@ the post-indexed indirect addressing mode."""
 
 from __future__ import annotations
 
-import pytest
-
-from pop_lifter.interp_ir1 import InterpError, Trace, exec_atom
+from pop_lifter.interp_ir1 import Trace, exec_atom
 from pop_lifter.ir1 import (
     Abs,
     Bitwise,
     CmpIndirect,
-    Imm,
     IndirectY,
     LoadIndirect,
     Reg,
@@ -187,6 +184,34 @@ def test_indirect_y_wraps_effective_address_at_64k():
         t, t.ram,
     )
     assert t.a == 0x99
+
+
+def test_load_indirect_then_beq_fuses_to_zero_test():
+    """`lda (ptr),y ; beq L` must fuse into `if a == 0 goto L`
+    exactly like the other loads — pins the pass-2 contract that
+    `LoadIndirect` participates in `_affected_register`."""
+    from pop_lifter.ir1 import Branch, If, Return, Routine
+    from pop_lifter.pass2_struct import structure_routine
+
+    src = SourceRef(file="syn", line=0, raw="")
+    r = Routine(
+        name="f",
+        body=[
+            LoadIndirect(
+                reg=Reg.A,
+                source=IndirectY(ptr=Abs(name="p", addr=0x80)),
+                src=src,
+            ),
+            Branch(cond="eq", target="]rts", src=src),
+            Return(src=src),
+        ],
+    )
+    out = structure_routine(r)
+    ifs = [i for i in out.body if isinstance(i, If)]
+    assert len(ifs) == 1
+    assert ifs[0].cond.reg is Reg.A
+    assert ifs[0].cond.op == "=="
+    assert ifs[0].cond.rhs.value == 0
 
 
 def test_bitwise_and_indirect_y_combines_with_pointer_byte():
