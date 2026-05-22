@@ -3,7 +3,7 @@
 fn falling {
   a = *CharY@0x0042        ; CTRL.S:77
   x = *CharBlockY@0x0045        ; CTRL.S:79
-  ??? inx             ; CTRL.S:80
+  x += 1                         ; CTRL.S:80
   ??? cmp FloorY,x            ; CTRL.S:81
   if cs goto :1       ; CTRL.S:82
   tail_call fallon                ; CTRL.S:84
@@ -15,7 +15,7 @@ fn falling {
 :2:
   call cmpspace                  ; CTRL.S:94
   if ne goto hitflr       ; CTRL.S:95
-  ??? inc CharBlockY            ; CTRL.S:97
+  *CharBlockY@0x0045 += 1                         ; CTRL.S:97
 ]rts:
   return                           ; CTRL.S:99
 }
@@ -54,7 +54,7 @@ fn CHECKFLOOR {
 
 fn hitflr {
   x = *CharBlockY@0x0045        ; CTRL.S:141
-  ??? inx             ; CTRL.S:142
+  x += 1                         ; CTRL.S:142
   a = *(FloorY@0x127e + x)   ; CTRL.S:143
   *CharY@0x0042 = a            ; CTRL.S:144
   call getunderft                  ; CTRL.S:146
@@ -141,7 +141,7 @@ fn hitflr {
 
 fn fallon {
   a = *btn@0x003d        ; CTRL.S:249
-  ??? and CharLife            ; CTRL.S:250
+  a = a & *CharLife@0x004f              ; CTRL.S:250
   if pl goto ]rts       ; CTRL.S:251
   a = *CharYVel@0x0048        ; CTRL.S:253
   cmp a, #0x20              ; CTRL.S:254
@@ -150,7 +150,7 @@ fn fallon {
   c = 0                            ; CTRL.S:258
   a = a + #0x19 + c              ; CTRL.S:259
   x = *CharBlockY@0x0045        ; CTRL.S:260
-  ??? inx             ; CTRL.S:261
+  x += 1                         ; CTRL.S:261
   ??? cmp FloorY,x            ; CTRL.S:262
   if cc goto ]rts       ; CTRL.S:263
   a = *CharX@0x0041        ; CTRL.S:268
@@ -169,7 +169,7 @@ fn fallon {
   call addcharx                  ; CTRL.S:286
   *CharX@0x0041 = a            ; CTRL.S:287
   x = *CharBlockY@0x0045        ; CTRL.S:289
-  ??? inx             ; CTRL.S:290
+  x += 1                         ; CTRL.S:290
   a = *(FloorY@0x127e + x)   ; CTRL.S:291
   *CharY@0x0042 = a            ; CTRL.S:292
   a = #0x00                  ; CTRL.S:294
@@ -190,7 +190,7 @@ fn fallon {
 
 fn onground {
   a = *Fcheck@0x0085        ; CTRL.S:314
-  ??? and #fcheckmark            ; CTRL.S:315
+  a = a & #0x40              ; CTRL.S:315
   if eq goto ]rts       ; CTRL.S:316
   call getunderft                  ; CTRL.S:318
   cmp a, #0x14              ; CTRL.S:319
@@ -220,7 +220,7 @@ fn onground {
   call indexblock                  ; CTRL.S:346
   a = #0x02                  ; CTRL.S:347
   call :sub                  ; CTRL.S:348
-  ??? iny             ; CTRL.S:349
+  y += 1                         ; CTRL.S:349
 :sub:
   call markwipe                  ; CTRL.S:350
   tail_call markred                ; CTRL.S:351
@@ -229,7 +229,7 @@ startfall:
   a = #0x00                  ; CTRL.S:357
   *rjumpflag@0x023a = a            ; CTRL.S:358
   *CharSword@0x004e = a            ; CTRL.S:359
-  ??? inc CharBlockY            ; CTRL.S:361
+  *CharBlockY@0x0045 += 1                         ; CTRL.S:361
   call addslicers                  ; CTRL.S:362
   a = *CharPosn@0x0040        ; CTRL.S:364
   *rjumpflag@0x023a = a            ; CTRL.S:367
@@ -308,7 +308,7 @@ fn :no  (aka startfall) {
   a = #0x00                  ; CTRL.S:357
   *rjumpflag@0x023a = a            ; CTRL.S:358
   *CharSword@0x004e = a            ; CTRL.S:359
-  ??? inc CharBlockY            ; CTRL.S:361
+  *CharBlockY@0x0045 += 1                         ; CTRL.S:361
   call addslicers                  ; CTRL.S:362
   a = *CharPosn@0x0040        ; CTRL.S:364
   *rjumpflag@0x023a = a            ; CTRL.S:367
@@ -425,13 +425,13 @@ fn InsideBlock {
   call getdist                  ; CTRL.S:490
   c = 0                            ; CTRL.S:491
   a = a + #0x0e + c              ; CTRL.S:492
-  ??? eor #$ff            ; CTRL.S:493
+  a = a ^ #0xff              ; CTRL.S:493
   c = 0                            ; CTRL.S:494
   a = a + #0x08 + c              ; CTRL.S:495
   goto :reland                ; CTRL.S:496
 :1:
   call getdist                  ; CTRL.S:498
-  ??? eor #$ff            ; CTRL.S:499
+  a = a ^ #0xff              ; CTRL.S:499
   c = 0                            ; CTRL.S:500
   a = a + #0x08 + c              ; CTRL.S:501
   goto :reland                ; CTRL.S:502
@@ -478,7 +478,7 @@ fn PLAYERCTRL {
 :cont1:
   a = *stunned@0x00e6        ; CTRL.S:562
   if eq goto :cont       ; CTRL.S:563
-  ??? dec stunned            ; CTRL.S:564
+  *stunned@0x00e6 -= 1                         ; CTRL.S:564
 :cont:
   a = *level@0x03f4        ; CTRL.S:566
   if ne goto :game       ; CTRL.S:567
@@ -1485,11 +1485,11 @@ fn DoRunjump {
 :loop:
   a = *blockx@0x008c        ; CTRL.S:1770
   x = *CharFace@0x0043        ; CTRL.S:1771
-  ??? inx             ; CTRL.S:1772
+  x += 1                         ; CTRL.S:1772
   c = 0                            ; CTRL.S:1773
   ??? adc plus1,x            ; CTRL.S:1774
   *blockx@0x008c = a            ; CTRL.S:1775
-  ??? tax             ; CTRL.S:1777
+  x = a                            ; CTRL.S:1777
   y = *CharBlockY@0x0045        ; CTRL.S:1778
   a = *CharScrn@0x004b        ; CTRL.S:1779
   call rdblock                  ; CTRL.S:1780
@@ -1497,7 +1497,7 @@ fn DoRunjump {
   if eq goto :done       ; CTRL.S:1783
   call cmpspace                  ; CTRL.S:1785
   if eq goto :done       ; CTRL.S:1786
-  ??? inc bufindex            ; CTRL.S:1788
+  *bufindex@0x00c1 += 1                         ; CTRL.S:1788
   a = *bufindex@0x00c1        ; CTRL.S:1790
   cmp a, #0x02              ; CTRL.S:1791
   if cc goto :loop       ; CTRL.S:1792
@@ -1581,9 +1581,9 @@ fn DoJumphigh {
   c = 0                            ; CTRL.S:1902
   a = a + *ztemp@0x00e9 + c    ; CTRL.S:1903
   call getblockx                  ; CTRL.S:1905
-  ??? tax             ; CTRL.S:1906
+  x = a                            ; CTRL.S:1906
   y = *CharBlockY@0x0045        ; CTRL.S:1908
-  ??? dey             ; CTRL.S:1909
+  y -= 1                         ; CTRL.S:1909
   a = *CharScrn@0x004b        ; CTRL.S:1911
   call rdblock                  ; CTRL.S:1912
   cmp a, #0x14              ; CTRL.S:1914
@@ -1627,7 +1627,7 @@ fn CHECKPRESS {
   cmp a, #0x4f              ; CTRL.S:1962
   if eq goto :touchceil       ; CTRL.S:1963
   a = *Fcheck@0x0085        ; CTRL.S:1965
-  ??? and #fcheckmark            ; CTRL.S:1966
+  a = a & #0x40              ; CTRL.S:1966
   if eq goto ]rts       ; CTRL.S:1967
   call getunderft                  ; CTRL.S:1971
 :checkit:
@@ -1694,7 +1694,7 @@ fn CHECKIMPALE {
 fn DOIMPALE {
   call jamspikes                  ; CTRL.S:2059
   x = *CharBlockY@0x0045        ; CTRL.S:2061
-  ??? inx             ; CTRL.S:2062
+  x += 1                         ; CTRL.S:2062
   a = *(FloorY@0x127e + x)   ; CTRL.S:2063
   *CharY@0x0042 = a            ; CTRL.S:2064
   a = *tempblockx@0x0091        ; CTRL.S:2066
@@ -1798,7 +1798,7 @@ startfall:
   a = #0x00                  ; CTRL.S:357
   *rjumpflag@0x023a = a            ; CTRL.S:358
   *CharSword@0x004e = a            ; CTRL.S:359
-  ??? inc CharBlockY            ; CTRL.S:361
+  *CharBlockY@0x0045 += 1                         ; CTRL.S:361
   call addslicers                  ; CTRL.S:362
   a = *CharPosn@0x0040        ; CTRL.S:364
   *rjumpflag@0x023a = a            ; CTRL.S:367

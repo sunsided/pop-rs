@@ -74,17 +74,60 @@ def test_cmp_bcc_fuses_to_lt(source_dir):
     assert len(matching) == 1
 
 
-def test_unfused_branch_left_alone(source_dir):
-    """`and #fcheckmark ; beq ]rts` in `onground` — the `and` isn't yet
-    a recognised flag-setter, so the branch must remain as a Branch
-    (not silently rewritten as a sign or load test)."""
+def test_bitwise_and_branch_fuses(source_dir):
+    """`and #fcheckmark ; beq ]rts` in `onground` — the pass-1 long-
+    tail slice lifts `and` as `Bitwise`, which `pass2_struct` treats
+    as a flag-setter (Z/N reflect A's post-and value). The branch
+    must fuse into `if a == 0 goto ]rts`."""
     ir2 = structure_module(_ir1_module(source_dir, "CTRL.S", ["CHECKFLOOR"]))
     onground = ir2.find("onground")
     assert onground is not None
-    # There should be at least one literal `Branch` left in onground;
-    # its target is `]rts` and it follows an Unsupported `and`.
-    raw_branches = [item for item in onground.body if isinstance(item, Branch)]
-    assert any(b.target == "]rts" and b.cond == "eq" for b in raw_branches)
+    # Find the If immediately following an `and` against fcheckmark.
+    from pop_lifter.ir1 import Bitwise, If
+    for prev, item in zip(onground.body, onground.body[1:]):
+        if (
+            isinstance(prev, Bitwise)
+            and prev.op == "and"
+            and isinstance(item, If)
+            and item.target == "]rts"
+        ):
+            assert item.cond.op == "=="
+            assert item.cond.rhs.value == 0
+            return
+    raise AssertionError(
+        "no `and ; beq ]rts` pair fused in onground — fusion regression?"
+    )
+
+
+def test_unfused_branch_left_alone():
+    """When the preceding op is still `Unsupported` (e.g. an opcode
+    not yet lifted by pass 1), the Branch must NOT fuse. We use a
+    synthetic routine with an `???` predecessor to exercise that
+    contract independently of which real opcodes happen to be
+    lifted in any given commit."""
+    from pop_lifter.ir1 import (
+        Branch,
+        Reg,
+        Return,
+        Routine,
+        SourceRef,
+        Unsupported,
+    )
+    src = SourceRef(file="syn", line=0, raw="")
+    r = Routine(
+        name="syn",
+        body=[
+            Unsupported(mnemonic="bit", operand="$80", src=src),
+            Branch(cond="eq", target="]rts", src=src),
+            Return(src=src),
+        ],
+    )
+    out = structure_routine(r)
+    # Branch must remain unfused — Unsupported predecessors don't
+    # expose a known affected register.
+    assert any(isinstance(item, Branch) for item in out.body)
+    from pop_lifter.ir1 import If
+    assert not any(isinstance(item, If) for item in out.body)
 
 
 def test_structurer_is_idempotent(source_dir):

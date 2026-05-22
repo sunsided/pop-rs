@@ -42,13 +42,16 @@ from .ir1 import (
     AdcAbs,
     AdcImm,
     Asl,
+    Bitwise,
     Branch,
     Call,
     Clc,
     CmpAbs,
     CmpImm,
+    DecTarget,
     Goto,
     Imm,
+    IncTarget,
     Label,
     LoadAbs,
     LoadImm,
@@ -61,6 +64,7 @@ from .ir1 import (
     SourceRef,
     StoreAbs,
     StoreIndexed,
+    Transfer,
     Unsupported,
 )
 from .pass0_lex import Line
@@ -283,6 +287,53 @@ def _lift_instr(
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return AdcAbs(source=addr, src=src)
+        return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
+
+    # Index-register inc/dec — single-byte opcodes, no operand.
+    if mnemonic in ("inx", "iny"):
+        reg = Reg.X if mnemonic == "inx" else Reg.Y
+        return IncTarget(target=reg, src=src)
+    if mnemonic in ("dex", "dey"):
+        reg = Reg.X if mnemonic == "dex" else Reg.Y
+        return DecTarget(target=reg, src=src)
+
+    # Memory inc/dec — single-operand against an absolute address.
+    # POP doesn't use the zero-page-indexed form (`inc addr,x`) in code
+    # paths we've lifted; mark those Unsupported when they surface.
+    if mnemonic in ("inc", "dec"):
+        if line.operand is None:
+            return Unsupported(mnemonic=mnemonic, operand=None, src=src)
+        addr = _parse_absolute(line.operand, equates)
+        if addr is None:
+            return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
+        node_cls = IncTarget if mnemonic == "inc" else DecTarget
+        return node_cls(target=addr, src=src)
+
+    # Register transfers (`tax` / `tay` / `txa` / `tya`). `tsx`/`txs`
+    # interact with the stack pointer — out of scope for now.
+    if mnemonic in ("tax", "tay", "txa", "tya"):
+        src_dst = {
+            "tax": (Reg.A, Reg.X),
+            "tay": (Reg.A, Reg.Y),
+            "txa": (Reg.X, Reg.A),
+            "tya": (Reg.Y, Reg.A),
+        }[mnemonic]
+        return Transfer(src_reg=src_dst[0], dst_reg=src_dst[1], src=src)
+
+    # Bitwise on A — `and` / `ora` / `eor`. Each accepts both
+    # immediate (`#imm`) and absolute (`addr`) forms; indirect-indexed
+    # `(zp),y` and zero-page-X aren't in this slice. Indexed forms
+    # (`and table,x`) would need a Bitwise-Indexed variant; defer.
+    if mnemonic in ("and", "ora", "eor"):
+        if line.operand is None:
+            return Unsupported(mnemonic=mnemonic, operand=None, src=src)
+        op_key = {"and": "and", "ora": "or", "eor": "eor"}[mnemonic]
+        imm = _parse_immediate(line.operand, equates)
+        if imm is not None:
+            return Bitwise(op=op_key, source=imm, src=src)
+        addr = _parse_absolute(line.operand, equates)
+        if addr is not None:
+            return Bitwise(op=op_key, source=addr, src=src)
         return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
 
     # All other opcodes are out of scope for this slice. Marking
