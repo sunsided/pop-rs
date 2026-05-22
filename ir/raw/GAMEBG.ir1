@@ -51,7 +51,7 @@ fn TIMELEFTMSG {
   ??? lsr             ; GAMEBG.S:231
   ??? lsr             ; GAMEBG.S:232
   if eq goto :skip1st       ; GAMEBG.S:233
-  ??? tax             ; GAMEBG.S:234
+  x = a                            ; GAMEBG.S:234
   ??? lda digit2,x            ; GAMEBG.S:235
   *IMAGE@0x0004 = a            ; GAMEBG.S:236
   call addmsg                  ; GAMEBG.S:238
@@ -61,8 +61,8 @@ fn TIMELEFTMSG {
   a = a + #0x01 + c              ; GAMEBG.S:242
   *XCO@0x0001 = a            ; GAMEBG.S:243
   a = *temp@0x00eb        ; GAMEBG.S:245
-  ??? and #$f            ; GAMEBG.S:246
-  ??? tax             ; GAMEBG.S:247
+  a = a & #0x0f              ; GAMEBG.S:246
+  x = a                            ; GAMEBG.S:247
   ??? lda digit2,x            ; GAMEBG.S:248
   *IMAGE@0x0004 = a            ; GAMEBG.S:249
   call addmsg                  ; GAMEBG.S:251
@@ -138,7 +138,7 @@ fn CONTINUEMSG {
   ??? ldx #>contbox            ; GAMEBG.S:335
   call setupimage                  ; GAMEBG.S:336
   a = *KidBlockX@0x0054        ; GAMEBG.S:338
-  ??? and #1            ; GAMEBG.S:339
+  a = a & #0x01              ; GAMEBG.S:339
   if ne goto :1       ; GAMEBG.S:340
   a = #0xa8                  ; GAMEBG.S:341
   *YCO@0x0002 = a            ; GAMEBG.S:342
@@ -172,13 +172,13 @@ fn setupimage {
   y = #0x00                  ; GAMEBG.S:373
   ??? lda (addr),y            ; GAMEBG.S:374
   *YCO@0x0002 = a            ; GAMEBG.S:375
-  ??? iny             ; GAMEBG.S:376
+  y += 1                         ; GAMEBG.S:376
   ??? lda (addr),y            ; GAMEBG.S:377
   *XCO@0x0001 = a            ; GAMEBG.S:378
-  ??? iny             ; GAMEBG.S:379
+  y += 1                         ; GAMEBG.S:379
   ??? lda (addr),y            ; GAMEBG.S:380
   *OFFSET@0x0003 = a            ; GAMEBG.S:381
-  ??? iny             ; GAMEBG.S:382
+  y += 1                         ; GAMEBG.S:382
   ??? lda (addr),y            ; GAMEBG.S:383
   *IMAGE@0x0004 = a            ; GAMEBG.S:384
 ]rts:
@@ -194,7 +194,7 @@ fn DRAWKID {
 :2:
   a = *mergetimer@0x00df        ; GAMEBG.S:397
   if mi goto :1       ; GAMEBG.S:398
-  ??? and #1            ; GAMEBG.S:399
+  a = a & #0x01              ; GAMEBG.S:399
   if eq goto :1       ; GAMEBG.S:400
   tail_call DrawEored                ; GAMEBG.S:401
 :1:
@@ -241,7 +241,7 @@ fn chgoffset {
   a = a + *OFFSET@0x0003 + c    ; GAMEBG.S:463
   cmp a, #0x07              ; GAMEBG.S:464
   if cc goto :1       ; GAMEBG.S:465
-  ??? inc XCO            ; GAMEBG.S:467
+  *XCO@0x0001 += 1                         ; GAMEBG.S:467
   c = 1                            ; GAMEBG.S:468
   ??? sbc #7            ; GAMEBG.S:469
 :1:
@@ -309,7 +309,7 @@ fn DRAWKIDMETER {
 :draw:
   *IMAGE@0x0004 = a            ; GAMEBG.S:544
   x = *xsave@0x00e8        ; GAMEBG.S:545
-  ??? tya             ; GAMEBG.S:546
+  a = y                            ; GAMEBG.S:546
   c = 0                            ; GAMEBG.S:547
   a = a + *xsave@0x00e8 + c    ; GAMEBG.S:548
   *xsave@0x00e8 = a            ; GAMEBG.S:549
@@ -329,7 +329,7 @@ fn DRAWKIDMETER {
   cmp x, *MaxKidStr@0x00d0    ; GAMEBG.S:567
   if cs goto ]rts       ; GAMEBG.S:568
   call :drawimg                  ; GAMEBG.S:569
-  ??? inc xsave            ; GAMEBG.S:570
+  *xsave@0x00e8 += 1                         ; GAMEBG.S:570
   if ne goto :dloop       ; GAMEBG.S:571
 ]rts:
   return                           ; GAMEBG.S:572
@@ -394,7 +394,7 @@ fn DRAWOPPMETER {
 :draw:
   *IMAGE@0x0004 = a            ; GAMEBG.S:640
   x = *xsave@0x00e8        ; GAMEBG.S:641
-  ??? tya             ; GAMEBG.S:642
+  a = y                            ; GAMEBG.S:642
   c = 0                            ; GAMEBG.S:643
   a = a + *xsave@0x00e8 + c    ; GAMEBG.S:644
   *xsave@0x00e8 = a            ; GAMEBG.S:645
@@ -418,31 +418,31 @@ fn DRAWOPPMETER {
 fn SETUPFLASK {
   a = #0x02                  ; GAMEBG.S:676
   *OFFSET@0x0003 = a            ; GAMEBG.S:677
-  ??? txa             ; GAMEBG.S:679
-  ??? and #%11100000            ; GAMEBG.S:680
+  a = x                            ; GAMEBG.S:679
+  a = a & #0xe0              ; GAMEBG.S:680
   cmp a, #0x00              ; GAMEBG.S:681
   if eq goto :0       ; GAMEBG.S:682
   cmp a, #0x40              ; GAMEBG.S:683
   if eq goto :tall       ; GAMEBG.S:684
   if cc goto :cont       ; GAMEBG.S:685
-  ??? inc OFFSET            ; GAMEBG.S:687
+  *OFFSET@0x0003 += 1                         ; GAMEBG.S:687
 :tall:
   a = *YCO@0x0002        ; GAMEBG.S:689
   c = 1                            ; GAMEBG.S:690
   ??? sbc #4            ; GAMEBG.S:691
   *YCO@0x0002 = a            ; GAMEBG.S:692
 :cont:
-  ??? txa             ; GAMEBG.S:694
-  ??? and #%00011111            ; GAMEBG.S:695
-  ??? tax             ; GAMEBG.S:696
+  a = x                            ; GAMEBG.S:694
+  a = a & #0x1f              ; GAMEBG.S:695
+  x = a                            ; GAMEBG.S:696
   cmp x, #0x09              ; GAMEBG.S:697
   if cc goto :ok       ; GAMEBG.S:698
   x = #0x00                  ; GAMEBG.S:699
 :ok:
   ??? lda bubble,x            ; GAMEBG.S:700
   *IMAGE@0x0004 = a            ; GAMEBG.S:701
-  ??? inc XCO            ; GAMEBG.S:703
-  ??? inc XCO            ; GAMEBG.S:704
+  *XCO@0x0001 += 1                         ; GAMEBG.S:703
+  *XCO@0x0001 += 1                         ; GAMEBG.S:704
   a = *YCO@0x0002        ; GAMEBG.S:706
   c = 1                            ; GAMEBG.S:707
   ??? sbc #14            ; GAMEBG.S:708
@@ -463,7 +463,7 @@ SETUPFLAME:
   if cs goto ]rts       ; GAMEBG.S:737
   ??? lda torchflame,x            ; GAMEBG.S:739
   *IMAGE@0x0004 = a            ; GAMEBG.S:740
-  ??? inc XCO            ; GAMEBG.S:742
+  *XCO@0x0001 += 1                         ; GAMEBG.S:742
   a = *YCO@0x0002        ; GAMEBG.S:744
   c = 1                            ; GAMEBG.S:745
   ??? sbc #43            ; GAMEBG.S:746
@@ -483,7 +483,7 @@ fn SETUPFLAME {
   if cs goto ]rts       ; GAMEBG.S:737
   ??? lda torchflame,x            ; GAMEBG.S:739
   *IMAGE@0x0004 = a            ; GAMEBG.S:740
-  ??? inc XCO            ; GAMEBG.S:742
+  *XCO@0x0001 += 1                         ; GAMEBG.S:742
   a = *YCO@0x0002        ; GAMEBG.S:744
   c = 1                            ; GAMEBG.S:745
   ??? sbc #43            ; GAMEBG.S:746
@@ -527,11 +527,11 @@ fn TWINKLE {
   call ]setch6                  ; GAMEBG.S:803
   call fastlay                  ; GAMEBG.S:804
   a = *PAGE@0x0000        ; GAMEBG.S:805
-  ??? eor #$20            ; GAMEBG.S:806
+  a = a ^ #0x20              ; GAMEBG.S:806
   *PAGE@0x0000 = a            ; GAMEBG.S:807
   call fastlay                  ; GAMEBG.S:808
   a = *PAGE@0x0000        ; GAMEBG.S:809
-  ??? eor #$20            ; GAMEBG.S:810
+  a = a ^ #0x20              ; GAMEBG.S:810
   *PAGE@0x0000 = a            ; GAMEBG.S:811
   return                           ; GAMEBG.S:812
 }
@@ -641,7 +641,7 @@ fn saveFChar {
 :loop:
   a = *(FCharVars@0x0070 + x)   ; GAMEBG.S:944
   ??? sta tempsave,x            ; GAMEBG.S:945
-  ??? dex             ; GAMEBG.S:946
+  x -= 1                         ; GAMEBG.S:946
   if pl goto :loop       ; GAMEBG.S:947
   return                           ; GAMEBG.S:948
 }
@@ -651,7 +651,7 @@ fn restoreFChar {
 :loop:
   ??? lda tempsave,x            ; GAMEBG.S:952
   *(FCharVars@0x0070 + x) = a   ; GAMEBG.S:953
-  ??? dex             ; GAMEBG.S:954
+  x -= 1                         ; GAMEBG.S:954
   if pl goto :loop       ; GAMEBG.S:955
 ]rts:
   return                           ; GAMEBG.S:956
@@ -702,13 +702,13 @@ fn SETUPCOMIX {
   if eq goto :2       ; GAMEBG.S:1012
   a = #0x01                  ; GAMEBG.S:1013
 :2:
-  ??? eor FCharX            ; GAMEBG.S:1015
-  ??? eor FCharFace            ; GAMEBG.S:1016
-  ??? and #1            ; GAMEBG.S:1017
+  a = a ^ *FCharX@0x0071              ; GAMEBG.S:1015
+  a = a ^ *FCharFace@0x0074              ; GAMEBG.S:1016
+  a = a & #0x01              ; GAMEBG.S:1017
   if ne goto :1       ; GAMEBG.S:1018
-  ??? inc FCharX            ; GAMEBG.S:1019
+  *FCharX@0x0071 += 1                         ; GAMEBG.S:1019
   if ne goto :1       ; GAMEBG.S:1020
-  ??? inc FCharX+1            ; GAMEBG.S:1021
+  *FCharX+1@0x0072 += 1                         ; GAMEBG.S:1021
 :1:
   a = #0x41                  ; GAMEBG.S:1023
   *FCharImage@0x0070 = a            ; GAMEBG.S:1024
@@ -729,7 +729,7 @@ fn SETUPCOMIX {
 
 fn ADDCHAROBJ {
   x = *objX@0xb493        ; GAMEBG.S:1051
-  ??? inx             ; GAMEBG.S:1052
+  x += 1                         ; GAMEBG.S:1052
   cmp x, #0x14              ; GAMEBG.S:1053
   if cs goto ]rts       ; GAMEBG.S:1054
   *objX@0xb493 = x            ; GAMEBG.S:1055
@@ -738,11 +738,11 @@ fn ADDCHAROBJ {
   *XCO@0x0001 = a            ; GAMEBG.S:1060
   a = *FCharX+1@0x0072        ; GAMEBG.S:1061
   *OFFSET@0x0003 = a            ; GAMEBG.S:1062
-  ??? txa             ; GAMEBG.S:1064
+  a = x                            ; GAMEBG.S:1064
   ??? pha             ; GAMEBG.S:1065
   call cvtx                  ; GAMEBG.S:1066
   ??? pla             ; GAMEBG.S:1067
-  ??? tax             ; GAMEBG.S:1068
+  x = a                            ; GAMEBG.S:1068
   a = *XCO@0x0001        ; GAMEBG.S:1070
   *(objX@0xb493 + x) = a   ; GAMEBG.S:1071
   a = *OFFSET@0x0003        ; GAMEBG.S:1072
@@ -773,7 +773,7 @@ fn SETOBJINDX {
   *(objINDX@0xb47f + x) = a   ; GAMEBG.S:1107
   cmp a, #0x1e              ; GAMEBG.S:1109
   if cs goto :os       ; GAMEBG.S:1110
-  ??? tax             ; GAMEBG.S:1112
+  x = a                            ; GAMEBG.S:1112
   a = #0x01                  ; GAMEBG.S:1114
   *(objbuf@0x5ef0 + x) = a   ; GAMEBG.S:1115
 :os:
@@ -827,7 +827,7 @@ fn prchar {
   a = #0x01                  ; GAMEBG.S:1180
   *OPACITY@0x0006 = a            ; GAMEBG.S:1181
   call lay                  ; GAMEBG.S:1183
-  ??? inc XCO            ; GAMEBG.S:1185
+  *XCO@0x0001 += 1                         ; GAMEBG.S:1185
   return                           ; GAMEBG.S:1186
   ??? usr $a9,17,$00,*-org            ; GAMEBG.S:1191
 }
@@ -835,7 +835,7 @@ fn prchar {
 fn :draw {
   *IMAGE@0x0004 = a            ; GAMEBG.S:640
   x = *xsave@0x00e8        ; GAMEBG.S:641
-  ??? tya             ; GAMEBG.S:642
+  a = y                            ; GAMEBG.S:642
   c = 0                            ; GAMEBG.S:643
   a = a + *xsave@0x00e8 + c    ; GAMEBG.S:644
   *xsave@0x00e8 = a            ; GAMEBG.S:645
@@ -919,13 +919,13 @@ fn :sub {
   if eq goto :2       ; GAMEBG.S:1012
   a = #0x01                  ; GAMEBG.S:1013
 :2:
-  ??? eor FCharX            ; GAMEBG.S:1015
-  ??? eor FCharFace            ; GAMEBG.S:1016
-  ??? and #1            ; GAMEBG.S:1017
+  a = a ^ *FCharX@0x0071              ; GAMEBG.S:1015
+  a = a ^ *FCharFace@0x0074              ; GAMEBG.S:1016
+  a = a & #0x01              ; GAMEBG.S:1017
   if ne goto :1       ; GAMEBG.S:1018
-  ??? inc FCharX            ; GAMEBG.S:1019
+  *FCharX@0x0071 += 1                         ; GAMEBG.S:1019
   if ne goto :1       ; GAMEBG.S:1020
-  ??? inc FCharX+1            ; GAMEBG.S:1021
+  *FCharX+1@0x0072 += 1                         ; GAMEBG.S:1021
 :1:
   a = #0x41                  ; GAMEBG.S:1023
   *FCharImage@0x0070 = a            ; GAMEBG.S:1024

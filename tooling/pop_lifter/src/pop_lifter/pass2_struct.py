@@ -81,15 +81,18 @@ from .ir1 import (
     AdcAbs,
     AdcImm,
     Asl,
+    Bitwise,
     Branch,
     Call,
     Clc,
     CmpAbs,
     CmpImm,
     Compare,
+    DecTarget,
     Goto,
     If,
     Imm,
+    IncTarget,
     Item,
     Label,
     LoadAbs,
@@ -99,6 +102,7 @@ from .ir1 import (
     Return,
     Routine,
     Sec,
+    Transfer,
     Unsupported,
 )
 
@@ -130,6 +134,34 @@ _LOAD_FUSE_OPS: dict[str, tuple[str, bool]] = {
 _ZERO_IMM = Imm(value=0, text="#$00")
 
 
+def _affected_register(item: Item):
+    """Return the register whose new value the most recent flag-setter
+    *exposed* via Z/N. Used to fuse `<defining-op> ; b(eq|ne|pl|mi) L`
+    into `if reg <op> 0 goto L`. `cmp` is excluded — its rhs is
+    explicit, so `_fuse_pair` handles it separately.
+
+    Returns `None` if the predecessor isn't one of the register-
+    visible flag setters (e.g. memory inc/dec, which sets Z/N from
+    a memory cell that Compare can't reference yet).
+    """
+    if isinstance(item, (LoadAbs, LoadIndexed, LoadImm)):
+        return item.reg
+    if isinstance(item, Transfer):
+        return item.dst_reg
+    if isinstance(item, (IncTarget, DecTarget)):
+        # Only register-target inc/dec exposes a flag-readable
+        # register — memory inc/dec would need a Compare form that
+        # references memory, which we don't have yet.
+        from .ir1 import Reg
+        if isinstance(item.target, Reg):
+            return item.target
+        return None
+    if isinstance(item, Bitwise):
+        from .ir1 import Reg
+        return Reg.A
+    return None
+
+
 def _fuse_pair(prev: Item, branch: Branch) -> If | None:
     """Try to fuse `prev` (a flag-setter) with `branch` (a conditional
     transfer). Returns the `If` replacement or `None` if the pair
@@ -147,14 +179,15 @@ def _fuse_pair(prev: Item, branch: Branch) -> If | None:
             target=branch.target,
             src=branch.src,
         )
-    if isinstance(prev, (LoadAbs, LoadIndexed, LoadImm)):
+    affected = _affected_register(prev)
+    if affected is not None:
         load_op = _LOAD_FUSE_OPS.get(branch.cond)
         if load_op is None:
             return None
         op, needs_zero_rhs = load_op
         rhs = _ZERO_IMM if needs_zero_rhs else None
         return If(
-            cond=Compare(reg=prev.reg, op=op, rhs=rhs),
+            cond=Compare(reg=affected, op=op, rhs=rhs),
             target=branch.target,
             src=branch.src,
         )
@@ -163,8 +196,21 @@ def _fuse_pair(prev: Item, branch: Branch) -> If | None:
 
 def _defines_flags(item: Item) -> bool:
     """Heuristic: does this IR1 item define Z/N/C in a way the next
-    branch might read? Conservative — only the obvious cases."""
-    return isinstance(item, (CmpImm, CmpAbs, LoadImm, LoadAbs, LoadIndexed))
+    branch might read? Conservative — only the obvious cases.
+
+    Pass-1 long-tail additions (`IncTarget`/`DecTarget`/`Transfer`/
+    `Bitwise`) all define Z/N from their result, so a subsequent
+    `beq`/`bne`/`bpl`/`bmi` can fuse with them. (None of them touch
+    C, so `bcs`/`bcc` wouldn't make sense — pass-2 fusion already
+    only treats `cmp` as the C-defining predecessor.)
+    """
+    return isinstance(
+        item,
+        (
+            CmpImm, CmpAbs, LoadImm, LoadAbs, LoadIndexed,
+            IncTarget, DecTarget, Transfer, Bitwise,
+        ),
+    )
 
 
 def structure_routine(routine: Routine) -> Routine:
@@ -408,6 +454,14 @@ def _backward_sweep(
             # Lda* writes Z/N; the load itself has a side-effect (the
             # register update) so we can't drop it even when Z/N are
             # dead.
+            live -= {"Z", "N"}
+            continue
+
+        if isinstance(item, (IncTarget, DecTarget, Transfer, Bitwise)):
+            # Pass-1 long-tail ops: all write Z/N from their result and
+            # have an observable side effect (register or memory
+            # update). Like Lda*, never elidable; just clears Z/N
+            # from the live set going backward.
             live -= {"Z", "N"}
             continue
 

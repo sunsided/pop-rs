@@ -22,10 +22,10 @@ MOVEMEM:
 :loop:
   ??? lda (]source),y            ; MISC.S:108
   ??? sta (]dest),y            ; MISC.S:109
-  ??? iny             ; MISC.S:110
+  y += 1                         ; MISC.S:110
   if ne goto :loop       ; MISC.S:111
-  ??? inc ]source+1            ; MISC.S:113
-  ??? inc ]dest+1            ; MISC.S:114
+  *]source+1@0x00f3 += 1                         ; MISC.S:113
+  *]dest+1@0x00f1 += 1                         ; MISC.S:114
   a = *]source+1@0x00f3        ; MISC.S:115
   cmp a, *]endsourc+1@0x00f5    ; MISC.S:116
   if ne goto :loop       ; MISC.S:117
@@ -43,10 +43,10 @@ fn MOVEMEM {
 :loop:
   ??? lda (]source),y            ; MISC.S:108
   ??? sta (]dest),y            ; MISC.S:109
-  ??? iny             ; MISC.S:110
+  y += 1                         ; MISC.S:110
   if ne goto :loop       ; MISC.S:111
-  ??? inc ]source+1            ; MISC.S:113
-  ??? inc ]dest+1            ; MISC.S:114
+  *]source+1@0x00f3 += 1                         ; MISC.S:113
+  *]dest+1@0x00f1 += 1                         ; MISC.S:114
   a = *]source+1@0x00f3        ; MISC.S:115
   cmp a, *]endsourc+1@0x00f5    ; MISC.S:116
   if ne goto :loop       ; MISC.S:117
@@ -121,10 +121,10 @@ fn FIRSTGUARD {
 
 fn Mark3 {
   call Mark1                  ; MISC.S:225
-  ??? iny             ; MISC.S:226
+  y += 1                         ; MISC.S:226
 Mark2:
   call Mark1                  ; MISC.S:227
-  ??? iny             ; MISC.S:228
+  y += 1                         ; MISC.S:228
 Mark1:
   a = #0x04                  ; MISC.S:229
   *height@0x0004 = a            ; MISC.S:230
@@ -136,7 +136,7 @@ Mark1:
 
 fn Mark2 {
   call Mark1                  ; MISC.S:227
-  ??? iny             ; MISC.S:228
+  y += 1                         ; MISC.S:228
 Mark1:
   a = #0x04                  ; MISC.S:229
   *height@0x0004 = a            ; MISC.S:230
@@ -235,7 +235,7 @@ fn POTIONEFFECT {
   cmp x, #0x04              ; MISC.S:326
   if ne goto :5       ; MISC.S:327
   a = *invert@0x009f        ; MISC.S:328
-  ??? eor #$ff            ; MISC.S:329
+  a = a ^ #0xff              ; MISC.S:329
   *invert@0x009f = a            ; MISC.S:330
   a = #0x02                  ; MISC.S:331
   *redrawflg@0x0097 = a            ; MISC.S:332
@@ -306,7 +306,7 @@ fn STABCHAR {
   ??? sbc #14            ; MISC.S:412
   call addcharx                  ; MISC.S:413
   *CharX@0x0041 = a            ; MISC.S:414
-  ??? inc CharBlockY            ; MISC.S:415
+  *CharBlockY@0x0045 += 1                         ; MISC.S:415
   a = #0x51                  ; MISC.S:416
   call jumpseq                  ; MISC.S:417
   goto :3                ; MISC.S:418
@@ -339,7 +339,7 @@ fn UNHOLY {
   cmp a, #0x0c              ; MISC.S:452
   if ne goto ]rts       ; MISC.S:453
   a = *OpID@0x03a9        ; MISC.S:455
-  ??? ora CharID            ; MISC.S:456
+  a = a | *CharID@0x004d              ; MISC.S:456
   cmp a, #0x01              ; MISC.S:457
   if ne goto ]rts       ; MISC.S:458
   a = *CharLife@0x004f        ; MISC.S:460
@@ -373,7 +373,7 @@ REFLECTION:
   if mi goto ]rts       ; MISC.S:501
   call setupchar                  ; MISC.S:505
   x = *CharBlockY@0x0045        ; MISC.S:509
-  ??? inx             ; MISC.S:510
+  x += 1                         ; MISC.S:510
   a = *(BlockTop@0x1274 + x)   ; MISC.S:511
   cmp a, *FCharY@0x0073    ; MISC.S:512
   if cs goto ]rts       ; MISC.S:513
@@ -401,7 +401,7 @@ fn REFLECTION {
   if mi goto ]rts       ; MISC.S:501
   call setupchar                  ; MISC.S:505
   x = *CharBlockY@0x0045        ; MISC.S:509
-  ??? inx             ; MISC.S:510
+  x += 1                         ; MISC.S:510
   a = *(BlockTop@0x1274 + x)   ; MISC.S:511
   cmp a, *FCharY@0x0073    ; MISC.S:512
   if cs goto ]rts       ; MISC.S:513
@@ -447,7 +447,7 @@ fn BONESRISE {
   a = #0x02                  ; MISC.S:625
   call markred                  ; MISC.S:626
   call markwipe                  ; MISC.S:627
-  ??? iny             ; MISC.S:628
+  y += 1                         ; MISC.S:628
   call markred                  ; MISC.S:629
   call markwipe                  ; MISC.S:630
   ??? pla             ; MISC.S:631
@@ -491,7 +491,7 @@ DECSTR:
   if ne goto :enemy       ; MISC.S:693
   cmp a, *KidStrength@0x00ce    ; MISC.S:695
   if cs goto killkid       ; MISC.S:696
-  ??? eor #$ff            ; MISC.S:698
+  a = a ^ #0xff              ; MISC.S:698
   c = 0                            ; MISC.S:699
   a = a + #0x01 + c              ; MISC.S:700
   *ChgKidStr@0x00cf = a            ; MISC.S:701
@@ -499,7 +499,7 @@ DECSTR:
 :enemy:
   cmp a, *OppStrength@0x00cc    ; MISC.S:705
   if cs goto killopp       ; MISC.S:706
-  ??? eor #$ff            ; MISC.S:708
+  a = a ^ #0xff              ; MISC.S:708
   c = 0                            ; MISC.S:709
   a = a + #0x01 + c              ; MISC.S:710
   *ChgOppStr@0x00d2 = a            ; MISC.S:711
@@ -517,7 +517,7 @@ fn getreflect {
   call getdist                  ; MISC.S:535
   x = *CharFace@0x0043        ; MISC.S:537
   if mi goto :left       ; MISC.S:538
-  ??? eor #$ff            ; MISC.S:540
+  a = a ^ #0xff              ; MISC.S:540
   c = 0                            ; MISC.S:541
   a = a + #0x0e + c              ; MISC.S:542
 :left:
@@ -530,7 +530,7 @@ fn getreflect {
   ??? sbc CharX            ; MISC.S:551
   *CharX@0x0041 = a            ; MISC.S:552
   a = *CharFace@0x0043        ; MISC.S:554
-  ??? eor #$ff            ; MISC.S:555
+  a = a ^ #0xff              ; MISC.S:555
   *CharFace@0x0043 = a            ; MISC.S:556
 ]rts:
   return                           ; MISC.S:558
@@ -558,7 +558,7 @@ fn DECSTR {
   if ne goto :enemy       ; MISC.S:693
   cmp a, *KidStrength@0x00ce    ; MISC.S:695
   if cs goto killkid       ; MISC.S:696
-  ??? eor #$ff            ; MISC.S:698
+  a = a ^ #0xff              ; MISC.S:698
   c = 0                            ; MISC.S:699
   a = a + #0x01 + c              ; MISC.S:700
   *ChgKidStr@0x00cf = a            ; MISC.S:701
@@ -566,7 +566,7 @@ fn DECSTR {
 :enemy:
   cmp a, *OppStrength@0x00cc    ; MISC.S:705
   if cs goto killopp       ; MISC.S:706
-  ??? eor #$ff            ; MISC.S:708
+  a = a ^ #0xff              ; MISC.S:708
   c = 0                            ; MISC.S:709
   a = a + #0x01 + c              ; MISC.S:710
   *ChgOppStr@0x00d2 = a            ; MISC.S:711
@@ -620,7 +620,7 @@ fn LOADLEVELX {
   ??? pha             ; MISC.S:802
   ??? lda bgset2,x            ; MISC.S:803
   ??? ldy chset,x            ; MISC.S:804
-  ??? tax             ; MISC.S:805
+  x = a                            ; MISC.S:805
   ??? pla             ; MISC.S:806
   tail_call loadlevel                ; MISC.S:808
 ]rts:
@@ -648,7 +648,7 @@ fn CHECKALERT {
   cmp a, #0x56              ; MISC.S:846
   if eq goto ]safe       ; MISC.S:847
   a = *KidLife@0x005f        ; MISC.S:849
-  ??? and ShadLife            ; MISC.S:850
+  a = a & *ShadLife@0x006f              ; MISC.S:850
   if pl goto ]safe       ; MISC.S:851
   a = *KidScrn@0x005b        ; MISC.S:853
   cmp a, *ShadScrn@0x006b    ; MISC.S:854
@@ -679,7 +679,7 @@ fn CHECKALERT {
   a = *]Xend@0x00f1        ; MISC.S:889
   cmp a, *]Xcount@0x00f0    ; MISC.S:890
   if cs goto :cont       ; MISC.S:891
-  ??? tax             ; MISC.S:892
+  x = a                            ; MISC.S:892
   a = *]Xcount@0x00f0        ; MISC.S:893
   *]Xend@0x00f1 = a            ; MISC.S:894
   *]Xcount@0x00f0 = x            ; MISC.S:895
@@ -750,7 +750,7 @@ fn CHECKALERT {
   return                           ; MISC.S:968
 :rdblock:
   call getblockxp                  ; MISC.S:974
-  ??? tax             ; MISC.S:975
+  x = a                            ; MISC.S:975
   y = *KidBlockY@0x0055        ; MISC.S:976
   a = *KidScrn@0x005b        ; MISC.S:977
   tail_call rdblock                ; MISC.S:978
@@ -766,7 +766,7 @@ fn DISPVERSION {
   cmp a, #0x40              ; MISC.S:993
   if eq goto :done       ; MISC.S:994
   *($400@0x0400 + x) = a   ; MISC.S:995
-  ??? inx             ; MISC.S:996
+  x += 1                         ; MISC.S:996
   if pl goto :loop       ; MISC.S:997
 :done:
   a = *RAMWRTaux@0xc005        ; MISC.S:999
@@ -789,7 +789,7 @@ fn DISPVERSION {
 
 fn :rdblock {
   call getblockxp                  ; MISC.S:974
-  ??? tax             ; MISC.S:975
+  x = a                            ; MISC.S:975
   y = *KidBlockY@0x0055        ; MISC.S:976
   a = *KidScrn@0x005b        ; MISC.S:977
   tail_call rdblock                ; MISC.S:978

@@ -13,14 +13,14 @@ RDBLOCK1:
   a = *(Mult10@0x1200 + y)   ; CTRLSUBS.S:162
   c = 0                            ; CTRLSUBS.S:163
   a = a + *tempblockx@0x0091 + c    ; CTRLSUBS.S:164
-  ??? tay             ; CTRLSUBS.S:165
+  y = a                            ; CTRLSUBS.S:165
   ??? lda (BlueType),y            ; CTRLSUBS.S:166
-  ??? and #idmask            ; CTRLSUBS.S:167
-  ??? tax             ; CTRLSUBS.S:168
+  a = a & #0x1f              ; CTRLSUBS.S:167
+  x = a                            ; CTRLSUBS.S:168
   return                           ; CTRLSUBS.S:169
 :nullscrn:
   a = #0x14                  ; CTRLSUBS.S:171
-  ??? tax             ; CTRLSUBS.S:172
+  x = a                            ; CTRLSUBS.S:172
   return                           ; CTRLSUBS.S:173
 }
 
@@ -33,14 +33,14 @@ fn RDBLOCK1 {
   a = *(Mult10@0x1200 + y)   ; CTRLSUBS.S:162
   c = 0                            ; CTRLSUBS.S:163
   a = a + *tempblockx@0x0091 + c    ; CTRLSUBS.S:164
-  ??? tay             ; CTRLSUBS.S:165
+  y = a                            ; CTRLSUBS.S:165
   ??? lda (BlueType),y            ; CTRLSUBS.S:166
-  ??? and #idmask            ; CTRLSUBS.S:167
-  ??? tax             ; CTRLSUBS.S:168
+  a = a & #0x1f              ; CTRLSUBS.S:167
+  x = a                            ; CTRLSUBS.S:168
   return                           ; CTRLSUBS.S:169
 :nullscrn:
   a = #0x14                  ; CTRLSUBS.S:171
-  ??? tax             ; CTRLSUBS.S:172
+  x = a                            ; CTRLSUBS.S:172
   return                           ; CTRLSUBS.S:173
 }
 
@@ -113,7 +113,7 @@ fn GETLEFT {
   if eq goto ]rts       ; CTRLSUBS.S:245
   a = a << 1                       ; CTRLSUBS.S:246
   a = a << 1                       ; CTRLSUBS.S:247
-  ??? tax             ; CTRLSUBS.S:248
+  x = a                            ; CTRLSUBS.S:248
   a = *(MAP-4@0xbe9c + x)   ; CTRLSUBS.S:249
 ]rts:
   return                           ; CTRLSUBS.S:250
@@ -123,7 +123,7 @@ fn GETRIGHT {
   if eq goto ]rts       ; CTRLSUBS.S:253
   a = a << 1                       ; CTRLSUBS.S:254
   a = a << 1                       ; CTRLSUBS.S:255
-  ??? tax             ; CTRLSUBS.S:256
+  x = a                            ; CTRLSUBS.S:256
   a = *(MAP-3@0xbe9d + x)   ; CTRLSUBS.S:257
   return                           ; CTRLSUBS.S:258
 ]rts:
@@ -134,7 +134,7 @@ fn GETUP {
   if eq goto ]rts       ; CTRLSUBS.S:261
   a = a << 1                       ; CTRLSUBS.S:262
   a = a << 1                       ; CTRLSUBS.S:263
-  ??? tax             ; CTRLSUBS.S:264
+  x = a                            ; CTRLSUBS.S:264
   a = *(MAP-2@0xbe9e + x)   ; CTRLSUBS.S:265
   return                           ; CTRLSUBS.S:266
 ]rts:
@@ -145,7 +145,7 @@ fn GETDOWN {
   if eq goto ]rts       ; CTRLSUBS.S:269
   a = a << 1                       ; CTRLSUBS.S:270
   a = a << 1                       ; CTRLSUBS.S:271
-  ??? tax             ; CTRLSUBS.S:272
+  x = a                            ; CTRLSUBS.S:272
   a = *(MAP-1@0xbe9f + x)   ; CTRLSUBS.S:273
   return                           ; CTRLSUBS.S:274
 ]rts:
@@ -183,8 +183,8 @@ fn GETSCRNS {
 
 fn GETBASEX {
   a = *Fcheck@0x0085        ; CTRLSUBS.S:330
-  ??? and #Ffootmark            ; CTRLSUBS.S:331
-  ??? eor #$ff            ; CTRLSUBS.S:333
+  a = a & #0x1f              ; CTRLSUBS.S:331
+  a = a ^ #0xff              ; CTRLSUBS.S:333
   c = 0                            ; CTRLSUBS.S:334
   a = a + #0x01 + c              ; CTRLSUBS.S:335
   c = 0                            ; CTRLSUBS.S:337
@@ -195,7 +195,7 @@ fn GETBASEX {
 fn ADDCHARX {
   ??? bit CharFace            ; CTRLSUBS.S:354
   if pl goto :right       ; CTRLSUBS.S:355
-  ??? eor #$ff            ; CTRLSUBS.S:357
+  a = a ^ #0xff              ; CTRLSUBS.S:357
   c = 0                            ; CTRLSUBS.S:358
   a = a + #0x01 + c              ; CTRLSUBS.S:359
 :right:
@@ -213,7 +213,7 @@ fn ADDFCHARX {
   *ztemp@0x00e9 = a            ; CTRLSUBS.S:381
   a = #0xff                  ; CTRLSUBS.S:383
 :1:
-  ??? eor FCharFace            ; CTRLSUBS.S:384
+  a = a ^ *FCharFace@0x0074              ; CTRLSUBS.S:384
   if mi goto :left       ; CTRLSUBS.S:385
   a = *ztemp@0x00e9        ; CTRLSUBS.S:387
   c = 0                            ; CTRLSUBS.S:388
@@ -243,12 +243,12 @@ fn GETUNDERFT {
 
 fn GETINFRONT {
   x = *CharFace@0x0043        ; CTRLSUBS.S:421
-  ??? inx             ; CTRLSUBS.S:422
+  x += 1                         ; CTRLSUBS.S:422
   a = *CharBlockX@0x0044        ; CTRLSUBS.S:423
   c = 0                            ; CTRLSUBS.S:424
   ??? adc plus1,x            ; CTRLSUBS.S:425
   *infrontx@0x008e = a            ; CTRLSUBS.S:426
-  ??? tax             ; CTRLSUBS.S:427
+  x = a                            ; CTRLSUBS.S:427
   y = *CharBlockY@0x0045        ; CTRLSUBS.S:429
   a = *CharScrn@0x004b        ; CTRLSUBS.S:430
   tail_call RDBLOCK                ; CTRLSUBS.S:431
@@ -256,13 +256,13 @@ fn GETINFRONT {
 
 fn GET2INFRONT {
   x = *CharFace@0x0043        ; CTRLSUBS.S:434
-  ??? inx             ; CTRLSUBS.S:435
+  x += 1                         ; CTRLSUBS.S:435
   a = *CharBlockX@0x0044        ; CTRLSUBS.S:436
   c = 0                            ; CTRLSUBS.S:437
   ??? adc plus1,x            ; CTRLSUBS.S:438
   c = 0                            ; CTRLSUBS.S:439
   ??? adc plus1,x            ; CTRLSUBS.S:440
-  ??? tax             ; CTRLSUBS.S:441
+  x = a                            ; CTRLSUBS.S:441
   y = *CharBlockY@0x0045        ; CTRLSUBS.S:443
   a = *CharScrn@0x004b        ; CTRLSUBS.S:444
   tail_call RDBLOCK                ; CTRLSUBS.S:445
@@ -270,12 +270,12 @@ fn GET2INFRONT {
 
 fn GETBEHIND {
   x = *CharFace@0x0043        ; CTRLSUBS.S:448
-  ??? inx             ; CTRLSUBS.S:449
+  x += 1                         ; CTRLSUBS.S:449
   a = *CharBlockX@0x0044        ; CTRLSUBS.S:450
   c = 0                            ; CTRLSUBS.S:451
   ??? adc minus1,x            ; CTRLSUBS.S:452
   *behindx@0x008f = a            ; CTRLSUBS.S:453
-  ??? tax             ; CTRLSUBS.S:454
+  x = a                            ; CTRLSUBS.S:454
   y = *CharBlockY@0x0045        ; CTRLSUBS.S:456
   a = *CharScrn@0x004b        ; CTRLSUBS.S:457
   tail_call RDBLOCK                ; CTRLSUBS.S:458
@@ -283,7 +283,7 @@ fn GETBEHIND {
 
 fn GETABOVE {
   y = *CharBlockY@0x0045        ; CTRLSUBS.S:461
-  ??? dey             ; CTRLSUBS.S:462
+  y -= 1                         ; CTRLSUBS.S:462
   *abovey@0x0090 = y            ; CTRLSUBS.S:463
   x = *CharBlockX@0x0044        ; CTRLSUBS.S:465
   a = *CharScrn@0x004b        ; CTRLSUBS.S:466
@@ -292,14 +292,14 @@ fn GETABOVE {
 
 fn GETABOVEINF {
   x = *CharFace@0x0043        ; CTRLSUBS.S:470
-  ??? inx             ; CTRLSUBS.S:471
+  x += 1                         ; CTRLSUBS.S:471
   a = *CharBlockX@0x0044        ; CTRLSUBS.S:472
   c = 0                            ; CTRLSUBS.S:473
   ??? adc plus1,x            ; CTRLSUBS.S:474
   *infrontx@0x008e = a            ; CTRLSUBS.S:475
-  ??? tax             ; CTRLSUBS.S:476
+  x = a                            ; CTRLSUBS.S:476
   y = *CharBlockY@0x0045        ; CTRLSUBS.S:478
-  ??? dey             ; CTRLSUBS.S:479
+  y -= 1                         ; CTRLSUBS.S:479
   *abovey@0x0090 = y            ; CTRLSUBS.S:480
   a = *CharScrn@0x004b        ; CTRLSUBS.S:482
   tail_call RDBLOCK                ; CTRLSUBS.S:483
@@ -307,14 +307,14 @@ fn GETABOVEINF {
 
 fn GETABOVEBEH {
   x = *CharFace@0x0043        ; CTRLSUBS.S:486
-  ??? inx             ; CTRLSUBS.S:487
+  x += 1                         ; CTRLSUBS.S:487
   a = *CharBlockX@0x0044        ; CTRLSUBS.S:488
   c = 0                            ; CTRLSUBS.S:489
   ??? adc minus1,x            ; CTRLSUBS.S:490
   *behindx@0x008f = a            ; CTRLSUBS.S:491
-  ??? tax             ; CTRLSUBS.S:492
+  x = a                            ; CTRLSUBS.S:492
   y = *CharBlockY@0x0045        ; CTRLSUBS.S:494
-  ??? dey             ; CTRLSUBS.S:495
+  y -= 1                         ; CTRLSUBS.S:495
   *abovey@0x0090 = y            ; CTRLSUBS.S:496
   a = *CharScrn@0x004b        ; CTRLSUBS.S:498
   tail_call RDBLOCK                ; CTRLSUBS.S:499
@@ -353,7 +353,7 @@ fn GETDIST1 {
 fn GETBLOCKEJ {
   c = 0                            ; CTRLSUBS.S:539
   a = a + #0x05 + c              ; CTRLSUBS.S:540
-  ??? tax             ; CTRLSUBS.S:541
+  x = a                            ; CTRLSUBS.S:541
   a = *(BlockEdge@0x1260 + x)   ; CTRLSUBS.S:542
   return                           ; CTRLSUBS.S:543
 }
@@ -362,7 +362,7 @@ fn GETBLOCKXP {
   c = 1                            ; CTRLSUBS.S:561
   ??? sbc #angle            ; CTRLSUBS.S:562
 GETBLOCKX:
-  ??? tay             ; CTRLSUBS.S:565
+  y = a                            ; CTRLSUBS.S:565
   a = *(PixelTable@0x1100 + y)   ; CTRLSUBS.S:567
   *OFFSET@0x0003 = a            ; CTRLSUBS.S:568
   a = *(BlockTable@0x1000 + y)   ; CTRLSUBS.S:570
@@ -370,7 +370,7 @@ GETBLOCKX:
 }
 
 fn GETBLOCKX {
-  ??? tay             ; CTRLSUBS.S:565
+  y = a                            ; CTRLSUBS.S:565
   a = *(PixelTable@0x1100 + y)   ; CTRLSUBS.S:567
   *OFFSET@0x0003 = a            ; CTRLSUBS.S:568
   a = *(BlockTable@0x1000 + y)   ; CTRLSUBS.S:570
@@ -382,10 +382,10 @@ fn GETBLOCKY {
 :loop:
   ??? cmp BlockTop+1,x            ; CTRLSUBS.S:587
   if cs goto :gotY       ; CTRLSUBS.S:588
-  ??? dex             ; CTRLSUBS.S:589
+  x -= 1                         ; CTRLSUBS.S:589
   if pl goto :loop       ; CTRLSUBS.S:590
 :gotY:
-  ??? txa             ; CTRLSUBS.S:591
+  a = x                            ; CTRLSUBS.S:591
   return                           ; CTRLSUBS.S:592
 }
 
@@ -394,10 +394,10 @@ fn GETBLOCKYP {
 :loop:
   ??? cmp FloorY+1,x            ; CTRLSUBS.S:597
   if cs goto :gotY       ; CTRLSUBS.S:598
-  ??? dex             ; CTRLSUBS.S:599
+  x -= 1                         ; CTRLSUBS.S:599
   if pl goto :loop       ; CTRLSUBS.S:600
 :gotY:
-  ??? txa             ; CTRLSUBS.S:601
+  a = x                            ; CTRLSUBS.S:601
 ]rts:
   return                           ; CTRLSUBS.S:602
 }
@@ -412,7 +412,7 @@ fn INDEXBLOCK {
   if cs goto :os       ; CTRLSUBS.S:623
   c = 0                            ; CTRLSUBS.S:625
   ??? adc Mult10,y            ; CTRLSUBS.S:626
-  ??? tay             ; CTRLSUBS.S:628
+  y = a                            ; CTRLSUBS.S:628
   c = 0                            ; CTRLSUBS.S:629
   return                           ; CTRLSUBS.S:630
 :os:
@@ -433,7 +433,7 @@ fn UNINDEX {
   if cc goto ]rts       ; CTRLSUBS.S:651
   c = 1                            ; CTRLSUBS.S:652
   ??? sbc #10            ; CTRLSUBS.S:653
-  ??? inx             ; CTRLSUBS.S:654
+  x += 1                         ; CTRLSUBS.S:654
   if ne goto :loop       ; CTRLSUBS.S:655
 ]rts:
   return                           ; CTRLSUBS.S:656
@@ -450,7 +450,7 @@ fn GETBASEBLOCK {
 fn FACEDX {
   ??? bit CharFace            ; CTRLSUBS.S:682
   if mi goto ]rts       ; CTRLSUBS.S:683
-  ??? eor #$ff            ; CTRLSUBS.S:685
+  a = a ^ #0xff              ; CTRLSUBS.S:685
   c = 0                            ; CTRLSUBS.S:686
   a = a + #0x01 + c              ; CTRLSUBS.S:687
 ]rts:
@@ -461,7 +461,7 @@ fn JUMPSEQ {
   c = 1                            ; CTRLSUBS.S:701
   ??? sbc #1            ; CTRLSUBS.S:702
   a = a << 1                       ; CTRLSUBS.S:703
-  ??? tax             ; CTRLSUBS.S:704
+  x = a                            ; CTRLSUBS.S:704
   a = *(seqtab@0x3000 + x)   ; CTRLSUBS.S:706
   *CharSeq@0x0049 = a            ; CTRLSUBS.S:707
   a = *(seqtab+1@0x3001 + x)   ; CTRLSUBS.S:709
@@ -474,7 +474,7 @@ fn OPJUMPSEQ {
   c = 1                            ; CTRLSUBS.S:719
   ??? sbc #1            ; CTRLSUBS.S:720
   a = a << 1                       ; CTRLSUBS.S:721
-  ??? tax             ; CTRLSUBS.S:722
+  x = a                            ; CTRLSUBS.S:722
   a = *(seqtab@0x3000 + x)   ; CTRLSUBS.S:724
   *OpSeq@0x03a5 = a            ; CTRLSUBS.S:725
   a = *(seqtab+1@0x3001 + x)   ; CTRLSUBS.S:727
@@ -508,7 +508,7 @@ fn INDEXCHAR {
   if ne goto :3       ; CTRLSUBS.S:765
 :fall:
 :climbup:
-  ??? dec tempblockx            ; CTRLSUBS.S:767
+  *tempblockx@0x0091 -= 1                         ; CTRLSUBS.S:767
 :3:
   call indexblock                  ; CTRLSUBS.S:769
   *FCharIndex@0x0075 = y            ; CTRLSUBS.S:770
@@ -549,14 +549,14 @@ fn SETUPCHAR {
   ??? sbc #ScrnTop            ; CTRLSUBS.S:827
   *FCharY@0x0073 = a            ; CTRLSUBS.S:828
   a = *Fcheck@0x0085        ; CTRLSUBS.S:830
-  ??? eor FCharFace            ; CTRLSUBS.S:831
+  a = a ^ *FCharFace@0x0074              ; CTRLSUBS.S:831
   if mi goto :ok       ; CTRLSUBS.S:832
   a = *FCharX@0x0071        ; CTRLSUBS.S:834
   c = 0                            ; CTRLSUBS.S:835
   a = a + #0x01 + c              ; CTRLSUBS.S:836
   *FCharX@0x0071 = a            ; CTRLSUBS.S:837
   if cc goto :ok       ; CTRLSUBS.S:838
-  ??? inc FCharX+1            ; CTRLSUBS.S:839
+  *FCharX+1@0x0072 += 1                         ; CTRLSUBS.S:839
 :ok:
 ]rts:
   return                           ; CTRLSUBS.S:841
@@ -579,17 +579,17 @@ fn SETUPSWORD {
   if eq goto ]rts       ; CTRLSUBS.S:865
 :2:
   a = *Fsword@0x00d9        ; CTRLSUBS.S:867
-  ??? and #$3f            ; CTRLSUBS.S:868
+  a = a & #0x3f              ; CTRLSUBS.S:868
   if eq goto ]rts       ; CTRLSUBS.S:869
   call getswordframe                  ; CTRLSUBS.S:871
   y = #0x00                  ; CTRLSUBS.S:873
   ??? lda (framepoint),y            ; CTRLSUBS.S:874
   if eq goto ]rts       ; CTRLSUBS.S:875
   call decodeswim                  ; CTRLSUBS.S:877
-  ??? iny             ; CTRLSUBS.S:879
+  y += 1                         ; CTRLSUBS.S:879
   ??? lda (framepoint),y            ; CTRLSUBS.S:880
   *Fdx@0x0083 = a            ; CTRLSUBS.S:881
-  ??? iny             ; CTRLSUBS.S:883
+  y += 1                         ; CTRLSUBS.S:883
   ??? lda (framepoint),y            ; CTRLSUBS.S:884
   *Fdy@0x0084 = a            ; CTRLSUBS.S:885
   a = *Fdx@0x0083        ; CTRLSUBS.S:887
@@ -690,10 +690,10 @@ fn getswordframe {
 
 fn decodeim {
   a = *Fimage@0x0082        ; CTRLSUBS.S:1018
-  ??? and #%10000000            ; CTRLSUBS.S:1019
+  a = a & #0x80              ; CTRLSUBS.S:1019
   *ztemp@0x00e9 = a            ; CTRLSUBS.S:1020
   a = *Fsword@0x00d9        ; CTRLSUBS.S:1022
-  ??? and #%11000000            ; CTRLSUBS.S:1023
+  a = a & #0xc0              ; CTRLSUBS.S:1023
   ??? lsr             ; CTRLSUBS.S:1025
   a = a + *ztemp@0x00e9 + c    ; CTRLSUBS.S:1026
   ??? lsr             ; CTRLSUBS.S:1027
@@ -703,8 +703,8 @@ fn decodeim {
   ??? lsr             ; CTRLSUBS.S:1031
   *FCharTable@0x007a = a            ; CTRLSUBS.S:1032
   a = *Fimage@0x0082        ; CTRLSUBS.S:1034
-  ??? and #$7f            ; CTRLSUBS.S:1035
-  ??? ora timebomb            ; CTRLSUBS.S:1036
+  a = a & #0x7f              ; CTRLSUBS.S:1035
+  a = a | *timebomb@0x007d              ; CTRLSUBS.S:1036
   *FCharImage@0x0070 = a            ; CTRLSUBS.S:1037
   return                           ; CTRLSUBS.S:1039
 }
@@ -721,7 +721,7 @@ fn GETEDGES {
   x = *FCharTable@0x007a        ; CTRLSUBS.S:1073
   call dimchar                  ; CTRLSUBS.S:1074
   *imheight@0x00b5 = x            ; CTRLSUBS.S:1075
-  ??? tax             ; CTRLSUBS.S:1077
+  x = a                            ; CTRLSUBS.S:1077
   a = *(Mult7@0x1210 + x)   ; CTRLSUBS.S:1078
   c = 0                            ; CTRLSUBS.S:1079
   a = a + #0x01 + c              ; CTRLSUBS.S:1080
@@ -770,7 +770,7 @@ fn GETEDGES {
   a = #0x00                  ; CTRLSUBS.S:1139
   *ztemp@0x00e9 = a            ; CTRLSUBS.S:1140
   a = *Fcheck@0x0085        ; CTRLSUBS.S:1142
-  ??? and #Fthinmark            ; CTRLSUBS.S:1143
+  a = a & #0x20              ; CTRLSUBS.S:1143
   if eq goto :nothin       ; CTRLSUBS.S:1144
   a = #0x03                  ; CTRLSUBS.S:1146
   *ztemp@0x00e9 = a            ; CTRLSUBS.S:1147
@@ -882,10 +882,10 @@ fn QUICKFG {
   if cc goto :cont       ; CTRLSUBS.S:1264
   a = *CharFace@0x0043        ; CTRLSUBS.S:1266
   if pl goto :faceR       ; CTRLSUBS.S:1267
-  ??? dec leftblock            ; CTRLSUBS.S:1268
+  *leftblock@0x00ba -= 1                         ; CTRLSUBS.S:1268
   goto :cont                ; CTRLSUBS.S:1269
 :faceR:
-  ??? inc rightblock            ; CTRLSUBS.S:1271
+  *rightblock@0x00bb += 1                         ; CTRLSUBS.S:1271
 :cont:
   a = *bottomblock@0x00bd        ; CTRLSUBS.S:1275
 :outloop:
@@ -962,7 +962,7 @@ fn CROPCHAR {
   if eq goto :not       ; CTRLSUBS.S:1365
 :2:
   x = *CharBlockY@0x0045        ; CTRLSUBS.S:1367
-  ??? inx             ; CTRLSUBS.S:1368
+  x += 1                         ; CTRLSUBS.S:1368
   cmp x, #0x01              ; CTRLSUBS.S:1369
   if eq goto :ok       ; CTRLSUBS.S:1370
   a = *(BlockTop@0x1274 + x)   ; CTRLSUBS.S:1372
@@ -980,7 +980,7 @@ fn CROPCHAR {
   a = *CDLeftEj@0x00be        ; CTRLSUBS.S:1390
   call getblockx                  ; CTRLSUBS.S:1391
   *blockx@0x008c = a            ; CTRLSUBS.S:1392
-  ??? tax             ; CTRLSUBS.S:1394
+  x = a                            ; CTRLSUBS.S:1394
   y = *CharBlockY@0x0045        ; CTRLSUBS.S:1395
   a = *CharScrn@0x004b        ; CTRLSUBS.S:1396
   call rdblock                  ; CTRLSUBS.S:1397
@@ -1017,7 +1017,7 @@ fn CROPCHAR {
   a = *CDRightEj@0x00bf        ; CTRLSUBS.S:1444
   call getblockx                  ; CTRLSUBS.S:1445
   *blockx@0x008c = a            ; CTRLSUBS.S:1446
-  ??? tax             ; CTRLSUBS.S:1448
+  x = a                            ; CTRLSUBS.S:1448
   y = *CharBlockY@0x0045        ; CTRLSUBS.S:1449
   a = *CharScrn@0x004b        ; CTRLSUBS.S:1450
   call rdblock                  ; CTRLSUBS.S:1451
@@ -1150,9 +1150,9 @@ fn GETSEQ {
   y = #0x00                  ; CTRLSUBS.S:1630
   ??? lda (CharSeq),y            ; CTRLSUBS.S:1631
   ??? pha             ; CTRLSUBS.S:1632
-  ??? inc CharSeq            ; CTRLSUBS.S:1634
+  *CharSeq@0x0049 += 1                         ; CTRLSUBS.S:1634
   if ne goto :done       ; CTRLSUBS.S:1635
-  ??? inc CharSeq+1            ; CTRLSUBS.S:1636
+  *CharSeq+1@0x004a += 1                         ; CTRLSUBS.S:1636
 :done:
   ??? pla             ; CTRLSUBS.S:1638
   return                           ; CTRLSUBS.S:1639
@@ -1165,16 +1165,16 @@ fn GETFRAMEINFO {
   y = #0x00                  ; CTRLSUBS.S:1654
   ??? lda (framepoint),y            ; CTRLSUBS.S:1655
   *Fimage@0x0082 = a            ; CTRLSUBS.S:1656
-  ??? iny             ; CTRLSUBS.S:1658
+  y += 1                         ; CTRLSUBS.S:1658
   ??? lda (framepoint),y            ; CTRLSUBS.S:1659
   *Fsword@0x00d9 = a            ; CTRLSUBS.S:1660
-  ??? iny             ; CTRLSUBS.S:1662
+  y += 1                         ; CTRLSUBS.S:1662
   ??? lda (framepoint),y            ; CTRLSUBS.S:1663
   *Fdx@0x0083 = a            ; CTRLSUBS.S:1664
-  ??? iny             ; CTRLSUBS.S:1666
+  y += 1                         ; CTRLSUBS.S:1666
   ??? lda (framepoint),y            ; CTRLSUBS.S:1667
   *Fdy@0x0084 = a            ; CTRLSUBS.S:1668
-  ??? iny             ; CTRLSUBS.S:1670
+  y += 1                         ; CTRLSUBS.S:1670
   ??? lda (framepoint),y            ; CTRLSUBS.S:1671
   *Fcheck@0x0085 = a            ; CTRLSUBS.S:1672
 ]rts:
@@ -1280,12 +1280,12 @@ fn ZERORED {
   *(movebuf@0x5ed2 + y) = a   ; CTRLSUBS.S:1790
   *(objbuf@0x5ef0 + y) = a   ; CTRLSUBS.S:1791
   *(halfbuf@0x5e3c + y) = a   ; CTRLSUBS.S:1792
-  ??? dey             ; CTRLSUBS.S:1794
+  y -= 1                         ; CTRLSUBS.S:1794
   if pl goto :loop       ; CTRLSUBS.S:1795
   y = #0x09                  ; CTRLSUBS.S:1797
 :dloop:
   *(topbuf@0x5f2c + y) = a   ; CTRLSUBS.S:1798
-  ??? dey             ; CTRLSUBS.S:1799
+  y -= 1                         ; CTRLSUBS.S:1799
   if pl goto :dloop       ; CTRLSUBS.S:1800
   return                           ; CTRLSUBS.S:1802
 }
@@ -1364,7 +1364,7 @@ fn sub {
   if eq goto ]rts       ; CTRLSUBS.S:1904
   cmp a, *CharScrn@0x004b    ; CTRLSUBS.S:1905
   if ne goto ]rts       ; CTRLSUBS.S:1906
-  ??? inc tempblocky            ; CTRLSUBS.S:1908
+  *tempblocky@0x0092 += 1                         ; CTRLSUBS.S:1908
   goto :loop                ; CTRLSUBS.S:1909
 ]rts:
   return                           ; CTRLSUBS.S:1858
@@ -1375,7 +1375,7 @@ fn LOADKID {
 :loop:
   a = *(Kid@0x0050 + x)   ; CTRLSUBS.S:1921
   *(Char@0x0040 + x) = a   ; CTRLSUBS.S:1922
-  ??? dex             ; CTRLSUBS.S:1924
+  x -= 1                         ; CTRLSUBS.S:1924
   if pl goto :loop       ; CTRLSUBS.S:1925
 ]rts:
   return                           ; CTRLSUBS.S:1926
@@ -1386,7 +1386,7 @@ fn SAVEKID {
 :loop:
   a = *(Char@0x0040 + x)   ; CTRLSUBS.S:1931
   *(Kid@0x0050 + x) = a   ; CTRLSUBS.S:1932
-  ??? dex             ; CTRLSUBS.S:1934
+  x -= 1                         ; CTRLSUBS.S:1934
   if pl goto :loop       ; CTRLSUBS.S:1935
 ]rts:
   return                           ; CTRLSUBS.S:1936
@@ -1397,7 +1397,7 @@ fn LOADSHAD {
 :loop:
   a = *(Shad@0x0060 + x)   ; CTRLSUBS.S:1941
   *(Char@0x0040 + x) = a   ; CTRLSUBS.S:1942
-  ??? dex             ; CTRLSUBS.S:1944
+  x -= 1                         ; CTRLSUBS.S:1944
   if pl goto :loop       ; CTRLSUBS.S:1945
 ]rts:
   return                           ; CTRLSUBS.S:1946
@@ -1408,7 +1408,7 @@ fn SAVESHAD {
 :loop:
   a = *(Char@0x0040 + x)   ; CTRLSUBS.S:1952
   *(Shad@0x0060 + x) = a   ; CTRLSUBS.S:1953
-  ??? dex             ; CTRLSUBS.S:1955
+  x -= 1                         ; CTRLSUBS.S:1955
   if pl goto :loop       ; CTRLSUBS.S:1956
   return                           ; CTRLSUBS.S:1957
 }
@@ -1420,7 +1420,7 @@ fn LOADKIDWOP {
   *(Char@0x0040 + x) = a   ; CTRLSUBS.S:1965
   a = *(Shad@0x0060 + x)   ; CTRLSUBS.S:1967
   *(Op@0x039c + x) = a   ; CTRLSUBS.S:1968
-  ??? dex             ; CTRLSUBS.S:1970
+  x -= 1                         ; CTRLSUBS.S:1970
   if pl goto :loop       ; CTRLSUBS.S:1971
   return                           ; CTRLSUBS.S:1972
 }
@@ -1432,7 +1432,7 @@ fn SAVEKIDWOP {
   *(Kid@0x0050 + x) = a   ; CTRLSUBS.S:1978
   a = *(Op@0x039c + x)   ; CTRLSUBS.S:1980
   *(Shad@0x0060 + x) = a   ; CTRLSUBS.S:1981
-  ??? dex             ; CTRLSUBS.S:1983
+  x -= 1                         ; CTRLSUBS.S:1983
   if pl goto :loop       ; CTRLSUBS.S:1984
   return                           ; CTRLSUBS.S:1985
 }
@@ -1444,7 +1444,7 @@ fn LOADSHADWOP {
   *(Char@0x0040 + x) = a   ; CTRLSUBS.S:1993
   a = *(Kid@0x0050 + x)   ; CTRLSUBS.S:1995
   *(Op@0x039c + x) = a   ; CTRLSUBS.S:1996
-  ??? dex             ; CTRLSUBS.S:1998
+  x -= 1                         ; CTRLSUBS.S:1998
   if pl goto :loop       ; CTRLSUBS.S:1999
   return                           ; CTRLSUBS.S:2000
 }
@@ -1456,7 +1456,7 @@ fn SAVESHADWOP {
   *(Shad@0x0060 + x) = a   ; CTRLSUBS.S:2006
   a = *(Op@0x039c + x)   ; CTRLSUBS.S:2008
   *(Kid@0x0050 + x) = a   ; CTRLSUBS.S:2009
-  ??? dex             ; CTRLSUBS.S:2011
+  x -= 1                         ; CTRLSUBS.S:2011
   if pl goto :loop       ; CTRLSUBS.S:2012
   return                           ; CTRLSUBS.S:2013
 }
@@ -1500,32 +1500,32 @@ fn GETOPDIST {
   if pl goto :1       ; CTRLSUBS.S:2071
   a = #0x7f                  ; CTRLSUBS.S:2072
 :1:
-  ??? eor #$ff            ; CTRLSUBS.S:2073
+  a = a ^ #0xff              ; CTRLSUBS.S:2073
   c = 0                            ; CTRLSUBS.S:2074
   a = a + #0x01 + c              ; CTRLSUBS.S:2075
 :got:
   x = *CharFace@0x0043        ; CTRLSUBS.S:2079
   if pl goto :cont       ; CTRLSUBS.S:2080
-  ??? eor #$ff            ; CTRLSUBS.S:2081
+  a = a ^ #0xff              ; CTRLSUBS.S:2081
   c = 0                            ; CTRLSUBS.S:2082
   a = a + #0x01 + c              ; CTRLSUBS.S:2083
 :cont:
-  ??? tax             ; CTRLSUBS.S:2088
+  x = a                            ; CTRLSUBS.S:2088
   a = *CharFace@0x0043        ; CTRLSUBS.S:2089
-  ??? eor OpFace            ; CTRLSUBS.S:2090
+  a = a ^ *OpFace@0x039f              ; CTRLSUBS.S:2090
   if pl goto :done       ; CTRLSUBS.S:2091
-  ??? txa             ; CTRLSUBS.S:2092
+  a = x                            ; CTRLSUBS.S:2092
   cmp a, #0x72              ; CTRLSUBS.S:2093
   if cs goto :done2       ; CTRLSUBS.S:2094
   c = 0                            ; CTRLSUBS.S:2095
   a = a + #0x0d + c              ; CTRLSUBS.S:2096
 :done2:
-  ??? tax             ; CTRLSUBS.S:2097
+  x = a                            ; CTRLSUBS.S:2097
   return                           ; CTRLSUBS.S:2098
 :safe:
   x = #0x7f                  ; CTRLSUBS.S:2100
 :done:
-  ??? txa             ; CTRLSUBS.S:2101
+  a = x                            ; CTRLSUBS.S:2101
 ]rts:
   return                           ; CTRLSUBS.S:2102
 }
@@ -1534,7 +1534,7 @@ fn UNEVENFLOOR {
   call getunderft                  ; CTRLSUBS.S:2110
   cmp a, #0x05              ; CTRLSUBS.S:2111
   if ne goto ]rts       ; CTRLSUBS.S:2112
-  ??? inc CharY            ; CTRLSUBS.S:2113
+  *CharY@0x0042 += 1                         ; CTRLSUBS.S:2113
 ]rts:
   return                           ; CTRLSUBS.S:2114
   ??? usr $a9,19,$200,*-org            ; CTRLSUBS.S:2119

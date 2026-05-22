@@ -11,7 +11,7 @@ fn ADDSOUND {
   x = *soundtable@0xb6c0        ; SOUND.S:82
   cmp x, #0x20              ; SOUND.S:83
   if cs goto :rts       ; SOUND.S:84
-  ??? inx             ; SOUND.S:86
+  x += 1                         ; SOUND.S:86
   *(soundtable@0xb6c0 + x) = a   ; SOUND.S:87
   *soundtable@0xb6c0 = x            ; SOUND.S:88
 :rts:
@@ -29,7 +29,7 @@ fn PLAYBACK {
   ??? stx savex            ; SOUND.S:109
   call makesound                  ; SOUND.S:111
   ??? ldx savex            ; SOUND.S:113
-  ??? dex             ; SOUND.S:115
+  x -= 1                         ; SOUND.S:115
   if ne goto :loop       ; SOUND.S:116
 :rts:
   return                           ; SOUND.S:118
@@ -39,7 +39,7 @@ fn makesound {
   a = a << 1                       ; SOUND.S:128
   ??? cmp #maxaddr            ; SOUND.S:129
   if cs goto :rts       ; SOUND.S:130
-  ??? tax             ; SOUND.S:132
+  x = a                            ; SOUND.S:132
   ??? lda lookup,x            ; SOUND.S:133
   ??? sta :sm+1            ; SOUND.S:134
   ??? lda lookup+1,x            ; SOUND.S:135
@@ -199,10 +199,10 @@ fn tone {
 :midloop:
   y = #0x00                  ; SOUND.S:338
 :inloop:
-  ??? iny             ; SOUND.S:340
+  y += 1                         ; SOUND.S:340
   ??? cpy :pitch            ; SOUND.S:341
   if cc goto :inloop       ; SOUND.S:342
-  ??? inx             ; SOUND.S:344
+  x += 1                         ; SOUND.S:344
   ??? cpx :pitch+1            ; SOUND.S:345
   if cc goto :midloop       ; SOUND.S:346
   c = 1                            ; SOUND.S:348

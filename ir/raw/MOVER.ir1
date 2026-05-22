@@ -11,7 +11,7 @@ fn searchtrob {
   cmp a, *trscrn@0xb620    ; MOVER.S:113
   if eq goto :rts       ; MOVER.S:114
 :next:
-  ??? dex             ; MOVER.S:116
+  x -= 1                         ; MOVER.S:116
   if ne goto :loop       ; MOVER.S:117
 :rts:
   return                           ; MOVER.S:119
@@ -24,7 +24,7 @@ fn addtrob {
   x = *numtrans@0x0095        ; MOVER.S:137
   cmp x, #0x1f              ; MOVER.S:138
   if eq goto :rts       ; MOVER.S:139
-  ??? inx             ; MOVER.S:141
+  x += 1                         ; MOVER.S:141
   *numtrans@0x0095 = x            ; MOVER.S:142
   a = *trdirec@0xb640        ; MOVER.S:144
   *(trdirec@0xb640 + x) = a   ; MOVER.S:145
@@ -44,7 +44,7 @@ fn addamob {
   x = *nummob@0x030d        ; MOVER.S:164
   cmp x, #0x0f              ; MOVER.S:165
   if eq goto :rts       ; MOVER.S:166
-  ??? inx             ; MOVER.S:168
+  x += 1                         ; MOVER.S:168
   *nummob@0x030d = x            ; MOVER.S:169
   tail_call savemob                ; MOVER.S:171
 :rts:
@@ -126,7 +126,7 @@ fn TRIGFLASK {
   a = #0x01                  ; MOVER.S:273
   *trdirec@0xb640 = a            ; MOVER.S:274
   call rnd                  ; MOVER.S:278
-  ??? and #7            ; MOVER.S:279
+  a = a & #0x07              ; MOVER.S:279
   ??? ora (BlueSpec),y            ; MOVER.S:280
   ??? sta (BlueSpec),y            ; MOVER.S:281
   tail_call addtrob                ; MOVER.S:282
@@ -138,7 +138,7 @@ fn TRIGSWORD {
   a = #0x01                  ; MOVER.S:292
   *trdirec@0xb640 = a            ; MOVER.S:293
   call rnd                  ; MOVER.S:294
-  ??? and #$1f            ; MOVER.S:295
+  a = a & #0x1f              ; MOVER.S:295
   ??? sta (BlueSpec),y            ; MOVER.S:296
   tail_call addtrob                ; MOVER.S:297
 }
@@ -149,7 +149,7 @@ fn TRIGTORCH {
   a = #0x01                  ; MOVER.S:308
   *trdirec@0xb640 = a            ; MOVER.S:309
   call rnd                  ; MOVER.S:313
-  ??? and #$f            ; MOVER.S:314
+  a = a & #0x0f              ; MOVER.S:314
   ??? sta (BlueSpec),y            ; MOVER.S:315
   tail_call addtrob                ; MOVER.S:316
 }
@@ -227,7 +227,7 @@ fn BREAKLOOSE {
 BREAKLOOSE1:
   *state@0x00f0 = a            ; MOVER.S:393
   ??? lda (BlueType),y            ; MOVER.S:395
-  ??? and #reqmask            ; MOVER.S:396
+  a = a & #0x20              ; MOVER.S:396
   if ne goto ]rts       ; MOVER.S:397
   ??? lda (BlueSpec),y            ; MOVER.S:399
   if mi goto :ok       ; MOVER.S:400
@@ -249,7 +249,7 @@ BREAKLOOSE1:
 fn BREAKLOOSE1 {
   *state@0x00f0 = a            ; MOVER.S:393
   ??? lda (BlueType),y            ; MOVER.S:395
-  ??? and #reqmask            ; MOVER.S:396
+  a = a & #0x20              ; MOVER.S:396
   if ne goto ]rts       ; MOVER.S:397
   ??? lda (BlueSpec),y            ; MOVER.S:399
   if mi goto :ok       ; MOVER.S:400
@@ -270,12 +270,12 @@ fn BREAKLOOSE1 {
 
 fn PUSHPP {
   ??? lda (BlueType),y            ; MOVER.S:426
-  ??? and #idmask            ; MOVER.S:427
+  a = a & #0x1f              ; MOVER.S:427
   *pptype@0x00f4 = a            ; MOVER.S:428
 pushpp1:
   ??? lda (BlueSpec),y            ; MOVER.S:430
   *linkindex@0x00f3 = a            ; MOVER.S:431
-  ??? tax             ; MOVER.S:432
+  x = a                            ; MOVER.S:432
   call gettimer                  ; MOVER.S:433
   cmp a, #0x1f              ; MOVER.S:435
   if eq goto ]rts       ; MOVER.S:436
@@ -307,7 +307,7 @@ pushpp1:
 fn pushpp1 {
   ??? lda (BlueSpec),y            ; MOVER.S:430
   *linkindex@0x00f3 = a            ; MOVER.S:431
-  ??? tax             ; MOVER.S:432
+  x = a                            ; MOVER.S:432
   call gettimer                  ; MOVER.S:433
   cmp a, #0x1f              ; MOVER.S:435
   if eq goto ]rts       ; MOVER.S:436
@@ -338,7 +338,7 @@ fn pushpp1 {
 
 fn JAMPP {
   ??? lda (BlueType),y            ; MOVER.S:481
-  ??? and #idmask            ; MOVER.S:482
+  a = a & #0x1f              ; MOVER.S:482
   *pptype@0x00f4 = a            ; MOVER.S:483
   cmp a, #0x06              ; MOVER.S:484
   if eq goto :1       ; MOVER.S:485
@@ -366,14 +366,14 @@ trigger:
   call calcblue                  ; MOVER.S:519
   y = *trloc@0xb600        ; MOVER.S:520
   ??? lda (BlueType),y            ; MOVER.S:521
-  ??? and #idmask            ; MOVER.S:522
+  a = a & #0x1f              ; MOVER.S:522
   call trigobj                  ; MOVER.S:524
   a = *trdirec@0xb640        ; MOVER.S:526
   if mi goto :skip       ; MOVER.S:527
   call addtrob                  ; MOVER.S:529
 :skip:
   x = *linkindex@0x00f3        ; MOVER.S:531
-  ??? inc linkindex            ; MOVER.S:532
+  *linkindex@0x00f3 += 1                         ; MOVER.S:532
   call getlastflag                  ; MOVER.S:534
   if eq goto :loop       ; MOVER.S:535
 :rts:
@@ -392,14 +392,14 @@ fn trigger  (aka :loop) {
   call calcblue                  ; MOVER.S:519
   y = *trloc@0xb600        ; MOVER.S:520
   ??? lda (BlueType),y            ; MOVER.S:521
-  ??? and #idmask            ; MOVER.S:522
+  a = a & #0x1f              ; MOVER.S:522
   call trigobj                  ; MOVER.S:524
   a = *trdirec@0xb640        ; MOVER.S:526
   if mi goto :skip       ; MOVER.S:527
   call addtrob                  ; MOVER.S:529
 :skip:
   x = *linkindex@0x00f3        ; MOVER.S:531
-  ??? inc linkindex            ; MOVER.S:532
+  *linkindex@0x00f3 += 1                         ; MOVER.S:532
   call getlastflag                  ; MOVER.S:534
   if eq goto :loop       ; MOVER.S:535
 :rts:
@@ -485,7 +485,7 @@ ANIMTRANS:
   ??? sta ]cleanflag            ; MOVER.S:649
 :1:
   *(trdirec@0xb640 + x) = a   ; MOVER.S:651
-  ??? dex             ; MOVER.S:653
+  x -= 1                         ; MOVER.S:653
   if ne goto :loop       ; MOVER.S:654
   ??? lda ]cleanflag            ; MOVER.S:656
   if eq goto ]rts       ; MOVER.S:657
@@ -495,14 +495,14 @@ ANIMTRANS:
   a = *(trdirec@0xb640 + x)   ; MOVER.S:666
   cmp a, #0xff              ; MOVER.S:667
   if eq goto :next       ; MOVER.S:668
-  ??? iny             ; MOVER.S:670
+  y += 1                         ; MOVER.S:670
   *(trdirec@0xb640 + y) = a   ; MOVER.S:671
   a = *(trloc@0xb600 + x)   ; MOVER.S:672
   *(trloc@0xb600 + y) = a   ; MOVER.S:673
   a = *(trscrn@0xb620 + x)   ; MOVER.S:674
   *(trscrn@0xb620 + y) = a   ; MOVER.S:675
 :next:
-  ??? inx             ; MOVER.S:677
+  x += 1                         ; MOVER.S:677
   cmp x, *numtrans@0x0095    ; MOVER.S:679
   if cc goto :dloop       ; MOVER.S:680
   if eq goto :dloop       ; MOVER.S:681
@@ -527,7 +527,7 @@ fn ANIMTRANS {
   ??? sta ]cleanflag            ; MOVER.S:649
 :1:
   *(trdirec@0xb640 + x) = a   ; MOVER.S:651
-  ??? dex             ; MOVER.S:653
+  x -= 1                         ; MOVER.S:653
   if ne goto :loop       ; MOVER.S:654
   ??? lda ]cleanflag            ; MOVER.S:656
   if eq goto ]rts       ; MOVER.S:657
@@ -537,14 +537,14 @@ fn ANIMTRANS {
   a = *(trdirec@0xb640 + x)   ; MOVER.S:666
   cmp a, #0xff              ; MOVER.S:667
   if eq goto :next       ; MOVER.S:668
-  ??? iny             ; MOVER.S:670
+  y += 1                         ; MOVER.S:670
   *(trdirec@0xb640 + y) = a   ; MOVER.S:671
   a = *(trloc@0xb600 + x)   ; MOVER.S:672
   *(trloc@0xb600 + y) = a   ; MOVER.S:673
   a = *(trscrn@0xb620 + x)   ; MOVER.S:674
   *(trscrn@0xb620 + y) = a   ; MOVER.S:675
 :next:
-  ??? inx             ; MOVER.S:677
+  x += 1                         ; MOVER.S:677
   cmp x, *numtrans@0x0095    ; MOVER.S:679
   if cc goto :dloop       ; MOVER.S:680
   if eq goto :dloop       ; MOVER.S:681
@@ -567,7 +567,7 @@ fn animobj {
   ??? lda (BlueSpec),y            ; MOVER.S:704
   *state@0x00f0 = a            ; MOVER.S:705
   ??? lda (BlueType),y            ; MOVER.S:707
-  ??? and #idmask            ; MOVER.S:708
+  a = a & #0x1f              ; MOVER.S:708
   cmp a, #0x13              ; MOVER.S:712
   if ne goto :1       ; MOVER.S:713
   call animtorch                  ; MOVER.S:714
@@ -659,7 +659,7 @@ fn animexit {
 :downfast:
   ??? cpx #maxgatevel            ; MOVER.S:811
   if cs goto :2       ; MOVER.S:812
-  ??? inx             ; MOVER.S:813
+  x += 1                         ; MOVER.S:813
   *trdirec@0xb640 = x            ; MOVER.S:814
 :2:
   a = *state@0x00f0        ; MOVER.S:815
@@ -724,7 +724,7 @@ fn animgate {
 :downfast:
   ??? cpx #maxgatevel            ; MOVER.S:901
   if cs goto :2       ; MOVER.S:902
-  ??? inx             ; MOVER.S:904
+  x += 1                         ; MOVER.S:904
   *trdirec@0xb640 = x            ; MOVER.S:905
 :2:
   a = *state@0x00f0        ; MOVER.S:907
@@ -745,7 +745,7 @@ fn animplate {
   x = *trdirec@0xb640        ; MOVER.S:928
   if mi goto ]rts       ; MOVER.S:929
   a = *state@0x00f0        ; MOVER.S:931
-  ??? tax             ; MOVER.S:932
+  x = a                            ; MOVER.S:932
   call gettimer                  ; MOVER.S:933
   c = 1                            ; MOVER.S:934
   ??? sbc #1            ; MOVER.S:935
@@ -766,20 +766,20 @@ fn animslicer {
   x = *trdirec@0xb640        ; MOVER.S:956
   if mi goto :done       ; MOVER.S:957
   a = *state@0x00f0        ; MOVER.S:959
-  ??? tax             ; MOVER.S:960
-  ??? and #$80            ; MOVER.S:961
+  x = a                            ; MOVER.S:960
+  a = a & #0x80              ; MOVER.S:961
   *state@0x00f0 = a            ; MOVER.S:962
-  ??? txa             ; MOVER.S:963
-  ??? and #$7f            ; MOVER.S:964
+  a = x                            ; MOVER.S:963
+  a = a & #0x7f              ; MOVER.S:964
   c = 0                            ; MOVER.S:965
   a = a + #0x01 + c              ; MOVER.S:966
   cmp a, #0x10              ; MOVER.S:967
   if cc goto :1       ; MOVER.S:968
   a = #0x01                  ; MOVER.S:969
 :1:
-  ??? ora state            ; MOVER.S:970
+  a = a | *state@0x00f0              ; MOVER.S:970
   *state@0x00f0 = a            ; MOVER.S:971
-  ??? and #$7f            ; MOVER.S:972
+  a = a & #0x7f              ; MOVER.S:972
   cmp a, #0x02              ; MOVER.S:973
   if ne goto :2       ; MOVER.S:974
   a = #0x13                  ; MOVER.S:976
@@ -795,18 +795,18 @@ fn animslicer {
   a = *KidLife@0x005f        ; MOVER.S:988
   if mi goto :done       ; MOVER.S:989
   a = *state@0x00f0        ; MOVER.S:991
-  ??? and #$80            ; MOVER.S:992
+  a = a & #0x80              ; MOVER.S:992
   if ne goto :done       ; MOVER.S:993
 :os:
   a = *state@0x00f0        ; MOVER.S:997
-  ??? and #$7f            ; MOVER.S:998
+  a = a & #0x7f              ; MOVER.S:998
   cmp a, #0x06              ; MOVER.S:999
   if cc goto :done       ; MOVER.S:1000
 :purge:
   call stopobj                  ; MOVER.S:1002
 :done:
   a = *state@0x00f0        ; MOVER.S:1004
-  ??? and #$7f            ; MOVER.S:1005
+  a = a & #0x7f              ; MOVER.S:1005
   cmp a, #0x06              ; MOVER.S:1006
   if cs goto ]rts       ; MOVER.S:1007
   tail_call redslicer                ; MOVER.S:1009
@@ -821,12 +821,12 @@ fn animflask {
   cmp a, *VisScrn@0x00cb    ; MOVER.S:1021
   if ne goto :purge       ; MOVER.S:1022
   a = *state@0x00f0        ; MOVER.S:1024
-  ??? and #%11100000            ; MOVER.S:1025
+  a = a & #0xe0              ; MOVER.S:1025
   *temp1@0x00f1 = a            ; MOVER.S:1026
   a = *state@0x00f0        ; MOVER.S:1027
-  ??? and #%00011111            ; MOVER.S:1028
+  a = a & #0x1f              ; MOVER.S:1028
   call GETFLASKFRAME                  ; MOVER.S:1029
-  ??? ora temp1            ; MOVER.S:1030
+  a = a | *temp1@0x00f1              ; MOVER.S:1030
   *state@0x00f0 = a            ; MOVER.S:1031
   tail_call redflask                ; MOVER.S:1033
 ]purge:
@@ -840,10 +840,10 @@ fn animsword {
   a = *trscrn@0xb620        ; MOVER.S:1043
   cmp a, *VisScrn@0x00cb    ; MOVER.S:1044
   if ne goto ]purge       ; MOVER.S:1045
-  ??? dec state            ; MOVER.S:1047
+  *state@0x00f0 -= 1                         ; MOVER.S:1047
   if ne goto :1       ; MOVER.S:1048
   call rnd                  ; MOVER.S:1049
-  ??? and #$3f            ; MOVER.S:1050
+  a = a & #0x3f              ; MOVER.S:1050
   c = 0                            ; MOVER.S:1051
   a = a + #0x28 + c              ; MOVER.S:1052
   *state@0x00f0 = a            ; MOVER.S:1053
@@ -901,7 +901,7 @@ fn animspikes {
   if mi goto :done       ; MOVER.S:1126
   a = *state@0x00f0        ; MOVER.S:1128
   if mi goto :timerloop       ; MOVER.S:1129
-  ??? inc state            ; MOVER.S:1134
+  *state@0x00f0 += 1                         ; MOVER.S:1134
   cmp a, #0x05              ; MOVER.S:1136
   if eq goto :starttimer       ; MOVER.S:1137
   cmp a, #0x09              ; MOVER.S:1139
@@ -916,9 +916,9 @@ fn animspikes {
   *state@0x00f0 = a            ; MOVER.S:1153
   if ne goto :done       ; MOVER.S:1155
 :timerloop:
-  ??? dec state            ; MOVER.S:1158
+  *state@0x00f0 -= 1                         ; MOVER.S:1158
   a = *state@0x00f0        ; MOVER.S:1160
-  ??? and #$7f            ; MOVER.S:1161
+  a = a & #0x7f              ; MOVER.S:1161
   if ne goto :rts       ; MOVER.S:1162
   a = #0x06                  ; MOVER.S:1164
   *state@0x00f0 = a            ; MOVER.S:1165
@@ -931,7 +931,7 @@ fn animspikes {
 fn animfloor {
   x = *trdirec@0xb640        ; MOVER.S:1177
   if mi goto :red       ; MOVER.S:1178
-  ??? inc state            ; MOVER.S:1184
+  *state@0x00f0 += 1                         ; MOVER.S:1184
   a = *state@0x00f0        ; MOVER.S:1186
   if mi goto :wiggle       ; MOVER.S:1187
   cmp a, #0x0a              ; MOVER.S:1189
@@ -1004,7 +1004,7 @@ fn redsword  (aka redflask) {
 }
 
 fn redloose {
-  ??? inc trobcount            ; MOVER.S:1285
+  *trobcount@0xb6e0 += 1                         ; MOVER.S:1285
   a = #0x1f                  ; MOVER.S:1286
   *height@0x0004 = a            ; MOVER.S:1287
   tail_call redtrobj                ; MOVER.S:1288
@@ -1021,14 +1021,14 @@ fn redgate {
 }
 
 fn redspikes {
-  ??? inc trobcount            ; MOVER.S:1306
+  *trobcount@0xb6e0 += 1                         ; MOVER.S:1306
   a = #0x1f                  ; MOVER.S:1307
   *height@0x0004 = a            ; MOVER.S:1308
   tail_call redtrobj                ; MOVER.S:1309
 }
 
 fn redslicer {
-  ??? inc trobcount            ; MOVER.S:1315
+  *trobcount@0xb6e0 += 1                         ; MOVER.S:1315
   a = #0x3f                  ; MOVER.S:1316
   *height@0x0004 = a            ; MOVER.S:1317
   call check                  ; MOVER.S:1318
@@ -1052,7 +1052,7 @@ fn redplate {
   a = *trloc@0xb600        ; MOVER.S:1349
   c = 1                            ; MOVER.S:1350
   ??? sbc #20            ; MOVER.S:1351
-  ??? tay             ; MOVER.S:1352
+  y = a                            ; MOVER.S:1352
   c = 1                            ; MOVER.S:1354
   return                           ; MOVER.S:1355
 }
@@ -1076,7 +1076,7 @@ fn checkleft {
   if eq goto ]no       ; MOVER.S:1380
   cmp y, #0x14              ; MOVER.S:1381
   if eq goto ]no       ; MOVER.S:1382
-  ??? dey             ; MOVER.S:1384
+  y -= 1                         ; MOVER.S:1384
   c = 0                            ; MOVER.S:1385
   return                           ; MOVER.S:1386
 :notonscrn:
@@ -1090,10 +1090,10 @@ fn checkleft {
   cmp y, #0x14              ; MOVER.S:1397
   if ne goto :yesr       ; MOVER.S:1398
 :yesr:
-  ??? tya             ; MOVER.S:1400
+  a = y                            ; MOVER.S:1400
   c = 0                            ; MOVER.S:1401
   a = a + #0x09 + c              ; MOVER.S:1402
-  ??? tay             ; MOVER.S:1403
+  y = a                            ; MOVER.S:1403
   c = 0                            ; MOVER.S:1405
   return                           ; MOVER.S:1406
 }
@@ -1109,7 +1109,7 @@ fn checkright {
   if eq goto ]no       ; MOVER.S:1421
   cmp y, #0x1d              ; MOVER.S:1423
   if eq goto ]no       ; MOVER.S:1424
-  ??? iny             ; MOVER.S:1426
+  y += 1                         ; MOVER.S:1426
   c = 0                            ; MOVER.S:1427
   return                           ; MOVER.S:1428
 :notonscrn:
@@ -1123,10 +1123,10 @@ fn checkright {
   cmp y, #0x1d              ; MOVER.S:1441
   if ne goto ]no       ; MOVER.S:1442
 :yesl:
-  ??? tya             ; MOVER.S:1444
+  a = y                            ; MOVER.S:1444
   c = 1                            ; MOVER.S:1445
   ??? sbc #9            ; MOVER.S:1446
-  ??? tay             ; MOVER.S:1447
+  y = a                            ; MOVER.S:1447
   c = 0                            ; MOVER.S:1449
   return                           ; MOVER.S:1450
 ]no:
@@ -1147,14 +1147,14 @@ fn checkabover {
   if eq goto ]no       ; MOVER.S:1469
   cmp y, #0x1d              ; MOVER.S:1471
   if eq goto ]no       ; MOVER.S:1472
-  ??? tya             ; MOVER.S:1474
+  a = y                            ; MOVER.S:1474
   c = 1                            ; MOVER.S:1475
   ??? sbc #9            ; MOVER.S:1476
-  ??? tay             ; MOVER.S:1477
+  y = a                            ; MOVER.S:1477
   c = 0                            ; MOVER.S:1479
   return                           ; MOVER.S:1480
 :above:
-  ??? iny             ; MOVER.S:1483
+  y += 1                         ; MOVER.S:1483
   c = 1                            ; MOVER.S:1484
   return                           ; MOVER.S:1485
 :notonscrn:
@@ -1168,10 +1168,10 @@ fn checkabover {
   cmp y, #0x1d              ; MOVER.S:1498
   if ne goto ]no       ; MOVER.S:1499
 :yesl:
-  ??? tya             ; MOVER.S:1501
+  a = y                            ; MOVER.S:1501
   c = 1                            ; MOVER.S:1502
   ??? sbc #19            ; MOVER.S:1503
-  ??? tay             ; MOVER.S:1504
+  y = a                            ; MOVER.S:1504
   c = 0                            ; MOVER.S:1506
   return                           ; MOVER.S:1507
 :yes0:
@@ -1184,10 +1184,10 @@ fn checkabover {
   y = *trloc@0xb600        ; MOVER.S:1517
   cmp y, #0x09              ; MOVER.S:1518
   if cs goto ]no       ; MOVER.S:1519
-  ??? tya             ; MOVER.S:1521
+  a = y                            ; MOVER.S:1521
   c = 0                            ; MOVER.S:1522
   a = a + #0x15 + c              ; MOVER.S:1523
-  ??? tay             ; MOVER.S:1524
+  y = a                            ; MOVER.S:1524
   c = 0                            ; MOVER.S:1526
   return                           ; MOVER.S:1527
 :notbelow:
@@ -1205,40 +1205,40 @@ fn checkabover {
 
 fn gettimer {
   a = *(LINKMAP@0xbda0 + x)   ; MOVER.S:1550
-  ??? and #%00011111            ; MOVER.S:1551
+  a = a & #0x1f              ; MOVER.S:1551
   return                           ; MOVER.S:1552
 }
 
 fn chgtimer {
-  ??? and #%00011111            ; MOVER.S:1554
+  a = a & #0x1f              ; MOVER.S:1554
   *temp1@0x00f1 = a            ; MOVER.S:1555
   a = *(LINKMAP@0xbda0 + x)   ; MOVER.S:1556
-  ??? and #%11100000            ; MOVER.S:1557
-  ??? ora temp1            ; MOVER.S:1558
+  a = a & #0xe0              ; MOVER.S:1557
+  a = a | *temp1@0x00f1              ; MOVER.S:1558
   *(LINKMAP@0xbda0 + x) = a   ; MOVER.S:1559
   return                           ; MOVER.S:1560
 }
 
 fn getloc {
   a = *(LINKLOC@0xbca0 + x)   ; MOVER.S:1562
-  ??? and #%00011111            ; MOVER.S:1563
+  a = a & #0x1f              ; MOVER.S:1563
   return                           ; MOVER.S:1564
 }
 
 fn getlastflag {
   a = *(LINKLOC@0xbca0 + x)   ; MOVER.S:1566
-  ??? and #%10000000            ; MOVER.S:1567
+  a = a & #0x80              ; MOVER.S:1567
   return                           ; MOVER.S:1568
 }
 
 fn getscrn {
   a = *(LINKLOC@0xbca0 + x)   ; MOVER.S:1570
-  ??? and #%01100000            ; MOVER.S:1571
+  a = a & #0x60              ; MOVER.S:1571
   ??? lsr             ; MOVER.S:1572
   ??? lsr             ; MOVER.S:1573
   *temp1@0x00f1 = a            ; MOVER.S:1574
   a = *(LINKMAP@0xbda0 + x)   ; MOVER.S:1575
-  ??? and #%11100000            ; MOVER.S:1576
+  a = a & #0xe0              ; MOVER.S:1576
   a = a + *temp1@0x00f1 + c    ; MOVER.S:1577
   ??? lsr             ; MOVER.S:1578
   ??? lsr             ; MOVER.S:1579
@@ -1257,7 +1257,7 @@ fn ANIMMOBS {
   call checkcrush                  ; MOVER.S:1597
   x = *tempnt@0x0096        ; MOVER.S:1599
   call savemob                  ; MOVER.S:1600
-  ??? dex             ; MOVER.S:1602
+  x -= 1                         ; MOVER.S:1602
   if ne goto :loop       ; MOVER.S:1603
   x = #0x01                  ; MOVER.S:1607
   y = #0x00                  ; MOVER.S:1608
@@ -1265,7 +1265,7 @@ fn ANIMMOBS {
   a = *(mobvel@0xb690 + x)   ; MOVER.S:1610
   cmp a, #0xff              ; MOVER.S:1611
   if eq goto :next       ; MOVER.S:1612
-  ??? iny             ; MOVER.S:1614
+  y += 1                         ; MOVER.S:1614
   *(mobvel@0xb690 + y) = a   ; MOVER.S:1615
   a = *(mobx@0xb660 + x)   ; MOVER.S:1616
   *(mobx@0xb660 + y) = a   ; MOVER.S:1617
@@ -1278,7 +1278,7 @@ fn ANIMMOBS {
   a = *(moblevel@0xb6b0 + x)   ; MOVER.S:1624
   *(moblevel@0xb6b0 + y) = a   ; MOVER.S:1625
 :next:
-  ??? inx             ; MOVER.S:1627
+  x += 1                         ; MOVER.S:1627
   cmp x, *nummob@0x030d    ; MOVER.S:1629
   if cc goto :dloop       ; MOVER.S:1630
   if eq goto :dloop       ; MOVER.S:1631
@@ -1294,7 +1294,7 @@ fn animmob {
 :done:
   a = *mobvel@0xb690        ; MOVER.S:1647
   if pl goto ]rts       ; MOVER.S:1648
-  ??? inc mobvel            ; MOVER.S:1649
+  *mobvel@0xb690 += 1                         ; MOVER.S:1649
 ]rts:
   return                           ; MOVER.S:1650
 }
@@ -1398,7 +1398,7 @@ fn makespace {
 }
 
 fn passthru {
-  ??? inc moblevel            ; MOVER.S:1808
+  *moblevel@0xb6b0 += 1                         ; MOVER.S:1808
   a = *moblevel@0xb6b0        ; MOVER.S:1810
   cmp a, #0x03              ; MOVER.S:1811
   if cc goto ]rts       ; MOVER.S:1812
@@ -1462,7 +1462,7 @@ fn markmob {
   a = #0x02                  ; MOVER.S:1884
   call markred                  ; MOVER.S:1885
   call markwipe                  ; MOVER.S:1886
-  ??? inc tempblockx            ; MOVER.S:1888
+  *tempblockx@0x0091 += 1                         ; MOVER.S:1888
   call indexblock                  ; MOVER.S:1890
   a = #0x02                  ; MOVER.S:1891
   call markred                  ; MOVER.S:1892
@@ -1524,7 +1524,7 @@ fn crushchar {
   if ne goto ]rts       ; MOVER.S:1956
 :ground:
   x = *CharBlockY@0x0045        ; MOVER.S:1961
-  ??? inx             ; MOVER.S:1962
+  x += 1                         ; MOVER.S:1962
   a = *(FloorY@0x127e + x)   ; MOVER.S:1963
   *CharY@0x0042 = a            ; MOVER.S:1964
   a = #0x01                  ; MOVER.S:1966
@@ -1553,7 +1553,7 @@ fn ADDMOBS {
   call ATM                  ; MOVER.S:1993
 :1:
   x = *tempnt@0x0096        ; MOVER.S:1995
-  ??? dex             ; MOVER.S:1996
+  x -= 1                         ; MOVER.S:1996
   if ne goto :loop       ; MOVER.S:1997
 :rts:
 ]rts:
@@ -1591,7 +1591,7 @@ fn ATM {
   call indexblock                  ; MOVER.S:2044
   *FCharIndex@0x0075 = y            ; MOVER.S:2045
 :cont1:
-  ??? inc tempblockx            ; MOVER.S:2050
+  *tempblockx@0x0091 += 1                         ; MOVER.S:2050
   call indexblock                  ; MOVER.S:2051
   a = #0x02                  ; MOVER.S:2053
   call markfloor                  ; MOVER.S:2054
@@ -1616,10 +1616,10 @@ fn ATM {
 }
 
 fn addmobobj {
-  ??? inc objX            ; MOVER.S:2087
+  *objX@0xb493 += 1                         ; MOVER.S:2087
   x = *objX@0xb493        ; MOVER.S:2088
   a = *mobtype@0xb6a0        ; MOVER.S:2090
-  ??? ora #$80            ; MOVER.S:2091
+  a = a | #0x80              ; MOVER.S:2091
   *(objTYP@0xb4f7 + x) = a   ; MOVER.S:2092
   a = *mobx@0xb660        ; MOVER.S:2094
   *(objX@0xb493 + x) = a   ; MOVER.S:2095
@@ -1649,7 +1649,7 @@ fn SHAKEM {
 SHAKEM1:
   x = #0x09                  ; MOVER.S:2131
 :loop:
-  ??? txa             ; MOVER.S:2132
+  a = x                            ; MOVER.S:2132
   ??? pha             ; MOVER.S:2133
   *tempblockx@0x0091 = a            ; MOVER.S:2134
   call rdblock1                  ; MOVER.S:2136
@@ -1658,8 +1658,8 @@ SHAKEM1:
   call shakeit                  ; MOVER.S:2140
 :cont:
   ??? pla             ; MOVER.S:2142
-  ??? tax             ; MOVER.S:2143
-  ??? dex             ; MOVER.S:2144
+  x = a                            ; MOVER.S:2143
+  x -= 1                         ; MOVER.S:2144
   if pl goto :loop       ; MOVER.S:2145
 ]rts:
   return                           ; MOVER.S:2147
@@ -1668,7 +1668,7 @@ SHAKEM1:
 fn SHAKEM1 {
   x = #0x09                  ; MOVER.S:2131
 :loop:
-  ??? txa             ; MOVER.S:2132
+  a = x                            ; MOVER.S:2132
   ??? pha             ; MOVER.S:2133
   *tempblockx@0x0091 = a            ; MOVER.S:2134
   call rdblock1                  ; MOVER.S:2136
@@ -1677,8 +1677,8 @@ fn SHAKEM1 {
   call shakeit                  ; MOVER.S:2140
 :cont:
   ??? pla             ; MOVER.S:2142
-  ??? tax             ; MOVER.S:2143
-  ??? dex             ; MOVER.S:2144
+  x = a                            ; MOVER.S:2143
+  x -= 1                         ; MOVER.S:2144
   if pl goto :loop       ; MOVER.S:2145
 ]rts:
   return                           ; MOVER.S:2147

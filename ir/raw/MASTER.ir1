@@ -135,7 +135,7 @@ fn SAVEGAME {
 :loop:
   a = *(savedgame@0xb6f0 + x)   ; MASTER.S:399
   *($200@0x0200 + x) = a   ; MASTER.S:400
-  ??? dex             ; MASTER.S:401
+  x -= 1                         ; MASTER.S:401
   if pl goto :loop       ; MASTER.S:402
   *RAMRDmain@0xc002 = a            ; MASTER.S:403
   a = #0x17                  ; MASTER.S:405
@@ -157,7 +157,7 @@ fn LOADGAME {
 :loop:
   a = *($200@0x0200 + x)   ; MASTER.S:428
   *(savedgame@0xb6f0 + x) = a   ; MASTER.S:429
-  ??? dex             ; MASTER.S:430
+  x -= 1                         ; MASTER.S:430
   if pl goto :loop       ; MASTER.S:431
   tail_call driveoff                ; MASTER.S:433
 }
@@ -542,9 +542,9 @@ fn pauseNI  (aka :loop) {
 :loop1:
   x = #0x00                  ; MASTER.S:979
 :loop2:
-  ??? dex             ; MASTER.S:980
+  x -= 1                         ; MASTER.S:980
   if ne goto :loop2       ; MASTER.S:981
-  ??? dey             ; MASTER.S:982
+  y -= 1                         ; MASTER.S:982
   if ne goto :loop1       ; MASTER.S:983
   a = *pausetemp@0x03f7        ; MASTER.S:985
   c = 1                            ; MASTER.S:986
@@ -845,11 +845,11 @@ fn PlaySongNI {
 fn PlaySongI {
   call setaux                  ; MASTER.S:1390
   if eq goto ]rts       ; MASTER.S:1391
-  ??? tay             ; MASTER.S:1393
+  y = a                            ; MASTER.S:1393
   a = *musicon@0x031a        ; MASTER.S:1394
-  ??? and soundon            ; MASTER.S:1395
+  a = a & *soundon@0x0203              ; MASTER.S:1395
   if eq goto :pause       ; MASTER.S:1396
-  ??? tya             ; MASTER.S:1398
+  a = y                            ; MASTER.S:1398
   call xminit                  ; MASTER.S:1399
 :loop:
   call StartGame?                  ; MASTER.S:1400
@@ -859,7 +859,7 @@ fn PlaySongI {
 ]rts:
   return                           ; MASTER.S:1404
 :pause:
-  ??? txa             ; MASTER.S:1406
+  a = x                            ; MASTER.S:1406
 tpause:
 :loop:
   *pausetemp@0x03f7 = a            ; MASTER.S:1413
@@ -868,9 +868,9 @@ tpause:
   x = #0x00                  ; MASTER.S:1416
 :loop2:
   call StartGame?                  ; MASTER.S:1417
-  ??? dex             ; MASTER.S:1418
+  x -= 1                         ; MASTER.S:1418
   if ne goto :loop2       ; MASTER.S:1419
-  ??? dey             ; MASTER.S:1420
+  y -= 1                         ; MASTER.S:1420
   if ne goto :loop1       ; MASTER.S:1421
   a = *pausetemp@0x03f7        ; MASTER.S:1423
   c = 1                            ; MASTER.S:1424
@@ -887,9 +887,9 @@ fn tpause  (aka :loop) {
   x = #0x00                  ; MASTER.S:1416
 :loop2:
   call StartGame?                  ; MASTER.S:1417
-  ??? dex             ; MASTER.S:1418
+  x -= 1                         ; MASTER.S:1418
   if ne goto :loop2       ; MASTER.S:1419
-  ??? dey             ; MASTER.S:1420
+  y -= 1                         ; MASTER.S:1420
   if ne goto :loop1       ; MASTER.S:1421
   a = *pausetemp@0x03f7        ; MASTER.S:1423
   c = 1                            ; MASTER.S:1424

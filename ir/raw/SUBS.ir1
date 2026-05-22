@@ -19,7 +19,7 @@ fn CRUMBLE {
   *tempblockx@0x0091 = x            ; SUBS.S:123
   call :trigloose                  ; SUBS.S:124
   x = *tempblockx@0x0091        ; SUBS.S:125
-  ??? dex             ; SUBS.S:126
+  x -= 1                         ; SUBS.S:126
   cmp x, #0x02              ; SUBS.S:127
   if cs goto :loop       ; SUBS.S:128
 ]rts:
@@ -29,8 +29,8 @@ fn CRUMBLE {
   cmp a, #0x0b              ; SUBS.S:133
   if ne goto ]rts       ; SUBS.S:134
   call rnd                  ; SUBS.S:135
-  ??? and #$0f            ; SUBS.S:136
-  ??? eor #$ff            ; SUBS.S:137
+  a = a & #0x0f              ; SUBS.S:136
+  a = a ^ #0xff              ; SUBS.S:137
   c = 0                            ; SUBS.S:138
   a = a + #0x01 + c              ; SUBS.S:139
   tail_call breakloose1                ; SUBS.S:140
@@ -42,37 +42,37 @@ fn ADDTORCHES {
   y = #0x1d                  ; SUBS.S:150
 :loop:
   ??? lda (BlueType),y            ; SUBS.S:151
-  ??? and #idmask            ; SUBS.S:152
+  a = a & #0x1f              ; SUBS.S:152
   cmp a, #0x13              ; SUBS.S:153
   if ne goto :c1       ; SUBS.S:154
-  ??? tya             ; SUBS.S:155
+  a = y                            ; SUBS.S:155
   ??? pha             ; SUBS.S:156
   a = *VisScrn@0x00cb        ; SUBS.S:157
   call trigtorch                  ; SUBS.S:158
   ??? pla             ; SUBS.S:159
-  ??? tay             ; SUBS.S:160
+  y = a                            ; SUBS.S:160
   if pl goto :cont       ; SUBS.S:161
 :c1:
   cmp a, #0x0a              ; SUBS.S:163
   if ne goto :c2       ; SUBS.S:164
-  ??? tya             ; SUBS.S:165
+  a = y                            ; SUBS.S:165
   ??? pha             ; SUBS.S:166
   a = *VisScrn@0x00cb        ; SUBS.S:167
   call trigflask                  ; SUBS.S:168
   ??? pla             ; SUBS.S:169
-  ??? tay             ; SUBS.S:170
+  y = a                            ; SUBS.S:170
   if pl goto :cont       ; SUBS.S:171
 :c2:
   cmp a, #0x16              ; SUBS.S:173
   if ne goto :cont       ; SUBS.S:174
-  ??? tya             ; SUBS.S:175
+  a = y                            ; SUBS.S:175
   ??? pha             ; SUBS.S:176
   a = *VisScrn@0x00cb        ; SUBS.S:177
   call trigsword                  ; SUBS.S:178
   ??? pla             ; SUBS.S:179
-  ??? tay             ; SUBS.S:180
+  y = a                            ; SUBS.S:180
 :cont:
-  ??? dey             ; SUBS.S:181
+  y -= 1                         ; SUBS.S:181
   if pl goto :loop       ; SUBS.S:182
 ]rts:
   return                           ; SUBS.S:184
@@ -82,7 +82,7 @@ fn PAUSE  (aka :outer) {
   ??? pha             ; SUBS.S:192
   x = #0x00                  ; SUBS.S:193
 :loop:
-  ??? dex             ; SUBS.S:194
+  x -= 1                         ; SUBS.S:194
   if ne goto :loop       ; SUBS.S:195
   ??? pla             ; SUBS.S:196
   c = 1                            ; SUBS.S:197
@@ -127,29 +127,29 @@ fn ADDSLICERS {
   cmp y, #0x03              ; SUBS.S:258
   if cs goto ]rts       ; SUBS.S:259
   a = *(Mult10@0x1200 + y)   ; SUBS.S:261
-  ??? tay             ; SUBS.S:262
+  y = a                            ; SUBS.S:262
   c = 0                            ; SUBS.S:263
   a = a + #0x0a + c              ; SUBS.S:264
   ??? sta :sm+1            ; SUBS.S:265
 :loop:
   ??? lda (BlueType),y            ; SUBS.S:267
-  ??? and #idmask            ; SUBS.S:268
+  a = a & #0x1f              ; SUBS.S:268
   cmp a, #0x12              ; SUBS.S:269
   if ne goto :cont       ; SUBS.S:270
   ??? lda (BlueSpec),y            ; SUBS.S:272
-  ??? tax             ; SUBS.S:273
-  ??? and #$7f            ; SUBS.S:274
+  x = a                            ; SUBS.S:273
+  a = a & #0x7f              ; SUBS.S:274
   if eq goto :ok       ; SUBS.S:275
   cmp a, #0x06              ; SUBS.S:276
   if cc goto :cont       ; SUBS.S:277
 :ok:
-  ??? txa             ; SUBS.S:278
-  ??? and #$80            ; SUBS.S:279
-  ??? ora tempstate            ; SUBS.S:280
+  a = x                            ; SUBS.S:278
+  a = a & #0x80              ; SUBS.S:279
+  a = a | *tempstate@0x00f2              ; SUBS.S:280
   call trigslicer                  ; SUBS.S:281
   call getnextstate                  ; SUBS.S:282
 :cont:
-  ??? iny             ; SUBS.S:284
+  y += 1                         ; SUBS.S:284
 :sm:
   cmp y, #0x00              ; SUBS.S:285
   if cc goto :loop       ; SUBS.S:286
@@ -173,7 +173,7 @@ fn getnextstate {
 
 fn pburn {
   ??? ldx ptorchcount            ; SUBS.S:320
-  ??? inx             ; SUBS.S:321
+  x += 1                         ; SUBS.S:321
   ??? lda ptorchx,x            ; SUBS.S:322
   if pl goto :ok       ; SUBS.S:323
   x = #0x00                  ; SUBS.S:324
@@ -188,7 +188,7 @@ fn pburn {
   ??? lda ptorchstate,x            ; SUBS.S:332
   call getflameframe                  ; SUBS.S:333
   ??? sta ptorchstate,x            ; SUBS.S:334
-  ??? tax             ; SUBS.S:335
+  x = a                            ; SUBS.S:335
   call psetupflame                  ; SUBS.S:336
   tail_call lay                ; SUBS.S:337
 }
@@ -196,7 +196,7 @@ fn pburn {
 fn pflow {
   ??? ldx psandcount            ; SUBS.S:345
   if mi goto ]rts       ; SUBS.S:346
-  ??? inx             ; SUBS.S:347
+  x += 1                         ; SUBS.S:347
   cmp x, #0x03              ; SUBS.S:348
   if cc goto :ok       ; SUBS.S:349
   x = #0x00                  ; SUBS.S:350
@@ -215,26 +215,26 @@ fn pstars {
   if eq goto :ok       ; SUBS.S:363
   ??? dec pstarcount,x            ; SUBS.S:364
   if ne goto :ok       ; SUBS.S:365
-  ??? txa             ; SUBS.S:366
+  a = x                            ; SUBS.S:366
   ??? pha             ; SUBS.S:367
   call twinkle                  ; SUBS.S:368
   ??? pla             ; SUBS.S:369
-  ??? tax             ; SUBS.S:370
+  x = a                            ; SUBS.S:370
 :ok:
-  ??? dex             ; SUBS.S:371
+  x -= 1                         ; SUBS.S:371
   if pl goto :loop       ; SUBS.S:372
   call rnd                  ; SUBS.S:376
   cmp a, #0x0a              ; SUBS.S:377
   if cs goto ]rts       ; SUBS.S:378
   call rnd                  ; SUBS.S:379
-  ??? and #3            ; SUBS.S:380
+  a = a & #0x03              ; SUBS.S:380
   c = 0                            ; SUBS.S:381
   a = a + #0x05 + c              ; SUBS.S:382
   ??? pha             ; SUBS.S:383
   call rnd                  ; SUBS.S:384
   call rnd                  ; SUBS.S:385
-  ??? and #3            ; SUBS.S:386
-  ??? tax             ; SUBS.S:387
+  a = a & #0x03              ; SUBS.S:386
+  x = a                            ; SUBS.S:387
   ??? pla             ; SUBS.S:388
   ??? sta pstarcount,x            ; SUBS.S:389
   tail_call twinkle                ; SUBS.S:390
@@ -271,7 +271,7 @@ fn PLAYCUT {
   ??? pha             ; SUBS.S:435
   call initit                  ; SUBS.S:436
   ??? pla             ; SUBS.S:437
-  ??? tax             ; SUBS.S:438
+  x = a                            ; SUBS.S:438
   tail_call PlayCut4                ; SUBS.S:441
   ??? lda AddrL,x            ; SUBS.S:444
   ??? sta :sm+1            ; SUBS.S:445
@@ -579,14 +579,14 @@ fn addglass1 {
 }
 
 fn PlaySongX {
-  ??? tay             ; SUBS.S:777
+  y = a                            ; SUBS.S:777
   a = *soundon@0x0203        ; SUBS.S:778
-  ??? and musicon            ; SUBS.S:779
+  a = a & *musicon@0x031a              ; SUBS.S:779
   if ne goto :1       ; SUBS.S:780
-  ??? txa             ; SUBS.S:781
+  a = x                            ; SUBS.S:781
   tail_call play                ; SUBS.S:782
 :1:
-  ??? tya             ; SUBS.S:783
+  a = y                            ; SUBS.S:783
 PlaySong:
   call minit                  ; SUBS.S:795
   call swpage                  ; SUBS.S:796
@@ -594,8 +594,8 @@ PlaySong:
   a = #0x01                  ; SUBS.S:797
   call strobe                  ; SUBS.S:798
   a = *$c061@0xc061        ; SUBS.S:799
-  ??? ora $c062            ; SUBS.S:800
-  ??? ora keypress            ; SUBS.S:801
+  a = a | *$c062@0xc062              ; SUBS.S:800
+  a = a | *keypress@0x020f              ; SUBS.S:801
   if mi goto :interrupt       ; SUBS.S:802
   call pburn                  ; SUBS.S:803
   call pstars                  ; SUBS.S:804
@@ -614,8 +614,8 @@ fn PlaySong {
   a = #0x01                  ; SUBS.S:797
   call strobe                  ; SUBS.S:798
   a = *$c061@0xc061        ; SUBS.S:799
-  ??? ora $c062            ; SUBS.S:800
-  ??? ora keypress            ; SUBS.S:801
+  a = a | *$c062@0xc062              ; SUBS.S:800
+  a = a | *keypress@0x020f              ; SUBS.S:801
   if mi goto :interrupt       ; SUBS.S:802
   call pburn                  ; SUBS.S:803
   call pstars                  ; SUBS.S:804
@@ -628,15 +628,15 @@ fn PlaySong {
 }
 
 fn PlaySongI {
-  ??? tay             ; SUBS.S:823
+  y = a                            ; SUBS.S:823
   a = *soundon@0x0203        ; SUBS.S:824
-  ??? and musicon            ; SUBS.S:825
+  a = a & *musicon@0x031a              ; SUBS.S:825
   if ne goto :1       ; SUBS.S:826
-  ??? txa             ; SUBS.S:827
+  a = x                            ; SUBS.S:827
   if eq goto ]rts       ; SUBS.S:828
   tail_call play                ; SUBS.S:829
 :1:
-  ??? tya             ; SUBS.S:830
+  a = y                            ; SUBS.S:830
   call minit                  ; SUBS.S:832
   call swpage                  ; SUBS.S:833
 :loop:
@@ -658,7 +658,7 @@ fn PlaySongI {
 
 fn swpage {
   a = *PAGE@0x0000        ; SUBS.S:851
-  ??? eor #$20            ; SUBS.S:852
+  a = a ^ #0x20              ; SUBS.S:852
   *PAGE@0x0000 = a            ; SUBS.S:853
 ]rts:
   return                           ; SUBS.S:854
@@ -676,7 +676,7 @@ fn flashon {
 fn flashoff {
   a = *lightning@0x0088        ; SUBS.S:864
   if eq goto ]rts       ; SUBS.S:865
-  ??? dec lightning            ; SUBS.S:866
+  *lightning@0x0088 -= 1                         ; SUBS.S:866
   tail_call doflashoff                ; SUBS.S:867
 ]rts:
   return                           ; SUBS.S:854
@@ -697,8 +697,8 @@ playloop:
   tail_call dostartgame                ; SUBS.S:891
 :notdemo:
   a = *$c061@0xc061        ; SUBS.S:893
-  ??? ora $c062            ; SUBS.S:894
-  ??? ora keypress            ; SUBS.S:895
+  a = a | *$c062@0xc062              ; SUBS.S:894
+  a = a | *keypress@0x020f              ; SUBS.S:895
   if mi goto ]rts       ; SUBS.S:896
 :cont:
   call NextFrame                  ; SUBS.S:898
@@ -730,8 +730,8 @@ fn playloop {
   tail_call dostartgame                ; SUBS.S:891
 :notdemo:
   a = *$c061@0xc061        ; SUBS.S:893
-  ??? ora $c062            ; SUBS.S:894
-  ??? ora keypress            ; SUBS.S:895
+  a = a | *$c062@0xc062              ; SUBS.S:894
+  a = a | *keypress@0x020f              ; SUBS.S:895
   if mi goto ]rts       ; SUBS.S:896
 :cont:
   call NextFrame                  ; SUBS.S:898
@@ -797,7 +797,7 @@ fn DoFast {
   call zerolsts                  ; SUBS.S:971
   a = *redrawglass@0x0214        ; SUBS.S:973
   if eq goto :3       ; SUBS.S:974
-  ??? dec redrawglass            ; SUBS.S:975
+  *redrawglass@0x0214 -= 1                         ; SUBS.S:975
   x = *GlassState@0x0213        ; SUBS.S:976
   call drawglass                  ; SUBS.S:977
 :3:
@@ -998,7 +998,7 @@ fn initit {
   x = #0x03                  ; SUBS.S:1252
 :loop:
   ??? sta pstarcount,x            ; SUBS.S:1253
-  ??? dex             ; SUBS.S:1254
+  x -= 1                         ; SUBS.S:1254
   if pl goto :loop       ; SUBS.S:1255
   a = #0xff                  ; SUBS.S:1257
   ??? sta psandcount            ; SUBS.S:1258
@@ -1017,16 +1017,16 @@ fn getglass {
   a = *MinLeft@0x0300        ; SUBS.S:1279
   cmp a, #0x06              ; SUBS.S:1280
   if cc goto :got       ; SUBS.S:1281
-  ??? dex             ; SUBS.S:1282
+  x -= 1                         ; SUBS.S:1282
   cmp a, #0x11              ; SUBS.S:1283
   if cc goto :got       ; SUBS.S:1284
-  ??? dex             ; SUBS.S:1285
+  x -= 1                         ; SUBS.S:1285
   cmp a, #0x21              ; SUBS.S:1286
   if cc goto :got       ; SUBS.S:1287
-  ??? dex             ; SUBS.S:1288
+  x -= 1                         ; SUBS.S:1288
   cmp a, #0x41              ; SUBS.S:1289
   if cc goto :got       ; SUBS.S:1290
-  ??? dex             ; SUBS.S:1291
+  x -= 1                         ; SUBS.S:1291
 :got:
 ]rts:
   return                           ; SUBS.S:1293
@@ -1152,7 +1152,7 @@ fn SETINITIALS {
   *SCRNUM@0x0023 = a            ; SUBS.S:1445
 :loop:
   call DoScrn                  ; SUBS.S:1447
-  ??? dec SCRNUM            ; SUBS.S:1449
+  *SCRNUM@0x0023 -= 1                         ; SUBS.S:1449
   if ne goto :loop       ; SUBS.S:1450
   return                           ; SUBS.S:1451
 }
@@ -1166,7 +1166,7 @@ fn DoScrn {
   if cc goto :skip       ; SUBS.S:1461
   ??? sta (BlueSpec),y            ; SUBS.S:1462
 :skip:
-  ??? dey             ; SUBS.S:1464
+  y -= 1                         ; SUBS.S:1464
   if pl goto :loop       ; SUBS.S:1465
   return                           ; SUBS.S:1467
 }
@@ -1203,7 +1203,7 @@ fn STARTKID {
   a = a + #0x0e + c              ; SUBS.S:1513
   *CharX@0x0041 = a            ; SUBS.S:1514
   a = *KidStartFace@0xbf42        ; SUBS.S:1516
-  ??? eor #$ff            ; SUBS.S:1517
+  a = a ^ #0xff              ; SUBS.S:1517
   *CharFace@0x0043 = a            ; SUBS.S:1518
   a = *origstrength@0x00e1        ; SUBS.S:1520
   x = *level@0x03f4        ; SUBS.S:1521
@@ -1381,7 +1381,7 @@ fn INITIALGUARDS {
   a = #0x00                  ; SUBS.S:1685
   *(GdStartSeqH-1@0xbfbe + y) = a   ; SUBS.S:1686
 :nogd:
-  ??? dey             ; SUBS.S:1688
+  y -= 1                         ; SUBS.S:1688
   if ne goto :loop       ; SUBS.S:1689
 ]rts:
   return                           ; SUBS.S:1690
@@ -1431,8 +1431,8 @@ fn :trigloose {
   cmp a, #0x0b              ; SUBS.S:133
   if ne goto ]rts       ; SUBS.S:134
   call rnd                  ; SUBS.S:135
-  ??? and #$0f            ; SUBS.S:136
-  ??? eor #$ff            ; SUBS.S:137
+  a = a & #0x0f              ; SUBS.S:136
+  a = a ^ #0xff              ; SUBS.S:137
   c = 0                            ; SUBS.S:138
   a = a + #0x01 + c              ; SUBS.S:139
   tail_call breakloose1                ; SUBS.S:140

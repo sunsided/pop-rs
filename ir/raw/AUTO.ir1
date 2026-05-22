@@ -6,15 +6,15 @@ fn AUTOCTRL {
   if eq goto :5       ; AUTO.S:164
   a = *justblocked@0x007e        ; AUTO.S:166
   if eq goto :jb0       ; AUTO.S:167
-  ??? dec justblocked            ; AUTO.S:168
+  *justblocked@0x007e -= 1                         ; AUTO.S:168
 :jb0:
   a = *gdtimer@0x007f        ; AUTO.S:170
   if eq goto :gt0       ; AUTO.S:171
-  ??? dec gdtimer            ; AUTO.S:172
+  *gdtimer@0x007f -= 1                         ; AUTO.S:172
 :gt0:
   a = *refract@0x00a1        ; AUTO.S:174
   if eq goto :2       ; AUTO.S:175
-  ??? dec refract            ; AUTO.S:176
+  *refract@0x00a1 -= 1                         ; AUTO.S:176
 :2:
   a = *CharID@0x004d        ; AUTO.S:178
   cmp a, #0x18              ; AUTO.S:179
@@ -430,7 +430,7 @@ fn FollowKid {
   tail_call DoAdvance                ; AUTO.S:652
 :atedge:
   call getinfront                  ; AUTO.S:659
-  ??? inc tempblocky            ; AUTO.S:660
+  *tempblocky@0x0092 += 1                         ; AUTO.S:660
   call rdblock1                  ; AUTO.S:661
   *ztemp@0x00e9 = a            ; AUTO.S:662
   cmp a, #0x02              ; AUTO.S:663
@@ -750,7 +750,7 @@ fn chgshadposn {
 :loop:
   ??? lda (ztemp),y            ; AUTO.S:1051
   *(Char@0x0040 + y) = a   ; AUTO.S:1052
-  ??? dey             ; AUTO.S:1053
+  y -= 1                         ; AUTO.S:1053
   if pl goto :loop       ; AUTO.S:1054
   y = #0x07                  ; AUTO.S:1056
   ??? lda (ztemp),y            ; AUTO.S:1057
@@ -778,18 +778,18 @@ fn AUTOPLAYBACK {
   a = *PlayCount@0x00a0        ; AUTO.S:1155
   cmp a, #0xfe              ; AUTO.S:1156
   if cs goto :rts       ; AUTO.S:1157
-  ??? inc PlayCount            ; AUTO.S:1158
+  *PlayCount@0x00a0 += 1                         ; AUTO.S:1158
   y = *PreRecPtr@0x0309        ; AUTO.S:1162
   a = *PlayCount@0x00a0        ; AUTO.S:1164
   ??? cmp (ProgStart),y            ; AUTO.S:1165
   if cs goto :next       ; AUTO.S:1166
-  ??? dey             ; AUTO.S:1170
+  y -= 1                         ; AUTO.S:1170
   ??? lda (ProgStart),y            ; AUTO.S:1171
   goto :ex                ; AUTO.S:1172
 :next:
-  ??? iny             ; AUTO.S:1176
+  y += 1                         ; AUTO.S:1176
   ??? lda (ProgStart),y            ; AUTO.S:1177
-  ??? iny             ; AUTO.S:1178
+  y += 1                         ; AUTO.S:1178
   *PreRecPtr@0x0309 = y            ; AUTO.S:1179
 :ex:
   cmp a, #0xff              ; AUTO.S:1183
@@ -836,7 +836,7 @@ fn AUTOPLAYBACK {
 CUTCHECK:
   a = *CUTTIMER@0x0028        ; AUTO.S:1231
   if eq goto :ok       ; AUTO.S:1232
-  ??? dec CUTTIMER            ; AUTO.S:1234
+  *CUTTIMER@0x0028 -= 1                         ; AUTO.S:1234
 ]rts:
   return                           ; AUTO.S:1235
 :ok:
@@ -897,7 +897,7 @@ CUTCHECK:
 fn :endpb  (aka CUTCHECK) {
   a = *CUTTIMER@0x0028        ; AUTO.S:1231
   if eq goto :ok       ; AUTO.S:1232
-  ??? dec CUTTIMER            ; AUTO.S:1234
+  *CUTTIMER@0x0028 -= 1                         ; AUTO.S:1234
 ]rts:
   return                           ; AUTO.S:1235
 :ok:
@@ -984,7 +984,7 @@ fn updateguard {
   a = *ShadBlockY@0x0065        ; AUTO.S:1355
   *tempblocky@0x0092 = a            ; AUTO.S:1356
   call indexblock                  ; AUTO.S:1357
-  ??? tya             ; AUTO.S:1358
+  a = y                            ; AUTO.S:1358
   x = *ShadScrn@0x006b        ; AUTO.S:1359
   *(GdStartBlock-1@0xbf46 + x) = a   ; AUTO.S:1360
   a = *ShadX@0x0061        ; AUTO.S:1362

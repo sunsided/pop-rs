@@ -40,15 +40,18 @@ from .ir1 import (
     AdcAbs,
     AdcImm,
     Asl,
+    Bitwise,
     Branch,
     Call,
     Clc,
     CmpAbs,
     CmpImm,
     Compare,
+    DecTarget,
     Goto,
     If,
     Imm,
+    IncTarget,
     Label,
     LoadAbs,
     LoadImm,
@@ -60,6 +63,7 @@ from .ir1 import (
     Sec,
     StoreAbs,
     StoreIndexed,
+    Transfer,
     Unsupported,
 )
 
@@ -286,6 +290,62 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         diff = (reg_val - rhs) & 0xff
         trace.c = 1 if reg_val >= rhs else 0
         _set_zn(trace, diff)
+        return True
+    if isinstance(item, (IncTarget, DecTarget)):
+        delta = 1 if isinstance(item, IncTarget) else -1
+        if isinstance(item.target, Reg):
+            # Only X and Y are valid 6502 inc/dec targets — there is
+            # no `ina`/`dea` on the stock NMOS chip. The lifter only
+            # emits these for X/Y, but if a future caller hand-builds
+            # a node with `Reg.A` we want a clean InterpError rather
+            # than a KeyError into a register-lookup dict.
+            if item.target is Reg.X:
+                cur = trace.x
+            elif item.target is Reg.Y:
+                cur = trace.y
+            else:
+                raise InterpError(
+                    f"{type(item).__name__} on Reg.A is not a valid "
+                    f"6502 operation (no ina/dea on NMOS)"
+                )
+            new = (cur + delta) & 0xff
+            if item.target is Reg.X:
+                trace.x = new
+            else:
+                trace.y = new
+            _set_zn(trace, new)
+        else:
+            addr = item.target.addr & 0xffff
+            new = (ram[addr] + delta) & 0xff
+            ram[addr] = new
+            trace.writes[addr] = new
+            _set_zn(trace, new)
+        return True
+    if isinstance(item, Transfer):
+        value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.src_reg]
+        if item.dst_reg is Reg.A:
+            trace.a = value
+        elif item.dst_reg is Reg.X:
+            trace.x = value
+        else:
+            trace.y = value
+        _set_zn(trace, value)
+        return True
+    if isinstance(item, Bitwise):
+        rhs = (
+            item.source.value & 0xff
+            if isinstance(item.source, Imm)
+            else ram[item.source.addr & 0xffff]
+        )
+        if item.op == "and":
+            trace.a = trace.a & rhs
+        elif item.op == "or":
+            trace.a = trace.a | rhs
+        elif item.op == "eor":
+            trace.a = trace.a ^ rhs
+        else:
+            raise InterpError(f"unknown Bitwise op {item.op!r}")
+        _set_zn(trace, trace.a)
         return True
     if isinstance(item, Unsupported):
         raise InterpError(
@@ -564,5 +624,15 @@ def run(
                 f"refusing to execute unsupported opcode "
                 f"{item.mnemonic!r} at {item.src.short()} ({item.src.raw!r})"
             )
+
+        # Atoms added by later slices (IncTarget / DecTarget / Transfer /
+        # Bitwise / ...) are handled by the shared `exec_atom` helper.
+        # That keeps both interpreters on a single per-opcode dispatch
+        # so they can't drift; we only need bespoke handling in this
+        # loop for the control-flow nodes above (Branch, If, Goto,
+        # Call, Return).
+        if exec_atom(item, trace, ram):
+            idx += 1
+            continue
 
         raise InterpError(f"unknown IR1 item: {type(item).__name__}")

@@ -211,6 +211,67 @@ class AdcAbs:
     src: SourceRef
 
 
+# ---------------------------------------------------------------- new in pass-1 long tail
+
+
+@dataclass(frozen=True)
+class IncTarget:
+    """`inx` / `iny` / `inc addr` — add 1 to a register or memory
+    location. Sets Z/N on the result; does NOT touch C. `target` is
+    either a `Reg` (X or Y — `ina` doesn't exist on stock 6502) or
+    an `Abs` for memory-resident counters."""
+
+    target: "Reg | Abs"
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class DecTarget:
+    """`dex` / `dey` / `dec addr` — same as `IncTarget` but
+    decrement. Sets Z/N; does NOT touch C."""
+
+    target: "Reg | Abs"
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class Transfer:
+    """`tax` / `tay` / `txa` / `tya` — copy one register into another.
+    Sets Z/N based on the destination value. The 6502 has no
+    accumulator↔X+Y transfers via memory in this set; we never
+    emit one for `tsx`/`txs` here since the stack pointer is
+    modelled separately by the interpreter."""
+
+    src_reg: Reg
+    dst_reg: Reg
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class Bitwise:
+    """`and` / `ora` / `eor` against A. `op` ∈ {"and", "or", "eor"}.
+    `source` is `Imm` (immediate operand) or `Abs` (memory). Updates
+    A and Z/N; does NOT touch C.
+
+    POP uses these heavily for flag-mask tests. The classic
+    `and #fcheckmark ; beq ]rts` lowers to two IR items in order:
+
+        a = a & fcheckmark            # Bitwise (mutates A, sets Z/N)
+        if a == 0 goto ]rts           # If (reads Z of post-and A)
+
+    Pass 2's fuser collapses the `Bitwise + Branch` pair into the
+    structured `If` shown above. The fused Compare always tests
+    against `0`; the mask is preserved by the prior `Bitwise` body
+    item (still visible in the dump). Semantically this is the
+    same as `if (a & fcheckmark) == 0 goto ]rts`, just expressed
+    as two statements because pass-2's Compare doesn't have an
+    embedded-expression form."""
+
+    op: str
+    source: "Imm | Abs"
+    src: SourceRef
+
+
 @dataclass(frozen=True)
 class LoadIndexed:
     """`lda/ldx/ldy base,idx` — load from `mem[base + idx_reg]`.
@@ -330,6 +391,7 @@ Instr = (
     | LoadAbs | Asl | Clc | Sec | AdcImm | AdcAbs
     | LoadIndexed | StoreIndexed | CmpImm | CmpAbs | Branch
     | If
+    | IncTarget | DecTarget | Transfer | Bitwise
     | Unsupported
 )
 Item = Label | Instr
@@ -446,6 +508,18 @@ def format_item(item: Item) -> str:
         return f"  {kw} {item.target}                ; {item.src.short()}"
     if isinstance(item, Return):
         return f"  return                           ; {item.src.short()}"
+    if isinstance(item, IncTarget):
+        tgt = item.target if isinstance(item.target, Reg) else f"*{_fmt_abs(item.target)}"
+        return f"  {tgt} += 1                         ; {item.src.short()}"
+    if isinstance(item, DecTarget):
+        tgt = item.target if isinstance(item.target, Reg) else f"*{_fmt_abs(item.target)}"
+        return f"  {tgt} -= 1                         ; {item.src.short()}"
+    if isinstance(item, Transfer):
+        return f"  {item.dst_reg} = {item.src_reg}                            ; {item.src.short()}"
+    if isinstance(item, Bitwise):
+        sym = {"and": "&", "or": "|", "eor": "^"}[item.op]
+        rhs = _fmt_imm(item.source) if isinstance(item.source, Imm) else f"*{_fmt_abs(item.source)}"
+        return f"  a = a {sym} {rhs}              ; {item.src.short()}"
     if isinstance(item, Unsupported):
         op = item.operand if item.operand else ""
         return f"  ??? {item.mnemonic} {op}            ; {item.src.short()}"
