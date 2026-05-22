@@ -176,3 +176,105 @@ def test_rol_then_beq_fuses_to_zero_test_on_a():
     assert ifs[0].cond.reg is Reg.A
     assert ifs[0].cond.op == "=="
     assert ifs[0].cond.rhs.value == 0
+
+
+# ---- carry-liveness: rotates READ C, so a preceding sec/clc must
+# survive the elision sweep. The first version of this slice missed
+# that on Rol/Ror/ShiftMem(rol|ror), which would have silently elided
+# the carry setup. These tests pin the fix.
+
+
+def test_sec_before_rol_a_survives_elision():
+    """`sec ; rol a` — the rotate reads the carry bit to fold it in
+    from the bottom, so the `sec` is a real flag-input. Liveness
+    must keep it alive."""
+    from pop_lifter.ir1 import Sec
+    from pop_lifter.pass2_struct import _eliminate_dead_flags
+
+    src = SourceRef(file="syn", line=0, raw="")
+    r = Routine(
+        name="f",
+        body=[
+            Sec(src=src),
+            Rol(src=src),
+            Return(src=src),
+        ],
+    )
+    out = _eliminate_dead_flags(structure_routine(r), flag_demand={})
+    assert any(isinstance(i, Sec) for i in out.body), (
+        "Sec feeding a rol must not be elided — rol reads C"
+    )
+
+
+def test_clc_before_ror_a_survives_elision():
+    """Symmetric — `clc ; ror a` reads C as the high-bit shift-in."""
+    from pop_lifter.ir1 import Clc
+    from pop_lifter.pass2_struct import _eliminate_dead_flags
+
+    src = SourceRef(file="syn", line=0, raw="")
+    r = Routine(
+        name="f",
+        body=[
+            Clc(src=src),
+            Ror(src=src),
+            Return(src=src),
+        ],
+    )
+    out = _eliminate_dead_flags(structure_routine(r), flag_demand={})
+    assert any(isinstance(i, Clc) for i in out.body), (
+        "Clc feeding a ror must not be elided — ror reads C"
+    )
+
+
+def test_sec_before_shiftmem_rol_survives_elision():
+    """Same contract for the memory rotate forms — `sec ; rol addr`
+    folds the carry into the rotated memory byte."""
+    from pop_lifter.ir1 import Sec
+    from pop_lifter.pass2_struct import _eliminate_dead_flags
+
+    src = SourceRef(file="syn", line=0, raw="")
+    r = Routine(
+        name="f",
+        body=[
+            Sec(src=src),
+            ShiftMem(
+                op="rol",
+                target=Abs(name="hi", addr=0x101),
+                src=src,
+            ),
+            Return(src=src),
+        ],
+    )
+    out = _eliminate_dead_flags(structure_routine(r), flag_demand={})
+    assert any(isinstance(i, Sec) for i in out.body), (
+        "Sec feeding ShiftMem(rol) must not be elided — rotates read C"
+    )
+
+
+def test_clc_before_shiftmem_asl_can_be_elided():
+    """Negative case — `asl` and `lsr` (shifts, not rotates) DON'T
+    read C, they shift in a 0. So a `clc` before `asl addr` IS dead
+    and should be dropped. Pinning this prevents the over-cautious
+    fix (treating all four shift/rotate ops as carry-readers) from
+    creeping in."""
+    from pop_lifter.ir1 import Clc
+    from pop_lifter.pass2_struct import _eliminate_dead_flags
+
+    src = SourceRef(file="syn", line=0, raw="")
+    r = Routine(
+        name="f",
+        body=[
+            Clc(src=src),
+            ShiftMem(
+                op="asl",
+                target=Abs(name="lo", addr=0x100),
+                src=src,
+            ),
+            Return(src=src),
+        ],
+    )
+    out = _eliminate_dead_flags(structure_routine(r), flag_demand={})
+    assert not any(isinstance(i, Clc) for i in out.body), (
+        "Clc before ShiftMem(asl) is dead — asl doesn't read C, "
+        "and there's no other reader downstream"
+    )

@@ -1469,6 +1469,7 @@ fn VBLI {
   *$c079@0xc079 = a            ; GRAFIX.S:1973
   *$c05b@0xc05b = a            ; GRAFIX.S:1974
   *$c078@0xc078 = a            ; GRAFIX.S:1975
+  c = 1                            ; GRAFIX.S:1976
   *vblflag@0x01fb ror>= 1                 ; GRAFIX.S:1977
 :notvbl:
   ??? rti             ; GRAFIX.S:1978

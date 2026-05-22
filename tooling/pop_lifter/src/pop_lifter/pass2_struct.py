@@ -171,12 +171,14 @@ def _affected_register(item: Item):
     if isinstance(item, Bitwise):
         from .ir1 import Reg
         return Reg.A
-    if isinstance(item, (SbcImm, SbcAbs, SbcIndexed, Lsr, Rol, Ror)):
-        # All six define A's new value as their flag-side-effect,
+    if isinstance(item, (SbcImm, SbcAbs, SbcIndexed, Asl, Lsr, Rol, Ror)):
+        # All seven define A's new value as their flag-side-effect,
         # so a subsequent `beq`/`bne`/`bpl`/`bmi` reads Z/N of A.
-        # Rol/Ror are added here for symmetry with Asl/Lsr; the
-        # accumulator rotate forms expose A's new value the same
-        # way the shift forms do.
+        # Asl belongs here too — `asl a ; beq L` fuses into
+        # `if a == 0 goto L` exactly like Lsr/Rol/Ror do. Earlier
+        # comments referring to "symmetry with Asl" were misleading
+        # because Asl wasn't actually on this list; now it is, so
+        # the claim holds.
         from .ir1 import Reg
         return Reg.A
     # Adc{Imm,Abs,Indexed} deliberately NOT here — Adc both reads
@@ -261,7 +263,8 @@ def _defines_flags(item: Item) -> bool:
             CmpImm, CmpAbs, CmpIndexed,
             LoadImm, LoadAbs, LoadIndexed, LoadIndirect,
             IncTarget, DecTarget, Transfer, Bitwise,
-            SbcImm, SbcAbs, SbcIndexed, Lsr, Rol, Ror, Bit, ShiftMem,
+            SbcImm, SbcAbs, SbcIndexed,
+            Asl, Lsr, Rol, Ror, Bit, ShiftMem,
             Pla,
             # AdcIndexed: see `_affected_register` note — adc lacks
             # the symmetric fusion path the others have, so its
@@ -562,19 +565,36 @@ def _backward_sweep(
             live -= {"Z", "N", "C"}
             continue
 
-        if isinstance(item, (Asl, Lsr, Rol, Ror)):
-            # All four accumulator shifts/rotates write Z,N,C and
-            # mutate A, so they're never eligible for elision even
-            # when the flags are dead — but their flag writes do
-            # clear the live set.
+        if isinstance(item, (Asl, Lsr)):
+            # Shifts write Z,N,C and mutate A. They don't *read* C
+            # — the shifted-in bit is always 0 — so the backward
+            # sweep just clears Z/N/C from `live`.
             live -= {"Z", "N", "C"}
+            continue
+
+        if isinstance(item, (Rol, Ror)):
+            # Rotates write Z,N,C **and read C** (the carry rotates
+            # in from the opposite end of the shifted byte). Going
+            # backward: clear the writes first, then add C as a
+            # read so a preceding `sec`/`clc` (or any other carry-
+            # setter) stays alive. Without the explicit `live.add
+            # ("C")` the elision pass would happily drop the
+            # `sec` before `rol`/`ror` — silently changing program
+            # semantics. Mirrors `Adc*` / `Sbc*` for the same
+            # reason.
+            live -= {"Z", "N", "C"}
+            live.add("C")
             continue
 
         if isinstance(item, ShiftMem):
             # Memory shift/rotate. Same flag effect (writes Z,N,C)
-            # but the side effect is on RAM rather than A. Never
-            # elidable — the memory write is the whole point.
+            # plus a RAM write as the headline side effect; never
+            # elidable.
             live -= {"Z", "N", "C"}
+            if item.op in ("rol", "ror"):
+                # Memory rotates also read C — same reason as the
+                # accumulator forms above.
+                live.add("C")
             continue
 
         if isinstance(item, Bit):
