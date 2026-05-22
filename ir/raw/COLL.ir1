@@ -40,7 +40,7 @@ fn CHECKBARR {
   call getCData                  ; COLL.S:135
   a = *BlockYthis@0x039a        ; COLL.S:139
   c = 1                            ; COLL.S:140
-  ??? sbc #1            ; COLL.S:141
+  a = a - #0x01 - (1 - c)        ; COLL.S:141
   *blocky@0x008d = a            ; COLL.S:142
   a = #0x90                  ; COLL.S:144
   x = #0x50                  ; COLL.S:145
@@ -141,7 +141,7 @@ fn initCDbufs {
   cmp a, *BlockYlast@0x039b    ; COLL.S:274
   if eq goto :usethis       ; COLL.S:275
   c = 1                            ; COLL.S:277
-  ??? sbc #6            ; COLL.S:278
+  a = a - #0x06 - (1 - c)        ; COLL.S:278
   cmp a, *BlockYlast@0x039b    ; COLL.S:279
   if eq goto :usethis       ; COLL.S:280
   a = *BlockYthis@0x039a        ; COLL.S:284
@@ -150,7 +150,7 @@ fn initCDbufs {
   cmp a, *BlockYlast@0x039b    ; COLL.S:287
   if eq goto :useabove       ; COLL.S:288
   c = 1                            ; COLL.S:289
-  ??? sbc #3            ; COLL.S:290
+  a = a - #0x03 - (1 - c)        ; COLL.S:290
   cmp a, *BlockYlast@0x039b    ; COLL.S:291
   if eq goto :useabove       ; COLL.S:292
 :usebelow:
@@ -266,7 +266,7 @@ fn rightcoll {
   y = *tempblocky@0x0092        ; COLL.S:453
   call getrightbar                  ; COLL.S:455
   c = 1                            ; COLL.S:456
-  ??? sbc CDLeftEj            ; COLL.S:457
+  a = a - *CDLeftEj@0x00be - (1 - c) ; COLL.S:457
   x = #0x00                  ; COLL.S:459
   tail_call collide                ; COLL.S:460
 ]rts:
@@ -287,7 +287,7 @@ fn leftcoll {
   y = *tempblocky@0x0092        ; COLL.S:480
   call getleftbar                  ; COLL.S:481
   c = 1                            ; COLL.S:482
-  ??? sbc CDRightEj            ; COLL.S:483
+  a = a - *CDRightEj@0x00bf - (1 - c) ; COLL.S:483
   x = #0xff                  ; COLL.S:485
   tail_call collide                ; COLL.S:486
 ]rts:
@@ -305,7 +305,7 @@ fn checkcoll1 {
   cmp a, #0x03              ; COLL.S:504
   if cc goto :1       ; COLL.S:505
   c = 1                            ; COLL.S:506
-  ??? sbc #3            ; COLL.S:507
+  a = a - #0x03 - (1 - c)        ; COLL.S:507
 :1:
   *tempblocky@0x0092 = a            ; COLL.S:508
   a = *(SNthisframe@0x0360 + x)   ; COLL.S:510
@@ -382,7 +382,7 @@ fn AdjustScrn {
   return                           ; COLL.S:617
 :osL:
   c = 1                            ; COLL.S:618
-  ??? sbc #ScrnWidth            ; COLL.S:619
+  a = a - #0x8c - (1 - c)        ; COLL.S:619
 ]rts:
   return                           ; COLL.S:620
 }
@@ -489,7 +489,7 @@ fn GroundBump {
   if eq goto :skipair       ; COLL.S:718
   a = *(FloorY+1@0x127f + x)   ; COLL.S:720
   c = 1                            ; COLL.S:721
-  ??? sbc CharY            ; COLL.S:722
+  a = a - *CharY@0x0042 - (1 - c) ; COLL.S:722
   cmp a, #0x0f              ; COLL.S:723
   if cs goto AirBump       ; COLL.S:724
 :skipair:
@@ -642,7 +642,7 @@ DBarr:
   ??? adc BarL,y            ; COLL.S:953
   *ztemp@0x00e9 = a            ; COLL.S:954
   c = 1                            ; COLL.S:956
-  ??? sbc CDRightEj            ; COLL.S:957
+  a = a - *CDRightEj@0x00bf - (1 - c) ; COLL.S:957
   return                           ; COLL.S:958
 :clr:
   a = #0xff                  ; COLL.S:960
@@ -660,7 +660,7 @@ DBarr:
   *ztemp@0x00e9 = a            ; COLL.S:977
   a = *CDLeftEj@0x00be        ; COLL.S:979
   c = 1                            ; COLL.S:980
-  ??? sbc ztemp            ; COLL.S:981
+  a = a - *ztemp@0x00e9 - (1 - c) ; COLL.S:981
 ]rts:
   return                           ; COLL.S:983
 }
@@ -689,7 +689,7 @@ fn DBarr {
   ??? adc BarL,y            ; COLL.S:953
   *ztemp@0x00e9 = a            ; COLL.S:954
   c = 1                            ; COLL.S:956
-  ??? sbc CDRightEj            ; COLL.S:957
+  a = a - *CDRightEj@0x00bf - (1 - c) ; COLL.S:957
   return                           ; COLL.S:958
 :clr:
   a = #0xff                  ; COLL.S:960
@@ -707,7 +707,7 @@ fn DBarr {
   *ztemp@0x00e9 = a            ; COLL.S:977
   a = *CDLeftEj@0x00be        ; COLL.S:979
   c = 1                            ; COLL.S:980
-  ??? sbc ztemp            ; COLL.S:981
+  a = a - *ztemp@0x00e9 - (1 - c) ; COLL.S:981
 ]rts:
   return                           ; COLL.S:983
 }
@@ -1002,8 +1002,8 @@ fn CHECKGATE {
 
 fn gatebarr? {
   a = *(BlueSpec@0x0026)[y]   ; COLL.S:1375
-  ??? lsr             ; COLL.S:1376
-  ??? lsr             ; COLL.S:1377
+  a = a >> 1                       ; COLL.S:1376
+  a = a >> 1                       ; COLL.S:1377
   c = 0                            ; COLL.S:1378
   a = a + #0x06 + c              ; COLL.S:1379
   cmp a, *imheight@0x00b5    ; COLL.S:1380
@@ -1081,7 +1081,7 @@ fn DBarr2 {
   ??? adc BarL,y            ; COLL.S:1479
   *ztemp@0x00e9 = a            ; COLL.S:1480
   c = 1                            ; COLL.S:1482
-  ??? sbc CDRightEj            ; COLL.S:1483
+  a = a - *CDRightEj@0x00bf - (1 - c) ; COLL.S:1483
   return                           ; COLL.S:1484
 :clr:
   a = #0xff                  ; COLL.S:1486
@@ -1099,7 +1099,7 @@ fn DBarr2 {
   *ztemp@0x00e9 = a            ; COLL.S:1503
   a = *CDLeftEj@0x00be        ; COLL.S:1505
   c = 1                            ; COLL.S:1506
-  ??? sbc ztemp            ; COLL.S:1507
+  a = a - *ztemp@0x00e9 - (1 - c) ; COLL.S:1507
 ]rts:
   return                           ; COLL.S:1509
   ??? usr $a9,16,$b00,*-org            ; COLL.S:1514

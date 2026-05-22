@@ -1026,7 +1026,7 @@ fn shakeloose {
   *jarabove@0x00cd = a            ; TOPCTRL.S:1286
   a = *CharBlockY@0x0045        ; TOPCTRL.S:1288
   c = 1                            ; TOPCTRL.S:1289
-  ??? sbc #1            ; TOPCTRL.S:1290
+  a = a - #0x01 - (1 - c)        ; TOPCTRL.S:1290
   tail_call shakem                ; TOPCTRL.S:1291
 }
 
@@ -1249,7 +1249,7 @@ fn wtlessflash {
   if eq goto ]rts       ; TOPCTRL.S:1687
   x = #0x00                  ; TOPCTRL.S:1688
   c = 1                            ; TOPCTRL.S:1689
-  ??? sbc #1            ; TOPCTRL.S:1690
+  a = a - #0x01 - (1 - c)        ; TOPCTRL.S:1690
   *weightless@0x00c5 = a            ; TOPCTRL.S:1691
   if eq goto :3       ; TOPCTRL.S:1692
   x = #0xff                  ; TOPCTRL.S:1693

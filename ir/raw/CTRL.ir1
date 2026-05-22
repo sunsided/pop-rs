@@ -1051,8 +1051,8 @@ fn standing {
   if ne goto :nostairs       ; CTRL.S:1160
 :stairs:
   a = *(BlueSpec@0x0026)[y]   ; CTRL.S:1162
-  ??? lsr             ; CTRL.S:1163
-  ??? lsr             ; CTRL.S:1164
+  a = a >> 1                       ; CTRL.S:1163
+  a = a >> 1                       ; CTRL.S:1164
   cmp a, #0x1e              ; CTRL.S:1165
   if cc goto :nostairs       ; CTRL.S:1166
   tail_call Stairs                ; CTRL.S:1168
@@ -1091,14 +1091,14 @@ fn standing {
   cmp a, #0x04              ; CTRL.S:1223
   if ne goto :succeed       ; CTRL.S:1224
   a = *(BlueSpec@0x0026)[y]   ; CTRL.S:1226
-  ??? lsr             ; CTRL.S:1227
-  ??? lsr             ; CTRL.S:1228
+  a = a >> 1                       ; CTRL.S:1227
+  a = a >> 1                       ; CTRL.S:1228
   cmp a, #0x06              ; CTRL.S:1229
   if cc goto :no       ; CTRL.S:1230
 :succeed:
   call getdist                  ; CTRL.S:1232
   c = 1                            ; CTRL.S:1233
-  ??? sbc #9            ; CTRL.S:1234
+  a = a - #0x09 - (1 - c)        ; CTRL.S:1234
   call addcharx                  ; CTRL.S:1236
   *CharX@0x0041 = a            ; CTRL.S:1237
   a = #0x44                  ; CTRL.S:1239
@@ -1265,8 +1265,8 @@ fn hanging {
   x = *CharFace@0x0043        ; CTRL.S:1477
   if eq goto :succeed       ; CTRL.S:1478
   a = *(BlueSpec@0x0026)[y]   ; CTRL.S:1480
-  ??? lsr             ; CTRL.S:1481
-  ??? lsr             ; CTRL.S:1482
+  a = a >> 1                       ; CTRL.S:1481
+  a = a >> 1                       ; CTRL.S:1482
   cmp a, #0x06              ; CTRL.S:1483
   if cc goto :fail       ; CTRL.S:1484
   if cs goto :succeed       ; CTRL.S:1485
@@ -1423,7 +1423,7 @@ fn DoJumpup {
   if eq goto DoJumpedge       ; CTRL.S:1666
   call getdist                  ; CTRL.S:1670
   c = 1                            ; CTRL.S:1671
-  ??? sbc #14            ; CTRL.S:1672
+  a = a - #0x0e - (1 - c)        ; CTRL.S:1672
   call addcharx                  ; CTRL.S:1673
   *CharX@0x0041 = a            ; CTRL.S:1674
   call rereadblocks                  ; CTRL.S:1676
@@ -1434,7 +1434,7 @@ fn DoJumpedge {
   call getabove                  ; CTRL.S:1684
   call getdist                  ; CTRL.S:1688
   c = 1                            ; CTRL.S:1689
-  ??? sbc #10            ; CTRL.S:1690
+  a = a - #0x0a - (1 - c)        ; CTRL.S:1690
   call addcharx                  ; CTRL.S:1692
   *CharX@0x0041 = a            ; CTRL.S:1693
   a = #0x10                  ; CTRL.S:1697
@@ -1450,7 +1450,7 @@ fn DoJumphang {
 :Long:
   a = *atemp@0x00f4        ; CTRL.S:1714
   c = 1                            ; CTRL.S:1715
-  ??? sbc #4            ; CTRL.S:1716
+  a = a - #0x04 - (1 - c)        ; CTRL.S:1716
   call addcharx                  ; CTRL.S:1717
   *CharX@0x0041 = a            ; CTRL.S:1718
   a = #0x18                  ; CTRL.S:1720
@@ -1511,7 +1511,7 @@ fn DoRunjump {
   c = 0                            ; CTRL.S:1804
   ??? adc Mult7,x            ; CTRL.S:1805
   c = 1                            ; CTRL.S:1807
-  ??? sbc #RJLeadDist            ; CTRL.S:1808
+  a = a - #0x0e - (1 - c)        ; CTRL.S:1808
   cmp a, #0xf8              ; CTRL.S:1811
   if cs goto :ok       ; CTRL.S:1812
   cmp a, #0x02              ; CTRL.S:1814
@@ -1568,7 +1568,7 @@ fn DoJumphigh {
   cmp x, #0x01              ; CTRL.S:1887
   if ne goto :ok       ; CTRL.S:1888
   c = 1                            ; CTRL.S:1890
-  ??? sbc #3            ; CTRL.S:1891
+  a = a - #0x03 - (1 - c)        ; CTRL.S:1891
   call addcharx                  ; CTRL.S:1892
   *CharX@0x0041 = a            ; CTRL.S:1893
 :ok:
@@ -1767,11 +1767,11 @@ fn PickItUp {
   cmp a, #0x16              ; CTRL.S:2143
   if eq goto :PickupSword       ; CTRL.S:2144
   a = *(BlueSpec@0x0026)[y]   ; CTRL.S:2146
-  ??? lsr             ; CTRL.S:2147
-  ??? lsr             ; CTRL.S:2148
-  ??? lsr             ; CTRL.S:2149
-  ??? lsr             ; CTRL.S:2150
-  ??? lsr             ; CTRL.S:2151
+  a = a >> 1                       ; CTRL.S:2147
+  a = a >> 1                       ; CTRL.S:2148
+  a = a >> 1                       ; CTRL.S:2149
+  a = a >> 1                       ; CTRL.S:2150
+  a = a >> 1                       ; CTRL.S:2151
   call RemoveObj                  ; CTRL.S:2152
   a = #0x4e                  ; CTRL.S:2154
   tail_call jumpseq                ; CTRL.S:2155

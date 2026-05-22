@@ -1278,7 +1278,7 @@ fn Cright {
   *CharScrn@0x004b = a            ; AUTO.S:1694
   a = *CharX@0x0041        ; AUTO.S:1696
   c = 1                            ; AUTO.S:1697
-  ??? sbc #140            ; AUTO.S:1698
+  a = a - #0x8c - (1 - c)        ; AUTO.S:1698
   *CharX@0x0041 = a            ; AUTO.S:1699
   x = #0x00                  ; AUTO.S:1701
   return                           ; AUTO.S:1702
@@ -1306,11 +1306,11 @@ fn Cdown {
   *CharScrn@0x004b = a            ; AUTO.S:1725
   a = *CharBlockY@0x0045        ; AUTO.S:1727
   c = 1                            ; AUTO.S:1728
-  ??? sbc #3            ; AUTO.S:1729
+  a = a - #0x03 - (1 - c)        ; AUTO.S:1729
   *CharBlockY@0x0045 = a            ; AUTO.S:1730
   a = *CharY@0x0042        ; AUTO.S:1732
   c = 1                            ; AUTO.S:1733
-  ??? sbc #189            ; AUTO.S:1734
+  a = a - #0xbd - (1 - c)        ; AUTO.S:1734
   *CharY@0x0042 = a            ; AUTO.S:1735
   x = #0x02                  ; AUTO.S:1737
 ]rts:

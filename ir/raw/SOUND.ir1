@@ -121,7 +121,7 @@ DoFlashMsg:
   call tone                  ; SOUND.S:251
   ??? pla             ; SOUND.S:253
   c = 1                            ; SOUND.S:254
-  ??? sbc #1            ; SOUND.S:255
+  a = a - #0x01 - (1 - c)        ; SOUND.S:255
   if ne goto :loop       ; SOUND.S:256
   return                           ; SOUND.S:258
 }
@@ -140,7 +140,7 @@ fn DoGotKey  (aka DoFlashMsg) {
   call tone                  ; SOUND.S:251
   ??? pla             ; SOUND.S:253
   c = 1                            ; SOUND.S:254
-  ??? sbc #1            ; SOUND.S:255
+  a = a - #0x01 - (1 - c)        ; SOUND.S:255
   if ne goto :loop       ; SOUND.S:256
   return                           ; SOUND.S:258
 }
@@ -194,7 +194,7 @@ fn tone {
   ??? sty :pitch            ; SOUND.S:332
   ??? stx :pitch+1            ; SOUND.S:333
 :outloop:
-  ??? bit spkr            ; SOUND.S:335
+  bit *spkr@0xc030                ; SOUND.S:335
   x = #0x00                  ; SOUND.S:337
 :midloop:
   y = #0x00                  ; SOUND.S:338
@@ -206,7 +206,7 @@ fn tone {
   ??? cpx :pitch+1            ; SOUND.S:345
   if cc goto :midloop       ; SOUND.S:346
   c = 1                            ; SOUND.S:348
-  ??? sbc #1            ; SOUND.S:349
+  a = a - #0x01 - (1 - c)        ; SOUND.S:349
   if ne goto :outloop       ; SOUND.S:350
   return                           ; SOUND.S:352
   ??? usr $a9,20,$e00,*-org            ; SOUND.S:359

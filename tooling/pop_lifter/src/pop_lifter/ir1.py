@@ -211,6 +211,71 @@ class AdcAbs:
     src: SourceRef
 
 
+# ---------------------------------------------------------------- pass-1 medium-tail atoms
+
+
+@dataclass(frozen=True)
+class SbcImm:
+    """`sbc #imm` — A = A - imm - (1 - C) (mod 256). C = 1 means "no
+    borrow needed" (the result fit without underflow); C = 0 means a
+    borrow happened. Sets N, Z, C (and V, which we don't currently
+    model since no branch reads it).
+
+    Implemented in the interpreter as the standard `A + ~operand + C`
+    trick so the 6502's borrow convention falls out of the same
+    arithmetic the chip itself uses."""
+
+    imm: Imm
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class SbcAbs:
+    """`sbc addr` — same as `SbcImm` but reading the subtrahend from
+    memory. Pairs with `Clc`/`Sec` + `Adc*` to form 16-bit math."""
+
+    source: Abs
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class Lsr:
+    """`lsr a` / `lsr` — accumulator-only logical shift right.
+    `C = old A bit 0`, `A = A >> 1`. N is always 0 (the shifted-in
+    bit). Z = (A == 0).
+
+    Memory `lsr addr` would need a separate node; none of the
+    routines lifted so far emit it."""
+
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class Bit:
+    """`bit operand` — bit-test. Sets:
+
+    * `Z = (A & operand) == 0` — fusable in principle but our
+      `Compare` form has no masked-equality variant, so pass 2
+      leaves `bit ; beq` unfused for now.
+    * `N = bit 7 of operand` — *not* of `(A & operand)`. The N flag
+      reflects the OPERAND, independent of A.
+    * `V = bit 6 of operand` — same as N but for bit 6. (Like
+      `SbcImm`, V is conceptually written but **not currently
+      tracked** in `Trace`; nothing reads it yet. `bvc`/`bvs` aren't
+      lifted, so a V-dependent test would surface as `Unsupported`
+      rather than silently misbehave.)
+
+    Crucially, `bit` does NOT modify A. `Bit(Imm)` is therefore a
+    pure flag-setter, eligible for elision by `pass2_struct` when
+    its outputs are dead. `Bit(Abs)` is **not** elided, because the
+    memory read itself can be side-effecting — `bit $c0xx` is the
+    classic Apple II soft-switch idiom (speaker click, page select,
+    paddle reads)."""
+
+    source: "Imm | Abs"
+    src: SourceRef
+
+
 # ---------------------------------------------------------------- indirect addressing
 
 
@@ -459,6 +524,7 @@ Instr = (
     | If
     | IncTarget | DecTarget | Transfer | Bitwise
     | LoadIndirect | StoreIndirect | CmpIndirect
+    | SbcImm | SbcAbs | Lsr | Bit
     | Unsupported
 )
 Item = Label | Instr
@@ -550,6 +616,15 @@ def format_item(item: Item) -> str:
         return f"  a = a + {_fmt_imm(item.imm)} + c              ; {item.src.short()}"
     if isinstance(item, AdcAbs):
         return f"  a = a + *{_fmt_abs(item.source)} + c    ; {item.src.short()}"
+    if isinstance(item, SbcImm):
+        return f"  a = a - {_fmt_imm(item.imm)} - (1 - c)        ; {item.src.short()}"
+    if isinstance(item, SbcAbs):
+        return f"  a = a - *{_fmt_abs(item.source)} - (1 - c) ; {item.src.short()}"
+    if isinstance(item, Lsr):
+        return f"  a = a >> 1                       ; {item.src.short()}"
+    if isinstance(item, Bit):
+        rhs = _fmt_imm(item.source) if isinstance(item.source, Imm) else f"*{_fmt_abs(item.source)}"
+        return f"  bit {rhs}                ; {item.src.short()}"
     if isinstance(item, LoadIndexed):
         return (
             f"  {item.reg} = *({_fmt_abs(item.base)} + {item.index})"

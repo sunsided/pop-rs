@@ -81,6 +81,7 @@ from .ir1 import (
     AdcAbs,
     AdcImm,
     Asl,
+    Bit,
     Bitwise,
     Branch,
     Call,
@@ -99,9 +100,12 @@ from .ir1 import (
     LoadImm,
     LoadIndexed,
     LoadIndirect,
+    Lsr,
     ModuleIR1,
     Return,
     Routine,
+    SbcAbs,
+    SbcImm,
     Sec,
     Transfer,
     Unsupported,
@@ -160,6 +164,16 @@ def _affected_register(item: Item):
     if isinstance(item, Bitwise):
         from .ir1 import Reg
         return Reg.A
+    if isinstance(item, (SbcImm, SbcAbs, Lsr)):
+        # All three define A's new value as their flag-side-effect,
+        # so a subsequent `beq`/`bne`/`bpl`/`bmi` reads Z/N of A.
+        from .ir1 import Reg
+        return Reg.A
+    # `Bit` is excluded on purpose. Its Z reflects `A & operand`, not
+    # A's own value, and our Compare form has no masked-equality
+    # variant — fusing `bit ; beq` would silently rewrite to
+    # `if a == 0` which is the WRONG predicate. Leave it unfused
+    # until pass 3 introduces an expression-bearing Compare.
     return None
 
 
@@ -210,6 +224,7 @@ def _defines_flags(item: Item) -> bool:
         (
             CmpImm, CmpAbs, LoadImm, LoadAbs, LoadIndexed, LoadIndirect,
             IncTarget, DecTarget, Transfer, Bitwise,
+            SbcImm, SbcAbs, Lsr, Bit,
         ),
     )
 
@@ -472,8 +487,40 @@ def _backward_sweep(
             live.add("C")
             continue
 
-        if isinstance(item, Asl):
+        if isinstance(item, (SbcImm, SbcAbs)):
+            # Sbc is symmetric with Adc: writes Z,N,C; reads C (the
+            # borrow flag chains through subsequent sbc's).
             live -= {"Z", "N", "C"}
+            live.add("C")
+            continue
+
+        if isinstance(item, (Asl, Lsr)):
+            # Both accumulator shifts write Z,N,C and mutate A, so
+            # they're never eligible for elision even when the flags
+            # are dead — but their flag writes do clear the live set.
+            live -= {"Z", "N", "C"}
+            continue
+
+        if isinstance(item, Bit):
+            # `Bit(Imm)` is a pure flag-setter — no memory access at
+            # all — so the normal Cmp-style elision rules apply.
+            #
+            # `Bit(Abs)` reads a byte from memory. On the Apple II,
+            # `bit $c0xx` is the canonical idiom for toggling soft-
+            # switches (speaker, page select, paddle reads, etc.) —
+            # the *read itself* is the observable side effect. Even
+            # outside the $C0xx page we can't tell from pass 2 alone
+            # whether a memory read is to a soft-switch or to plain
+            # RAM, so the safe and uniform rule is "never elide
+            # Bit(Abs)". Future work that knows the soft-switch range
+            # can relax this; for now correctness trumps the loss of
+            # ~43 elisions worst case.
+            from .ir1 import Imm
+            defines = {"Z", "N", "V"}
+            if isinstance(item.source, Imm) and not (live & defines):
+                drop.add(i)
+            else:
+                live -= defines
             continue
 
         if isinstance(item, Label):
