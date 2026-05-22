@@ -147,9 +147,69 @@ def test_chgshadposn_has_one_back_edge(source_dir):
     assert cfg.blocks[dst].label == ":loop"
 
 
-def test_natural_loop_body_includes_header_and_tail():
-    """Natural-loop body for a 3-block do-while is exactly the 3
-    blocks: header, intermediate (optional), tail."""
+def test_natural_loop_body_multi_block():
+    """Natural-loop body for a genuine multi-block do-while: header
+    has a conditional forward exit, tail is a separate block with the
+    back-edge. The body should be exactly {header, tail}; the
+    preheader (block 0) and the post-loop block must not be pulled
+    in."""
+    from pop_lifter.cfg import natural_loop_body
+    from pop_lifter.ir1 import (
+        Abs,
+        Branch,
+        CmpImm,
+        Imm,
+        Label,
+        LoadImm,
+        Reg,
+        Return,
+        Routine,
+        SourceRef,
+        StoreAbs,
+    )
+
+    src = SourceRef(file="syn", line=0, raw="")
+    # B0: LoadImm (preheader, falls through to :hdr)
+    # B1 (:hdr): StoreAbs to scratch, Branch(eq, :end) — header with
+    #            a forward exit, which means it's NOT the tail.
+    # B2: StoreAbs to scratch, Branch(ne, :hdr) — the tail.
+    # B3 (:end): Return — post-loop.
+    r = Routine(
+        name="dw_multi",
+        body=[
+            LoadImm(reg=Reg.A, imm=Imm(value=0, text="#0"), src=src),
+            Label(name=":hdr", src=src),
+            StoreAbs(reg=Reg.A, target=Abs(name="s", addr=0x80), src=src),
+            Branch(cond="eq", target=":end", src=src),
+            StoreAbs(reg=Reg.A, target=Abs(name="t", addr=0x81), src=src),
+            Branch(cond="ne", target=":hdr", src=src),
+            Label(name=":end", src=src),
+            Return(src=src),
+        ],
+    )
+    cfg = build_cfg(r)
+    hdr = cfg.label_to_block[":hdr"]
+    end = cfg.label_to_block[":end"]
+    # The tail is the block whose terminator targets the header.
+    tail = next(
+        b.id for b in cfg.blocks
+        if isinstance(b.terminator, Branch) and b.terminator.target == ":hdr"
+    )
+    assert tail != hdr, "test setup error: tail and header collapsed"
+
+    body = natural_loop_body(cfg, source=tail, header=hdr)
+    assert body == {hdr, tail}, (
+        f"expected loop body {{hdr, tail}} = {{{hdr}, {tail}}}, got {body}"
+    )
+    # Preheader (B0) and post-loop block (:end) must be excluded.
+    assert 0 not in body
+    assert end not in body
+
+
+def test_natural_loop_body_self_loop():
+    """Single-block do-while (`:hdr ... bne :hdr`) — the header IS
+    the tail. Pinned to catch the bug where the reverse walk used to
+    pull the preheader into the body when `source == header`."""
     from pop_lifter.cfg import natural_loop_body
     from pop_lifter.ir1 import (
         Branch,
@@ -165,7 +225,7 @@ def test_natural_loop_body_includes_header_and_tail():
 
     src = SourceRef(file="syn", line=0, raw="")
     r = Routine(
-        name="dw",
+        name="self",
         body=[
             LoadImm(reg=Reg.A, imm=Imm(value=0, text="#0"), src=src),
             Label(name=":hdr", src=src),
@@ -175,13 +235,9 @@ def test_natural_loop_body_includes_header_and_tail():
         ],
     )
     cfg = build_cfg(r)
-    # Block 0 is the entry (LoadImm + fall-through to :hdr).
-    # Block 1 (:hdr) is the loop header.
-    # Block 2 is the tail (Branch back to :hdr).
-    # Block 3 is the post-loop Return.
     hdr = cfg.label_to_block[":hdr"]
-    tail = hdr + 1
-    body = natural_loop_body(cfg, source=tail, header=hdr)
-    assert hdr in body and tail in body
-    # The Return block must NOT be in the loop.
-    assert (tail + 1) not in body
+    # In the self-loop case the back-edge source IS the header.
+    body = natural_loop_body(cfg, source=hdr, header=hdr)
+    assert body == {hdr}, (
+        f"self-loop body should be just {{header}}, got {body}"
+    )

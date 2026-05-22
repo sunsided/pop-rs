@@ -70,6 +70,7 @@ from .cfg import (
     compute_idoms,
     dominates,
     find_back_edges,
+    find_dfs_back_edges,
     natural_loop_body,
 )
 from .ir1 import (
@@ -230,13 +231,18 @@ def reloop_routine(routine: Routine) -> RoutineIR3:
     """
     cfg = build_cfg(routine)
 
-    # All back-edges must belong to a recognised simple loop — any
-    # leftover back-edge means we can't soundly do a single-pass walk,
-    # and the routine takes the fallback path.
-    back = find_back_edges(cfg) if cfg.blocks else []
+    # Every cycle in the CFG must belong to a recognised simple loop.
+    # We use `find_dfs_back_edges` (not `find_back_edges`) here so the
+    # gate catches *irreducible* loops too — those have no dominator
+    # back-edge but still represent cycles the linear walker can't
+    # safely traverse. Without this stricter check the walker's
+    # `visiting` escape hatch would fire mid-cycle and emit a
+    # `GotoStmt` referencing a synthesised `BB{n}` label that nothing
+    # downstream can resolve.
+    cycle_edges = find_dfs_back_edges(cfg) if cfg.blocks else []
     loops, loop_blocks = _detect_simple_loops(cfg)
-    if back and not all(
-        src in loop_blocks and dst in loop_blocks for src, dst in back
+    if cycle_edges and not all(
+        src in loop_blocks and dst in loop_blocks for src, dst in cycle_edges
     ):
         return _wrap_unstructured(routine)
 

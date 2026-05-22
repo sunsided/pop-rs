@@ -250,7 +250,12 @@ def dominates(idom: dict[int, int], a: int, b: int) -> bool:
 def find_back_edges(cfg: CFG) -> list[tuple[int, int]]:
     """Return all back-edges `(source, target)` where `target`
     dominates `source`. These are the canonical loop entries: each
-    back-edge induces a natural loop with `target` as the header."""
+    back-edge induces a natural loop with `target` as the header.
+
+    Only catches *reducible* loops. For arbitrary-cycle detection
+    (including irreducible flow that has no dominator back-edge),
+    use `find_dfs_back_edges`.
+    """
     idom = compute_idoms(cfg)
     edges: list[tuple[int, int]] = []
     for s, succs in cfg.succ.items():
@@ -262,13 +267,55 @@ def find_back_edges(cfg: CFG) -> list[tuple[int, int]]:
     return edges
 
 
+def find_dfs_back_edges(cfg: CFG) -> list[tuple[int, int]]:
+    """DFS classification of back-edges: any edge `(s, d)` where `d`
+    is on the DFS stack when `s` is being explored. Catches *every*
+    cycle in the CFG including irreducible ones (the kind without
+    a dominator back-edge — Tarjan's "cross-into-SCC" shape).
+
+    Pass 2's relooper uses this for the fallback gate: if the CFG
+    has any cycle that doesn't fully belong to a recognised simple
+    do-while, the routine takes the unstructured fallback. Sticking
+    with `find_back_edges` for that gate would silently miss
+    irreducible loops, which would then trip the walker's `visiting`
+    escape hatch and emit `GotoStmt`s to synthesized labels that no
+    interpreter can resolve.
+    """
+    visited: set[int] = set()
+    on_stack: set[int] = set()
+    edges: list[tuple[int, int]] = []
+
+    def dfs(b: int) -> None:
+        visited.add(b)
+        on_stack.add(b)
+        for s in cfg.succ.get(b, []):
+            if s in on_stack:
+                edges.append((b, s))
+            elif s not in visited:
+                dfs(s)
+        on_stack.discard(b)
+
+    if cfg.blocks:
+        dfs(cfg.entry_id)
+    return edges
+
+
 def natural_loop_body(cfg: CFG, source: int, header: int) -> set[int]:
     """Body of the natural loop induced by back-edge `(source, header)`:
     the header plus every block that can reach `source` without going
     through the header. Computed as a reverse BFS from `source` along
     predecessor edges, stopping at `header`. The header itself is
-    always included."""
-    body: set[int] = {header, source}
+    always included.
+
+    Self-loop edge case: when `source == header` the loop is a single
+    block (a back-edge from the header to itself). The body is just
+    `{header}`; we don't seed the worklist, which would otherwise
+    walk past the header into the preheader.
+    """
+    body: set[int] = {header}
+    if source == header:
+        return body
+    body.add(source)
     worklist: list[int] = [source]
     while worklist:
         b = worklist.pop()
