@@ -139,3 +139,131 @@ def test_step_limit_is_exclusive_upper_bound(source_dir):
     # One fewer than required — should raise.
     with pytest.raises(InterpError, match="step limit"):
         run(module, "DoStrike", max_steps=3)
+
+
+# ---- rndp + RND slice: new opcodes, cross-module tail call, jsr stack
+
+
+RND_SEED_ADDR = 0x9E
+GUARDPROG_ADDR = 0xDD
+
+
+def _two_module(source_dir):
+    from pop_lifter.pass1_lift import lift_file
+    ast = parse_files(
+        [
+            source_dir / "EQ.S",
+            source_dir / "GAMEEQ.S",
+            source_dir / "AUTO.S",
+            source_dir / "GRAFIX.S",
+        ],
+        search_paths=[source_dir],
+    )
+    auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
+    grafix = next(f for f in ast.files if Path(f.path).name == "GRAFIX.S")
+    m_auto = lift_file(auto, ast.equates, ["rndp"]).module
+    m_grafix = lift_file(grafix, ast.equates, ["RND"]).module
+    return m_auto, m_grafix
+
+
+def test_rnd_computes_5seed_plus_23(source_dir):
+    """Per the source comment in GRAFIX.S: `RNDseed := (5 * RNDseed + 23) mod 256`.
+    We pin a handful of representative seed values."""
+    _, grafix = _two_module(source_dir)
+    for seed in (0, 1, 7, 23, 100, 200, 255):
+        ram = bytearray(0x10000)
+        ram[RND_SEED_ADDR] = seed
+        trace = run(grafix, "RND", ram=ram)
+        expected = (5 * seed + 23) & 0xff
+        assert ram[RND_SEED_ADDR] == expected, (
+            f"seed={seed}: RND wrote {ram[RND_SEED_ADDR]:#04x}, "
+            f"expected {expected:#04x}"
+        )
+        assert trace.a == expected
+
+
+def test_rnd_carry_after_first_asl_does_not_corrupt_5seed(source_dir):
+    """The first `asl` can set carry; the subsequent `adc` happens
+    after a `clc`, so the carry must NOT contribute. Verify with a
+    seed whose top bit is 1, which guarantees C=1 after `asl`."""
+    _, grafix = _two_module(source_dir)
+    seed = 0x80  # bit 7 set → asl produces 0x00 with C=1
+    ram = bytearray(0x10000)
+    ram[RND_SEED_ADDR] = seed
+    trace = run(grafix, "RND", ram=ram)
+    # 5*0x80 = 0x280; mod 256 = 0x80; +23 = 0x97
+    assert ram[RND_SEED_ADDR] == (5 * seed + 23) & 0xff == 0x97
+    assert trace.c == 0  # last adc #23 doesn't overflow when low byte is small
+
+
+def test_rndp_tail_calls_into_RND_via_alias(source_dir):
+    """`rndp` loads guardprog into X and tail-calls `rnd`, which is a
+    grafix jump-table slot pointing at GRAFIX::RND. The interpreter
+    resolves the slot via the explicit alias map."""
+    auto, grafix = _two_module(source_dir)
+    ram = bytearray(0x10000)
+    ram[GUARDPROG_ADDR] = 7
+    ram[RND_SEED_ADDR] = 100
+    trace = run(
+        [auto, grafix],
+        "rndp",
+        ram=ram,
+        aliases={"rnd": "RND"},
+    )
+    # rndp loaded guardprog into X
+    assert trace.x == 7
+    # RND ran end-to-end and updated the seed
+    assert ram[RND_SEED_ADDR] == (5 * 100 + 23) & 0xff
+    # tail-call doesn't grow the stack
+    assert trace.max_stack_depth == 0
+
+
+def test_jsr_rts_returns_to_caller(source_dir):
+    """`jsr` followed by `rts` must resume at the next IR1 item, not
+    at routine entry. A minimal sanity check: lift AUTOCTRL's prefix
+    and run with everything past the first `jsr DoRelease` mocked out.
+
+    For this test we synthesize a tiny module by hand — that's cheaper
+    than building a fixture that survives the existing AUTOCTRL body
+    of Unsupported opcodes."""
+    from pop_lifter.ir1 import (
+        Abs,
+        Call,
+        Imm,
+        LoadImm,
+        ModuleIR1,
+        Reg,
+        Return,
+        Routine,
+        SourceRef,
+        StoreAbs,
+    )
+
+    src = SourceRef(file="synthetic", line=1, raw="")
+
+    callee = Routine(
+        name="callee",
+        body=[
+            LoadImm(reg=Reg.A, imm=Imm(value=0x42, text="#$42"), src=src),
+            StoreAbs(reg=Reg.A, target=Abs(name="slot", addr=0x100), src=src),
+            Return(src=src),
+        ],
+    )
+    caller = Routine(
+        name="caller",
+        body=[
+            Call(target="callee", src=src),
+            # The post-return code: writes 0xAA to addr 0x101 so a test
+            # can verify we resumed *after* the jsr.
+            LoadImm(reg=Reg.A, imm=Imm(value=0xAA, text="#$aa"), src=src),
+            StoreAbs(reg=Reg.A, target=Abs(name="post", addr=0x101), src=src),
+            Return(src=src),
+        ],
+    )
+    module = ModuleIR1(name="SYN", file="synthetic", routines=[caller, callee])
+
+    trace = run(module, "caller")
+    assert trace.ram[0x100] == 0x42
+    assert trace.ram[0x101] == 0xAA
+    # One nested call observed.
+    assert trace.max_stack_depth == 1

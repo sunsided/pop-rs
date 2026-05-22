@@ -5,14 +5,14 @@ fn RDBLOCK {
   *tempblockx@0x0091 = x            ; CTRLSUBS.S:151
   *tempblocky@0x0092 = y            ; CTRLSUBS.S:152
 RDBLOCK1:
-  ??? jsr handler            ; CTRLSUBS.S:155
-  ??? lda tempscrn            ; CTRLSUBS.S:157
+  call handler                  ; CTRLSUBS.S:155
+  a = *tempscrn@0x0093        ; CTRLSUBS.S:157
   ??? beq :nullscrn            ; CTRLSUBS.S:158
-  ??? jsr calcblue            ; CTRLSUBS.S:159
-  ??? ldy tempblocky            ; CTRLSUBS.S:161
+  call calcblue                  ; CTRLSUBS.S:159
+  y = *tempblocky@0x0092        ; CTRLSUBS.S:161
   ??? lda Mult10,y            ; CTRLSUBS.S:162
-  ??? clc             ; CTRLSUBS.S:163
-  ??? adc tempblockx            ; CTRLSUBS.S:164
+  c = 0                            ; CTRLSUBS.S:163
+  a = a + *tempblockx@0x0091 + c    ; CTRLSUBS.S:164
   ??? tay             ; CTRLSUBS.S:165
   ??? lda (BlueType),y            ; CTRLSUBS.S:166
   ??? and #idmask            ; CTRLSUBS.S:167
@@ -21,14 +21,14 @@ RDBLOCK1:
 }
 
 fn RDBLOCK1 {
-  ??? jsr handler            ; CTRLSUBS.S:155
-  ??? lda tempscrn            ; CTRLSUBS.S:157
+  call handler                  ; CTRLSUBS.S:155
+  a = *tempscrn@0x0093        ; CTRLSUBS.S:157
   ??? beq :nullscrn            ; CTRLSUBS.S:158
-  ??? jsr calcblue            ; CTRLSUBS.S:159
-  ??? ldy tempblocky            ; CTRLSUBS.S:161
+  call calcblue                  ; CTRLSUBS.S:159
+  y = *tempblocky@0x0092        ; CTRLSUBS.S:161
   ??? lda Mult10,y            ; CTRLSUBS.S:162
-  ??? clc             ; CTRLSUBS.S:163
-  ??? adc tempblockx            ; CTRLSUBS.S:164
+  c = 0                            ; CTRLSUBS.S:163
+  a = a + *tempblockx@0x0091 + c    ; CTRLSUBS.S:164
   ??? tay             ; CTRLSUBS.S:165
   ??? lda (BlueType),y            ; CTRLSUBS.S:166
   ??? and #idmask            ; CTRLSUBS.S:167
@@ -37,48 +37,48 @@ fn RDBLOCK1 {
 }
 
 fn handler {
-  ??? lda tempblockx            ; CTRLSUBS.S:178
+  a = *tempblockx@0x0091        ; CTRLSUBS.S:178
   ??? bpl :1            ; CTRLSUBS.S:179
-  ??? jsr offleft            ; CTRLSUBS.S:180
+  call offleft                  ; CTRLSUBS.S:180
   tail_call handler                ; CTRLSUBS.S:181
 }
 
 fn offtop {
-  ??? clc             ; CTRLSUBS.S:200
-  ??? adc #3            ; CTRLSUBS.S:201
+  c = 0                            ; CTRLSUBS.S:200
+  a = a + #0x03 + c              ; CTRLSUBS.S:201
   *tempblocky@0x0092 = a            ; CTRLSUBS.S:202
-  ??? lda tempscrn            ; CTRLSUBS.S:204
-  ??? jsr GETUP            ; CTRLSUBS.S:205
+  a = *tempscrn@0x0093        ; CTRLSUBS.S:204
+  call GETUP                  ; CTRLSUBS.S:205
   *tempscrn@0x0093 = a            ; CTRLSUBS.S:206
   return                           ; CTRLSUBS.S:207
 }
 
 fn offbot {
-  ??? sec             ; CTRLSUBS.S:209
+  c = 1                            ; CTRLSUBS.S:209
   ??? sbc #3            ; CTRLSUBS.S:210
   *tempblocky@0x0092 = a            ; CTRLSUBS.S:211
-  ??? lda tempscrn            ; CTRLSUBS.S:213
-  ??? jsr GETDOWN            ; CTRLSUBS.S:214
+  a = *tempscrn@0x0093        ; CTRLSUBS.S:213
+  call GETDOWN                  ; CTRLSUBS.S:214
   *tempscrn@0x0093 = a            ; CTRLSUBS.S:215
   return                           ; CTRLSUBS.S:216
 }
 
 fn offleft {
-  ??? clc             ; CTRLSUBS.S:218
-  ??? adc #10            ; CTRLSUBS.S:219
+  c = 0                            ; CTRLSUBS.S:218
+  a = a + #0x0a + c              ; CTRLSUBS.S:219
   *tempblockx@0x0091 = a            ; CTRLSUBS.S:220
-  ??? lda tempscrn            ; CTRLSUBS.S:222
-  ??? jsr GETLEFT            ; CTRLSUBS.S:223
+  a = *tempscrn@0x0093        ; CTRLSUBS.S:222
+  call GETLEFT                  ; CTRLSUBS.S:223
   *tempscrn@0x0093 = a            ; CTRLSUBS.S:224
   return                           ; CTRLSUBS.S:225
 }
 
 fn offrt {
-  ??? sec             ; CTRLSUBS.S:227
+  c = 1                            ; CTRLSUBS.S:227
   ??? sbc #10            ; CTRLSUBS.S:228
   *tempblockx@0x0091 = a            ; CTRLSUBS.S:229
-  ??? lda tempscrn            ; CTRLSUBS.S:231
-  ??? jsr GETRIGHT            ; CTRLSUBS.S:232
+  a = *tempscrn@0x0093        ; CTRLSUBS.S:231
+  call GETRIGHT                  ; CTRLSUBS.S:232
   *tempscrn@0x0093 = a            ; CTRLSUBS.S:233
 ]rts:
   return                           ; CTRLSUBS.S:234
@@ -86,8 +86,8 @@ fn offrt {
 
 fn GETLEFT {
   ??? beq ]rts            ; CTRLSUBS.S:245
-  ??? asl             ; CTRLSUBS.S:246
-  ??? asl             ; CTRLSUBS.S:247
+  a = a << 1                       ; CTRLSUBS.S:246
+  a = a << 1                       ; CTRLSUBS.S:247
   ??? tax             ; CTRLSUBS.S:248
   ??? lda MAP-4,x            ; CTRLSUBS.S:249
 ]rts:
@@ -96,8 +96,8 @@ fn GETLEFT {
 
 fn GETRIGHT {
   ??? beq ]rts            ; CTRLSUBS.S:253
-  ??? asl             ; CTRLSUBS.S:254
-  ??? asl             ; CTRLSUBS.S:255
+  a = a << 1                       ; CTRLSUBS.S:254
+  a = a << 1                       ; CTRLSUBS.S:255
   ??? tax             ; CTRLSUBS.S:256
   ??? lda MAP-3,x            ; CTRLSUBS.S:257
   return                           ; CTRLSUBS.S:258
@@ -105,8 +105,8 @@ fn GETRIGHT {
 
 fn GETUP {
   ??? beq ]rts            ; CTRLSUBS.S:261
-  ??? asl             ; CTRLSUBS.S:262
-  ??? asl             ; CTRLSUBS.S:263
+  a = a << 1                       ; CTRLSUBS.S:262
+  a = a << 1                       ; CTRLSUBS.S:263
   ??? tax             ; CTRLSUBS.S:264
   ??? lda MAP-2,x            ; CTRLSUBS.S:265
   return                           ; CTRLSUBS.S:266
@@ -114,50 +114,50 @@ fn GETUP {
 
 fn GETDOWN {
   ??? beq ]rts            ; CTRLSUBS.S:269
-  ??? asl             ; CTRLSUBS.S:270
-  ??? asl             ; CTRLSUBS.S:271
+  a = a << 1                       ; CTRLSUBS.S:270
+  a = a << 1                       ; CTRLSUBS.S:271
   ??? tax             ; CTRLSUBS.S:272
   ??? lda MAP-1,x            ; CTRLSUBS.S:273
   return                           ; CTRLSUBS.S:274
 }
 
 fn GETSCRNS {
-  ??? lda VisScrn            ; CTRLSUBS.S:285
-  ??? jsr GETLEFT            ; CTRLSUBS.S:286
+  a = *VisScrn@0x00cb        ; CTRLSUBS.S:285
+  call GETLEFT                  ; CTRLSUBS.S:286
   *scrnLeft@0x0031 = a            ; CTRLSUBS.S:287
-  ??? lda VisScrn            ; CTRLSUBS.S:289
-  ??? jsr GETRIGHT            ; CTRLSUBS.S:290
+  a = *VisScrn@0x00cb        ; CTRLSUBS.S:289
+  call GETRIGHT                  ; CTRLSUBS.S:290
   *scrnRight@0x0032 = a            ; CTRLSUBS.S:291
-  ??? lda VisScrn            ; CTRLSUBS.S:293
-  ??? jsr GETUP            ; CTRLSUBS.S:294
+  a = *VisScrn@0x00cb        ; CTRLSUBS.S:293
+  call GETUP                  ; CTRLSUBS.S:294
   *scrnAbove@0x0033 = a            ; CTRLSUBS.S:295
-  ??? lda VisScrn            ; CTRLSUBS.S:297
-  ??? jsr GETDOWN            ; CTRLSUBS.S:298
+  a = *VisScrn@0x00cb        ; CTRLSUBS.S:297
+  call GETDOWN                  ; CTRLSUBS.S:298
   *scrnBelow@0x0034 = a            ; CTRLSUBS.S:299
-  ??? lda scrnBelow            ; CTRLSUBS.S:303
-  ??? jsr GETLEFT            ; CTRLSUBS.S:304
+  a = *scrnBelow@0x0034        ; CTRLSUBS.S:303
+  call GETLEFT                  ; CTRLSUBS.S:304
   *scrnBelowL@0x0035 = a            ; CTRLSUBS.S:305
-  ??? lda scrnBelow            ; CTRLSUBS.S:307
-  ??? jsr GETRIGHT            ; CTRLSUBS.S:308
+  a = *scrnBelow@0x0034        ; CTRLSUBS.S:307
+  call GETRIGHT                  ; CTRLSUBS.S:308
   *scrnBelowR@0x0038 = a            ; CTRLSUBS.S:309
-  ??? lda scrnAbove            ; CTRLSUBS.S:311
-  ??? jsr GETLEFT            ; CTRLSUBS.S:312
+  a = *scrnAbove@0x0033        ; CTRLSUBS.S:311
+  call GETLEFT                  ; CTRLSUBS.S:312
   *scrnAboveL@0x0036 = a            ; CTRLSUBS.S:313
-  ??? lda scrnAbove            ; CTRLSUBS.S:315
-  ??? jsr GETRIGHT            ; CTRLSUBS.S:316
+  a = *scrnAbove@0x0033        ; CTRLSUBS.S:315
+  call GETRIGHT                  ; CTRLSUBS.S:316
   *scrnAboveR@0x0037 = a            ; CTRLSUBS.S:317
 ]rts:
   return                           ; CTRLSUBS.S:318
 }
 
 fn GETBASEX {
-  ??? lda Fcheck            ; CTRLSUBS.S:330
+  a = *Fcheck@0x0085        ; CTRLSUBS.S:330
   ??? and #Ffootmark            ; CTRLSUBS.S:331
   ??? eor #$ff            ; CTRLSUBS.S:333
-  ??? clc             ; CTRLSUBS.S:334
-  ??? adc #1            ; CTRLSUBS.S:335
-  ??? clc             ; CTRLSUBS.S:337
-  ??? adc Fdx            ; CTRLSUBS.S:338
+  c = 0                            ; CTRLSUBS.S:334
+  a = a + #0x01 + c              ; CTRLSUBS.S:335
+  c = 0                            ; CTRLSUBS.S:337
+  a = a + *Fdx@0x0083 + c    ; CTRLSUBS.S:338
   tail_call ADDCHARX                ; CTRLSUBS.S:340
 }
 
@@ -165,11 +165,11 @@ fn ADDCHARX {
   ??? bit CharFace            ; CTRLSUBS.S:354
   ??? bpl :right            ; CTRLSUBS.S:355
   ??? eor #$ff            ; CTRLSUBS.S:357
-  ??? clc             ; CTRLSUBS.S:358
-  ??? adc #1            ; CTRLSUBS.S:359
+  c = 0                            ; CTRLSUBS.S:358
+  a = a + #0x01 + c              ; CTRLSUBS.S:359
 :right:
-  ??? clc             ; CTRLSUBS.S:361
-  ??? adc CharX            ; CTRLSUBS.S:362
+  c = 0                            ; CTRLSUBS.S:361
+  a = a + *CharX@0x0041 + c    ; CTRLSUBS.S:362
   return                           ; CTRLSUBS.S:363
 }
 
@@ -177,139 +177,139 @@ fn ADDFCHARX {
   *ztemp@0x00e9 = a            ; CTRLSUBS.S:375
   ??? bpl :1            ; CTRLSUBS.S:376
   a = #0x00                  ; CTRLSUBS.S:378
-  ??? sec             ; CTRLSUBS.S:379
+  c = 1                            ; CTRLSUBS.S:379
   ??? sbc ztemp            ; CTRLSUBS.S:380
   *ztemp@0x00e9 = a            ; CTRLSUBS.S:381
   a = #0xff                  ; CTRLSUBS.S:383
 :1:
   ??? eor FCharFace            ; CTRLSUBS.S:384
   ??? bmi :left            ; CTRLSUBS.S:385
-  ??? lda ztemp            ; CTRLSUBS.S:387
-  ??? clc             ; CTRLSUBS.S:388
-  ??? adc FCharX            ; CTRLSUBS.S:389
+  a = *ztemp@0x00e9        ; CTRLSUBS.S:387
+  c = 0                            ; CTRLSUBS.S:388
+  a = a + *FCharX@0x0071 + c    ; CTRLSUBS.S:389
   *FCharX@0x0071 = a            ; CTRLSUBS.S:390
-  ??? lda FCharX+1            ; CTRLSUBS.S:392
-  ??? adc #0            ; CTRLSUBS.S:393
+  a = *FCharX+1@0x0072        ; CTRLSUBS.S:392
+  a = a + #0x00 + c              ; CTRLSUBS.S:393
   *FCharX+1@0x0072 = a            ; CTRLSUBS.S:394
   return                           ; CTRLSUBS.S:395
 }
 
 fn GETUNDERFT {
-  ??? ldx CharBlockX            ; CTRLSUBS.S:415
-  ??? ldy CharBlockY            ; CTRLSUBS.S:416
-  ??? lda CharScrn            ; CTRLSUBS.S:417
+  x = *CharBlockX@0x0044        ; CTRLSUBS.S:415
+  y = *CharBlockY@0x0045        ; CTRLSUBS.S:416
+  a = *CharScrn@0x004b        ; CTRLSUBS.S:417
   tail_call RDBLOCK                ; CTRLSUBS.S:418
 }
 
 fn GETINFRONT {
-  ??? ldx CharFace            ; CTRLSUBS.S:421
+  x = *CharFace@0x0043        ; CTRLSUBS.S:421
   ??? inx             ; CTRLSUBS.S:422
-  ??? lda CharBlockX            ; CTRLSUBS.S:423
-  ??? clc             ; CTRLSUBS.S:424
+  a = *CharBlockX@0x0044        ; CTRLSUBS.S:423
+  c = 0                            ; CTRLSUBS.S:424
   ??? adc plus1,x            ; CTRLSUBS.S:425
   *infrontx@0x008e = a            ; CTRLSUBS.S:426
   ??? tax             ; CTRLSUBS.S:427
-  ??? ldy CharBlockY            ; CTRLSUBS.S:429
-  ??? lda CharScrn            ; CTRLSUBS.S:430
+  y = *CharBlockY@0x0045        ; CTRLSUBS.S:429
+  a = *CharScrn@0x004b        ; CTRLSUBS.S:430
   tail_call RDBLOCK                ; CTRLSUBS.S:431
 }
 
 fn GET2INFRONT {
-  ??? ldx CharFace            ; CTRLSUBS.S:434
+  x = *CharFace@0x0043        ; CTRLSUBS.S:434
   ??? inx             ; CTRLSUBS.S:435
-  ??? lda CharBlockX            ; CTRLSUBS.S:436
-  ??? clc             ; CTRLSUBS.S:437
+  a = *CharBlockX@0x0044        ; CTRLSUBS.S:436
+  c = 0                            ; CTRLSUBS.S:437
   ??? adc plus1,x            ; CTRLSUBS.S:438
-  ??? clc             ; CTRLSUBS.S:439
+  c = 0                            ; CTRLSUBS.S:439
   ??? adc plus1,x            ; CTRLSUBS.S:440
   ??? tax             ; CTRLSUBS.S:441
-  ??? ldy CharBlockY            ; CTRLSUBS.S:443
-  ??? lda CharScrn            ; CTRLSUBS.S:444
+  y = *CharBlockY@0x0045        ; CTRLSUBS.S:443
+  a = *CharScrn@0x004b        ; CTRLSUBS.S:444
   tail_call RDBLOCK                ; CTRLSUBS.S:445
 }
 
 fn GETBEHIND {
-  ??? ldx CharFace            ; CTRLSUBS.S:448
+  x = *CharFace@0x0043        ; CTRLSUBS.S:448
   ??? inx             ; CTRLSUBS.S:449
-  ??? lda CharBlockX            ; CTRLSUBS.S:450
-  ??? clc             ; CTRLSUBS.S:451
+  a = *CharBlockX@0x0044        ; CTRLSUBS.S:450
+  c = 0                            ; CTRLSUBS.S:451
   ??? adc minus1,x            ; CTRLSUBS.S:452
   *behindx@0x008f = a            ; CTRLSUBS.S:453
   ??? tax             ; CTRLSUBS.S:454
-  ??? ldy CharBlockY            ; CTRLSUBS.S:456
-  ??? lda CharScrn            ; CTRLSUBS.S:457
+  y = *CharBlockY@0x0045        ; CTRLSUBS.S:456
+  a = *CharScrn@0x004b        ; CTRLSUBS.S:457
   tail_call RDBLOCK                ; CTRLSUBS.S:458
 }
 
 fn GETABOVE {
-  ??? ldy CharBlockY            ; CTRLSUBS.S:461
+  y = *CharBlockY@0x0045        ; CTRLSUBS.S:461
   ??? dey             ; CTRLSUBS.S:462
   *abovey@0x0090 = y            ; CTRLSUBS.S:463
-  ??? ldx CharBlockX            ; CTRLSUBS.S:465
-  ??? lda CharScrn            ; CTRLSUBS.S:466
+  x = *CharBlockX@0x0044        ; CTRLSUBS.S:465
+  a = *CharScrn@0x004b        ; CTRLSUBS.S:466
   tail_call RDBLOCK                ; CTRLSUBS.S:467
 }
 
 fn GETABOVEINF {
-  ??? ldx CharFace            ; CTRLSUBS.S:470
+  x = *CharFace@0x0043        ; CTRLSUBS.S:470
   ??? inx             ; CTRLSUBS.S:471
-  ??? lda CharBlockX            ; CTRLSUBS.S:472
-  ??? clc             ; CTRLSUBS.S:473
+  a = *CharBlockX@0x0044        ; CTRLSUBS.S:472
+  c = 0                            ; CTRLSUBS.S:473
   ??? adc plus1,x            ; CTRLSUBS.S:474
   *infrontx@0x008e = a            ; CTRLSUBS.S:475
   ??? tax             ; CTRLSUBS.S:476
-  ??? ldy CharBlockY            ; CTRLSUBS.S:478
+  y = *CharBlockY@0x0045        ; CTRLSUBS.S:478
   ??? dey             ; CTRLSUBS.S:479
   *abovey@0x0090 = y            ; CTRLSUBS.S:480
-  ??? lda CharScrn            ; CTRLSUBS.S:482
+  a = *CharScrn@0x004b        ; CTRLSUBS.S:482
   tail_call RDBLOCK                ; CTRLSUBS.S:483
 }
 
 fn GETABOVEBEH {
-  ??? ldx CharFace            ; CTRLSUBS.S:486
+  x = *CharFace@0x0043        ; CTRLSUBS.S:486
   ??? inx             ; CTRLSUBS.S:487
-  ??? lda CharBlockX            ; CTRLSUBS.S:488
-  ??? clc             ; CTRLSUBS.S:489
+  a = *CharBlockX@0x0044        ; CTRLSUBS.S:488
+  c = 0                            ; CTRLSUBS.S:489
   ??? adc minus1,x            ; CTRLSUBS.S:490
   *behindx@0x008f = a            ; CTRLSUBS.S:491
   ??? tax             ; CTRLSUBS.S:492
-  ??? ldy CharBlockY            ; CTRLSUBS.S:494
+  y = *CharBlockY@0x0045        ; CTRLSUBS.S:494
   ??? dey             ; CTRLSUBS.S:495
   *abovey@0x0090 = y            ; CTRLSUBS.S:496
-  ??? lda CharScrn            ; CTRLSUBS.S:498
+  a = *CharScrn@0x004b        ; CTRLSUBS.S:498
   tail_call RDBLOCK                ; CTRLSUBS.S:499
 }
 
 fn GETDIST {
-  ??? jsr GETBASEX            ; CTRLSUBS.S:512
+  call GETBASEX                  ; CTRLSUBS.S:512
 GETDIST1:
-  ??? jsr GETBLOCKXP            ; CTRLSUBS.S:515
-  ??? lda CharFace            ; CTRLSUBS.S:517
+  call GETBLOCKXP                  ; CTRLSUBS.S:515
+  a = *CharFace@0x0043        ; CTRLSUBS.S:517
   ??? beq :facingright            ; CTRLSUBS.S:518
 :facingleft:
-  ??? lda OFFSET            ; CTRLSUBS.S:521
+  a = *OFFSET@0x0003        ; CTRLSUBS.S:521
   return                           ; CTRLSUBS.S:522
 }
 
 fn GETDIST1 {
-  ??? jsr GETBLOCKXP            ; CTRLSUBS.S:515
-  ??? lda CharFace            ; CTRLSUBS.S:517
+  call GETBLOCKXP                  ; CTRLSUBS.S:515
+  a = *CharFace@0x0043        ; CTRLSUBS.S:517
   ??? beq :facingright            ; CTRLSUBS.S:518
 :facingleft:
-  ??? lda OFFSET            ; CTRLSUBS.S:521
+  a = *OFFSET@0x0003        ; CTRLSUBS.S:521
   return                           ; CTRLSUBS.S:522
 }
 
 fn GETBLOCKEJ {
-  ??? clc             ; CTRLSUBS.S:539
-  ??? adc #5            ; CTRLSUBS.S:540
+  c = 0                            ; CTRLSUBS.S:539
+  a = a + #0x05 + c              ; CTRLSUBS.S:540
   ??? tax             ; CTRLSUBS.S:541
   ??? lda BlockEdge,x            ; CTRLSUBS.S:542
   return                           ; CTRLSUBS.S:543
 }
 
 fn GETBLOCKXP {
-  ??? sec             ; CTRLSUBS.S:561
+  c = 1                            ; CTRLSUBS.S:561
   ??? sbc #angle            ; CTRLSUBS.S:562
 GETBLOCKX:
   ??? tay             ; CTRLSUBS.S:565
@@ -353,17 +353,17 @@ fn GETBLOCKYP {
 }
 
 fn INDEXBLOCK {
-  ??? ldy tempblocky            ; CTRLSUBS.S:616
+  y = *tempblocky@0x0092        ; CTRLSUBS.S:616
   ??? bmi :above            ; CTRLSUBS.S:617
   ??? cpy #3            ; CTRLSUBS.S:618
   ??? bcs :os            ; CTRLSUBS.S:619
-  ??? lda tempblockx            ; CTRLSUBS.S:621
+  a = *tempblockx@0x0091        ; CTRLSUBS.S:621
   ??? cmp #10            ; CTRLSUBS.S:622
   ??? bcs :os            ; CTRLSUBS.S:623
-  ??? clc             ; CTRLSUBS.S:625
+  c = 0                            ; CTRLSUBS.S:625
   ??? adc Mult10,y            ; CTRLSUBS.S:626
   ??? tay             ; CTRLSUBS.S:628
-  ??? clc             ; CTRLSUBS.S:629
+  c = 0                            ; CTRLSUBS.S:629
   return                           ; CTRLSUBS.S:630
 }
 
@@ -372,7 +372,7 @@ fn UNINDEX {
 :loop:
   ??? cmp #10            ; CTRLSUBS.S:650
   ??? bcc ]rts            ; CTRLSUBS.S:651
-  ??? sec             ; CTRLSUBS.S:652
+  c = 1                            ; CTRLSUBS.S:652
   ??? sbc #10            ; CTRLSUBS.S:653
   ??? inx             ; CTRLSUBS.S:654
   ??? bne :loop            ; CTRLSUBS.S:655
@@ -381,8 +381,8 @@ fn UNINDEX {
 }
 
 fn GETBASEBLOCK {
-  ??? jsr getbasex            ; CTRLSUBS.S:667
-  ??? jsr getblockxp            ; CTRLSUBS.S:668
+  call getbasex                  ; CTRLSUBS.S:667
+  call getblockxp                  ; CTRLSUBS.S:668
   *CharBlockX@0x0044 = a            ; CTRLSUBS.S:669
 ]rts:
   return                           ; CTRLSUBS.S:670
@@ -392,16 +392,16 @@ fn FACEDX {
   ??? bit CharFace            ; CTRLSUBS.S:682
   ??? bmi ]rts            ; CTRLSUBS.S:683
   ??? eor #$ff            ; CTRLSUBS.S:685
-  ??? clc             ; CTRLSUBS.S:686
-  ??? adc #1            ; CTRLSUBS.S:687
+  c = 0                            ; CTRLSUBS.S:686
+  a = a + #0x01 + c              ; CTRLSUBS.S:687
 ]rts:
   return                           ; CTRLSUBS.S:689
 }
 
 fn JUMPSEQ {
-  ??? sec             ; CTRLSUBS.S:701
+  c = 1                            ; CTRLSUBS.S:701
   ??? sbc #1            ; CTRLSUBS.S:702
-  ??? asl             ; CTRLSUBS.S:703
+  a = a << 1                       ; CTRLSUBS.S:703
   ??? tax             ; CTRLSUBS.S:704
   ??? lda seqtab,x            ; CTRLSUBS.S:706
   *CharSeq@0x0049 = a            ; CTRLSUBS.S:707
@@ -412,9 +412,9 @@ fn JUMPSEQ {
 }
 
 fn OPJUMPSEQ {
-  ??? sec             ; CTRLSUBS.S:719
+  c = 1                            ; CTRLSUBS.S:719
   ??? sbc #1            ; CTRLSUBS.S:720
-  ??? asl             ; CTRLSUBS.S:721
+  a = a << 1                       ; CTRLSUBS.S:721
   ??? tax             ; CTRLSUBS.S:722
   ??? lda seqtab,x            ; CTRLSUBS.S:724
   *OpSeq@0x03a5 = a            ; CTRLSUBS.S:725
@@ -425,15 +425,15 @@ fn OPJUMPSEQ {
 }
 
 fn INDEXCHAR {
-  ??? lda CharAction            ; CTRLSUBS.S:741
+  a = *CharAction@0x0046        ; CTRLSUBS.S:741
   ??? cmp #1            ; CTRLSUBS.S:742
   ??? bne :4            ; CTRLSUBS.S:743
-  ??? lda bottomblock            ; CTRLSUBS.S:746
+  a = *bottomblock@0x00bd        ; CTRLSUBS.S:746
   *tempblocky@0x0092 = a            ; CTRLSUBS.S:747
-  ??? lda leftblock            ; CTRLSUBS.S:749
+  a = *leftblock@0x00ba        ; CTRLSUBS.S:749
 :1:
   *tempblockx@0x0091 = a            ; CTRLSUBS.S:750
-  ??? lda CharPosn            ; CTRLSUBS.S:752
+  a = *CharPosn@0x0040        ; CTRLSUBS.S:752
   ??? cmp #135            ; CTRLSUBS.S:753
   ??? bcc :2            ; CTRLSUBS.S:754
   ??? cmp #149            ; CTRLSUBS.S:755
@@ -451,45 +451,45 @@ fn INDEXCHAR {
 :climbup:
   ??? dec tempblockx            ; CTRLSUBS.S:767
 :3:
-  ??? jsr indexblock            ; CTRLSUBS.S:769
+  call indexblock                  ; CTRLSUBS.S:769
   *FCharIndex@0x0075 = y            ; CTRLSUBS.S:770
   return                           ; CTRLSUBS.S:771
 }
 
 fn SETUPCHAR {
-  ??? jsr zerocrop            ; CTRLSUBS.S:795
-  ??? jsr GETFRAMEINFO            ; CTRLSUBS.S:797
-  ??? lda CharFace            ; CTRLSUBS.S:799
+  call zerocrop                  ; CTRLSUBS.S:795
+  call GETFRAMEINFO                  ; CTRLSUBS.S:797
+  a = *CharFace@0x0043        ; CTRLSUBS.S:799
   *FCharFace@0x0074 = a            ; CTRLSUBS.S:800
-  ??? jsr decodeim            ; CTRLSUBS.S:802
+  call decodeim                  ; CTRLSUBS.S:802
   a = #0x00                  ; CTRLSUBS.S:804
   *FCharX+1@0x0072 = a            ; CTRLSUBS.S:805
-  ??? lda Fdx            ; CTRLSUBS.S:807
-  ??? jsr addcharx            ; CTRLSUBS.S:808
-  ??? sec             ; CTRLSUBS.S:809
+  a = *Fdx@0x0083        ; CTRLSUBS.S:807
+  call addcharx                  ; CTRLSUBS.S:808
+  c = 1                            ; CTRLSUBS.S:809
   ??? sbc #ScrnLeft            ; CTRLSUBS.S:810
   *FCharX@0x0071 = a            ; CTRLSUBS.S:811
   ??? asl FCharX            ; CTRLSUBS.S:813
   ??? rol FCharX+1            ; CTRLSUBS.S:814
   ??? beq :pos            ; CTRLSUBS.S:815
-  ??? lda FCharX            ; CTRLSUBS.S:817
+  a = *FCharX@0x0071        ; CTRLSUBS.S:817
   ??? cmp #$f0            ; CTRLSUBS.S:818
   ??? bcc :pos            ; CTRLSUBS.S:819
   a = #0xff                  ; CTRLSUBS.S:820
   *FCharX+1@0x0072 = a            ; CTRLSUBS.S:821
 :pos:
-  ??? lda Fdy            ; CTRLSUBS.S:823
-  ??? clc             ; CTRLSUBS.S:824
-  ??? adc CharY            ; CTRLSUBS.S:825
-  ??? sec             ; CTRLSUBS.S:826
+  a = *Fdy@0x0084        ; CTRLSUBS.S:823
+  c = 0                            ; CTRLSUBS.S:824
+  a = a + *CharY@0x0042 + c    ; CTRLSUBS.S:825
+  c = 1                            ; CTRLSUBS.S:826
   ??? sbc #ScrnTop            ; CTRLSUBS.S:827
   *FCharY@0x0073 = a            ; CTRLSUBS.S:828
-  ??? lda Fcheck            ; CTRLSUBS.S:830
+  a = *Fcheck@0x0085        ; CTRLSUBS.S:830
   ??? eor FCharFace            ; CTRLSUBS.S:831
   ??? bmi :ok            ; CTRLSUBS.S:832
-  ??? lda FCharX            ; CTRLSUBS.S:834
-  ??? clc             ; CTRLSUBS.S:835
-  ??? adc #1            ; CTRLSUBS.S:836
+  a = *FCharX@0x0071        ; CTRLSUBS.S:834
+  c = 0                            ; CTRLSUBS.S:835
+  a = a + #0x01 + c              ; CTRLSUBS.S:836
   *FCharX@0x0071 = a            ; CTRLSUBS.S:837
   ??? bcc :ok            ; CTRLSUBS.S:838
   ??? inc FCharX+1            ; CTRLSUBS.S:839
@@ -499,82 +499,82 @@ fn SETUPCHAR {
 }
 
 fn SETUPSWORD {
-  ??? lda CharID            ; CTRLSUBS.S:853
+  a = *CharID@0x004d        ; CTRLSUBS.S:853
   ??? cmp #2            ; CTRLSUBS.S:854
   ??? bne :3            ; CTRLSUBS.S:855
-  ??? lda CharLife            ; CTRLSUBS.S:856
+  a = *CharLife@0x004f        ; CTRLSUBS.S:856
   ??? bmi :2            ; CTRLSUBS.S:857
 :3:
-  ??? lda CharPosn            ; CTRLSUBS.S:859
+  a = *CharPosn@0x0040        ; CTRLSUBS.S:859
   ??? cmp #229            ; CTRLSUBS.S:860
   ??? bcc :1            ; CTRLSUBS.S:861
   ??? cmp #238            ; CTRLSUBS.S:862
   ??? bcc :2            ; CTRLSUBS.S:863
 :1:
-  ??? lda CharSword            ; CTRLSUBS.S:864
+  a = *CharSword@0x004e        ; CTRLSUBS.S:864
   ??? beq ]rts            ; CTRLSUBS.S:865
 :2:
-  ??? lda Fsword            ; CTRLSUBS.S:867
+  a = *Fsword@0x00d9        ; CTRLSUBS.S:867
   ??? and #$3f            ; CTRLSUBS.S:868
   ??? beq ]rts            ; CTRLSUBS.S:869
-  ??? jsr getswordframe            ; CTRLSUBS.S:871
+  call getswordframe                  ; CTRLSUBS.S:871
   y = #0x00                  ; CTRLSUBS.S:873
   ??? lda (framepoint),y            ; CTRLSUBS.S:874
   ??? beq ]rts            ; CTRLSUBS.S:875
-  ??? jsr decodeswim            ; CTRLSUBS.S:877
+  call decodeswim                  ; CTRLSUBS.S:877
   ??? iny             ; CTRLSUBS.S:879
   ??? lda (framepoint),y            ; CTRLSUBS.S:880
   *Fdx@0x0083 = a            ; CTRLSUBS.S:881
   ??? iny             ; CTRLSUBS.S:883
   ??? lda (framepoint),y            ; CTRLSUBS.S:884
   *Fdy@0x0084 = a            ; CTRLSUBS.S:885
-  ??? lda Fdx            ; CTRLSUBS.S:887
-  ??? jsr ADDFCHARX            ; CTRLSUBS.S:888
-  ??? lda Fdy            ; CTRLSUBS.S:890
-  ??? clc             ; CTRLSUBS.S:891
-  ??? adc FCharY            ; CTRLSUBS.S:892
+  a = *Fdx@0x0083        ; CTRLSUBS.S:887
+  call ADDFCHARX                  ; CTRLSUBS.S:888
+  a = *Fdy@0x0084        ; CTRLSUBS.S:890
+  c = 0                            ; CTRLSUBS.S:891
+  a = a + *FCharY@0x0073 + c    ; CTRLSUBS.S:892
   *FCharY@0x0073 = a            ; CTRLSUBS.S:893
   tail_call ADDSWORDOBJ                ; CTRLSUBS.S:895
 }
 
 fn GETFRAME {
-  ??? jsr getfindex            ; CTRLSUBS.S:906
-  ??? lda framepoint            ; CTRLSUBS.S:907
-  ??? clc             ; CTRLSUBS.S:908
-  ??? adc #Fdef            ; CTRLSUBS.S:909
+  call getfindex                  ; CTRLSUBS.S:906
+  a = *framepoint@0x0080        ; CTRLSUBS.S:907
+  c = 0                            ; CTRLSUBS.S:908
+  a = a + #0x00 + c              ; CTRLSUBS.S:909
   *framepoint@0x0080 = a            ; CTRLSUBS.S:910
-  ??? lda framepoint+1            ; CTRLSUBS.S:911
-  ??? adc #>Fdef            ; CTRLSUBS.S:912
+  a = *framepoint+1@0x0081        ; CTRLSUBS.S:911
+  a = a + #0x00 + c              ; CTRLSUBS.S:912
   *framepoint+1@0x0081 = a            ; CTRLSUBS.S:913
   return                           ; CTRLSUBS.S:914
 }
 
 fn getaltframe1 {
-  ??? jsr getfindex            ; CTRLSUBS.S:918
-  ??? lda framepoint            ; CTRLSUBS.S:919
-  ??? clc             ; CTRLSUBS.S:920
-  ??? adc #altset1            ; CTRLSUBS.S:921
+  call getfindex                  ; CTRLSUBS.S:918
+  a = *framepoint@0x0080        ; CTRLSUBS.S:919
+  c = 0                            ; CTRLSUBS.S:920
+  a = a + #0xb0 + c              ; CTRLSUBS.S:921
   *framepoint@0x0080 = a            ; CTRLSUBS.S:922
-  ??? lda framepoint+1            ; CTRLSUBS.S:923
-  ??? adc #>altset1            ; CTRLSUBS.S:924
+  a = *framepoint+1@0x0081        ; CTRLSUBS.S:923
+  a = a + #0xb0 + c              ; CTRLSUBS.S:924
   *framepoint+1@0x0081 = a            ; CTRLSUBS.S:925
   return                           ; CTRLSUBS.S:926
 }
 
 fn getaltframe2 {
-  ??? jsr getfindex            ; CTRLSUBS.S:930
-  ??? lda framepoint            ; CTRLSUBS.S:931
-  ??? clc             ; CTRLSUBS.S:932
-  ??? adc #altset2            ; CTRLSUBS.S:933
+  call getfindex                  ; CTRLSUBS.S:930
+  a = *framepoint@0x0080        ; CTRLSUBS.S:931
+  c = 0                            ; CTRLSUBS.S:932
+  a = a + #0x78 + c              ; CTRLSUBS.S:933
   *framepoint@0x0080 = a            ; CTRLSUBS.S:934
-  ??? lda framepoint+1            ; CTRLSUBS.S:935
-  ??? adc #>altset2            ; CTRLSUBS.S:936
+  a = *framepoint+1@0x0081        ; CTRLSUBS.S:935
+  a = a + #0x78 + c              ; CTRLSUBS.S:936
   *framepoint+1@0x0081 = a            ; CTRLSUBS.S:937
   return                           ; CTRLSUBS.S:938
 }
 
 fn getfindex {
-  ??? sec             ; CTRLSUBS.S:942
+  c = 1                            ; CTRLSUBS.S:942
   ??? sbc #1            ; CTRLSUBS.S:943
   *ztemp@0x00e9 = a            ; CTRLSUBS.S:944
   *framepoint@0x0080 = a            ; CTRLSUBS.S:945
@@ -585,18 +585,18 @@ fn getfindex {
   ??? rol framepoint+1            ; CTRLSUBS.S:952
   ??? asl framepoint            ; CTRLSUBS.S:953
   ??? rol framepoint+1            ; CTRLSUBS.S:954
-  ??? lda framepoint            ; CTRLSUBS.S:956
-  ??? clc             ; CTRLSUBS.S:957
-  ??? adc ztemp            ; CTRLSUBS.S:958
+  a = *framepoint@0x0080        ; CTRLSUBS.S:956
+  c = 0                            ; CTRLSUBS.S:957
+  a = a + *ztemp@0x00e9 + c    ; CTRLSUBS.S:958
   *framepoint@0x0080 = a            ; CTRLSUBS.S:959
-  ??? lda framepoint+1            ; CTRLSUBS.S:961
-  ??? adc ztemp+1            ; CTRLSUBS.S:962
+  a = *framepoint+1@0x0081        ; CTRLSUBS.S:961
+  a = a + *ztemp+1@0x00ea + c    ; CTRLSUBS.S:962
   *framepoint+1@0x0081 = a            ; CTRLSUBS.S:963
   return                           ; CTRLSUBS.S:964
 }
 
 fn getswordframe {
-  ??? sec             ; CTRLSUBS.S:975
+  c = 1                            ; CTRLSUBS.S:975
   ??? sbc #1            ; CTRLSUBS.S:976
   *ztemp@0x00e9 = a            ; CTRLSUBS.S:977
   *framepoint@0x0080 = a            ; CTRLSUBS.S:978
@@ -605,38 +605,38 @@ fn getswordframe {
   *framepoint+1@0x0081 = a            ; CTRLSUBS.S:982
   ??? asl framepoint            ; CTRLSUBS.S:984
   ??? rol framepoint+1            ; CTRLSUBS.S:985
-  ??? lda framepoint            ; CTRLSUBS.S:987
-  ??? clc             ; CTRLSUBS.S:988
-  ??? adc ztemp            ; CTRLSUBS.S:989
+  a = *framepoint@0x0080        ; CTRLSUBS.S:987
+  c = 0                            ; CTRLSUBS.S:988
+  a = a + *ztemp@0x00e9 + c    ; CTRLSUBS.S:989
   *framepoint@0x0080 = a            ; CTRLSUBS.S:990
-  ??? lda framepoint+1            ; CTRLSUBS.S:992
-  ??? adc ztemp+1            ; CTRLSUBS.S:993
+  a = *framepoint+1@0x0081        ; CTRLSUBS.S:992
+  a = a + *ztemp+1@0x00ea + c    ; CTRLSUBS.S:993
   *framepoint+1@0x0081 = a            ; CTRLSUBS.S:994
-  ??? lda framepoint            ; CTRLSUBS.S:996
-  ??? clc             ; CTRLSUBS.S:997
-  ??? adc #swordtab            ; CTRLSUBS.S:998
+  a = *framepoint@0x0080        ; CTRLSUBS.S:996
+  c = 0                            ; CTRLSUBS.S:997
+  a = a + #0x3a + c              ; CTRLSUBS.S:998
   *framepoint@0x0080 = a            ; CTRLSUBS.S:999
-  ??? lda framepoint+1            ; CTRLSUBS.S:1001
-  ??? adc #>swordtab            ; CTRLSUBS.S:1002
+  a = *framepoint+1@0x0081        ; CTRLSUBS.S:1001
+  a = a + #0x3a + c              ; CTRLSUBS.S:1002
   *framepoint+1@0x0081 = a            ; CTRLSUBS.S:1003
   return                           ; CTRLSUBS.S:1005
 }
 
 fn decodeim {
-  ??? lda Fimage            ; CTRLSUBS.S:1018
+  a = *Fimage@0x0082        ; CTRLSUBS.S:1018
   ??? and #%10000000            ; CTRLSUBS.S:1019
   *ztemp@0x00e9 = a            ; CTRLSUBS.S:1020
-  ??? lda Fsword            ; CTRLSUBS.S:1022
+  a = *Fsword@0x00d9        ; CTRLSUBS.S:1022
   ??? and #%11000000            ; CTRLSUBS.S:1023
   ??? lsr             ; CTRLSUBS.S:1025
-  ??? adc ztemp            ; CTRLSUBS.S:1026
+  a = a + *ztemp@0x00e9 + c    ; CTRLSUBS.S:1026
   ??? lsr             ; CTRLSUBS.S:1027
   ??? lsr             ; CTRLSUBS.S:1028
   ??? lsr             ; CTRLSUBS.S:1029
   ??? lsr             ; CTRLSUBS.S:1030
   ??? lsr             ; CTRLSUBS.S:1031
   *FCharTable@0x007a = a            ; CTRLSUBS.S:1032
-  ??? lda Fimage            ; CTRLSUBS.S:1034
+  a = *Fimage@0x0082        ; CTRLSUBS.S:1034
   ??? and #$7f            ; CTRLSUBS.S:1035
   ??? ora timebomb            ; CTRLSUBS.S:1036
   *FCharImage@0x0070 = a            ; CTRLSUBS.S:1037
@@ -651,70 +651,70 @@ fn decodeswim {
 }
 
 fn GETEDGES {
-  ??? lda FCharImage            ; CTRLSUBS.S:1072
-  ??? ldx FCharTable            ; CTRLSUBS.S:1073
-  ??? jsr dimchar            ; CTRLSUBS.S:1074
+  a = *FCharImage@0x0070        ; CTRLSUBS.S:1072
+  x = *FCharTable@0x007a        ; CTRLSUBS.S:1073
+  call dimchar                  ; CTRLSUBS.S:1074
   *imheight@0x00b5 = x            ; CTRLSUBS.S:1075
   ??? tax             ; CTRLSUBS.S:1077
   ??? lda Mult7,x            ; CTRLSUBS.S:1078
-  ??? clc             ; CTRLSUBS.S:1079
-  ??? adc #1            ; CTRLSUBS.S:1080
+  c = 0                            ; CTRLSUBS.S:1079
+  a = a + #0x01 + c              ; CTRLSUBS.S:1080
   ??? lsr             ; CTRLSUBS.S:1081
   *imwidth@0x00b4 = a            ; CTRLSUBS.S:1082
-  ??? lda FCharX+1            ; CTRLSUBS.S:1084
+  a = *FCharX+1@0x0072        ; CTRLSUBS.S:1084
   ??? lsr             ; CTRLSUBS.S:1085
-  ??? lda FCharX            ; CTRLSUBS.S:1086
+  a = *FCharX@0x0071        ; CTRLSUBS.S:1086
   ??? ror             ; CTRLSUBS.S:1087
-  ??? clc             ; CTRLSUBS.S:1088
-  ??? adc #ScrnLeft            ; CTRLSUBS.S:1089
-  ??? ldx CharFace            ; CTRLSUBS.S:1094
+  c = 0                            ; CTRLSUBS.S:1088
+  a = a + #0x3a + c              ; CTRLSUBS.S:1089
+  x = *CharFace@0x0043        ; CTRLSUBS.S:1094
   ??? bmi :ok            ; CTRLSUBS.S:1095
-  ??? sec             ; CTRLSUBS.S:1097
+  c = 1                            ; CTRLSUBS.S:1097
   ??? sbc imwidth            ; CTRLSUBS.S:1098
 :ok:
   *leftej@0x00b7 = a            ; CTRLSUBS.S:1100
-  ??? clc             ; CTRLSUBS.S:1101
-  ??? adc imwidth            ; CTRLSUBS.S:1102
+  c = 0                            ; CTRLSUBS.S:1101
+  a = a + *imwidth@0x00b4 + c    ; CTRLSUBS.S:1102
   *rightej@0x00b8 = a            ; CTRLSUBS.S:1103
-  ??? lda FCharY            ; CTRLSUBS.S:1105
-  ??? sec             ; CTRLSUBS.S:1106
+  a = *FCharY@0x0073        ; CTRLSUBS.S:1105
+  c = 1                            ; CTRLSUBS.S:1106
   ??? sbc imheight            ; CTRLSUBS.S:1107
-  ??? clc             ; CTRLSUBS.S:1108
-  ??? adc #1            ; CTRLSUBS.S:1109
+  c = 0                            ; CTRLSUBS.S:1108
+  a = a + #0x01 + c              ; CTRLSUBS.S:1109
   ??? cmp #192            ; CTRLSUBS.S:1111
   ??? bcc :ok2            ; CTRLSUBS.S:1112
   a = #0x00                  ; CTRLSUBS.S:1113
 :ok2:
   *topej@0x00b9 = a            ; CTRLSUBS.S:1115
-  ??? jsr getblocky            ; CTRLSUBS.S:1117
+  call getblocky                  ; CTRLSUBS.S:1117
   ??? cmp #3            ; CTRLSUBS.S:1119
   ??? bne :1            ; CTRLSUBS.S:1120
   a = #0xff                  ; CTRLSUBS.S:1121
 :1:
   *topblock@0x00bc = a            ; CTRLSUBS.S:1123
-  ??? lda FCharY            ; CTRLSUBS.S:1125
-  ??? jsr getblocky            ; CTRLSUBS.S:1126
+  a = *FCharY@0x0073        ; CTRLSUBS.S:1125
+  call getblocky                  ; CTRLSUBS.S:1126
   *bottomblock@0x00bd = a            ; CTRLSUBS.S:1127
-  ??? lda leftej            ; CTRLSUBS.S:1129
-  ??? jsr getblockx            ; CTRLSUBS.S:1130
+  a = *leftej@0x00b7        ; CTRLSUBS.S:1129
+  call getblockx                  ; CTRLSUBS.S:1130
   *leftblock@0x00ba = a            ; CTRLSUBS.S:1131
-  ??? lda rightej            ; CTRLSUBS.S:1133
-  ??? jsr getblockx            ; CTRLSUBS.S:1134
+  a = *rightej@0x00b8        ; CTRLSUBS.S:1133
+  call getblockx                  ; CTRLSUBS.S:1134
   *rightblock@0x00bb = a            ; CTRLSUBS.S:1135
   a = #0x00                  ; CTRLSUBS.S:1139
   *ztemp@0x00e9 = a            ; CTRLSUBS.S:1140
-  ??? lda Fcheck            ; CTRLSUBS.S:1142
+  a = *Fcheck@0x0085        ; CTRLSUBS.S:1142
   ??? and #Fthinmark            ; CTRLSUBS.S:1143
   ??? beq :nothin            ; CTRLSUBS.S:1144
   a = #0x03                  ; CTRLSUBS.S:1146
   *ztemp@0x00e9 = a            ; CTRLSUBS.S:1147
 :nothin:
-  ??? lda leftej            ; CTRLSUBS.S:1149
-  ??? clc             ; CTRLSUBS.S:1150
-  ??? adc ztemp            ; CTRLSUBS.S:1151
+  a = *leftej@0x00b7        ; CTRLSUBS.S:1149
+  c = 0                            ; CTRLSUBS.S:1150
+  a = a + *ztemp@0x00e9 + c    ; CTRLSUBS.S:1151
   *CDLeftEj@0x00be = a            ; CTRLSUBS.S:1152
-  ??? lda rightej            ; CTRLSUBS.S:1154
-  ??? sec             ; CTRLSUBS.S:1155
+  a = *rightej@0x00b8        ; CTRLSUBS.S:1154
+  c = 1                            ; CTRLSUBS.S:1155
   ??? sbc ztemp            ; CTRLSUBS.S:1156
   *CDRightEj@0x00bf = a            ; CTRLSUBS.S:1157
 ]rts:
@@ -722,16 +722,16 @@ fn GETEDGES {
 }
 
 fn QUICKFLOOR {
-  ??? lda CharPosn            ; CTRLSUBS.S:1172
+  a = *CharPosn@0x0040        ; CTRLSUBS.S:1172
   ??? cmp #135            ; CTRLSUBS.S:1173
   ??? bcc :2            ; CTRLSUBS.S:1174
   ??? cmp #149            ; CTRLSUBS.S:1175
   ??? bcc :climbup            ; CTRLSUBS.S:1176
 :2:
-  ??? lda CharAction            ; CTRLSUBS.S:1178
+  a = *CharAction@0x0046        ; CTRLSUBS.S:1178
   ??? cmp #1            ; CTRLSUBS.S:1179
   ??? bne :1            ; CTRLSUBS.S:1180
-  ??? lda CharPosn            ; CTRLSUBS.S:1182
+  a = *CharPosn@0x0040        ; CTRLSUBS.S:1182
   ??? cmp #78            ; CTRLSUBS.S:1183
   ??? bcc ]rts            ; CTRLSUBS.S:1184
   ??? cmp #80            ; CTRLSUBS.S:1185
@@ -741,29 +741,29 @@ fn QUICKFLOOR {
 }
 
 fn markul {
-  ??? lda bottomblock            ; CTRLSUBS.S:1232
+  a = *bottomblock@0x00bd        ; CTRLSUBS.S:1232
   *tempblocky@0x0092 = a            ; CTRLSUBS.S:1233
-  ??? jsr indexblock            ; CTRLSUBS.S:1235
+  call indexblock                  ; CTRLSUBS.S:1235
   a = #0x02                  ; CTRLSUBS.S:1236
 marksm1:
-  ??? jsr markhalf            ; CTRLSUBS.S:1237
-  ??? lda topblock            ; CTRLSUBS.S:1239
+  call markhalf                  ; CTRLSUBS.S:1237
+  a = *topblock@0x00bc        ; CTRLSUBS.S:1239
   ??? cmp bottomblock            ; CTRLSUBS.S:1240
   ??? beq ]rts            ; CTRLSUBS.S:1241
   *tempblocky@0x0092 = a            ; CTRLSUBS.S:1242
-  ??? jsr indexblock            ; CTRLSUBS.S:1244
+  call indexblock                  ; CTRLSUBS.S:1244
   a = #0x02                  ; CTRLSUBS.S:1245
 marksm2:
   tail_call markhalf                ; CTRLSUBS.S:1246
 }
 
 fn marksm1 {
-  ??? jsr markhalf            ; CTRLSUBS.S:1237
-  ??? lda topblock            ; CTRLSUBS.S:1239
+  call markhalf                  ; CTRLSUBS.S:1237
+  a = *topblock@0x00bc        ; CTRLSUBS.S:1239
   ??? cmp bottomblock            ; CTRLSUBS.S:1240
   ??? beq ]rts            ; CTRLSUBS.S:1241
   *tempblocky@0x0092 = a            ; CTRLSUBS.S:1242
-  ??? jsr indexblock            ; CTRLSUBS.S:1244
+  call indexblock                  ; CTRLSUBS.S:1244
   a = #0x02                  ; CTRLSUBS.S:1245
 marksm2:
   tail_call markhalf                ; CTRLSUBS.S:1246
@@ -774,24 +774,24 @@ fn marksm2 {
 }
 
 fn QUICKFG {
-  ??? lda CharSword            ; CTRLSUBS.S:1262
+  a = *CharSword@0x004e        ; CTRLSUBS.S:1262
   ??? cmp #2            ; CTRLSUBS.S:1263
   ??? bcc :cont            ; CTRLSUBS.S:1264
-  ??? lda CharFace            ; CTRLSUBS.S:1266
+  a = *CharFace@0x0043        ; CTRLSUBS.S:1266
   ??? bpl :faceR            ; CTRLSUBS.S:1267
   ??? dec leftblock            ; CTRLSUBS.S:1268
   goto :cont                ; CTRLSUBS.S:1269
 }
 
 fn CROPCHAR {
-  ??? lda CharPosn            ; CTRLSUBS.S:1317
+  a = *CharPosn@0x0040        ; CTRLSUBS.S:1317
   ??? cmp #224            ; CTRLSUBS.S:1318
   ??? bcc :nost            ; CTRLSUBS.S:1319
   ??? cmp #229            ; CTRLSUBS.S:1320
   ??? bcs :nost            ; CTRLSUBS.S:1321
-  ??? lda doortop            ; CTRLSUBS.S:1322
-  ??? clc             ; CTRLSUBS.S:1323
-  ??? adc #2            ; CTRLSUBS.S:1324
+  a = *doortop@0x0215        ; CTRLSUBS.S:1322
+  c = 0                            ; CTRLSUBS.S:1323
+  a = a + #0x02 + c              ; CTRLSUBS.S:1324
   ??? cmp FCharY            ; CTRLSUBS.S:1325
   ??? bcs :bug            ; CTRLSUBS.S:1326
   *FCharCU@0x0076 = a            ; CTRLSUBS.S:1327
@@ -840,7 +840,7 @@ fn CMPBARR {
 fn CMPWALL {
   ??? cmp #block            ; CTRLSUBS.S:1572
   ??? beq :yes            ; CTRLSUBS.S:1573
-  ??? ldx CharFace            ; CTRLSUBS.S:1574
+  x = *CharFace@0x0043        ; CTRLSUBS.S:1574
   ??? bpl :no            ; CTRLSUBS.S:1575
   ??? cmp #panelwif            ; CTRLSUBS.S:1576
   ??? beq :yes            ; CTRLSUBS.S:1577
@@ -889,9 +889,9 @@ fn GETSEQ {
 }
 
 fn GETFRAMEINFO {
-  ??? lda CharPosn            ; CTRLSUBS.S:1649
-  ??? jsr GETFRAME            ; CTRLSUBS.S:1650
-  ??? jsr usealtsets            ; CTRLSUBS.S:1652
+  a = *CharPosn@0x0040        ; CTRLSUBS.S:1649
+  call GETFRAME                  ; CTRLSUBS.S:1650
+  call usealtsets                  ; CTRLSUBS.S:1652
   y = #0x00                  ; CTRLSUBS.S:1654
   ??? lda (framepoint),y            ; CTRLSUBS.S:1655
   *Fimage@0x0082 = a            ; CTRLSUBS.S:1656
@@ -912,27 +912,27 @@ fn GETFRAMEINFO {
 }
 
 fn usealtsets {
-  ??? ldx CharID            ; CTRLSUBS.S:1686
+  x = *CharID@0x004d        ; CTRLSUBS.S:1686
   ??? beq ]rts            ; CTRLSUBS.S:1687
   ??? cpx #24            ; CTRLSUBS.S:1688
   ??? beq ]rts            ; CTRLSUBS.S:1689
   ??? cpx #5            ; CTRLSUBS.S:1690
   ??? bcs :usealt2            ; CTRLSUBS.S:1691
-  ??? lda CharPosn            ; CTRLSUBS.S:1693
+  a = *CharPosn@0x0040        ; CTRLSUBS.S:1693
   ??? cpx #2            ; CTRLSUBS.S:1694
   ??? bcc :1            ; CTRLSUBS.S:1695
   ??? cmp #102            ; CTRLSUBS.S:1696
   ??? bcc ]rts            ; CTRLSUBS.S:1697
   ??? cmp #107            ; CTRLSUBS.S:1698
   ??? bcs :1            ; CTRLSUBS.S:1699
-  ??? clc             ; CTRLSUBS.S:1701
-  ??? adc #70            ; CTRLSUBS.S:1702
+  c = 0                            ; CTRLSUBS.S:1701
+  a = a + #0x46 + c              ; CTRLSUBS.S:1702
 :1:
   ??? cmp #150            ; CTRLSUBS.S:1704
   ??? bcc ]rts            ; CTRLSUBS.S:1705
   ??? cmp #190            ; CTRLSUBS.S:1706
   ??? bcs ]rts            ; CTRLSUBS.S:1707
-  ??? sec             ; CTRLSUBS.S:1709
+  c = 1                            ; CTRLSUBS.S:1709
   ??? sbc #149            ; CTRLSUBS.S:1710
   tail_call getaltframe1                ; CTRLSUBS.S:1711
 }
@@ -954,16 +954,16 @@ fn MARKWIPE {
   ??? pha             ; CTRLSUBS.S:1746
   ??? lda wipebuf,y            ; CTRLSUBS.S:1747
   ??? beq :2            ; CTRLSUBS.S:1748
-  ??? lda height            ; CTRLSUBS.S:1749
+  a = *height@0x0004        ; CTRLSUBS.S:1749
   ??? cmp whitebuf,y            ; CTRLSUBS.S:1750
   ??? bcc :1            ; CTRLSUBS.S:1751
 :2:
-  ??? lda height            ; CTRLSUBS.S:1752
+  a = *height@0x0004        ; CTRLSUBS.S:1752
   ??? sta whitebuf,y            ; CTRLSUBS.S:1753
 :1:
   ??? pla             ; CTRLSUBS.S:1754
   ??? sta wipebuf,y            ; CTRLSUBS.S:1755
-  ??? clc             ; CTRLSUBS.S:1756
+  c = 0                            ; CTRLSUBS.S:1756
   return                           ; CTRLSUBS.S:1757
 }
 
@@ -1010,7 +1010,7 @@ fn CHECKLEDGE {
   *ztemp@0x00e9 = a            ; CTRLSUBS.S:1815
   ??? lda (BlueSpec),y            ; CTRLSUBS.S:1817
   *tempstate@0x00f2 = a            ; CTRLSUBS.S:1818
-  ??? lda blockid            ; CTRLSUBS.S:1820
+  a = *blockid@0x008b        ; CTRLSUBS.S:1820
   ??? cmp #block            ; CTRLSUBS.S:1822
   ??? beq :no            ; CTRLSUBS.S:1823
   ??? cmp #panelwof            ; CTRLSUBS.S:1825
@@ -1018,9 +1018,9 @@ fn CHECKLEDGE {
   ??? bit CharFace            ; CTRLSUBS.S:1828
   ??? bpl :no            ; CTRLSUBS.S:1829
 :cont:
-  ??? jsr cmpspace            ; CTRLSUBS.S:1831
+  call cmpspace                  ; CTRLSUBS.S:1831
   ??? bne :no            ; CTRLSUBS.S:1832
-  ??? lda ztemp            ; CTRLSUBS.S:1836
+  a = *ztemp@0x00e9        ; CTRLSUBS.S:1836
   ??? cmp #loose            ; CTRLSUBS.S:1838
   ??? bne :notloose            ; CTRLSUBS.S:1839
   ??? bit tempstate            ; CTRLSUBS.S:1841
@@ -1031,7 +1031,7 @@ fn CHECKLEDGE {
   ??? bit CharFace            ; CTRLSUBS.S:1848
   ??? bmi :no            ; CTRLSUBS.S:1849
 :cont2:
-  ??? jsr cmpspace            ; CTRLSUBS.S:1851
+  call cmpspace                  ; CTRLSUBS.S:1851
   ??? beq :no            ; CTRLSUBS.S:1852
 :yes:
   a = #0x01                  ; CTRLSUBS.S:1854
@@ -1039,31 +1039,31 @@ fn CHECKLEDGE {
 }
 
 fn CHECKSPIKES {
-  ??? lda rightej            ; CTRLSUBS.S:1869
-  ??? jsr getblockxp            ; CTRLSUBS.S:1870
+  a = *rightej@0x00b8        ; CTRLSUBS.S:1869
+  call getblockxp                  ; CTRLSUBS.S:1870
   ??? bmi ]rts            ; CTRLSUBS.S:1871
   *tempright@0x00e8 = a            ; CTRLSUBS.S:1872
-  ??? lda leftej            ; CTRLSUBS.S:1876
-  ??? jsr getblockxp            ; CTRLSUBS.S:1877
+  a = *leftej@0x00b7        ; CTRLSUBS.S:1876
+  call getblockxp                  ; CTRLSUBS.S:1877
 :loop:
   *blockx@0x008c = a            ; CTRLSUBS.S:1878
-  ??? jsr sub            ; CTRLSUBS.S:1880
-  ??? lda blockx            ; CTRLSUBS.S:1882
+  call sub                  ; CTRLSUBS.S:1880
+  a = *blockx@0x008c        ; CTRLSUBS.S:1882
   ??? cmp tempright            ; CTRLSUBS.S:1883
   ??? beq ]rts            ; CTRLSUBS.S:1884
-  ??? clc             ; CTRLSUBS.S:1885
-  ??? adc #1            ; CTRLSUBS.S:1886
+  c = 0                            ; CTRLSUBS.S:1885
+  a = a + #0x01 + c              ; CTRLSUBS.S:1886
   goto :loop                ; CTRLSUBS.S:1887
 }
 
 fn sub {
   *tempblockx@0x0091 = a            ; CTRLSUBS.S:1889
-  ??? lda CharBlockY            ; CTRLSUBS.S:1890
+  a = *CharBlockY@0x0045        ; CTRLSUBS.S:1890
   *tempblocky@0x0092 = a            ; CTRLSUBS.S:1891
-  ??? lda CharScrn            ; CTRLSUBS.S:1892
+  a = *CharScrn@0x004b        ; CTRLSUBS.S:1892
   *tempscrn@0x0093 = a            ; CTRLSUBS.S:1893
 :loop:
-  ??? jsr rdblock1            ; CTRLSUBS.S:1894
+  call rdblock1                  ; CTRLSUBS.S:1894
   ??? cmp #spikes            ; CTRLSUBS.S:1896
   ??? bne :again            ; CTRLSUBS.S:1897
   tail_call trigspikes                ; CTRLSUBS.S:1898
@@ -1161,8 +1161,8 @@ fn SAVESHADWOP {
 }
 
 fn RECHARGEMETER {
-  ??? lda MaxKidStr            ; CTRLSUBS.S:2021
-  ??? sec             ; CTRLSUBS.S:2022
+  a = *MaxKidStr@0x00d0        ; CTRLSUBS.S:2021
+  c = 1                            ; CTRLSUBS.S:2022
   ??? sbc KidStrength            ; CTRLSUBS.S:2023
   *ChgKidStr@0x00cf = a            ; CTRLSUBS.S:2024
 ]rts:
@@ -1170,61 +1170,61 @@ fn RECHARGEMETER {
 }
 
 fn BOOSTMETER {
-  ??? lda MaxKidStr            ; CTRLSUBS.S:2033
+  a = *MaxKidStr@0x00d0        ; CTRLSUBS.S:2033
   ??? cmp #maxmaxstr            ; CTRLSUBS.S:2034
   ??? bcs :1            ; CTRLSUBS.S:2035
-  ??? clc             ; CTRLSUBS.S:2037
-  ??? adc #1            ; CTRLSUBS.S:2038
+  c = 0                            ; CTRLSUBS.S:2037
+  a = a + #0x01 + c              ; CTRLSUBS.S:2038
   *MaxKidStr@0x00d0 = a            ; CTRLSUBS.S:2039
 :1:
   tail_call RECHARGEMETER                ; CTRLSUBS.S:2041
 }
 
 fn GETOPDIST {
-  ??? lda CharScrn            ; CTRLSUBS.S:2053
+  a = *CharScrn@0x004b        ; CTRLSUBS.S:2053
   ??? cmp OpScrn            ; CTRLSUBS.S:2054
   ??? bne :safe            ; CTRLSUBS.S:2055
-  ??? lda OpX            ; CTRLSUBS.S:2059
+  a = *OpX@0x039d        ; CTRLSUBS.S:2059
   ??? cmp CharX            ; CTRLSUBS.S:2060
   ??? bcc :neg            ; CTRLSUBS.S:2061
-  ??? sec             ; CTRLSUBS.S:2062
+  c = 1                            ; CTRLSUBS.S:2062
   ??? sbc CharX            ; CTRLSUBS.S:2063
   ??? bpl :got            ; CTRLSUBS.S:2064
   a = #0x7f                  ; CTRLSUBS.S:2065
   ??? bpl :got            ; CTRLSUBS.S:2066
 :neg:
-  ??? lda CharX            ; CTRLSUBS.S:2068
-  ??? sec             ; CTRLSUBS.S:2069
+  a = *CharX@0x0041        ; CTRLSUBS.S:2068
+  c = 1                            ; CTRLSUBS.S:2069
   ??? sbc OpX            ; CTRLSUBS.S:2070
   ??? bpl :1            ; CTRLSUBS.S:2071
   a = #0x7f                  ; CTRLSUBS.S:2072
 :1:
   ??? eor #$ff            ; CTRLSUBS.S:2073
-  ??? clc             ; CTRLSUBS.S:2074
-  ??? adc #1            ; CTRLSUBS.S:2075
+  c = 0                            ; CTRLSUBS.S:2074
+  a = a + #0x01 + c              ; CTRLSUBS.S:2075
 :got:
-  ??? ldx CharFace            ; CTRLSUBS.S:2079
+  x = *CharFace@0x0043        ; CTRLSUBS.S:2079
   ??? bpl :cont            ; CTRLSUBS.S:2080
   ??? eor #$ff            ; CTRLSUBS.S:2081
-  ??? clc             ; CTRLSUBS.S:2082
-  ??? adc #1            ; CTRLSUBS.S:2083
+  c = 0                            ; CTRLSUBS.S:2082
+  a = a + #0x01 + c              ; CTRLSUBS.S:2083
 :cont:
   ??? tax             ; CTRLSUBS.S:2088
-  ??? lda CharFace            ; CTRLSUBS.S:2089
+  a = *CharFace@0x0043        ; CTRLSUBS.S:2089
   ??? eor OpFace            ; CTRLSUBS.S:2090
   ??? bpl :done            ; CTRLSUBS.S:2091
   ??? txa             ; CTRLSUBS.S:2092
   ??? cmp #127-estwidth            ; CTRLSUBS.S:2093
   ??? bcs :done2            ; CTRLSUBS.S:2094
-  ??? clc             ; CTRLSUBS.S:2095
-  ??? adc #estwidth            ; CTRLSUBS.S:2096
+  c = 0                            ; CTRLSUBS.S:2095
+  a = a + #0x0d + c              ; CTRLSUBS.S:2096
 :done2:
   ??? tax             ; CTRLSUBS.S:2097
   return                           ; CTRLSUBS.S:2098
 }
 
 fn UNEVENFLOOR {
-  ??? jsr getunderft            ; CTRLSUBS.S:2110
+  call getunderft                  ; CTRLSUBS.S:2110
   ??? cmp #dpressplate            ; CTRLSUBS.S:2111
   ??? bne ]rts            ; CTRLSUBS.S:2112
   ??? inc CharY            ; CTRLSUBS.S:2113

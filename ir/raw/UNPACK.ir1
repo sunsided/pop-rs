@@ -20,51 +20,51 @@ fn SNGEXPAND {
   a = #0x20                  ; UNPACK.S:135
   *V3@0x0005 = a            ; UNPACK.S:136
 :0:
-  ??? lda V2            ; UNPACK.S:137
-  ??? sec             ; UNPACK.S:138
+  a = *V2@0x0004        ; UNPACK.S:137
+  c = 1                            ; UNPACK.S:138
   ??? sbc #$28            ; UNPACK.S:139
   *V2@0x0004 = a            ; UNPACK.S:140
   ??? bcs :1            ; UNPACK.S:141
   ??? dec V3            ; UNPACK.S:142
 :1:
-  ??? lda V2            ; UNPACK.S:143
+  a = *V2@0x0004        ; UNPACK.S:143
   *V4@0x0006 = a            ; UNPACK.S:144
-  ??? lda V3            ; UNPACK.S:145
-  ??? clc             ; UNPACK.S:146
-  ??? adc #4            ; UNPACK.S:147
+  a = *V3@0x0005        ; UNPACK.S:145
+  c = 0                            ; UNPACK.S:146
+  a = a + #0x04 + c              ; UNPACK.S:147
   *V5@0x0007 = a            ; UNPACK.S:148
 :2:
-  ??? lda V4            ; UNPACK.S:149
-  ??? sec             ; UNPACK.S:150
+  a = *V4@0x0006        ; UNPACK.S:149
+  c = 1                            ; UNPACK.S:150
   ??? sbc #$80            ; UNPACK.S:151
   *V4@0x0006 = a            ; UNPACK.S:152
   ??? bcs :3            ; UNPACK.S:153
   ??? dec V5            ; UNPACK.S:154
 :3:
-  ??? lda V4            ; UNPACK.S:155
+  a = *V4@0x0006        ; UNPACK.S:155
   *PIC@0x0002 = a            ; UNPACK.S:156
-  ??? lda V5            ; UNPACK.S:157
-  ??? clc             ; UNPACK.S:158
-  ??? adc #$20            ; UNPACK.S:159
+  a = *V5@0x0007        ; UNPACK.S:157
+  c = 0                            ; UNPACK.S:158
+  a = a + #0x20 + c              ; UNPACK.S:159
   *PIC+1@0x0003 = a            ; UNPACK.S:160
 :5:
-  ??? lda PIC+1            ; UNPACK.S:161
-  ??? sec             ; UNPACK.S:162
+  a = *PIC+1@0x0003        ; UNPACK.S:161
+  c = 1                            ; UNPACK.S:162
   ??? sbc #4            ; UNPACK.S:163
   *PIC+1@0x0003 = a            ; UNPACK.S:164
-  ??? clc             ; UNPACK.S:165
+  c = 0                            ; UNPACK.S:165
   ??? bcc :6            ; UNPACK.S:166
 :13:
-  ??? lda PIC+1            ; UNPACK.S:167
+  a = *PIC+1@0x0003        ; UNPACK.S:167
   ??? cmp V5            ; UNPACK.S:168
   ??? bne :5            ; UNPACK.S:169
-  ??? lda V4            ; UNPACK.S:170
+  a = *V4@0x0006        ; UNPACK.S:170
   ??? cmp V2            ; UNPACK.S:171
   ??? bne :2            ; UNPACK.S:172
-  ??? lda V5            ; UNPACK.S:173
+  a = *V5@0x0007        ; UNPACK.S:173
   ??? cmp V3            ; UNPACK.S:174
   ??? bne :2            ; UNPACK.S:175
-  ??? lda V2            ; UNPACK.S:176
+  a = *V2@0x0004        ; UNPACK.S:176
   ??? bne :0            ; UNPACK.S:177
   ??? dey             ; UNPACK.S:178
   ??? bpl :4            ; UNPACK.S:179
@@ -84,12 +84,12 @@ fn WipeRgtExp {
 :Loop:
   a = #0x00                  ; UNPACK.S:263
   *YScrPos@0x00f3 = a            ; UNPACK.S:264
-  ??? jsr ExpandClm            ; UNPACK.S:265
+  call ExpandClm                  ; UNPACK.S:265
   a = #0x01                  ; UNPACK.S:267
   *YScrPos@0x00f3 = a            ; UNPACK.S:268
-  ??? jsr ExpandClm            ; UNPACK.S:269
+  call ExpandClm                  ; UNPACK.S:269
   ??? inc XClmPos            ; UNPACK.S:271
-  ??? lda XClmPos            ; UNPACK.S:273
+  a = *XClmPos@0x00f2        ; UNPACK.S:273
   ??? cmp #80            ; UNPACK.S:274
   ??? bne :Loop            ; UNPACK.S:275
 ]rts:
@@ -110,16 +110,16 @@ fn DeltaExp {
   *ByteHld@0x00f4 = a            ; UNPACK.S:301
   ??? and #$80            ; UNPACK.S:302
   ??? beq :ExpandOne            ; UNPACK.S:303
-  ??? lda ByteHld            ; UNPACK.S:305
+  a = *ByteHld@0x00f4        ; UNPACK.S:305
   ??? and #$7f            ; UNPACK.S:306
   ??? beq :NewCoord            ; UNPACK.S:307
   ??? tax             ; UNPACK.S:309
   y = #0x01                  ; UNPACK.S:311
   ??? lda (CrnDatPtr),y            ; UNPACK.S:312
-  ??? jsr ExpClmSeq1            ; UNPACK.S:313
-  ??? clc             ; UNPACK.S:315
-  ??? lda CrnDatPtr            ; UNPACK.S:316
-  ??? adc #2            ; UNPACK.S:317
+  call ExpClmSeq1                  ; UNPACK.S:313
+  c = 0                            ; UNPACK.S:315
+  a = *CrnDatPtr@0x00f0        ; UNPACK.S:316
+  a = a + #0x02 + c              ; UNPACK.S:317
   *CrnDatPtr@0x00f0 = a            ; UNPACK.S:318
   ??? bcc :a4            ; UNPACK.S:319
   ??? inc CrnDatPtr+1            ; UNPACK.S:320
@@ -136,12 +136,12 @@ fn ExpandClm  (aka :Loop) {
   y = #0x01                  ; UNPACK.S:372
   ??? lda (CrnDatPtr),y            ; UNPACK.S:373
   ??? tax             ; UNPACK.S:374
-  ??? lda ByteHld            ; UNPACK.S:375
+  a = *ByteHld@0x00f4        ; UNPACK.S:375
   ??? and #$7f            ; UNPACK.S:376
-  ??? jsr ExpClmSeq            ; UNPACK.S:377
-  ??? clc             ; UNPACK.S:379
-  ??? lda CrnDatPtr            ; UNPACK.S:380
-  ??? adc #2            ; UNPACK.S:381
+  call ExpClmSeq                  ; UNPACK.S:377
+  c = 0                            ; UNPACK.S:379
+  a = *CrnDatPtr@0x00f0        ; UNPACK.S:380
+  a = a + #0x02 + c              ; UNPACK.S:381
   *CrnDatPtr@0x00f0 = a            ; UNPACK.S:382
   ??? bcc :a4            ; UNPACK.S:383
   ??? inc CrnDatPtr+1            ; UNPACK.S:384
@@ -153,13 +153,13 @@ fn ExpClmSeq {
   *ByteHld@0x00f4 = a            ; UNPACK.S:419
   *RepeatCdn@0x00f5 = x            ; UNPACK.S:420
 :Loop:
-  ??? ldx XClmPos            ; UNPACK.S:422
-  ??? ldy YScrPos            ; UNPACK.S:423
-  ??? lda ByteHld            ; UNPACK.S:424
-  ??? jsr PutScrByte            ; UNPACK.S:425
-  ??? lda YScrPos            ; UNPACK.S:427
-  ??? clc             ; UNPACK.S:428
-  ??? adc #2            ; UNPACK.S:429
+  x = *XClmPos@0x00f2        ; UNPACK.S:422
+  y = *YScrPos@0x00f3        ; UNPACK.S:423
+  a = *ByteHld@0x00f4        ; UNPACK.S:424
+  call PutScrByte                  ; UNPACK.S:425
+  a = *YScrPos@0x00f3        ; UNPACK.S:427
+  c = 0                            ; UNPACK.S:428
+  a = a + #0x02 + c              ; UNPACK.S:429
   *YScrPos@0x00f3 = a            ; UNPACK.S:430
   ??? dec RepeatCdn            ; UNPACK.S:432
   ??? bne :Loop            ; UNPACK.S:433
@@ -170,14 +170,14 @@ fn ExpClmSeq1 {
   *ByteHld@0x00f4 = a            ; UNPACK.S:443
   *RepeatCdn@0x00f5 = x            ; UNPACK.S:444
 :Loop:
-  ??? ldx XClmPos            ; UNPACK.S:446
-  ??? ldy YScrPos            ; UNPACK.S:447
-  ??? lda ByteHld            ; UNPACK.S:448
+  x = *XClmPos@0x00f2        ; UNPACK.S:446
+  y = *YScrPos@0x00f3        ; UNPACK.S:447
+  a = *ByteHld@0x00f4        ; UNPACK.S:448
   ??? bmi :Next            ; UNPACK.S:449
-  ??? jsr PutScrByte            ; UNPACK.S:451
+  call PutScrByte                  ; UNPACK.S:451
 :Next:
   ??? inc YScrPos            ; UNPACK.S:453
-  ??? lda YScrPos            ; UNPACK.S:455
+  a = *YScrPos@0x00f3        ; UNPACK.S:455
   ??? cmp #192            ; UNPACK.S:456
   ??? bne :SkipXInc            ; UNPACK.S:457
   a = #0x00                  ; UNPACK.S:459
@@ -202,7 +202,7 @@ fn PutScrByte {
   ??? bcs NoAuxSet            ; UNPACK.S:493
   *RAMWRTaux@0xc005 = a            ; UNPACK.S:495
 NoAuxSet:
-  ??? lda ByteHld            ; UNPACK.S:497
+  a = *ByteHld@0x00f4        ; UNPACK.S:497
   ??? sta (ScrBasPtr),y            ; UNPACK.S:498
   *RAMWRTmain@0xc004 = a            ; UNPACK.S:500
 ]rts:
@@ -210,7 +210,7 @@ NoAuxSet:
 }
 
 fn NoAuxSet {
-  ??? lda ByteHld            ; UNPACK.S:497
+  a = *ByteHld@0x00f4        ; UNPACK.S:497
   ??? sta (ScrBasPtr),y            ; UNPACK.S:498
   *RAMWRTmain@0xc004 = a            ; UNPACK.S:500
 ]rts:
@@ -224,7 +224,7 @@ fn PURPLE {
 fn DELTAEXPPOP {
   *PAGE2on@0xc055 = a            ; UNPACK.S:524
 ]DE:
-  ??? jsr DeltaExp            ; UNPACK.S:525
+  call DeltaExp                  ; UNPACK.S:525
   *PAGE2off@0xc054 = a            ; UNPACK.S:526
   *RAMRDaux@0xc003 = a            ; UNPACK.S:527
   *RAMWRTaux@0xc005 = a            ; UNPACK.S:528
@@ -263,13 +263,13 @@ fn INVERTY {
 
 fn PROMPT {
   a = #0x41                  ; UNPACK.S:583
-  ??? ldx BBundID            ; UNPACK.S:584
+  x = *BBundID@0x03f5        ; UNPACK.S:584
   ??? cpx #POPside1            ; UNPACK.S:585
   ??? beq :1            ; UNPACK.S:586
   a = #0x42                  ; UNPACK.S:587
 :1:
   ??? sta msg2            ; UNPACK.S:588
-  ??? jsr blackout            ; UNPACK.S:590
+  call blackout                  ; UNPACK.S:590
   *RAMWRTmain@0xc004 = a            ; UNPACK.S:592
   x = #0x00                  ; UNPACK.S:594
 :loop:
@@ -281,9 +281,9 @@ fn PROMPT {
   ??? bpl :loop            ; UNPACK.S:600
 :done:
   *RAMWRTaux@0xc005 = a            ; UNPACK.S:602
-  ??? jsr whoop            ; UNPACK.S:603
+  call whoop                  ; UNPACK.S:603
 :wloop:
-  ??? lda $c000            ; UNPACK.S:605
+  a = *$c000@0xc000        ; UNPACK.S:605
   ??? ora $c061            ; UNPACK.S:606
   ??? ora $c062            ; UNPACK.S:607
   ??? bpl :wloop            ; UNPACK.S:608
@@ -300,10 +300,10 @@ fn CLR {
 }
 
 fn BLACKOUT {
-  ??? jsr CLR            ; UNPACK.S:628
+  call CLR                  ; UNPACK.S:628
 TEXT:
   *RAMRDaux@0xc003 = a            ; UNPACK.S:630
-  ??? jsr vblank            ; UNPACK.S:631
+  call vblank                  ; UNPACK.S:631
   *TEXTon@0xc051 = a            ; UNPACK.S:632
   *ADCOLoff@0xc00c = a            ; UNPACK.S:633
   *PAGE2off@0xc054 = a            ; UNPACK.S:634
@@ -313,7 +313,7 @@ TEXT:
 
 fn TEXT {
   *RAMRDaux@0xc003 = a            ; UNPACK.S:630
-  ??? jsr vblank            ; UNPACK.S:631
+  call vblank                  ; UNPACK.S:631
   *TEXTon@0xc051 = a            ; UNPACK.S:632
   *ADCOLoff@0xc00c = a            ; UNPACK.S:633
   *PAGE2off@0xc054 = a            ; UNPACK.S:634
@@ -324,7 +324,7 @@ fn TEXT {
 fn SETDHIRES {
   *RAMRDaux@0xc003 = a            ; UNPACK.S:641
   *RAMWRTaux@0xc005 = a            ; UNPACK.S:642
-  ??? jsr vblank            ; UNPACK.S:643
+  call vblank                  ; UNPACK.S:643
   *ADCOLon@0xc00d = a            ; UNPACK.S:644
   ??? bit HIRESon            ; UNPACK.S:645
   ??? bit DHIRESon            ; UNPACK.S:647
@@ -340,7 +340,7 @@ fn FADEIN {
   *RAMRDmain@0xc002 = a            ; UNPACK.S:682
   ??? sta :sm1+2            ; UNPACK.S:683
   ??? sta :sm2+2            ; UNPACK.S:684
-  ??? clc             ; UNPACK.S:686
+  c = 0                            ; UNPACK.S:686
   ??? xce             ; UNPACK.S:687
   ??? sep $30            ; UNPACK.S:689
   a = #0x1e                  ; UNPACK.S:691
@@ -377,11 +377,11 @@ fn FADEIN {
 }
 
 fn LOADSUPER {
-  ??? jsr rw18            ; UNPACK.S:850
+  call rw18                  ; UNPACK.S:850
   a = #0x00                  ; UNPACK.S:853
   *track@0x00fe = a            ; UNPACK.S:854
   *RAMWRTmain@0xc004 = a            ; UNPACK.S:855
-  ??? jsr loadscrn            ; UNPACK.S:856
+  call loadscrn                  ; UNPACK.S:856
   *RAMWRTaux@0xc005 = a            ; UNPACK.S:858
   tail_call loadscrn                ; UNPACK.S:859
 }
@@ -390,10 +390,10 @@ fn loadscrn {
   a = #0x20                  ; UNPACK.S:867
 :loop:
   ??? sta :sm            ; UNPACK.S:868
-  ??? jsr rw18            ; UNPACK.S:869
+  call rw18                  ; UNPACK.S:869
   ??? lda :sm            ; UNPACK.S:872
-  ??? clc             ; UNPACK.S:873
-  ??? adc #$12            ; UNPACK.S:874
+  c = 0                            ; UNPACK.S:873
+  a = a + #0x12 + c              ; UNPACK.S:874
   ??? cmp #$9e            ; UNPACK.S:875
   ??? bcc :loop            ; UNPACK.S:876
 ]rts:

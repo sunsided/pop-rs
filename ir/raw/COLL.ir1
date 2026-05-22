@@ -4,47 +4,47 @@ fn CHECKBARR {
   a = #0xff                  ; COLL.S:73
   *collideL@0x00c3 = a            ; COLL.S:74
   *collideR@0x00c4 = a            ; COLL.S:75
-  ??? lda CharAction            ; COLL.S:80
+  a = *CharAction@0x0046        ; COLL.S:80
   ??? cmp #7            ; COLL.S:81
   ??? beq ]rts            ; COLL.S:82
-  ??? lda CharBlockY            ; COLL.S:88
+  a = *CharBlockY@0x0045        ; COLL.S:88
   *BlockYthis@0x039a = a            ; COLL.S:89
-  ??? jsr initCDbufs            ; COLL.S:91
-  ??? lda BlockYthis            ; COLL.S:93
+  call initCDbufs                  ; COLL.S:91
+  a = *BlockYthis@0x039a        ; COLL.S:93
   *BlockYlast@0x039b = a            ; COLL.S:94
-  ??? lda CDRightEj            ; COLL.S:98
-  ??? jsr getblockxp            ; COLL.S:99
-  ??? clc             ; COLL.S:100
-  ??? adc #2            ; COLL.S:101
+  a = *CDRightEj@0x00bf        ; COLL.S:98
+  call getblockxp                  ; COLL.S:99
+  c = 0                            ; COLL.S:100
+  a = a + #0x02 + c              ; COLL.S:101
   ??? cmp #11            ; COLL.S:102
   ??? bcc :ok            ; COLL.S:103
   a = #0x0b                  ; COLL.S:104
 :ok:
   *endrange@0x00c0 = a            ; COLL.S:106
-  ??? lda CDLeftEj            ; COLL.S:108
-  ??? jsr getblockxp            ; COLL.S:109
+  a = *CDLeftEj@0x00be        ; COLL.S:108
+  call getblockxp                  ; COLL.S:109
   ??? tax             ; COLL.S:110
   ??? dex             ; COLL.S:111
   *begrange@0x00c8 = x            ; COLL.S:112
-  ??? lda BlockYthis            ; COLL.S:119
+  a = *BlockYthis@0x039a        ; COLL.S:119
   *blocky@0x008d = a            ; COLL.S:120
   a = #0x60                  ; COLL.S:122
   x = #0x20                  ; COLL.S:123
-  ??? jsr getCData            ; COLL.S:124
-  ??? lda BlockYthis            ; COLL.S:128
-  ??? clc             ; COLL.S:129
-  ??? adc #1            ; COLL.S:130
+  call getCData                  ; COLL.S:124
+  a = *BlockYthis@0x039a        ; COLL.S:128
+  c = 0                            ; COLL.S:129
+  a = a + #0x01 + c              ; COLL.S:130
   *blocky@0x008d = a            ; COLL.S:131
   a = #0x80                  ; COLL.S:133
   x = #0x40                  ; COLL.S:134
-  ??? jsr getCData            ; COLL.S:135
-  ??? lda BlockYthis            ; COLL.S:139
-  ??? sec             ; COLL.S:140
+  call getCData                  ; COLL.S:135
+  a = *BlockYthis@0x039a        ; COLL.S:139
+  c = 1                            ; COLL.S:140
   ??? sbc #1            ; COLL.S:141
   *blocky@0x008d = a            ; COLL.S:142
   a = #0x90                  ; COLL.S:144
   x = #0x50                  ; COLL.S:145
-  ??? jsr getCData            ; COLL.S:146
+  call getCData                  ; COLL.S:146
   x = #0x09                  ; COLL.S:151
 :loop2:
   ??? lda SNthisframe,x            ; COLL.S:153
@@ -70,8 +70,8 @@ fn CHECKBARR {
 :no:
   ??? dex             ; COLL.S:179
   ??? bpl :loop2            ; COLL.S:180
-  ??? ldx collideL            ; COLL.S:182
-  ??? ldy collideR            ; COLL.S:183
+  x = *collideL@0x00c3        ; COLL.S:182
+  y = *collideR@0x00c4        ; COLL.S:183
 ]rts:
   return                           ; COLL.S:185
 }
@@ -79,18 +79,18 @@ fn CHECKBARR {
 fn getCData {
   ??? sta :smodSN+1            ; COLL.S:195
   ??? stx :smodCD+1            ; COLL.S:196
-  ??? lda begrange            ; COLL.S:198
-  ??? jsr getblockej            ; COLL.S:199
-  ??? clc             ; COLL.S:200
-  ??? adc #angle            ; COLL.S:201
+  a = *begrange@0x00c8        ; COLL.S:198
+  call getblockej                  ; COLL.S:199
+  c = 0                            ; COLL.S:200
+  a = a + #0x07 + c              ; COLL.S:201
   *blockedge@0x00c2 = a            ; COLL.S:202
-  ??? ldx begrange            ; COLL.S:204
+  x = *begrange@0x00c8        ; COLL.S:204
 :loop:
   *bufindex@0x00c1 = x            ; COLL.S:205
-  ??? lda CharScrn            ; COLL.S:209
-  ??? ldx bufindex            ; COLL.S:210
-  ??? ldy blocky            ; COLL.S:211
-  ??? jsr getleftbar            ; COLL.S:212
+  a = *CharScrn@0x004b        ; COLL.S:209
+  x = *bufindex@0x00c1        ; COLL.S:210
+  y = *blocky@0x008d        ; COLL.S:211
+  call getleftbar                  ; COLL.S:212
   ??? cmp CDRightEj            ; COLL.S:214
   ??? bcc :RofL            ; COLL.S:215
 :LofL:
@@ -100,10 +100,10 @@ fn getCData {
   a = #0x0f                  ; COLL.S:220
 :cont1:
   *ztemp@0x00e9 = a            ; COLL.S:221
-  ??? lda CharScrn            ; COLL.S:225
-  ??? ldx bufindex            ; COLL.S:226
-  ??? ldy blocky            ; COLL.S:227
-  ??? jsr getrightbar            ; COLL.S:228
+  a = *CharScrn@0x004b        ; COLL.S:225
+  x = *bufindex@0x00c1        ; COLL.S:226
+  y = *blocky@0x008d        ; COLL.S:227
+  call getrightbar                  ; COLL.S:228
   ??? cmp CDLeftEj            ; COLL.S:230
   ??? bcc :RofR            ; COLL.S:231
   ??? beq :RofR            ; COLL.S:232
@@ -114,17 +114,17 @@ fn getCData {
   a = #0x00                  ; COLL.S:237
 :cont2:
   ??? ora ztemp            ; COLL.S:238
-  ??? ldx tempblockx            ; COLL.S:240
+  x = *tempblockx@0x0091        ; COLL.S:240
 :smodCD:
   ??? sta CDthisframe,x            ; COLL.S:241
-  ??? lda tempscrn            ; COLL.S:243
+  a = *tempscrn@0x0093        ; COLL.S:243
 :smodSN:
   ??? sta SNthisframe,x            ; COLL.S:244
-  ??? lda blockedge            ; COLL.S:246
-  ??? clc             ; COLL.S:247
-  ??? adc #14            ; COLL.S:248
+  a = *blockedge@0x00c2        ; COLL.S:246
+  c = 0                            ; COLL.S:247
+  a = a + #0x0e + c              ; COLL.S:248
   *blockedge@0x00c2 = a            ; COLL.S:249
-  ??? ldx bufindex            ; COLL.S:251
+  x = *bufindex@0x00c1        ; COLL.S:251
   ??? inx             ; COLL.S:252
   ??? cpx endrange            ; COLL.S:253
   ??? bne :loop            ; COLL.S:254
@@ -133,23 +133,23 @@ fn getCData {
 }
 
 fn initCDbufs {
-  ??? lda BlockYthis            ; COLL.S:268
+  a = *BlockYthis@0x039a        ; COLL.S:268
   ??? cmp BlockYlast            ; COLL.S:269
   ??? beq :usethis            ; COLL.S:270
-  ??? clc             ; COLL.S:272
-  ??? adc #3            ; COLL.S:273
+  c = 0                            ; COLL.S:272
+  a = a + #0x03 + c              ; COLL.S:273
   ??? cmp BlockYlast            ; COLL.S:274
   ??? beq :usethis            ; COLL.S:275
-  ??? sec             ; COLL.S:277
+  c = 1                            ; COLL.S:277
   ??? sbc #6            ; COLL.S:278
   ??? cmp BlockYlast            ; COLL.S:279
   ??? beq :usethis            ; COLL.S:280
-  ??? lda BlockYthis            ; COLL.S:284
-  ??? clc             ; COLL.S:285
-  ??? adc #1            ; COLL.S:286
+  a = *BlockYthis@0x039a        ; COLL.S:284
+  c = 0                            ; COLL.S:285
+  a = a + #0x01 + c              ; COLL.S:286
   ??? cmp BlockYlast            ; COLL.S:287
   ??? beq :useabove            ; COLL.S:288
-  ??? sec             ; COLL.S:289
+  c = 1                            ; COLL.S:289
   ??? sbc #3            ; COLL.S:290
   ??? cmp BlockYlast            ; COLL.S:291
   ??? beq :useabove            ; COLL.S:292
@@ -160,72 +160,72 @@ fn initCDbufs {
 }
 
 fn getleftbar {
-  ??? jsr rdblock            ; COLL.S:345
-  ??? jsr cmpbarr            ; COLL.S:347
+  call rdblock                  ; COLL.S:345
+  call cmpbarr                  ; COLL.S:347
   ??? beq :clear            ; COLL.S:348
   ??? tay             ; COLL.S:349
-  ??? lda blockedge            ; COLL.S:351
-  ??? clc             ; COLL.S:352
+  a = *blockedge@0x00c2        ; COLL.S:351
+  c = 0                            ; COLL.S:352
   ??? adc BarL,y            ; COLL.S:353
-  ??? sec             ; COLL.S:354
+  c = 1                            ; COLL.S:354
   return                           ; COLL.S:355
 }
 
 fn getrightbar {
-  ??? jsr rdblock            ; COLL.S:369
-  ??? jsr cmpbarr            ; COLL.S:371
+  call rdblock                  ; COLL.S:369
+  call cmpbarr                  ; COLL.S:371
   ??? beq :clear            ; COLL.S:372
   ??? tay             ; COLL.S:373
-  ??? lda blockedge            ; COLL.S:375
-  ??? clc             ; COLL.S:376
-  ??? adc #13            ; COLL.S:377
-  ??? sec             ; COLL.S:378
+  a = *blockedge@0x00c2        ; COLL.S:375
+  c = 0                            ; COLL.S:376
+  a = a + #0x0d + c              ; COLL.S:377
+  c = 1                            ; COLL.S:378
   ??? sbc BarR,y            ; COLL.S:379
-  ??? sec             ; COLL.S:380
+  c = 1                            ; COLL.S:380
   return                           ; COLL.S:381
 }
 
 fn COLLISIONS {
-  ??? lda AMtimer            ; COLL.S:401
+  a = *AMtimer@0x00c7        ; COLL.S:401
   ??? beq :cont            ; COLL.S:402
-  ??? lda $c030            ; COLL.S:403
+  a = *$c030@0xc030        ; COLL.S:403
   ??? dec AMtimer            ; COLL.S:404
   return                           ; COLL.S:405
 }
 
 fn rightcoll {
-  ??? lda CharSword            ; COLL.S:441
+  a = *CharSword@0x004e        ; COLL.S:441
   ??? cmp #2            ; COLL.S:442
   ??? beq :1            ; COLL.S:443
-  ??? lda CharFace            ; COLL.S:445
+  a = *CharFace@0x0043        ; COLL.S:445
   ??? bpl ]rts            ; COLL.S:446
 :1:
-  ??? jsr checkcoll1            ; COLL.S:448
+  call checkcoll1                  ; COLL.S:448
   ??? bcc ]rts            ; COLL.S:449
-  ??? lda tempscrn            ; COLL.S:451
-  ??? ldx tempblockx            ; COLL.S:452
-  ??? ldy tempblocky            ; COLL.S:453
-  ??? jsr getrightbar            ; COLL.S:455
-  ??? sec             ; COLL.S:456
+  a = *tempscrn@0x0093        ; COLL.S:451
+  x = *tempblockx@0x0091        ; COLL.S:452
+  y = *tempblocky@0x0092        ; COLL.S:453
+  call getrightbar                  ; COLL.S:455
+  c = 1                            ; COLL.S:456
   ??? sbc CDLeftEj            ; COLL.S:457
   x = #0x00                  ; COLL.S:459
   tail_call collide                ; COLL.S:460
 }
 
 fn leftcoll {
-  ??? lda CharSword            ; COLL.S:468
+  a = *CharSword@0x004e        ; COLL.S:468
   ??? cmp #2            ; COLL.S:469
   ??? beq :1            ; COLL.S:470
-  ??? lda CharFace            ; COLL.S:472
+  a = *CharFace@0x0043        ; COLL.S:472
   ??? bne ]rts            ; COLL.S:473
 :1:
-  ??? jsr checkcoll1            ; COLL.S:475
+  call checkcoll1                  ; COLL.S:475
   ??? bcc ]rts            ; COLL.S:476
-  ??? lda tempscrn            ; COLL.S:478
-  ??? ldx tempblockx            ; COLL.S:479
-  ??? ldy tempblocky            ; COLL.S:480
-  ??? jsr getleftbar            ; COLL.S:481
-  ??? sec             ; COLL.S:482
+  a = *tempscrn@0x0093        ; COLL.S:478
+  x = *tempblockx@0x0091        ; COLL.S:479
+  y = *tempblocky@0x0092        ; COLL.S:480
+  call getleftbar                  ; COLL.S:481
+  c = 1                            ; COLL.S:482
   ??? sbc CDRightEj            ; COLL.S:483
   x = #0xff                  ; COLL.S:485
   tail_call collide                ; COLL.S:486
@@ -233,21 +233,21 @@ fn leftcoll {
 
 fn checkcoll1 {
   *tempblockx@0x0091 = x            ; COLL.S:496
-  ??? lda CharBlockY            ; COLL.S:498
+  a = *CharBlockY@0x0045        ; COLL.S:498
   ??? bpl :2            ; COLL.S:499
-  ??? clc             ; COLL.S:500
-  ??? adc #3            ; COLL.S:501
+  c = 0                            ; COLL.S:500
+  a = a + #0x03 + c              ; COLL.S:501
   ??? bne :1            ; COLL.S:502
 :2:
   ??? cmp #3            ; COLL.S:504
   ??? bcc :1            ; COLL.S:505
-  ??? sec             ; COLL.S:506
+  c = 1                            ; COLL.S:506
   ??? sbc #3            ; COLL.S:507
 :1:
   *tempblocky@0x0092 = a            ; COLL.S:508
   ??? lda SNthisframe,x            ; COLL.S:510
   *tempscrn@0x0093 = a            ; COLL.S:511
-  ??? jsr rdblock1            ; COLL.S:513
+  call rdblock1                  ; COLL.S:513
   tail_call CHECKCOLL                ; COLL.S:515
 }
 
@@ -262,24 +262,24 @@ fn CHECKCOLL {
   ??? beq :mirror            ; COLL.S:538
   ??? bne :c1            ; COLL.S:539
 :mirror:
-  ??? lda CharID            ; COLL.S:545
+  a = *CharID@0x004d        ; COLL.S:545
   ??? bne :c1            ; COLL.S:546
-  ??? lda CharPosn            ; COLL.S:547
+  a = *CharPosn@0x0040        ; COLL.S:547
   ??? cmp #39            ; COLL.S:548
   ??? bcc :c1            ; COLL.S:549
   ??? cmp #44            ; COLL.S:550
   ??? bcs :c1            ; COLL.S:551
-  ??? lda CharFace            ; COLL.S:552
+  a = *CharFace@0x0043        ; COLL.S:552
   ??? bpl :c1            ; COLL.S:553
-  ??? jsr smashmirror            ; COLL.S:555
+  call smashmirror                  ; COLL.S:555
   a = #0xff                  ; COLL.S:556
   *createshad@0x00e5 = a            ; COLL.S:557
-  ??? clc             ; COLL.S:559
+  c = 0                            ; COLL.S:559
   return                           ; COLL.S:560
 }
 
 fn AdjustScrn {
-  ??? ldx tempscrn            ; COLL.S:603
+  x = *tempscrn@0x0093        ; COLL.S:603
   ??? cpx VisScrn            ; COLL.S:604
   ??? beq ]rts            ; COLL.S:605
   ??? cpx scrnLeft            ; COLL.S:606
@@ -295,16 +295,16 @@ fn AdjustScrn {
 
 fn collide {
   *CollFace@0x00f1 = x            ; COLL.S:632
-  ??? ldx CharLife            ; COLL.S:634
+  x = *CharLife@0x004f        ; COLL.S:634
   ??? bpl ]rts            ; COLL.S:635
-  ??? ldx CharPosn            ; COLL.S:637
+  x = *CharPosn@0x0040        ; COLL.S:637
   ??? cpx #177            ; COLL.S:638
   ??? beq ]rts            ; COLL.S:639
-  ??? clc             ; COLL.S:641
-  ??? adc CharX            ; COLL.S:642
+  c = 0                            ; COLL.S:641
+  a = a + *CharX@0x0041 + c    ; COLL.S:642
   *CharX@0x0041 = a            ; COLL.S:643
-  ??? jsr rdblock1            ; COLL.S:647
-  ??? ldx CollFace            ; COLL.S:649
+  call rdblock1                  ; COLL.S:647
+  x = *CollFace@0x00f1        ; COLL.S:649
   ??? bpl :faceL            ; COLL.S:650
   ??? cmp #block            ; COLL.S:652
   ??? beq :2            ; COLL.S:653
@@ -316,9 +316,9 @@ fn collide {
 
 fn AirBump {
   a = #0xfc                  ; COLL.S:686
-  ??? jsr addcharx            ; COLL.S:687
+  call addcharx                  ; COLL.S:687
   *CharX@0x0041 = a            ; COLL.S:688
-  ??? lda CharAction            ; COLL.S:690
+  a = *CharAction@0x0046        ; COLL.S:690
   ??? cmp #4            ; COLL.S:691
   ??? bne :3            ; COLL.S:692
   a = #0x00                  ; COLL.S:694
@@ -326,8 +326,8 @@ fn AirBump {
   ??? beq :smackwall            ; COLL.S:696
 :3:
   a = #0x2d                  ; COLL.S:698
-  ??? jsr jumpseq            ; COLL.S:699
-  ??? jsr animchar            ; COLL.S:700
+  call jumpseq                  ; COLL.S:699
+  call animchar                  ; COLL.S:700
 :smackwall:
 BumpSound:
   a = #0x01                  ; COLL.S:705
@@ -344,57 +344,57 @@ fn :smackwall  (aka BumpSound) {
 }
 
 fn GroundBump {
-  ??? ldx CharBlockY            ; COLL.S:714
-  ??? lda CharSword            ; COLL.S:716
+  x = *CharBlockY@0x0045        ; COLL.S:714
+  a = *CharSword@0x004e        ; COLL.S:716
   ??? cmp #2            ; COLL.S:717
   ??? beq :skipair            ; COLL.S:718
   ??? lda FloorY+1,x            ; COLL.S:720
-  ??? sec             ; COLL.S:721
+  c = 1                            ; COLL.S:721
   ??? sbc CharY            ; COLL.S:722
   ??? cmp #15            ; COLL.S:723
   ??? bcs AirBump            ; COLL.S:724
 :skipair:
   ??? lda FloorY+1,x            ; COLL.S:726
   *CharY@0x0042 = a            ; COLL.S:727
-  ??? lda CharYVel            ; COLL.S:729
+  a = *CharYVel@0x0048        ; COLL.S:729
   ??? cmp #OofVelocity            ; COLL.S:730
   ??? bcc :okvel            ; COLL.S:731
   a = #0xfb                  ; COLL.S:732
-  ??? jsr addcharx            ; COLL.S:733
+  call addcharx                  ; COLL.S:733
   *CharX@0x0041 = a            ; COLL.S:734
   return                           ; COLL.S:735
 }
 
 fn GETFWDDIST {
-  ??? jsr GetBaseBlock            ; COLL.S:826
-  ??? jsr setupchar            ; COLL.S:827
-  ??? jsr getedges            ; COLL.S:828
-  ??? jsr getunderft            ; COLL.S:832
+  call GetBaseBlock                  ; COLL.S:826
+  call setupchar                  ; COLL.S:827
+  call getedges                  ; COLL.S:828
+  call getunderft                  ; COLL.S:832
   *tempobjid@0x00f2 = a            ; COLL.S:833
-  ??? jsr cmpbarr            ; COLL.S:835
+  call cmpbarr                  ; COLL.S:835
   ??? beq :nextb            ; COLL.S:836
-  ??? lda CharBlockX            ; COLL.S:838
+  a = *CharBlockX@0x0044        ; COLL.S:838
   *tempblockx@0x0091 = a            ; COLL.S:839
-  ??? jsr DBarr            ; COLL.S:840
+  call DBarr                  ; COLL.S:840
   ??? tax             ; COLL.S:841
   ??? bpl :tobarr            ; COLL.S:842
 :nextb:
-  ??? jsr getinfront            ; COLL.S:847
+  call getinfront                  ; COLL.S:847
   *tempobjid@0x00f2 = a            ; COLL.S:848
   ??? cmp #panelwof            ; COLL.S:849
   ??? bne :99            ; COLL.S:850
-  ??? ldx CharFace            ; COLL.S:851
+  x = *CharFace@0x0043        ; COLL.S:851
   ??? bpl :toEOB            ; COLL.S:852
 :99:
-  ??? jsr cmpbarr            ; COLL.S:854
+  call cmpbarr                  ; COLL.S:854
   ??? beq :nobarr            ; COLL.S:855
-  ??? lda infrontx            ; COLL.S:857
+  a = *infrontx@0x008e        ; COLL.S:857
   *tempblockx@0x0091 = a            ; COLL.S:858
-  ??? jsr DBarr            ; COLL.S:859
+  call DBarr                  ; COLL.S:859
   ??? tax             ; COLL.S:860
   ??? bpl :tobarr            ; COLL.S:861
 :nobarr:
-  ??? jsr getinfront            ; COLL.S:867
+  call getinfront                  ; COLL.S:867
   *tempobjid@0x00f2 = a            ; COLL.S:868
   ??? cmp #loose            ; COLL.S:870
   ??? beq :toEOB            ; COLL.S:871
@@ -404,66 +404,66 @@ fn GETFWDDIST {
   ??? beq :toEOB1            ; COLL.S:877
   ??? cmp #flask            ; COLL.S:878
   ??? beq :toEOB1            ; COLL.S:879
-  ??? jsr cmpspace            ; COLL.S:881
+  call cmpspace                  ; COLL.S:881
   ??? beq :toEOB            ; COLL.S:882
 :fullstep:
   a = #0x0b                  ; COLL.S:886
   x = #0x02                  ; COLL.S:888
   ??? bne :done            ; COLL.S:889
 :toEOB1:
-  ??? jsr getdist            ; COLL.S:893
+  call getdist                  ; COLL.S:893
   ??? beq :fullstep            ; COLL.S:894
   x = #0x00                  ; COLL.S:895
   ??? beq :done            ; COLL.S:896
 :toEOB:
-  ??? jsr getdist            ; COLL.S:900
+  call getdist                  ; COLL.S:900
   x = #0x00                  ; COLL.S:902
 :done:
-  ??? ldy tempobjid            ; COLL.S:904
+  y = *tempobjid@0x00f2        ; COLL.S:904
 ]rts:
   return                           ; COLL.S:905
 }
 
 fn DBarr {
-  ??? lda tempobjid            ; COLL.S:926
+  a = *tempobjid@0x00f2        ; COLL.S:926
   ??? cmp #gate            ; COLL.S:927
   ??? bne :ok            ; COLL.S:928
-  ??? jsr gatebarr?            ; COLL.S:930
+  call gatebarr?                  ; COLL.S:930
   ??? bcs :clr            ; COLL.S:931
 :ok:
-  ??? lda tempblockx            ; COLL.S:933
-  ??? jsr getblockej            ; COLL.S:934
-  ??? clc             ; COLL.S:935
-  ??? adc #angle            ; COLL.S:936
+  a = *tempblockx@0x0091        ; COLL.S:933
+  call getblockej                  ; COLL.S:934
+  c = 0                            ; COLL.S:935
+  a = a + #0x07 + c              ; COLL.S:936
   *blockedge@0x00c2 = a            ; COLL.S:937
-  ??? lda CharFace            ; COLL.S:939
+  a = *CharFace@0x0043        ; COLL.S:939
   ??? bmi :checkL            ; COLL.S:940
 :checkR:
-  ??? lda tempobjid            ; COLL.S:945
-  ??? jsr cmpbarr            ; COLL.S:947
+  a = *tempobjid@0x00f2        ; COLL.S:945
+  call cmpbarr                  ; COLL.S:947
   ??? beq :clr            ; COLL.S:948
   ??? tay             ; COLL.S:949
-  ??? lda blockedge            ; COLL.S:951
-  ??? clc             ; COLL.S:952
+  a = *blockedge@0x00c2        ; COLL.S:951
+  c = 0                            ; COLL.S:952
   ??? adc BarL,y            ; COLL.S:953
   *ztemp@0x00e9 = a            ; COLL.S:954
-  ??? sec             ; COLL.S:956
+  c = 1                            ; COLL.S:956
   ??? sbc CDRightEj            ; COLL.S:957
   return                           ; COLL.S:958
 }
 
 fn ANIMCHAR  (aka :next) {
-  ??? jsr getseq            ; COLL.S:996
+  call getseq                  ; COLL.S:996
   ??? cmp #chx            ; COLL.S:999
   ??? bne :no1            ; COLL.S:1000
-  ??? jsr getseq            ; COLL.S:1002
-  ??? jsr addcharx            ; COLL.S:1004
+  call getseq                  ; COLL.S:1002
+  call addcharx                  ; COLL.S:1004
   *CharX@0x0041 = a            ; COLL.S:1005
   goto :next                ; COLL.S:1007
 }
 
 fn GoneUpstairs {
-  ??? lda level            ; COLL.S:1163
+  a = *level@0x03f4        ; COLL.S:1163
   ??? cmp #13            ; COLL.S:1164
   ??? beq :ok            ; COLL.S:1165
   ??? cmp #4            ; COLL.S:1166
@@ -475,14 +475,14 @@ fn GoneUpstairs {
   a = #0x09                  ; COLL.S:1171
 :2:
   x = #0x19                  ; COLL.S:1172
-  ??? jsr cuesong            ; COLL.S:1173
+  call cuesong                  ; COLL.S:1173
 :ok:
   ??? inc NextLevel            ; COLL.S:1175
   return                           ; COLL.S:1176
 }
 
 fn CHECKSLICE {
-  ??? lda CharBlockY            ; COLL.S:1187
+  a = *CharBlockY@0x0045        ; COLL.S:1187
   *tempblocky@0x0092 = a            ; COLL.S:1188
   x = #0x09                  ; COLL.S:1190
 :loop:
@@ -492,7 +492,7 @@ fn CHECKSLICE {
   ??? bne :ok            ; COLL.S:1196
   ??? lda SNthisframe,x            ; COLL.S:1200
   *tempscrn@0x0093 = a            ; COLL.S:1201
-  ??? jsr rdblock1            ; COLL.S:1203
+  call rdblock1                  ; COLL.S:1203
   ??? cmp #slicer            ; COLL.S:1204
   ??? bne :ok            ; COLL.S:1205
   ??? lda (BlueSpec),y            ; COLL.S:1207
@@ -500,7 +500,7 @@ fn CHECKSLICE {
   ??? cmp #slicerExt            ; COLL.S:1209
   ??? beq :slice            ; COLL.S:1210
 :ok:
-  ??? ldx tempblockx            ; COLL.S:1214
+  x = *tempblockx@0x0091        ; COLL.S:1214
   ??? dex             ; COLL.S:1215
   ??? bpl :loop            ; COLL.S:1216
 ]rts:
@@ -508,11 +508,11 @@ fn CHECKSLICE {
 }
 
 fn CHECKSLICE2 {
-  ??? jsr getunderft            ; COLL.S:1267
-  ??? jsr :slice?            ; COLL.S:1268
+  call getunderft                  ; COLL.S:1267
+  call :slice?                  ; COLL.S:1268
   ??? bcs ]rts            ; COLL.S:1269
   ??? inc tempblockx            ; COLL.S:1271
-  ??? jsr rdblock1            ; COLL.S:1272
+  call rdblock1                  ; COLL.S:1272
 :slice?:
   ??? cmp #slicer            ; COLL.S:1275
   ??? bne :safe            ; COLL.S:1276
@@ -520,35 +520,35 @@ fn CHECKSLICE2 {
   ??? and #$7f            ; COLL.S:1278
   ??? cmp #slicerExt            ; COLL.S:1279
   ??? bne :safe            ; COLL.S:1280
-  ??? lda tempblockx            ; COLL.S:1282
-  ??? jsr getblockej            ; COLL.S:1283
-  ??? clc             ; COLL.S:1284
-  ??? adc #angle            ; COLL.S:1285
+  a = *tempblockx@0x0091        ; COLL.S:1282
+  call getblockej                  ; COLL.S:1283
+  c = 0                            ; COLL.S:1284
+  a = a + #0x07 + c              ; COLL.S:1285
   *blockedge@0x00c2 = a            ; COLL.S:1286
-  ??? lda tempscrn            ; COLL.S:1288
-  ??? ldx tempblockx            ; COLL.S:1289
-  ??? ldy tempblocky            ; COLL.S:1290
-  ??? jsr getleftbar            ; COLL.S:1291
+  a = *tempscrn@0x0093        ; COLL.S:1288
+  x = *tempblockx@0x0091        ; COLL.S:1289
+  y = *tempblocky@0x0092        ; COLL.S:1290
+  call getleftbar                  ; COLL.S:1291
   ??? cmp CDRightEj            ; COLL.S:1292
   ??? bcs :safe            ; COLL.S:1293
-  ??? lda tempscrn            ; COLL.S:1295
-  ??? ldx tempblockx            ; COLL.S:1296
-  ??? ldy tempblocky            ; COLL.S:1297
-  ??? jsr getrightbar            ; COLL.S:1298
+  a = *tempscrn@0x0093        ; COLL.S:1295
+  x = *tempblockx@0x0091        ; COLL.S:1296
+  y = *tempblocky@0x0092        ; COLL.S:1297
+  call getrightbar                  ; COLL.S:1298
   ??? cmp CDLeftEj            ; COLL.S:1299
   ??? bcc :safe            ; COLL.S:1300
   ??? beq :safe            ; COLL.S:1301
-  ??? jsr rdblock1            ; COLL.S:1303
-  ??? jsr ]slice            ; COLL.S:1304
-  ??? sec             ; COLL.S:1305
+  call rdblock1                  ; COLL.S:1303
+  call ]slice                  ; COLL.S:1304
+  c = 1                            ; COLL.S:1305
   return                           ; COLL.S:1306
 }
 
 fn CHECKGATE {
-  ??? lda CharAction            ; COLL.S:1320
+  a = *CharAction@0x0046        ; COLL.S:1320
   ??? cmp #7            ; COLL.S:1321
   ??? beq :1            ; COLL.S:1322
-  ??? lda CharPosn            ; COLL.S:1323
+  a = *CharPosn@0x0040        ; COLL.S:1323
   ??? cmp #15            ; COLL.S:1324
   ??? beq :1            ; COLL.S:1325
   ??? cmp #108            ; COLL.S:1326
@@ -556,26 +556,26 @@ fn CHECKGATE {
   ??? cmp #111            ; COLL.S:1328
   ??? bcs ]rts            ; COLL.S:1329
 :1:
-  ??? jsr getunderft            ; COLL.S:1331
+  call getunderft                  ; COLL.S:1331
   ??? cmp #gate            ; COLL.S:1332
   ??? beq :check            ; COLL.S:1333
   ??? dec tempblockx            ; COLL.S:1335
-  ??? jsr rdblock1            ; COLL.S:1336
+  call rdblock1                  ; COLL.S:1336
   ??? cmp #gate            ; COLL.S:1337
   ??? bne ]rts            ; COLL.S:1338
 :check:
-  ??? ldx tempblockx            ; COLL.S:1340
+  x = *tempblockx@0x0091        ; COLL.S:1340
   ??? lda CDthisframe,x            ; COLL.S:1341
   ??? and CDlastframe,x            ; COLL.S:1342
   ??? cmp #$ff            ; COLL.S:1343
   ??? bne ]rts            ; COLL.S:1344
-  ??? jsr gatebarr?            ; COLL.S:1346
+  call gatebarr?                  ; COLL.S:1346
   ??? bcs ]rts            ; COLL.S:1347
-  ??? jsr BumpSound            ; COLL.S:1349
-  ??? lda tempblockx            ; COLL.S:1353
+  call BumpSound                  ; COLL.S:1349
+  a = *tempblockx@0x0091        ; COLL.S:1353
   *collX@0x0087 = a            ; COLL.S:1354
-  ??? jsr getunderft            ; COLL.S:1355
-  ??? lda tempblockx            ; COLL.S:1356
+  call getunderft                  ; COLL.S:1355
+  a = *tempblockx@0x0091        ; COLL.S:1356
   ??? cmp collX            ; COLL.S:1357
   ??? beq :left            ; COLL.S:1358
   ??? bcs :right            ; COLL.S:1359
@@ -585,8 +585,8 @@ fn CHECKGATE {
 :right:
   a = #0x05                  ; COLL.S:1363
 :10:
-  ??? clc             ; COLL.S:1364
-  ??? adc CharX            ; COLL.S:1365
+  c = 0                            ; COLL.S:1364
+  a = a + *CharX@0x0041 + c    ; COLL.S:1365
   *CharX@0x0041 = a            ; COLL.S:1366
 ]rts:
   return                           ; COLL.S:1367
@@ -596,61 +596,121 @@ fn gatebarr? {
   ??? lda (BlueSpec),y            ; COLL.S:1375
   ??? lsr             ; COLL.S:1376
   ??? lsr             ; COLL.S:1377
-  ??? clc             ; COLL.S:1378
-  ??? adc #gatemargin            ; COLL.S:1379
+  c = 0                            ; COLL.S:1378
+  a = a + #0x06 + c              ; COLL.S:1379
   ??? cmp imheight            ; COLL.S:1380
 ]rts:
   return                           ; COLL.S:1381
 }
 
 fn ENEMYCOLL {
-  ??? lda AMtimer            ; COLL.S:1390
+  a = *AMtimer@0x00c7        ; COLL.S:1390
   ??? bne ]rts            ; COLL.S:1391
-  ??? lda CharAction            ; COLL.S:1393
+  a = *CharAction@0x0046        ; COLL.S:1393
   ??? cmp #1            ; COLL.S:1394
   ??? bne ]rts            ; COLL.S:1395
-  ??? lda CharLife            ; COLL.S:1396
+  a = *CharLife@0x004f        ; COLL.S:1396
   ??? bpl ]rts            ; COLL.S:1397
-  ??? lda CharSword            ; COLL.S:1398
+  a = *CharSword@0x004e        ; COLL.S:1398
   ??? cmp #2            ; COLL.S:1399
   ??? bcc ]rts            ; COLL.S:1400
-  ??? jsr getunderft            ; COLL.S:1402
+  call getunderft                  ; COLL.S:1402
   ??? cmp #block            ; COLL.S:1403
   ??? beq :collide            ; COLL.S:1404
   ??? cmp #panelwif            ; COLL.S:1405
   ??? beq :collide            ; COLL.S:1406
   ??? cmp #gate            ; COLL.S:1407
   ??? bne :1            ; COLL.S:1408
-  ??? jsr gatebarr?            ; COLL.S:1409
+  call gatebarr?                  ; COLL.S:1409
   ??? bcc :collide            ; COLL.S:1410
 :1:
-  ??? lda CharFace            ; COLL.S:1414
+  a = *CharFace@0x0043        ; COLL.S:1414
   ??? bmi ]rts            ; COLL.S:1415
   ??? dec tempblockx            ; COLL.S:1416
-  ??? jsr rdblock1            ; COLL.S:1417
+  call rdblock1                  ; COLL.S:1417
   ??? cmp #panelwif            ; COLL.S:1418
   ??? beq :collide            ; COLL.S:1419
   ??? cmp #gate            ; COLL.S:1420
   ??? bne ]rts            ; COLL.S:1421
-  ??? jsr gatebarr?            ; COLL.S:1422
+  call gatebarr?                  ; COLL.S:1422
   ??? bcc :collide            ; COLL.S:1423
 ]rts:
   return                           ; COLL.S:1424
 }
 
 fn DBarr2 {
-  ??? lda CharFace            ; COLL.S:1465
+  a = *CharFace@0x0043        ; COLL.S:1465
   ??? bpl :checkL            ; COLL.S:1466
 :checkR:
-  ??? lda tempobjid            ; COLL.S:1471
-  ??? jsr cmpbarr            ; COLL.S:1473
+  a = *tempobjid@0x00f2        ; COLL.S:1471
+  call cmpbarr                  ; COLL.S:1473
   ??? beq :clr            ; COLL.S:1474
   ??? tay             ; COLL.S:1475
-  ??? lda blockedge            ; COLL.S:1477
-  ??? clc             ; COLL.S:1478
+  a = *blockedge@0x00c2        ; COLL.S:1477
+  c = 0                            ; COLL.S:1478
   ??? adc BarL,y            ; COLL.S:1479
   *ztemp@0x00e9 = a            ; COLL.S:1480
-  ??? sec             ; COLL.S:1482
+  c = 1                            ; COLL.S:1482
   ??? sbc CDRightEj            ; COLL.S:1483
   return                           ; COLL.S:1484
+}
+
+fn :slice? {
+  ??? cmp #slicer            ; COLL.S:1275
+  ??? bne :safe            ; COLL.S:1276
+  ??? lda (BlueSpec),y            ; COLL.S:1277
+  ??? and #$7f            ; COLL.S:1278
+  ??? cmp #slicerExt            ; COLL.S:1279
+  ??? bne :safe            ; COLL.S:1280
+  a = *tempblockx@0x0091        ; COLL.S:1282
+  call getblockej                  ; COLL.S:1283
+  c = 0                            ; COLL.S:1284
+  a = a + #0x07 + c              ; COLL.S:1285
+  *blockedge@0x00c2 = a            ; COLL.S:1286
+  a = *tempscrn@0x0093        ; COLL.S:1288
+  x = *tempblockx@0x0091        ; COLL.S:1289
+  y = *tempblocky@0x0092        ; COLL.S:1290
+  call getleftbar                  ; COLL.S:1291
+  ??? cmp CDRightEj            ; COLL.S:1292
+  ??? bcs :safe            ; COLL.S:1293
+  a = *tempscrn@0x0093        ; COLL.S:1295
+  x = *tempblockx@0x0091        ; COLL.S:1296
+  y = *tempblocky@0x0092        ; COLL.S:1297
+  call getrightbar                  ; COLL.S:1298
+  ??? cmp CDLeftEj            ; COLL.S:1299
+  ??? bcc :safe            ; COLL.S:1300
+  ??? beq :safe            ; COLL.S:1301
+  call rdblock1                  ; COLL.S:1303
+  call ]slice                  ; COLL.S:1304
+  c = 1                            ; COLL.S:1305
+  return                           ; COLL.S:1306
+}
+
+fn :slice  (aka ]slice) {
+  ??? lda (BlueSpec),y            ; COLL.S:1224
+  ??? ora #$80            ; COLL.S:1225
+  ??? sta (BlueSpec),y            ; COLL.S:1226
+:cont:
+  a = *CharPosn@0x0040        ; COLL.S:1228
+  ??? cmp #178            ; COLL.S:1229
+  ??? beq ]rts            ; COLL.S:1230
+  a = *tempblockx@0x0091        ; COLL.S:1232
+  call getblockej                  ; COLL.S:1233
+  c = 0                            ; COLL.S:1234
+  a = a + #0x07 + c              ; COLL.S:1235
+  *CharX@0x0041 = a            ; COLL.S:1236
+  a = #0x08                  ; COLL.S:1238
+  call addcharx                  ; COLL.S:1239
+  *CharX@0x0041 = a            ; COLL.S:1240
+  x = *CharBlockY@0x0045        ; COLL.S:1242
+  ??? inx             ; COLL.S:1243
+  ??? lda FloorY,x            ; COLL.S:1244
+  *CharY@0x0042 = a            ; COLL.S:1245
+  a = #0x64                  ; COLL.S:1247
+  call decstr                  ; COLL.S:1248
+  a = #0x05                  ; COLL.S:1250
+  call addsound                  ; COLL.S:1251
+  a = #0x36                  ; COLL.S:1253
+  call jumpseq                  ; COLL.S:1254
+  tail_call animchar                ; COLL.S:1255
 }

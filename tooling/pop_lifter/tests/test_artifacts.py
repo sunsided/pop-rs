@@ -18,6 +18,7 @@ from pop_lifter.pass1_lift import discover_entries, lift_file
 REPO_ROOT = Path(__file__).resolve().parents[3]
 IR_PASS0 = REPO_ROOT / "ir" / "pass0" / "equates.json"
 IR_PILOT = REPO_ROOT / "ir" / "pilot" / "auto_combat.ir1"
+IR_PILOT_RNDP = REPO_ROOT / "ir" / "pilot" / "rndp.ir1"
 IR_RAW = REPO_ROOT / "ir" / "raw"
 
 PILOT_ENTRIES = [
@@ -75,6 +76,48 @@ def test_pass1_pilot_artifact_matches(source_dir):
         f"  pop-lifter lift AUTO.S "
         f"{' '.join('--entry ' + e for e in PILOT_ENTRIES)} "
         f"--out {IR_PILOT.relative_to(REPO_ROOT)}"
+    )
+
+
+def _regen_rndp_pilot(source_dir: Path) -> str:
+    """Reproduce `pop-lifter lift AUTO.S GRAFIX.S --entry rndp --entry RND`.
+
+    Builds the cross-module rndp/RND dump as a concatenation of the two
+    module dumps separated by a single blank line, matching what the
+    CLI writes.
+    """
+    ast = parse_files(
+        [
+            source_dir / "EQ.S",
+            source_dir / "GAMEEQ.S",
+            source_dir / "AUTO.S",
+            source_dir / "GRAFIX.S",
+        ],
+        search_paths=[source_dir],
+    )
+    auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
+    grafix = next(f for f in ast.files if Path(f.path).name == "GRAFIX.S")
+    m_auto = lift_file(auto, ast.equates, ["rndp"]).module
+    m_grafix = lift_file(grafix, ast.equates, ["RND"]).module
+    return "\n".join([
+        ir1_mod.format_module(m_auto),
+        ir1_mod.format_module(m_grafix),
+    ])
+
+
+def test_pass1_rndp_pilot_artifact_matches(source_dir):
+    if not IR_PILOT_RNDP.exists():
+        raise AssertionError(
+            f"missing artifact {IR_PILOT_RNDP}. regenerate with:\n"
+            f"  pop-lifter lift AUTO.S GRAFIX.S --entry rndp --entry RND "
+            f"--out {IR_PILOT_RNDP.relative_to(REPO_ROOT)}"
+        )
+    expected = IR_PILOT_RNDP.read_text(encoding="utf-8")
+    actual = _regen_rndp_pilot(source_dir)
+    assert actual == expected, (
+        f"{IR_PILOT_RNDP.relative_to(REPO_ROOT)} is stale. regenerate with:\n"
+        f"  pop-lifter lift AUTO.S GRAFIX.S --entry rndp --entry RND "
+        f"--out {IR_PILOT_RNDP.relative_to(REPO_ROOT)}"
     )
 
 

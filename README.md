@@ -19,7 +19,8 @@ Inspectable intermediate artifacts:
 | Path                          | What it is                                                                                          |
 |-------------------------------|-----------------------------------------------------------------------------------------------------|
 | `ir/pass0/equates.json`       | Pass-0 AST: every named address from `EQ.S` + `GAMEEQ.S`, plus the `dum`/`dend` overlays.           |
-| `ir/pilot/auto_combat.ir1`    | Pass-1 IR1: the combat-button routines from `AUTO.S` lifted opcode-for-opcode (the pilot slice).    |
+| `ir/pilot/auto_combat.ir1`    | Pass-1 IR1: the combat-button routines from `AUTO.S` (first pilot slice).                           |
+| `ir/pilot/rndp.ir1`           | Pass-1 IR1: `rndp` (AUTO.S) + `RND` (GRAFIX.S) — the cross-module RNG slice.                        |
 | `ir/raw/*.ir1` + `SUMMARY.md` | Pass-1 mechanical sweep across every code file. Unlifted opcodes appear as `??? ...` for review.    |
 
 Regenerate after lifter changes:
@@ -29,6 +30,8 @@ pop-lifter dump-ast --out ir/pass0/equates.json
 pop-lifter lift AUTO.S --entry DoStrike --entry DoBlock --entry DoTurn \
     --entry DoStandup --entry DoEngarde --entry DoRelBtn --entry DoRelease \
     --out ir/pilot/auto_combat.ir1
+pop-lifter lift AUTO.S GRAFIX.S --entry rndp --entry RND \
+    --out ir/pilot/rndp.ir1
 pop-lifter lift-all --out-dir ir/raw
 ```
 
