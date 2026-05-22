@@ -1,0 +1,21 @@
+; module AUTO from 01 POP Source/Source/AUTO.S
+
+fn rndp {
+  x = *guardprog@0x00dd        ; AUTO.S:898
+  tail_call rnd                ; AUTO.S:899
+}
+
+; module GRAFIX from 01 POP Source/Source/GRAFIX.S
+
+fn RND {
+  a = *RNDseed@0x009e        ; GRAFIX.S:1387
+  a = a << 1                       ; GRAFIX.S:1388
+  a = a << 1                       ; GRAFIX.S:1389
+  c = 0                            ; GRAFIX.S:1390
+  a = a + *RNDseed@0x009e + c    ; GRAFIX.S:1391
+  c = 0                            ; GRAFIX.S:1392
+  a = a + #0x17 + c              ; GRAFIX.S:1393
+  *RNDseed@0x009e = a            ; GRAFIX.S:1394
+]rts:
+  return                           ; GRAFIX.S:1395
+}

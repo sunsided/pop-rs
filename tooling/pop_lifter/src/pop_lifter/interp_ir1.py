@@ -12,12 +12,19 @@ The interpreter is deliberately minimal:
 * 64K main RAM (`bytearray`). Aux RAM and bank-switched language card
   pages will land alongside the SMC / hi-res work; the AUTO.S combat
   pilot only touches zero-page and the soft-switch image in main RAM.
-* Pseudo-registers `a`, `x`, `y` (8-bit). The pilot doesn't read flags,
-  so `z`/`n`/`c`/`v` are not yet modelled on `Trace`; they land in the
-  next slice along with `cmp` and conditional branches.
-* No call stack — `jsr` lifts in a later slice. `jmp` to another routine
-  is treated as a tail call: the interpreter switches routines and
-  inherits the eventual `rts`.
+* Pseudo-registers `a`, `x`, `y` (8-bit) and a single carry flag `c`.
+  Z / N / V land alongside `cmp` and conditional branches in the
+  CheckFloor slice.
+* Explicit call stack — `jsr` pushes the return point, `rts` pops it.
+  An `rts` at depth 0 returns from the run. `jmp` to a routine in any
+  loaded module is treated as a tail call: the interpreter switches
+  routines without growing the stack.
+* Cross-module / jump-table aliasing — `run` accepts either a single
+  module or a list, plus an optional `aliases: dict[str, str]` that
+  maps Merlin jump-table slot names (e.g. `rnd`) to their concrete
+  implementation labels (`RND`). The plan's `jumptables.py` will
+  generate that map automatically from the dum blocks; here we accept
+  it from the test harness.
 
 `run` returns a `Trace` carrying the post-state plus the set of RAM
 addresses that were written. Tests assert against that diff rather than
@@ -29,13 +36,20 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .ir1 import (
+    AdcAbs,
+    AdcImm,
+    Asl,
+    Call,
+    Clc,
     Goto,
     Label,
+    LoadAbs,
     LoadImm,
     ModuleIR1,
     Reg,
     Return,
     Routine,
+    Sec,
     StoreAbs,
     Unsupported,
 )
@@ -53,8 +67,10 @@ class Trace:
     a: int
     x: int
     y: int
+    c: int = 0          # carry flag (0 or 1)
     writes: dict[int, int] = field(default_factory=dict)  # addr -> last value
     steps: int = 0
+    max_stack_depth: int = 0
 
     def diff_against(self, initial: bytes) -> dict[int, int]:
         """Return only the addresses whose byte differs from `initial`.
@@ -75,32 +91,71 @@ def _find_label_index(routine: Routine, name: str) -> int:
     )
 
 
+def _resolve(
+    modules: list[ModuleIR1],
+    aliases: dict[str, str],
+    name: str,
+) -> Routine | None:
+    """Look up a routine entry by name across every loaded module,
+    following the alias map. Returns `None` if nothing matches."""
+    seen: set[str] = set()
+    cur = name
+    while cur not in seen:
+        seen.add(cur)
+        for m in modules:
+            r = m.find(cur)
+            if r is not None:
+                return r
+        if cur in aliases:
+            cur = aliases[cur]
+            continue
+        break
+    return None
+
+
 def run(
-    module: ModuleIR1,
+    module: ModuleIR1 | list[ModuleIR1],
     entry: str,
     *,
     ram: bytearray | None = None,
     a: int = 0,
     x: int = 0,
     y: int = 0,
+    c: int = 0,
+    aliases: dict[str, str] | None = None,
     max_steps: int = 100_000,
 ) -> Trace:
-    """Execute `module`'s routine `entry` starting from the given
-    register/RAM state. Stops on the first `rts` reached (after
-    following tail-calls into other routines).
+    """Execute `entry` starting from the given register/RAM state.
+
+    `module` may be a single `ModuleIR1` or a list — the latter is how
+    cross-module calls (e.g. AUTO.S calling into GRAFIX.S's `RND`) get
+    resolved. `aliases` adds an extra hop for jump-table slot names
+    that don't appear as a label in any module body.
+
+    Stops when an `rts` is executed at call-stack depth 0.
     """
     if ram is None:
         ram = bytearray(0x10000)
     elif len(ram) != 0x10000:
         raise ValueError(f"ram must be 64K, got {len(ram)} bytes")
 
-    routine = module.find(entry)
-    if routine is None:
-        raise InterpError(f"unknown entry {entry!r} in module {module.name!r}")
+    modules: list[ModuleIR1] = [module] if isinstance(module, ModuleIR1) else list(module)
+    aliases = dict(aliases or {})
 
-    trace = Trace(ram=ram, a=a & 0xff, x=x & 0xff, y=y & 0xff)
+    routine = _resolve(modules, aliases, entry)
+    if routine is None:
+        names = [m.name for m in modules]
+        raise InterpError(
+            f"unknown entry {entry!r}; not found in any of {names} "
+            f"(aliases: {aliases!r})"
+        )
+
+    trace = Trace(ram=ram, a=a & 0xff, x=x & 0xff, y=y & 0xff, c=c & 1)
     idx = 0
     body = routine.body
+    # Each stack frame remembers the routine we were in and the index
+    # of the instruction *after* the `jsr` so `rts` can resume there.
+    stack: list[tuple[Routine, int]] = []
 
     while True:
         if trace.steps >= max_steps:
@@ -109,9 +164,6 @@ def run(
                 f"likely an unterminated loop"
             )
         if idx >= len(body):
-            # A routine body that ran off the end without a terminator
-            # would be a lifter bug. The pilot routines all end with
-            # `rts` or a tail-call `jmp`, so this should be unreachable.
             raise InterpError(
                 f"routine {routine.name!r} ran past end of body; missing terminator?"
             )
@@ -134,6 +186,17 @@ def run(
             idx += 1
             continue
 
+        if isinstance(item, LoadAbs):
+            value = ram[item.source.addr & 0xffff]
+            if item.reg is Reg.A:
+                trace.a = value
+            elif item.reg is Reg.X:
+                trace.x = value
+            else:
+                trace.y = value
+            idx += 1
+            continue
+
         if isinstance(item, StoreAbs):
             value = {
                 Reg.A: trace.a,
@@ -146,13 +209,58 @@ def run(
             idx += 1
             continue
 
+        if isinstance(item, Asl):
+            old = trace.a & 0xff
+            trace.a = (old << 1) & 0xff
+            trace.c = (old >> 7) & 1
+            idx += 1
+            continue
+
+        if isinstance(item, Clc):
+            trace.c = 0
+            idx += 1
+            continue
+
+        if isinstance(item, Sec):
+            trace.c = 1
+            idx += 1
+            continue
+
+        if isinstance(item, AdcImm):
+            total = (trace.a & 0xff) + (item.imm.value & 0xff) + trace.c
+            trace.a = total & 0xff
+            trace.c = 1 if total > 0xff else 0
+            idx += 1
+            continue
+
+        if isinstance(item, AdcAbs):
+            total = (trace.a & 0xff) + ram[item.source.addr & 0xffff] + trace.c
+            trace.a = total & 0xff
+            trace.c = 1 if total > 0xff else 0
+            idx += 1
+            continue
+
+        if isinstance(item, Call):
+            target = _resolve(modules, aliases, item.target)
+            if target is None:
+                raise InterpError(
+                    f"jsr target {item.target!r} not found in any loaded "
+                    f"module (aliases: {aliases!r})"
+                )
+            stack.append((routine, idx + 1))
+            trace.max_stack_depth = max(trace.max_stack_depth, len(stack))
+            routine = target
+            body = routine.body
+            idx = 0
+            continue
+
         if isinstance(item, Goto):
             if item.kind == "tail_call":
-                target = module.find(item.target)
+                target = _resolve(modules, aliases, item.target)
                 if target is None:
                     raise InterpError(
-                        f"tail-call target {item.target!r} not in module "
-                        f"{module.name!r}; was it lifted?"
+                        f"tail-call target {item.target!r} not found in any "
+                        f"loaded module (aliases: {aliases!r})"
                     )
                 routine = target
                 body = routine.body
@@ -163,7 +271,11 @@ def run(
             continue
 
         if isinstance(item, Return):
-            return trace
+            if not stack:
+                return trace
+            routine, idx = stack.pop()
+            body = routine.body
+            continue
 
         if isinstance(item, Unsupported):
             raise InterpError(

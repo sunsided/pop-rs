@@ -39,14 +39,21 @@ from pathlib import Path
 
 from .ir1 import (
     Abs,
+    AdcAbs,
+    AdcImm,
+    Asl,
+    Call,
+    Clc,
     Goto,
     Imm,
     Label,
+    LoadAbs,
     LoadImm,
     ModuleIR1,
     Reg,
     Return,
     Routine,
+    Sec,
     SourceRef,
     StoreAbs,
     Unsupported,
@@ -172,8 +179,11 @@ def _lift_instr(
         imm = _parse_immediate(line.operand, equates)
         if imm is not None:
             return LoadImm(reg=_reg_of_load(mnemonic), imm=imm, src=src)
-        # Absolute/indexed/indirect loads are part of the next pilot
-        # slice (`rndp`, `CheckFloor`). Mark unsupported for now.
+        addr = _parse_absolute(line.operand, equates)
+        if addr is not None:
+            return LoadAbs(reg=_reg_of_load(mnemonic), source=addr, src=src)
+        # Indexed / indirect-indexed loads (`,x`, `,y`, `(ptr),y`) land
+        # with the CheckFloor slice.
         return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
 
     if mnemonic in ("sta", "stx", "sty"):
@@ -182,6 +192,37 @@ def _lift_instr(
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return StoreAbs(reg=_reg_of_store(mnemonic), target=addr, src=src)
+        return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
+
+    if mnemonic == "jsr":
+        if not line.operand:
+            return Unsupported(mnemonic=mnemonic, operand=None, src=src)
+        return Call(target=line.operand.strip(), src=src)
+
+    if mnemonic == "asl":
+        # `asl` with no operand or `asl a` both mean accumulator shift.
+        # `asl abs` (memory) would need a separate IR node; rndp/RND
+        # never use that form, so leave it Unsupported for now.
+        op = (line.operand or "").strip().lower()
+        if op in ("", "a"):
+            return Asl(src=src)
+        return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
+
+    if mnemonic == "clc":
+        return Clc(src=src)
+
+    if mnemonic == "sec":
+        return Sec(src=src)
+
+    if mnemonic == "adc":
+        if line.operand is None:
+            return Unsupported(mnemonic=mnemonic, operand=None, src=src)
+        imm = _parse_immediate(line.operand, equates)
+        if imm is not None:
+            return AdcImm(imm=imm, src=src)
+        addr = _parse_absolute(line.operand, equates)
+        if addr is not None:
+            return AdcAbs(source=addr, src=src)
         return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
 
     # All other opcodes are out of scope for this slice. Marking
@@ -375,7 +416,7 @@ def lift_file(
         # creating a duplicate routine.
         already = next(
             (r for r in module.routines
-             if r.body and isinstance(r.body[0], (LoadImm, StoreAbs, Goto, Return, Unsupported))
+             if r.body and not isinstance(r.body[0], Label)
              and r.body[0].src.line == lines[idx].lineno
              and r.body[0].src.file == str(lines[idx].file)),
             None,
@@ -422,11 +463,17 @@ def lift_file(
         for n in routine.all_entry_names():
             lifted_names.add(n)
 
-        # Chase tail-call targets so the IR1 interpreter can resolve
-        # them. We only chase labels we know live in this file.
+        # Chase tail-call and JSR targets so the IR1 interpreter can
+        # resolve them. We only chase labels we know live in this file
+        # — cross-module callees are looked up at run time via the
+        # module / alias maps the caller passes to the interpreter.
         for item in routine.body:
+            target: str | None = None
             if isinstance(item, Goto) and item.kind == "tail_call":
-                if item.target in label_to_instr_index and item.target not in lifted_names:
-                    requested.append(item.target)
+                target = item.target
+            elif isinstance(item, Call):
+                target = item.target
+            if target and target in label_to_instr_index and target not in lifted_names:
+                requested.append(target)
 
     return LiftReport(module=module, unsupported=all_unsupported)

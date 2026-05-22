@@ -151,6 +151,67 @@ class Return:
 
 
 @dataclass(frozen=True)
+class Call:
+    """`jsr target` — push return address, transfer to `target`. The
+    interpreter implements this with an explicit call stack so step
+    counts and stack depth stay observable. `target` is the symbolic
+    label name; pass 1 records non-local names verbatim and lets the
+    interpreter resolve them across modules / aliases at run time."""
+
+    target: str
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class LoadAbs:
+    """`lda/ldx/ldy addr`. Loads an 8-bit value from memory into the
+    named register. Sets N/Z conceptually; the interpreter doesn't
+    track them yet because the rndp slice never reads them."""
+
+    reg: Reg
+    source: Abs
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class Asl:
+    """`asl a` — shift accumulator left one bit. New C = old bit 7;
+    new A = (A << 1) & 0xff."""
+
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class Clc:
+    """`clc` — clear carry."""
+
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class Sec:
+    """`sec` — set carry."""
+
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class AdcImm:
+    """`adc #imm` — A = A + imm + C (mod 256); C = overflow."""
+
+    imm: Imm
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class AdcAbs:
+    """`adc addr` — A = A + mem[addr] + C (mod 256); C = overflow."""
+
+    source: Abs
+    src: SourceRef
+
+
+@dataclass(frozen=True)
 class Unsupported:
     """An opcode the current lifter does not yet model. We keep it in
     the IR so dumps stay aligned with the source and so pass-2 reports
@@ -161,7 +222,11 @@ class Unsupported:
     src: SourceRef
 
 
-Instr = LoadImm | StoreAbs | Goto | Return | Unsupported
+Instr = (
+    LoadImm | StoreAbs | Goto | Return | Call
+    | LoadAbs | Asl | Clc | Sec | AdcImm | AdcAbs
+    | Unsupported
+)
 Item = Label | Instr
 
 
@@ -228,8 +293,22 @@ def format_item(item: Item) -> str:
         return f"{item.name}:"
     if isinstance(item, LoadImm):
         return f"  {item.reg} = {_fmt_imm(item.imm)}                  ; {item.src.short()}"
+    if isinstance(item, LoadAbs):
+        return f"  {item.reg} = *{_fmt_abs(item.source)}        ; {item.src.short()}"
     if isinstance(item, StoreAbs):
         return f"  *{_fmt_abs(item.target)} = {item.reg}            ; {item.src.short()}"
+    if isinstance(item, Asl):
+        return f"  a = a << 1                       ; {item.src.short()}"
+    if isinstance(item, Clc):
+        return f"  c = 0                            ; {item.src.short()}"
+    if isinstance(item, Sec):
+        return f"  c = 1                            ; {item.src.short()}"
+    if isinstance(item, AdcImm):
+        return f"  a = a + {_fmt_imm(item.imm)} + c              ; {item.src.short()}"
+    if isinstance(item, AdcAbs):
+        return f"  a = a + *{_fmt_abs(item.source)} + c    ; {item.src.short()}"
+    if isinstance(item, Call):
+        return f"  call {item.target}                  ; {item.src.short()}"
     if isinstance(item, Goto):
         kw = "tail_call" if item.kind == "tail_call" else "goto"
         return f"  {kw} {item.target}                ; {item.src.short()}"

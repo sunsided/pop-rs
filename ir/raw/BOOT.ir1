@@ -13,12 +13,12 @@ fn entry {
   *$c00c@0xc00c = a            ; BOOT.S:33
   *$c00e@0xc00e = a            ; BOOT.S:34
   *$c081@0xc081 = a            ; BOOT.S:35
-  ??? jsr text            ; BOOT.S:36
-  ??? jsr home            ; BOOT.S:37
-  ??? jsr normal            ; BOOT.S:38
-  ??? jsr pr0            ; BOOT.S:39
-  ??? jsr in0            ; BOOT.S:40
-  ??? ldx SLOT            ; BOOT.S:42
+  call text                  ; BOOT.S:36
+  call home                  ; BOOT.S:37
+  call normal                  ; BOOT.S:38
+  call pr0                  ; BOOT.S:39
+  call in0                  ; BOOT.S:40
+  x = *SLOT@0x002b        ; BOOT.S:42
   ??? txa             ; BOOT.S:43
   ??? lsr             ; BOOT.S:44
   ??? lsr             ; BOOT.S:45
@@ -29,33 +29,33 @@ fn entry {
   a = #0x0f                  ; BOOT.S:50
   *sector@0x0050 = a            ; BOOT.S:51
 :0:
-  ??? ldy sector            ; BOOT.S:53
+  y = *sector@0x0050        ; BOOT.S:53
   ??? lda skewtbl,y            ; BOOT.S:54
   *$3d@0x003d = a            ; BOOT.S:55
   ??? lda sectaddr,y            ; BOOT.S:56
   ??? beq :1            ; BOOT.S:57
   *$27@0x0027 = a            ; BOOT.S:58
 :rdsect:
-  ??? jsr $005c            ; BOOT.S:59
+  call $005c                  ; BOOT.S:59
 :1:
   ??? dec sector            ; BOOT.S:60
   ??? bne :0            ; BOOT.S:61
-  ??? lda SLOT            ; BOOT.S:63
+  a = *SLOT@0x002b        ; BOOT.S:63
   tail_call $900                ; BOOT.S:64
 }
 
 fn stage2 {
   *slot@0x00fd = x            ; BOOT.S:91
-  ??? jsr check128k            ; BOOT.S:93
-  ??? jsr moverw18            ; BOOT.S:95
+  call check128k                  ; BOOT.S:93
+  call moverw18                  ; BOOT.S:95
   a = #0x00                  ; BOOT.S:97
   *lastrack@0x00ff = a            ; BOOT.S:98
   *$3f3@0x03f3 = a            ; BOOT.S:99
   *$3f4@0x03f4 = a            ; BOOT.S:100
-  ??? jsr rw18            ; BOOT.S:102
-  ??? jsr rw18            ; BOOT.S:105
-  ??? jsr rw18            ; BOOT.S:108
-  ??? jsr rw18            ; BOOT.S:114
+  call rw18                  ; BOOT.S:102
+  call rw18                  ; BOOT.S:105
+  call rw18                  ; BOOT.S:108
+  call rw18                  ; BOOT.S:114
   tail_call $ee00                ; BOOT.S:117
 }
 
@@ -64,15 +64,15 @@ fn CHECKER {
   *$C005@0xc005 = a            ; BOOT.S:123
   *$C003@0xc003 = a            ; BOOT.S:124
   *$0800@0x0800 = a            ; BOOT.S:125
-  ??? lda $0C00            ; BOOT.S:126
+  a = *$0C00@0x0c00        ; BOOT.S:126
   ??? cmp #$EE            ; BOOT.S:127
   ??? bne :0            ; BOOT.S:128
   ??? asl $0C00            ; BOOT.S:129
-  ??? lda $0800            ; BOOT.S:130
+  a = *$0800@0x0800        ; BOOT.S:130
   ??? cmp $0C00            ; BOOT.S:131
   ??? beq :1            ; BOOT.S:132
 :0:
-  ??? clc             ; BOOT.S:133
+  c = 0                            ; BOOT.S:133
 :1:
   *$C004@0xc004 = a            ; BOOT.S:134
   *$C002@0xc002 = a            ; BOOT.S:135
@@ -81,7 +81,7 @@ fn CHECKER {
 
 fn check128k {
   *$c081@0xc081 = a            ; BOOT.S:147
-  ??? lda $FBB3            ; BOOT.S:149
+  a = *$FBB3@0xfbb3        ; BOOT.S:149
   ??? cmp #6            ; BOOT.S:150
   ??? bne NOT128K            ; BOOT.S:151
   ??? bit $C017            ; BOOT.S:153
@@ -92,23 +92,23 @@ fn check128k {
   ??? sta $180,X            ; BOOT.S:158
   ??? dex             ; BOOT.S:159
   ??? bpl :0            ; BOOT.S:160
-  ??? jsr $180            ; BOOT.S:162
+  call $180                  ; BOOT.S:162
   ??? bcs NOT128K            ; BOOT.S:163
   return                           ; BOOT.S:165
 }
 
 fn NOT128K {
-  ??? ldx SLOT            ; BOOT.S:170
+  x = *SLOT@0x002b        ; BOOT.S:170
   ??? lda $C088,X            ; BOOT.S:171
-  ??? jsr text            ; BOOT.S:173
-  ??? jsr home            ; BOOT.S:174
+  call text                  ; BOOT.S:173
+  call home                  ; BOOT.S:174
   a = #0x08                  ; BOOT.S:175
-  ??? jsr vtab            ; BOOT.S:176
+  call vtab                  ; BOOT.S:176
   y = #0x00                  ; BOOT.S:178
 :0:
   ??? lda MEMTEXT,Y            ; BOOT.S:179
   ??? beq *            ; BOOT.S:180
-  ??? jsr cout            ; BOOT.S:181
+  call cout                  ; BOOT.S:181
   ??? cmp #$8D            ; BOOT.S:182
   ??? bne :1            ; BOOT.S:183
   a = #0x04                  ; BOOT.S:184
@@ -137,7 +137,7 @@ movemem:
   ??? bne :loop            ; BOOT.S:222
   ??? inc source+1            ; BOOT.S:224
   ??? inc dest+1            ; BOOT.S:225
-  ??? lda source+1            ; BOOT.S:227
+  a = *source+1@0x0003        ; BOOT.S:227
   ??? cmp endsourc+1            ; BOOT.S:228
   ??? bne :loop            ; BOOT.S:229
   return                           ; BOOT.S:231
@@ -164,7 +164,7 @@ movemem:
   ??? bne :loop            ; BOOT.S:222
   ??? inc source+1            ; BOOT.S:224
   ??? inc dest+1            ; BOOT.S:225
-  ??? lda source+1            ; BOOT.S:227
+  a = *source+1@0x0003        ; BOOT.S:227
   ??? cmp endsourc+1            ; BOOT.S:228
   ??? bne :loop            ; BOOT.S:229
   return                           ; BOOT.S:231
@@ -185,7 +185,7 @@ fn movemem {
   ??? bne :loop            ; BOOT.S:222
   ??? inc source+1            ; BOOT.S:224
   ??? inc dest+1            ; BOOT.S:225
-  ??? lda source+1            ; BOOT.S:227
+  a = *source+1@0x0003        ; BOOT.S:227
   ??? cmp endsourc+1            ; BOOT.S:228
   ??? bne :loop            ; BOOT.S:229
   return                           ; BOOT.S:231

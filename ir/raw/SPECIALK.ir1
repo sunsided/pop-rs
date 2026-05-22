@@ -1,10 +1,10 @@
 ; module SPECIALK from 01 POP Source/Source/SPECIALK.S
 
 fn KEYS {
-  ??? lda SINGSTEP            ; SPECIALK.S:139
+  a = *SINGSTEP@0x0021        ; SPECIALK.S:139
   ??? beq KEYS1            ; SPECIALK.S:140
 freeze:
-  ??? lda $C000            ; SPECIALK.S:142
+  a = *$C000@0xc000        ; SPECIALK.S:142
   ??? bpl freeze            ; SPECIALK.S:143
   ??? cmp #kfreeze            ; SPECIALK.S:145
   ??? beq :fradv            ; SPECIALK.S:146
@@ -22,7 +22,7 @@ freeze:
 }
 
 fn freeze {
-  ??? lda $C000            ; SPECIALK.S:142
+  a = *$C000@0xc000        ; SPECIALK.S:142
   ??? bpl freeze            ; SPECIALK.S:143
   ??? cmp #kfreeze            ; SPECIALK.S:145
   ??? beq :fradv            ; SPECIALK.S:146
@@ -40,15 +40,15 @@ fn freeze {
 }
 
 fn KEYS1 {
-  ??? lda $C000            ; SPECIALK.S:160
+  a = *$C000@0xc000        ; SPECIALK.S:160
 KEYS2:
   *keypress@0x020f = a            ; SPECIALK.S:162
-  ??? lda $C010            ; SPECIALK.S:164
+  a = *$C010@0xc010        ; SPECIALK.S:164
   *keydown@0x0210 = a            ; SPECIALK.S:166
-  ??? jsr KREAD            ; SPECIALK.S:168
-  ??? lda keypress            ; SPECIALK.S:170
+  call KREAD                  ; SPECIALK.S:168
+  a = *keypress@0x020f        ; SPECIALK.S:170
   ??? bpl ]rts            ; SPECIALK.S:171
-  ??? ldx develment            ; SPECIALK.S:175
+  x = *develment@0x020e        ; SPECIALK.S:175
   ??? beq :nogo            ; SPECIALK.S:176
   ??? cmp #"0"            ; SPECIALK.S:177
   ??? bcc :nogo            ; SPECIALK.S:178
@@ -56,32 +56,32 @@ KEYS2:
   ??? bcs :nogo            ; SPECIALK.S:180
   ??? lda #C_go0            ; SPECIALK.S:185
   ??? ldx #>C_go0            ; SPECIALK.S:186
-  ??? jsr checkcode            ; SPECIALK.S:187
+  call checkcode                  ; SPECIALK.S:187
   ??? bne :nogo0            ; SPECIALK.S:188
   a = #0x00                  ; SPECIALK.S:189
 :golevel:
-  ??? clc             ; SPECIALK.S:190
-  ??? adc keypress            ; SPECIALK.S:191
-  ??? sec             ; SPECIALK.S:192
+  c = 0                            ; SPECIALK.S:190
+  a = a + *keypress@0x020f + c    ; SPECIALK.S:191
+  c = 1                            ; SPECIALK.S:192
   ??? sbc #"0"            ; SPECIALK.S:193
   ??? cmp #4            ; SPECIALK.S:195
   ??? bcc ]rts            ; SPECIALK.S:196
   ??? cmp #13            ; SPECIALK.S:197
   ??? bcs ]rts            ; SPECIALK.S:198
   *NextLevel@0x031c = a            ; SPECIALK.S:199
-  ??? jsr shortentime            ; SPECIALK.S:200
+  call shortentime                  ; SPECIALK.S:200
 ]rts:
   return                           ; SPECIALK.S:201
 }
 
 fn KEYS2 {
   *keypress@0x020f = a            ; SPECIALK.S:162
-  ??? lda $C010            ; SPECIALK.S:164
+  a = *$C010@0xc010        ; SPECIALK.S:164
   *keydown@0x0210 = a            ; SPECIALK.S:166
-  ??? jsr KREAD            ; SPECIALK.S:168
-  ??? lda keypress            ; SPECIALK.S:170
+  call KREAD                  ; SPECIALK.S:168
+  a = *keypress@0x020f        ; SPECIALK.S:170
   ??? bpl ]rts            ; SPECIALK.S:171
-  ??? ldx develment            ; SPECIALK.S:175
+  x = *develment@0x020e        ; SPECIALK.S:175
   ??? beq :nogo            ; SPECIALK.S:176
   ??? cmp #"0"            ; SPECIALK.S:177
   ??? bcc :nogo            ; SPECIALK.S:178
@@ -89,36 +89,36 @@ fn KEYS2 {
   ??? bcs :nogo            ; SPECIALK.S:180
   ??? lda #C_go0            ; SPECIALK.S:185
   ??? ldx #>C_go0            ; SPECIALK.S:186
-  ??? jsr checkcode            ; SPECIALK.S:187
+  call checkcode                  ; SPECIALK.S:187
   ??? bne :nogo0            ; SPECIALK.S:188
   a = #0x00                  ; SPECIALK.S:189
 :golevel:
-  ??? clc             ; SPECIALK.S:190
-  ??? adc keypress            ; SPECIALK.S:191
-  ??? sec             ; SPECIALK.S:192
+  c = 0                            ; SPECIALK.S:190
+  a = a + *keypress@0x020f + c    ; SPECIALK.S:191
+  c = 1                            ; SPECIALK.S:192
   ??? sbc #"0"            ; SPECIALK.S:193
   ??? cmp #4            ; SPECIALK.S:195
   ??? bcc ]rts            ; SPECIALK.S:196
   ??? cmp #13            ; SPECIALK.S:197
   ??? bcs ]rts            ; SPECIALK.S:198
   *NextLevel@0x031c = a            ; SPECIALK.S:199
-  ??? jsr shortentime            ; SPECIALK.S:200
+  call shortentime                  ; SPECIALK.S:200
 ]rts:
   return                           ; SPECIALK.S:201
 }
 
 fn LegitKeys {
-  ??? lda keypress            ; SPECIALK.S:266
+  a = *keypress@0x020f        ; SPECIALK.S:266
   ??? cmp #kfreeze            ; SPECIALK.S:267
   ??? bne :1            ; SPECIALK.S:268
   tail_call freeze                ; SPECIALK.S:269
 }
 
 fn DevelKeys {
-  ??? lda develment            ; SPECIALK.S:361
+  a = *develment@0x020e        ; SPECIALK.S:361
   ??? beq ]rts            ; SPECIALK.S:362
-  ??? jsr checkcodes            ; SPECIALK.S:364
-  ??? lda keypress            ; SPECIALK.S:366
+  call checkcodes                  ; SPECIALK.S:364
+  a = *keypress@0x020f        ; SPECIALK.S:366
   ??? cmp #kclean            ; SPECIALK.S:367
   ??? bne :1            ; SPECIALK.S:368
   a = #0x00                  ; SPECIALK.S:369
@@ -133,7 +133,7 @@ fn postload  (aka ]sm) {
 }
 
 fn preload {
-  ??? lda BBundID            ; SPECIALK.S:554
+  a = *BBundID@0x03f5        ; SPECIALK.S:554
   ??? sta ]sm+1            ; SPECIALK.S:555
   a = #0xa9                  ; SPECIALK.S:556
   *BBundID@0x03f5 = a            ; SPECIALK.S:557
@@ -141,7 +141,7 @@ fn preload {
 }
 
 fn addkey {
-  ??? ldx keybufptr            ; SPECIALK.S:568
+  x = *keybufptr@0x00ca        ; SPECIALK.S:568
   ??? inx             ; SPECIALK.S:569
   ??? cpx #keybuflen            ; SPECIALK.S:570
   ??? bcc :ok            ; SPECIALK.S:571
@@ -156,7 +156,7 @@ fn addkey {
 fn checkcode {
   ??? sta :smod+1            ; SPECIALK.S:648
   ??? stx :smod+2            ; SPECIALK.S:649
-  ??? ldx keybufptr            ; SPECIALK.S:651
+  x = *keybufptr@0x00ca        ; SPECIALK.S:651
   y = #0x00                  ; SPECIALK.S:652
 :loop:
 :smod:
@@ -205,9 +205,9 @@ KREAD:
   a = #0x00                  ; SPECIALK.S:719
   *kbdX@0x0039 = a            ; SPECIALK.S:720
   *kbdY@0x003a = a            ; SPECIALK.S:721
-  ??? lda keypress            ; SPECIALK.S:723
+  a = *keypress@0x020f        ; SPECIALK.S:723
   ??? bmi :cont            ; SPECIALK.S:724
-  ??? ldx keydown            ; SPECIALK.S:726
+  x = *keydown@0x0210        ; SPECIALK.S:726
   ??? bpl ]rts            ; SPECIALK.S:727
   ??? ora #$80            ; SPECIALK.S:729
 :cont:
@@ -242,9 +242,9 @@ KREAD:
   a = #0x00                  ; SPECIALK.S:719
   *kbdX@0x0039 = a            ; SPECIALK.S:720
   *kbdY@0x003a = a            ; SPECIALK.S:721
-  ??? lda keypress            ; SPECIALK.S:723
+  a = *keypress@0x020f        ; SPECIALK.S:723
   ??? bmi :cont            ; SPECIALK.S:724
-  ??? ldx keydown            ; SPECIALK.S:726
+  x = *keydown@0x0210        ; SPECIALK.S:726
   ??? bpl ]rts            ; SPECIALK.S:727
   ??? ora #$80            ; SPECIALK.S:729
 :cont:
@@ -277,9 +277,9 @@ KREAD:
   a = #0x00                  ; SPECIALK.S:719
   *kbdX@0x0039 = a            ; SPECIALK.S:720
   *kbdY@0x003a = a            ; SPECIALK.S:721
-  ??? lda keypress            ; SPECIALK.S:723
+  a = *keypress@0x020f        ; SPECIALK.S:723
   ??? bmi :cont            ; SPECIALK.S:724
-  ??? ldx keydown            ; SPECIALK.S:726
+  x = *keydown@0x0210        ; SPECIALK.S:726
   ??? bpl ]rts            ; SPECIALK.S:727
   ??? ora #$80            ; SPECIALK.S:729
 :cont:
@@ -310,9 +310,9 @@ KREAD:
   a = #0x00                  ; SPECIALK.S:719
   *kbdX@0x0039 = a            ; SPECIALK.S:720
   *kbdY@0x003a = a            ; SPECIALK.S:721
-  ??? lda keypress            ; SPECIALK.S:723
+  a = *keypress@0x020f        ; SPECIALK.S:723
   ??? bmi :cont            ; SPECIALK.S:724
-  ??? ldx keydown            ; SPECIALK.S:726
+  x = *keydown@0x0210        ; SPECIALK.S:726
   ??? bpl ]rts            ; SPECIALK.S:727
   ??? ora #$80            ; SPECIALK.S:729
 :cont:
@@ -341,9 +341,9 @@ KREAD:
   a = #0x00                  ; SPECIALK.S:719
   *kbdX@0x0039 = a            ; SPECIALK.S:720
   *kbdY@0x003a = a            ; SPECIALK.S:721
-  ??? lda keypress            ; SPECIALK.S:723
+  a = *keypress@0x020f        ; SPECIALK.S:723
   ??? bmi :cont            ; SPECIALK.S:724
-  ??? ldx keydown            ; SPECIALK.S:726
+  x = *keydown@0x0210        ; SPECIALK.S:726
   ??? bpl ]rts            ; SPECIALK.S:727
   ??? ora #$80            ; SPECIALK.S:729
 :cont:
@@ -370,9 +370,9 @@ KREAD:
   a = #0x00                  ; SPECIALK.S:719
   *kbdX@0x0039 = a            ; SPECIALK.S:720
   *kbdY@0x003a = a            ; SPECIALK.S:721
-  ??? lda keypress            ; SPECIALK.S:723
+  a = *keypress@0x020f        ; SPECIALK.S:723
   ??? bmi :cont            ; SPECIALK.S:724
-  ??? ldx keydown            ; SPECIALK.S:726
+  x = *keydown@0x0210        ; SPECIALK.S:726
   ??? bpl ]rts            ; SPECIALK.S:727
   ??? ora #$80            ; SPECIALK.S:729
 :cont:
@@ -397,9 +397,9 @@ KREAD:
   a = #0x00                  ; SPECIALK.S:719
   *kbdX@0x0039 = a            ; SPECIALK.S:720
   *kbdY@0x003a = a            ; SPECIALK.S:721
-  ??? lda keypress            ; SPECIALK.S:723
+  a = *keypress@0x020f        ; SPECIALK.S:723
   ??? bmi :cont            ; SPECIALK.S:724
-  ??? ldx keydown            ; SPECIALK.S:726
+  x = *keydown@0x0210        ; SPECIALK.S:726
   ??? bpl ]rts            ; SPECIALK.S:727
   ??? ora #$80            ; SPECIALK.S:729
 :cont:
@@ -422,9 +422,9 @@ KREAD:
   a = #0x00                  ; SPECIALK.S:719
   *kbdX@0x0039 = a            ; SPECIALK.S:720
   *kbdY@0x003a = a            ; SPECIALK.S:721
-  ??? lda keypress            ; SPECIALK.S:723
+  a = *keypress@0x020f        ; SPECIALK.S:723
   ??? bmi :cont            ; SPECIALK.S:724
-  ??? ldx keydown            ; SPECIALK.S:726
+  x = *keydown@0x0210        ; SPECIALK.S:726
   ??? bpl ]rts            ; SPECIALK.S:727
   ??? ora #$80            ; SPECIALK.S:729
 :cont:
@@ -445,9 +445,9 @@ KREAD:
   a = #0x00                  ; SPECIALK.S:719
   *kbdX@0x0039 = a            ; SPECIALK.S:720
   *kbdY@0x003a = a            ; SPECIALK.S:721
-  ??? lda keypress            ; SPECIALK.S:723
+  a = *keypress@0x020f        ; SPECIALK.S:723
   ??? bmi :cont            ; SPECIALK.S:724
-  ??? ldx keydown            ; SPECIALK.S:726
+  x = *keydown@0x0210        ; SPECIALK.S:726
   ??? bpl ]rts            ; SPECIALK.S:727
   ??? ora #$80            ; SPECIALK.S:729
 :cont:
@@ -466,9 +466,9 @@ fn KREAD {
   a = #0x00                  ; SPECIALK.S:719
   *kbdX@0x0039 = a            ; SPECIALK.S:720
   *kbdY@0x003a = a            ; SPECIALK.S:721
-  ??? lda keypress            ; SPECIALK.S:723
+  a = *keypress@0x020f        ; SPECIALK.S:723
   ??? bmi :cont            ; SPECIALK.S:724
-  ??? ldx keydown            ; SPECIALK.S:726
+  x = *keydown@0x0210        ; SPECIALK.S:726
   ??? bpl ]rts            ; SPECIALK.S:727
   ??? ora #$80            ; SPECIALK.S:729
 :cont:
@@ -485,11 +485,11 @@ fn KREAD {
 
 fn FACEJSTK {
   a = #0x00                  ; SPECIALK.S:789
-  ??? sec             ; SPECIALK.S:790
+  c = 1                            ; SPECIALK.S:790
   ??? sbc JSTKX            ; SPECIALK.S:791
   *JSTKX@0x0018 = a            ; SPECIALK.S:792
-  ??? ldx clrF            ; SPECIALK.S:794
-  ??? lda clrB            ; SPECIALK.S:795
+  x = *clrF@0x00d4        ; SPECIALK.S:794
+  a = *clrB@0x00d5        ; SPECIALK.S:795
   *clrF@0x00d4 = a            ; SPECIALK.S:796
   *clrB@0x00d5 = x            ; SPECIALK.S:797
 ]rts:
@@ -549,9 +549,9 @@ fn INITINPUT {
 }
 
 fn CLRJSTK {
-  ??? lda clrF            ; SPECIALK.S:884
+  a = *clrF@0x00d4        ; SPECIALK.S:884
   ??? bmi :1            ; SPECIALK.S:885
-  ??? ldx JSTKX            ; SPECIALK.S:887
+  x = *JSTKX@0x0018        ; SPECIALK.S:887
   ??? bmi :yesF            ; SPECIALK.S:888
   a = #0x00                  ; SPECIALK.S:890
   ??? beq :staF            ; SPECIALK.S:891
@@ -562,9 +562,9 @@ fn CLRJSTK {
 :staF:
   *clrF@0x00d4 = a            ; SPECIALK.S:897
 :1:
-  ??? lda clrB            ; SPECIALK.S:900
+  a = *clrB@0x00d5        ; SPECIALK.S:900
   ??? bmi :2            ; SPECIALK.S:901
-  ??? ldx JSTKX            ; SPECIALK.S:903
+  x = *JSTKX@0x0018        ; SPECIALK.S:903
   ??? cpx #1            ; SPECIALK.S:904
   ??? beq :yesB            ; SPECIALK.S:905
   a = #0x00                  ; SPECIALK.S:907
@@ -576,9 +576,9 @@ fn CLRJSTK {
 :staB:
   *clrB@0x00d5 = a            ; SPECIALK.S:914
 :2:
-  ??? lda clrU            ; SPECIALK.S:917
+  a = *clrU@0x00d6        ; SPECIALK.S:917
   ??? bmi :3            ; SPECIALK.S:918
-  ??? ldx JSTKY            ; SPECIALK.S:920
+  x = *JSTKY@0x0019        ; SPECIALK.S:920
   ??? bmi :yesU            ; SPECIALK.S:921
   a = #0x00                  ; SPECIALK.S:923
   ??? beq :staU            ; SPECIALK.S:924
@@ -589,9 +589,9 @@ fn CLRJSTK {
 :staU:
   *clrU@0x00d6 = a            ; SPECIALK.S:930
 :3:
-  ??? lda clrD            ; SPECIALK.S:933
+  a = *clrD@0x00d7        ; SPECIALK.S:933
   ??? bmi :4            ; SPECIALK.S:934
-  ??? ldx JSTKY            ; SPECIALK.S:936
+  x = *JSTKY@0x0019        ; SPECIALK.S:936
   ??? cpx #1            ; SPECIALK.S:937
   ??? beq :yesD            ; SPECIALK.S:938
   a = #0x00                  ; SPECIALK.S:940
@@ -603,9 +603,9 @@ fn CLRJSTK {
 :staD:
   *clrD@0x00d7 = a            ; SPECIALK.S:947
 :4:
-  ??? lda clrbtn            ; SPECIALK.S:950
+  a = *clrbtn@0x00d8        ; SPECIALK.S:950
   ??? bmi :5            ; SPECIALK.S:951
-  ??? ldx btn            ; SPECIALK.S:953
+  x = *btn@0x003d        ; SPECIALK.S:953
   ??? bmi :yesbtn            ; SPECIALK.S:954
   a = #0x00                  ; SPECIALK.S:956
   ??? beq :stabtn            ; SPECIALK.S:957
@@ -628,7 +628,7 @@ fn ZEROSOUND {
 
 fn ADDSOUND {
   ??? stx ]temp1            ; SPECIALK.S:993
-  ??? ldx soundtable            ; SPECIALK.S:995
+  x = *soundtable@0xb6c0        ; SPECIALK.S:995
   ??? cpx #maxsfx            ; SPECIALK.S:996
   ??? bcs :rts            ; SPECIALK.S:997
   ??? inx             ; SPECIALK.S:999
@@ -640,12 +640,12 @@ fn ADDSOUND {
 }
 
 fn DEMOKEYS {
-  ??? lda level            ; SPECIALK.S:1016
+  a = *level@0x03f4        ; SPECIALK.S:1016
   ??? bne :cont            ; SPECIALK.S:1017
-  ??? lda $c061            ; SPECIALK.S:1019
+  a = *$c061@0xc061        ; SPECIALK.S:1019
   ??? ora $c062            ; SPECIALK.S:1020
   ??? bmi :interrupt            ; SPECIALK.S:1021
-  ??? lda keypress            ; SPECIALK.S:1022
+  a = *keypress@0x020f        ; SPECIALK.S:1022
   ??? bpl :cont            ; SPECIALK.S:1023
   ??? cmp #ESC            ; SPECIALK.S:1024
   ??? beq :cont            ; SPECIALK.S:1025
@@ -659,17 +659,17 @@ fn DEMOKEYS {
 fn LISTTORCHES {
   a = #0x00                  ; SPECIALK.S:1053
   *]numtorches@0x00f0 = a            ; SPECIALK.S:1054
-  ??? lda VisScrn            ; SPECIALK.S:1056
-  ??? jsr calcblue            ; SPECIALK.S:1057
+  a = *VisScrn@0x00cb        ; SPECIALK.S:1056
+  call calcblue                  ; SPECIALK.S:1057
   y = #0x1d                  ; SPECIALK.S:1059
 :loop:
-  ??? jsr :sub            ; SPECIALK.S:1061
-  ??? ldx ]numtorches            ; SPECIALK.S:1063
+  call :sub                  ; SPECIALK.S:1061
+  x = *]numtorches@0x00f0        ; SPECIALK.S:1063
   ??? cpx #maxtorches            ; SPECIALK.S:1064
   ??? bcs :max            ; SPECIALK.S:1065
   ??? dey             ; SPECIALK.S:1067
   ??? bpl :loop            ; SPECIALK.S:1068
-  ??? ldx ]numtorches            ; SPECIALK.S:1070
+  x = *]numtorches@0x00f0        ; SPECIALK.S:1070
 :max:
   a = #0xff                  ; SPECIALK.S:1071
   ??? sta torchx,x            ; SPECIALK.S:1072
@@ -695,11 +695,11 @@ fn BURN {
   ??? lda torchclip,x            ; SPECIALK.S:1139
   *BOTCUT@0x0013 = a            ; SPECIALK.S:1140
   ??? lda torchstate,x            ; SPECIALK.S:1141
-  ??? jsr getflameframe            ; SPECIALK.S:1142
+  call getflameframe                  ; SPECIALK.S:1142
   ??? sta torchstate,x            ; SPECIALK.S:1143
   ??? tax             ; SPECIALK.S:1144
-  ??? jsr setupflame            ; SPECIALK.S:1145
-  ??? lda BOTCUT            ; SPECIALK.S:1146
+  call setupflame                  ; SPECIALK.S:1145
+  a = *BOTCUT@0x0013        ; SPECIALK.S:1146
   ??? bne :partial            ; SPECIALK.S:1147
 :whole:
   tail_call fastlay                ; SPECIALK.S:1148
@@ -713,7 +713,7 @@ fn GETMINLEFT {
   ??? sta :sm1+1            ; SPECIALK.S:1179
   a = #0x42                  ; SPECIALK.S:1180
   ??? sta :sm2+1            ; SPECIALK.S:1181
-  ??? jsr :sub            ; SPECIALK.S:1182
+  call :sub                  ; SPECIALK.S:1182
   *MinLeft@0x0300 = y            ; SPECIALK.S:1183
   ??? cpy #2            ; SPECIALK.S:1184
   ??? bcs ]rts            ; SPECIALK.S:1185
@@ -725,15 +725,15 @@ fn GETMINLEFT {
   ??? sta :sm1+1            ; SPECIALK.S:1195
   a = #0x12                  ; SPECIALK.S:1196
   ??? sta :sm2+1            ; SPECIALK.S:1197
-  ??? jsr :sub            ; SPECIALK.S:1198
+  call :sub                  ; SPECIALK.S:1198
   *SecLeft@0x0302 = y            ; SPECIALK.S:1199
   return                           ; SPECIALK.S:1200
 }
 
 fn KEEPTIME {
-  ??? lda level            ; SPECIALK.S:1264
+  a = *level@0x03f4        ; SPECIALK.S:1264
   ??? beq ]rts            ; SPECIALK.S:1265
-  ??? lda KidLife            ; SPECIALK.S:1267
+  a = *KidLife@0x005f        ; SPECIALK.S:1267
   ??? bpl ]rts            ; SPECIALK.S:1268
   ??? inc FrameCount            ; SPECIALK.S:1272
   ??? bne :1            ; SPECIALK.S:1273
@@ -744,16 +744,16 @@ fn KEEPTIME {
   *FrameCount@0x0306 = a            ; SPECIALK.S:1277
   *FrameCount+1@0x0307 = a            ; SPECIALK.S:1278
 :2:
-  ??? ldy NextTimeMsg            ; SPECIALK.S:1282
+  y = *NextTimeMsg@0x0301        ; SPECIALK.S:1282
   ??? cpy #nummsg            ; SPECIALK.S:1283
   ??? bcs ]rts            ; SPECIALK.S:1284
-  ??? lda FrameCount+1            ; SPECIALK.S:1285
+  a = *FrameCount+1@0x0307        ; SPECIALK.S:1285
   ??? cmp timetable+1,y            ; SPECIALK.S:1286
   ??? bcc ]rts            ; SPECIALK.S:1287
-  ??? lda FrameCount            ; SPECIALK.S:1288
+  a = *FrameCount@0x0306        ; SPECIALK.S:1288
   ??? cmp timetable,y            ; SPECIALK.S:1289
   ??? bcc ]rts            ; SPECIALK.S:1290
-  ??? lda msgtimer            ; SPECIALK.S:1294
+  a = *msgtimer@0x00db        ; SPECIALK.S:1294
   ??? bne ]rts            ; SPECIALK.S:1295
   ??? inc NextTimeMsg            ; SPECIALK.S:1299
   ??? inc NextTimeMsg            ; SPECIALK.S:1300
@@ -764,7 +764,7 @@ fn KEEPTIME {
 }
 
 fn SHORTENTIME {
-  ??? ldy NextTimeMsg            ; SPECIALK.S:1313
+  y = *NextTimeMsg@0x0301        ; SPECIALK.S:1313
   ??? cpy #20            ; SPECIALK.S:1314
   ??? bcs ]rts            ; SPECIALK.S:1315
   y = #0x12                  ; SPECIALK.S:1316
@@ -784,8 +784,44 @@ fn CUESONG {
 }
 
 fn DLOOP  (aka STROBE) {
-  ??? jsr keys            ; SPECIALK.S:1343
-  ??? jsr controller            ; SPECIALK.S:1344
+  call keys                  ; SPECIALK.S:1343
+  call controller                  ; SPECIALK.S:1344
 ]rts:
   return                           ; SPECIALK.S:1345
+}
+
+fn checkcodes {
+  return                           ; SPECIALK.S:587
+}
+
+fn :sub {
+  y = #0x61                  ; SPECIALK.S:1204
+:loop:
+  a = *]count+1@0x00f2        ; SPECIALK.S:1206
+  ??? cmp FrameCount+1            ; SPECIALK.S:1207
+  ??? bcc :1            ; SPECIALK.S:1208
+  ??? bne ]rts            ; SPECIALK.S:1209
+  a = *]count@0x00f1        ; SPECIALK.S:1210
+  ??? cmp FrameCount            ; SPECIALK.S:1211
+  ??? bcs ]rts            ; SPECIALK.S:1212
+:1:
+  a = *]count@0x00f1        ; SPECIALK.S:1214
+  c = 0                            ; SPECIALK.S:1215
+:sm1:
+  a = a + #0x42 + c              ; SPECIALK.S:1216
+  *]count@0x00f1 = a            ; SPECIALK.S:1217
+  a = *]count+1@0x00f2        ; SPECIALK.S:1218
+:sm2:
+  a = a + #0x42 + c              ; SPECIALK.S:1219
+  *]count+1@0x00f2 = a            ; SPECIALK.S:1220
+  ??? sed             ; SPECIALK.S:1222
+  ??? tya             ; SPECIALK.S:1223
+  c = 1                            ; SPECIALK.S:1224
+  ??? sbc #1            ; SPECIALK.S:1225
+  ??? cld             ; SPECIALK.S:1226
+  ??? tay             ; SPECIALK.S:1227
+  ??? bpl :loop            ; SPECIALK.S:1228
+  y = #0x00                  ; SPECIALK.S:1229
+]rts:
+  return                           ; SPECIALK.S:1230
 }

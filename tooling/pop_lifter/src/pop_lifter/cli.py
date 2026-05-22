@@ -129,41 +129,77 @@ def _cmd_lift(args: argparse.Namespace) -> int:
     if src_dir is None:
         return 2
 
-    file_path = Path(args.file)
-    if not file_path.is_absolute():
-        candidate = src_dir / file_path
-        if candidate.is_file():
-            file_path = candidate
-    if not file_path.is_file():
-        print(f"error: input file not found: {args.file}", file=sys.stderr)
-        return 2
+    # Resolve each input file: absolute paths used as-is; bare names are
+    # tried under the source dir first, then cwd.
+    file_paths: list[Path] = []
+    for raw in args.file:
+        p = Path(raw)
+        if not p.is_absolute():
+            candidate = src_dir / p
+            if candidate.is_file():
+                p = candidate
+        if not p.is_file():
+            print(f"error: input file not found: {raw}", file=sys.stderr)
+            return 2
+        file_paths.append(p)
 
-    # Parse the equate base (EQ.S + GAMEEQ.S) plus the target file so
+    # Parse the equate base (EQ.S + GAMEEQ.S) plus every target file so
     # every operand symbol the lifter encounters resolves to a concrete
-    # address. The target file's own equates (e.g. AUTO.S's `flaskscrn`)
-    # come in via the same parse_files call.
+    # address. Each target file's own equates flow through the same
+    # parse_files call.
     base = [src_dir / n for n in ("EQ.S", "GAMEEQ.S") if (src_dir / n).exists()]
-    ast = parse_files([*base, file_path], search_paths=[src_dir])
+    ast = parse_files([*base, *file_paths], search_paths=[src_dir])
 
-    target_str = str(file_path.resolve())
-    file_ast = next(
-        (f for f in ast.files if Path(f.path).resolve() == file_path.resolve()),
-        None,
-    )
-    if file_ast is None:
-        print(f"error: file {target_str} was not loaded by the parser", file=sys.stderr)
+    # For each file, lift only those `--entry` labels that this file
+    # actually defines. This lets a single CLI invocation produce a
+    # cross-module dump (e.g. AUTO.S's `rndp` + GRAFIX.S's `RND`)
+    # without forcing the caller to know which entry lives where.
+    dumps: list[tuple[Path, int, int, str]] = []
+    handled: set[str] = set()
+    for file_path in file_paths:
+        file_ast = next(
+            (f for f in ast.files if Path(f.path).resolve() == file_path.resolve()),
+            None,
+        )
+        if file_ast is None:
+            print(
+                f"error: file {file_path} was not loaded by the parser",
+                file=sys.stderr,
+            )
+            return 1
+        defined = set(discover_entries(file_ast))
+        local_entries = [e for e in args.entry if e in defined and e not in handled]
+        if not local_entries:
+            continue
+        report = lift_file(file_ast, ast.equates, local_entries)
+        if not report.module.routines:
+            continue
+        dumps.append((
+            file_path,
+            len(report.module.routines),
+            len(report.unsupported),
+            ir1_mod.format_module(report.module),
+        ))
+        handled.update(local_entries)
+
+    missing = [e for e in args.entry if e not in handled]
+    if missing:
+        print(
+            f"error: entries not found in any input file: {missing}",
+            file=sys.stderr,
+        )
         return 1
 
-    report = lift_file(file_ast, ast.equates, args.entry)
-
-    text = ir1_mod.format_module(report.module)
+    text = "\n".join(d[3] for d in dumps)
     if args.out:
         out_path = Path(args.out)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(text, encoding="utf-8")
+        total_routines = sum(d[1] for d in dumps)
+        total_unsupp = sum(d[2] for d in dumps)
         print(
-            f"wrote {out_path} ({len(report.module.routines)} routines, "
-            f"{len(report.unsupported)} unsupported ops)"
+            f"wrote {out_path} ({total_routines} routines across "
+            f"{len(dumps)} module(s), {total_unsupp} unsupported ops)"
         )
     else:
         sys.stdout.write(text)
@@ -321,11 +357,14 @@ def main(argv: list[str] | None = None) -> int:
 
     p_lift = sub.add_parser(
         "lift",
-        help="Pass 1: lift selected entry-point routines from a .S file to IR1.",
+        help="Pass 1: lift selected entry-point routines from one or more .S "
+             "files to IR1.",
     )
     p_lift.add_argument(
-        "file",
-        help=".S file (absolute path or relative to the source dir).",
+        "file", nargs="+",
+        help=".S file (absolute path or relative to the source dir). "
+             "Multiple files may be passed; each --entry is routed to the "
+             "file that defines it.",
     )
     p_lift.add_argument(
         "--entry", action="append", required=True,

@@ -165,3 +165,84 @@ def test_discover_entries_skips_equate_only_files(source_dir):
         ast = parse_files([source_dir / name], search_paths=[source_dir])
         file_ast = next(f for f in ast.files if Path(f.path).name == name)
         assert discover_entries(file_ast) == []
+
+
+# ---- rndp + RND slice: new opcodes (LoadAbs, ASL, CLC, AdcAbs, AdcImm, Call)
+
+
+def _lift(source_dir: Path, file: str, entries: list[str]):
+    ast = parse_files(
+        [source_dir / "EQ.S", source_dir / "GAMEEQ.S", source_dir / file],
+        search_paths=[source_dir],
+    )
+    file_ast = next(f for f in ast.files if Path(f.path).name == file)
+    return _lift_to_module(file_ast, ast.equates, entries)
+
+
+def _lift_to_module(file_ast, equates, entries):
+    return lift_file(file_ast, equates, entries).module
+
+
+def test_rndp_lift_shape(source_dir):
+    """`rndp` is the smallest cross-module call site: `ldx guardprog`
+    + `jmp rnd`. The lifter must produce LoadAbs(X) + tail_call goto."""
+    from pop_lifter.ir1 import Goto, LoadAbs, Reg
+
+    module = _lift(source_dir, "AUTO.S", ["rndp"])
+    routine = module.find("rndp")
+    assert routine is not None
+    body = routine.body
+    assert len(body) == 2
+    assert isinstance(body[0], LoadAbs)
+    assert body[0].reg is Reg.X
+    assert body[0].source.name == "guardprog"
+    assert isinstance(body[1], Goto)
+    assert body[1].kind == "tail_call"
+    assert body[1].target == "rnd"
+
+
+def test_rnd_lift_shape(source_dir):
+    """`RND` exercises every new arithmetic opcode: lda abs, asl a x2,
+    clc, adc abs, clc, adc #imm, sta abs, rts."""
+    from pop_lifter.ir1 import (
+        AdcAbs,
+        AdcImm,
+        Asl,
+        Clc,
+        LoadAbs,
+        Return,
+        StoreAbs,
+    )
+
+    module = _lift(source_dir, "GRAFIX.S", ["RND"])
+    routine = module.find("RND")
+    assert routine is not None
+    kinds = [type(item).__name__ for item in routine.body]
+    # The trailing `]rts:` label gets surfaced before the final `rts`.
+    assert kinds[:8] == [
+        "LoadAbs", "Asl", "Asl", "Clc", "AdcAbs", "Clc", "AdcImm", "StoreAbs"
+    ]
+    assert kinds[-1] == "Return"
+    body = routine.body
+    assert isinstance(body[0], LoadAbs) and body[0].source.name == "RNDseed"
+    assert isinstance(body[1], Asl)
+    assert isinstance(body[3], Clc)
+    assert isinstance(body[4], AdcAbs) and body[4].source.name == "RNDseed"
+    assert isinstance(body[6], AdcImm) and body[6].imm.value == 23
+    assert isinstance(body[7], StoreAbs) and body[7].target.name == "RNDseed"
+    assert isinstance(body[-1], Return)
+
+
+def test_jsr_lifts_to_call(source_dir):
+    """Every `jsr X` becomes a `Call(X)` IR node. AUTOCTRL's first
+    instruction is `jsr DoRelease`, which is a stable anchor across
+    refactors of the surrounding control flow."""
+    from pop_lifter.ir1 import Call
+
+    module = _lift(source_dir, "AUTO.S", ["AUTOCTRL"])
+    auto = module.find("AUTOCTRL")
+    assert auto is not None
+    calls = [item for item in auto.body if isinstance(item, Call)]
+    assert any(c.target == "DoRelease" for c in calls), (
+        "AUTOCTRL must lift `jsr DoRelease` (line 161) into a Call"
+    )

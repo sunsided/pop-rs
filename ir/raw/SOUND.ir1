@@ -8,7 +8,7 @@ fn ZEROSOUND  (aka lookup, endlook) {
 
 fn ADDSOUND {
   ??? stx savex            ; SOUND.S:80
-  ??? ldx soundtable            ; SOUND.S:82
+  x = *soundtable@0xb6c0        ; SOUND.S:82
   ??? cpx #maxsfx            ; SOUND.S:83
   ??? bcs :rts            ; SOUND.S:84
   ??? inx             ; SOUND.S:86
@@ -20,14 +20,14 @@ fn ADDSOUND {
 }
 
 fn PLAYBACK {
-  ??? lda soundon            ; SOUND.S:101
+  a = *soundon@0x0203        ; SOUND.S:101
   ??? beq :rts            ; SOUND.S:102
-  ??? ldx soundtable            ; SOUND.S:104
+  x = *soundtable@0xb6c0        ; SOUND.S:104
   ??? beq :rts            ; SOUND.S:105
 :loop:
   ??? lda soundtable,x            ; SOUND.S:107
   ??? stx savex            ; SOUND.S:109
-  ??? jsr makesound            ; SOUND.S:111
+  call makesound                  ; SOUND.S:111
   ??? ldx savex            ; SOUND.S:113
   ??? dex             ; SOUND.S:115
   ??? bne :loop            ; SOUND.S:116
@@ -36,7 +36,7 @@ fn PLAYBACK {
 }
 
 fn makesound {
-  ??? asl             ; SOUND.S:128
+  a = a << 1                       ; SOUND.S:128
   ??? cmp #maxaddr            ; SOUND.S:129
   ??? bcs :rts            ; SOUND.S:130
   ??? tax             ; SOUND.S:132
@@ -112,13 +112,13 @@ fn DoGotKey  (aka DoFlashMsg) {
   y = #0xf4                  ; SOUND.S:243
   x = #0xf4                  ; SOUND.S:244
   a = #0x0f                  ; SOUND.S:245
-  ??? jsr tone            ; SOUND.S:246
+  call tone                  ; SOUND.S:246
   y = #0x64                  ; SOUND.S:248
   x = #0x64                  ; SOUND.S:249
   a = #0x19                  ; SOUND.S:250
-  ??? jsr tone            ; SOUND.S:251
+  call tone                  ; SOUND.S:251
   ??? pla             ; SOUND.S:253
-  ??? sec             ; SOUND.S:254
+  c = 1                            ; SOUND.S:254
   ??? sbc #1            ; SOUND.S:255
   ??? bne :loop            ; SOUND.S:256
   return                           ; SOUND.S:258
@@ -182,7 +182,7 @@ fn tone {
   ??? inx             ; SOUND.S:344
   ??? cpx :pitch+1            ; SOUND.S:345
   ??? bcc :midloop            ; SOUND.S:346
-  ??? sec             ; SOUND.S:348
+  c = 1                            ; SOUND.S:348
   ??? sbc #1            ; SOUND.S:349
   ??? bne :outloop            ; SOUND.S:350
   return                           ; SOUND.S:352
