@@ -283,8 +283,9 @@ class Pha:
     bytes at `$0100..$01ff`. PHA pushes `A`; PLA pops the most
     recently pushed byte back into A.
 
-    The two-stack design (`call_stack` for JSR/RTS continuations,
-    `value_stack` for PHA/PLA bytes) is sound when:
+    The two-stack design — `Trace.value_stack` for PHA/PLA bytes,
+    plus a separate `stack` local in `interp_ir1.run` for JSR/RTS
+    continuation tuples — is sound when:
 
     1. Every callee balances its own PHA/PLA over each control path,
        so a routine's PHA bytes don't leak into its caller's frame
@@ -293,9 +294,10 @@ class Pha:
        idiom — true for POP's source (we grepped to confirm).
 
     If a future input violates either assumption we'd need full
-    byte-level stack emulation with `Trace.sp` + `Trace.ram[$0100..
-    $01ff]`. Documented here so the limitation is visible at the
-    IR1-type level, not just buried in the interpreter."""
+    byte-level stack emulation with a stack pointer and the actual
+    `$0100..$01ff` page in `Trace.ram`. Documented here so the
+    limitation is visible at the IR1-type level, not just buried in
+    the interpreter."""
 
     src: SourceRef
 

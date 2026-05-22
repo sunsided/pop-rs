@@ -102,7 +102,6 @@ from .ir1 import (
     LoadIndirect,
     Lsr,
     ModuleIR1,
-    Pha,
     Pla,
     Return,
     Routine,

@@ -107,9 +107,12 @@ class Trace:
     steps: int = 0
     max_stack_depth: int = 0
     # PHA/PLA byte stack — see `ir1.Pha` for the two-stack design
-    # rationale. Kept distinct from the JSR/RTS call-stack list above
-    # so each routine's pushed bytes can interleave correctly with
-    # the call/return frames around them.
+    # rationale. Kept distinct from the JSR/RTS call-stack tracking
+    # (a local `stack` list inside `run()`) so each routine's pushed
+    # bytes can interleave correctly with the call/return frames
+    # around them. The call stack isn't a Trace field because it
+    # only matters mid-execution; we expose its peak depth as
+    # `max_stack_depth` for observability.
     value_stack: list[int] = field(default_factory=list)
     max_value_stack_depth: int = 0
 

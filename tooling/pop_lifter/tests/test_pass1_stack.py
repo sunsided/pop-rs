@@ -114,9 +114,10 @@ def test_max_value_stack_depth_tracked():
 
 def test_pha_jsr_pla_preserves_a_even_when_callee_pushes_too():
     """The whole point of `pha ; jsr X ; pla` is "save A across this
-    call". Our two-stack design (call_stack for JSR/RTS, value_stack
-    for PHA/PLA) only holds together if each routine balances its
-    own PHA/PLA. This test exercises the worst-case interleaving:
+    call". Our two-stack design (a Python list in `run` for JSR/RTS
+    continuations, `Trace.value_stack` for PHA/PLA bytes — see
+    `ir1.Pha`) only holds together if each routine balances its own
+    PHA/PLA. This test exercises the worst-case interleaving:
 
         main:
           a = $42
@@ -133,12 +134,15 @@ def test_pha_jsr_pla_preserves_a_even_when_callee_pushes_too():
           pla            ← restore inner's saved A ($99)
           rts
 
-    Real hardware would interleave 5 bytes on the stack
-    ($42, ret_hi, ret_lo, $99) and PLA the right ones via SP
-    arithmetic. Our model: each PHA/PLA pair is independent, the
-    JSR/RTS is on a separate Python list, and as long as inner is
-    well-balanced (pushes and pops once) outer's `pla` gets back
-    its $42.
+    Real hardware would interleave 4 bytes on the stack at peak
+    depth — bottom-to-top: outer's `pha` writes $42, then JSR
+    writes ret_hi + ret_lo, then inner's `pha` writes $99. RTS
+    pops the 2 return-address bytes (leaving $42 and $99 with
+    $99 on top), inner's `pla` pops $99, control returns, and
+    outer's `pla` pops $42. Our model: each PHA/PLA pair is
+    independent, the JSR/RTS is on a separate Python list, and as
+    long as inner is well-balanced (pushes and pops once) outer's
+    `pla` gets back its $42.
     """
     src = SourceRef(file="syn", line=0, raw="")
 
@@ -196,10 +200,19 @@ def test_pla_then_beq_fuses_to_zero_test_on_a():
     assert ifs[0].cond.op == "=="
 
 
-def test_pha_is_neutral_for_pass_2():
-    """PHA writes no flags. A `cmp ; pha ; beq` should still fuse
-    cmp+beq because PHA in between doesn't disturb Z/N — the
-    pending-flag tracker treats PHA as transparent."""
+def test_pha_between_cmp_and_branch_blocks_fusion():
+    """On real hardware PHA preserves Z/N — it would be perfectly
+    sound to fuse `cmp #5 ; pha ; beq L` into `if a == 5 goto L`.
+    But pass 2's fuser is conservative: anything that isn't a
+    recognised flag-setter resets the pending-flag tracker, and
+    PHA isn't on that list (no `_affected_register` entry, no
+    `_defines_flags` entry, no special "preserves flags" carve-out).
+    The cmp+beq pair therefore does NOT fuse when PHA sits between
+    them — the branch stays a raw Branch.
+
+    Pinning this as intentional behaviour (not a regression to
+    chase) so a future tightening that adds PHA to the "preserves
+    Z/N" list will be a deliberate test update, not silent."""
     from pop_lifter.ir1 import CmpImm
 
     src = SourceRef(file="syn", line=0, raw="")
@@ -213,11 +226,5 @@ def test_pha_is_neutral_for_pass_2():
         ],
     )
     out = structure_routine(r)
-    # Wait — actually PHA breaks the pending-flag chain in pass-2
-    # (anything that's not a recognised flag-setter resets pending).
-    # That's deliberate conservatism, not a bug: pass 2 doesn't know
-    # PHA preserves Z/N. So the branch stays unfused here. Pin it.
-    assert any(isinstance(i, Branch) for i in out.body), (
-        "PHA between cmp and branch deliberately blocks fusion — "
-        "pass 2 is conservative on intermediate ops it doesn't model"
-    )
+    assert any(isinstance(i, Branch) for i in out.body)
+    assert not any(isinstance(i, If) for i in out.body)
