@@ -211,7 +211,71 @@ class AdcAbs:
     src: SourceRef
 
 
-# ---------------------------------------------------------------- new in pass-1 long tail
+# ---------------------------------------------------------------- indirect addressing
+
+
+@dataclass(frozen=True)
+class IndirectY:
+    """`(ptr),y` post-indexed indirect addressing. The CPU reads a
+    16-bit pointer from `mem[ptr.addr]` (low byte) and
+    `mem[ptr.addr + 1]` (high byte), then adds Y to that pointer and
+    uses the result as the effective address.
+
+    Notes:
+
+    * On the NMOS 6502 the high-byte fetch wraps at the page boundary
+      of the zero-page pointer (so `($ff),y` reads at $ff and $00).
+      The interpreter follows the more permissive `(addr + 1) & 0xffff`
+      rule because POP's pointers never sit at $ff and we don't want
+      to surprise authors of synthetic test inputs. If the engine
+      ends up exercising the wrap case we'll switch to the real
+      semantics.
+
+    * The 6502 has no `(ptr),x` form for absolute pointers, and POP's
+      source never uses `(zp,x)` — pre-indexed indirect — so this
+      single node type covers every indirect form we'll lift."""
+
+    ptr: Abs
+
+
+@dataclass(frozen=True)
+class LoadIndirect:
+    """`lda (ptr),y` — load A from the post-indexed indirect address.
+    Sets Z/N on the loaded byte. The 6502 only has the `lda` form
+    here (no `ldx`/`ldy` against `(ptr),y`), so `reg` is always A;
+    we record it explicitly so the same `_affected_register` rule
+    that handles `LoadAbs`/`LoadImm`/`LoadIndexed` also accepts this
+    node — `lda (ptr),y ; beq L` fuses into `if a == 0 goto L`
+    exactly like the other loads."""
+
+    reg: Reg
+    source: IndirectY
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class StoreIndirect:
+    """`sta (ptr),y` — store A at the post-indexed indirect address.
+    Doesn't affect flags. As with `LoadIndirect`, only `sta` exists
+    for this addressing mode on stock 6502."""
+
+    reg: Reg
+    target: IndirectY
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class CmpIndirect:
+    """`cmp (ptr),y` — compute A - mem[(ptr)+Y]; set Z/N/C without
+    storing. Only one site uses this in POP, but lifting it keeps
+    the dump consistent with the source."""
+
+    reg: Reg
+    source: IndirectY
+    src: SourceRef
+
+
+# ---------------------------------------------------------------- pass-1 long-tail atoms
 
 
 @dataclass(frozen=True)
@@ -250,8 +314,10 @@ class Transfer:
 @dataclass(frozen=True)
 class Bitwise:
     """`and` / `ora` / `eor` against A. `op` ∈ {"and", "or", "eor"}.
-    `source` is `Imm` (immediate operand) or `Abs` (memory). Updates
-    A and Z/N; does NOT touch C.
+    `source` is `Imm` (immediate operand), `Abs` (memory), or
+    `IndirectY` (`(ptr),y` post-indexed indirect — added for the
+    `and (ptr),y` / `ora (ptr),y` patterns POP uses for masked
+    sprite blits). Updates A and Z/N; does NOT touch C.
 
     POP uses these heavily for flag-mask tests. The classic
     `and #fcheckmark ; beq ]rts` lowers to two IR items in order:
@@ -268,7 +334,7 @@ class Bitwise:
     embedded-expression form."""
 
     op: str
-    source: "Imm | Abs"
+    source: "Imm | Abs | IndirectY"
     src: SourceRef
 
 
@@ -392,6 +458,7 @@ Instr = (
     | LoadIndexed | StoreIndexed | CmpImm | CmpAbs | Branch
     | If
     | IncTarget | DecTarget | Transfer | Bitwise
+    | LoadIndirect | StoreIndirect | CmpIndirect
     | Unsupported
 )
 Item = Label | Instr
@@ -518,8 +585,28 @@ def format_item(item: Item) -> str:
         return f"  {item.dst_reg} = {item.src_reg}                            ; {item.src.short()}"
     if isinstance(item, Bitwise):
         sym = {"and": "&", "or": "|", "eor": "^"}[item.op]
-        rhs = _fmt_imm(item.source) if isinstance(item.source, Imm) else f"*{_fmt_abs(item.source)}"
+        if isinstance(item.source, Imm):
+            rhs = _fmt_imm(item.source)
+        elif isinstance(item.source, IndirectY):
+            rhs = f"*({_fmt_abs(item.source.ptr)})[y]"
+        else:
+            rhs = f"*{_fmt_abs(item.source)}"
         return f"  a = a {sym} {rhs}              ; {item.src.short()}"
+    if isinstance(item, LoadIndirect):
+        return (
+            f"  {item.reg} = *({_fmt_abs(item.source.ptr)})[y]"
+            f"   ; {item.src.short()}"
+        )
+    if isinstance(item, StoreIndirect):
+        return (
+            f"  *({_fmt_abs(item.target.ptr)})[y] = {item.reg}"
+            f"   ; {item.src.short()}"
+        )
+    if isinstance(item, CmpIndirect):
+        return (
+            f"  cmp {item.reg}, *({_fmt_abs(item.source.ptr)})[y]"
+            f"   ; {item.src.short()}"
+        )
     if isinstance(item, Unsupported):
         op = item.operand if item.operand else ""
         return f"  ??? {item.mnemonic} {op}            ; {item.src.short()}"

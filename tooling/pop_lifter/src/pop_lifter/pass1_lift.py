@@ -48,14 +48,17 @@ from .ir1 import (
     Clc,
     CmpAbs,
     CmpImm,
+    CmpIndirect,
     DecTarget,
     Goto,
     Imm,
     IncTarget,
+    IndirectY,
     Label,
     LoadAbs,
     LoadImm,
     LoadIndexed,
+    LoadIndirect,
     ModuleIR1,
     Reg,
     Return,
@@ -64,6 +67,7 @@ from .ir1 import (
     SourceRef,
     StoreAbs,
     StoreIndexed,
+    StoreIndirect,
     Transfer,
     Unsupported,
 )
@@ -166,6 +170,43 @@ def _parse_indexed(
     return Abs(name=base_str, addr=addr & 0xffff), idx_reg
 
 
+def _parse_indirect_y(
+    operand: str,
+    equates: dict[str, int],
+) -> IndirectY | None:
+    """Parse `(name),y` — the 6502 post-indexed indirect form.
+    Returns the resolved `IndirectY` or `None` if the operand doesn't
+    match. POP only uses the `,y` variant; the `(zp,x)` pre-indexed
+    form never appears in any of the source files we lift.
+
+    The pointer's zero-page address is recorded on `IndirectY.ptr`
+    as a normal `Abs` so dumps and downstream passes see the symbolic
+    name. We don't enforce `ptr.addr < 0x100` here — Merlin's
+    assembler accepts arbitrary expressions and the interpreter
+    happens to work for any address; a real 6502 would only accept
+    zero-page pointers, but the engine code is well-behaved on this
+    front.
+    """
+    s = operand.strip()
+    if not s.startswith("("):
+        return None
+    # Expect `(<name>),y` (case-insensitive on the `y`).
+    close = s.find(")")
+    if close < 0:
+        return None
+    inner = s[1:close].strip()
+    # Normalise the tail to drop all whitespace + lowercase before
+    # comparing — handles `,y`, `, y`, `,Y`, etc. in one pass.
+    tail = s[close + 1:].replace(" ", "").replace("\t", "").lower()
+    if tail != ",y":
+        return None
+    try:
+        addr = eval_expr(inner, equates)
+    except ValueError:
+        return None
+    return IndirectY(ptr=Abs(name=inner, addr=addr & 0xffff))
+
+
 def _reg_of_load(mnemonic: str) -> Reg:
     return {"lda": Reg.A, "ldx": Reg.X, "ldy": Reg.Y}[mnemonic]
 
@@ -220,10 +261,20 @@ def _lift_instr(
             return LoadIndexed(
                 reg=_reg_of_load(mnemonic), base=base, index=idx_reg, src=src,
             )
+        # `lda` is the only *load mnemonic* that has a `(zp),y` form
+        # — `ldx`/`ldy` don't. (The addressing mode itself exists for
+        # plenty of other opcodes — `sta`, `cmp`, `adc`, `sbc`,
+        # `and`, `ora`, `eor` — those are dispatched in their own
+        # mnemonic branches below.) Try the indirect parse before
+        # the plain-absolute parse so we don't mis-resolve `(name)`
+        # as an absolute expression.
+        if mnemonic == "lda":
+            ind = _parse_indirect_y(line.operand, equates)
+            if ind is not None:
+                return LoadIndirect(reg=Reg.A, source=ind, src=src)
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return LoadAbs(reg=_reg_of_load(mnemonic), source=addr, src=src)
-        # Indirect-indexed `(ptr),y` lands in a later slice.
         return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
 
     if mnemonic in ("sta", "stx", "sty"):
@@ -235,6 +286,12 @@ def _lift_instr(
             return StoreIndexed(
                 reg=_reg_of_store(mnemonic), base=base, index=idx_reg, src=src,
             )
+        # Same indirect-indexed treatment as `lda` above — `sta` is
+        # the only store with a `(ptr),y` form on stock 6502.
+        if mnemonic == "sta":
+            ind = _parse_indirect_y(line.operand, equates)
+            if ind is not None:
+                return StoreIndirect(reg=Reg.A, target=ind, src=src)
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return StoreAbs(reg=_reg_of_store(mnemonic), target=addr, src=src)
@@ -247,6 +304,11 @@ def _lift_instr(
         imm = _parse_immediate(line.operand, equates)
         if imm is not None:
             return CmpImm(reg=reg, imm=imm, src=src)
+        # `(ptr),y` only exists for `cmp` (not `cpx`/`cpy`).
+        if mnemonic == "cmp":
+            ind = _parse_indirect_y(line.operand, equates)
+            if ind is not None:
+                return CmpIndirect(reg=Reg.A, source=ind, src=src)
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return CmpAbs(reg=reg, source=addr, src=src)
@@ -331,6 +393,11 @@ def _lift_instr(
         imm = _parse_immediate(line.operand, equates)
         if imm is not None:
             return Bitwise(op=op_key, source=imm, src=src)
+        # `(ptr),y` form — `and`/`ora`/`eor` all have one. Try before
+        # the plain-absolute parse for the same reason as `lda`.
+        ind = _parse_indirect_y(line.operand, equates)
+        if ind is not None:
+            return Bitwise(op=op_key, source=ind, src=src)
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return Bitwise(op=op_key, source=addr, src=src)

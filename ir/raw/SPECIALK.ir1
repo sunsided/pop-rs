@@ -1332,7 +1332,7 @@ fn LISTTORCHES {
 ]rts:
   return                           ; SPECIALK.S:1074
 :sub:
-  ??? lda (BlueType),y            ; SPECIALK.S:1076
+  a = *(BlueType@0x0024)[y]   ; SPECIALK.S:1076
   a = a & #0x1f              ; SPECIALK.S:1077
   cmp a, #0x13              ; SPECIALK.S:1078
   if ne goto ]rts       ; SPECIALK.S:1079
@@ -1361,7 +1361,7 @@ fn LISTTORCHES {
   ??? sta torchx,x            ; SPECIALK.S:1104
   ??? pla             ; SPECIALK.S:1106
   y = a                            ; SPECIALK.S:1107
-  ??? lda (BlueSpec),y            ; SPECIALK.S:1108
+  a = *(BlueSpec@0x0026)[y]   ; SPECIALK.S:1108
   ??? sta torchstate,x            ; SPECIALK.S:1109
   *]numtorches@0x00f0 += 1                         ; SPECIALK.S:1111
 ]rts:

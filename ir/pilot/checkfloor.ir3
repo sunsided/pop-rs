@@ -80,7 +80,7 @@ fn onground {
   }
   :yes:
   a = #0x01                  ; CTRL.S:344
-  ??? sta (BlueType),y            ; CTRL.S:345
+  *(BlueType@0x0024)[y] = a   ; CTRL.S:345
   call indexblock                ; CTRL.S:346
   a = #0x02                  ; CTRL.S:347
   call :sub                ; CTRL.S:348

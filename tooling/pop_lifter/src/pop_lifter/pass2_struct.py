@@ -98,6 +98,7 @@ from .ir1 import (
     LoadAbs,
     LoadImm,
     LoadIndexed,
+    LoadIndirect,
     ModuleIR1,
     Return,
     Routine,
@@ -144,7 +145,7 @@ def _affected_register(item: Item):
     visible flag setters (e.g. memory inc/dec, which sets Z/N from
     a memory cell that Compare can't reference yet).
     """
-    if isinstance(item, (LoadAbs, LoadIndexed, LoadImm)):
+    if isinstance(item, (LoadAbs, LoadIndexed, LoadImm, LoadIndirect)):
         return item.reg
     if isinstance(item, Transfer):
         return item.dst_reg
@@ -207,7 +208,7 @@ def _defines_flags(item: Item) -> bool:
     return isinstance(
         item,
         (
-            CmpImm, CmpAbs, LoadImm, LoadAbs, LoadIndexed,
+            CmpImm, CmpAbs, LoadImm, LoadAbs, LoadIndexed, LoadIndirect,
             IncTarget, DecTarget, Transfer, Bitwise,
         ),
     )
@@ -450,7 +451,7 @@ def _backward_sweep(
                 live.discard("C")
             continue
 
-        if isinstance(item, (LoadImm, LoadAbs, LoadIndexed)):
+        if isinstance(item, (LoadImm, LoadAbs, LoadIndexed, LoadIndirect)):
             # Lda* writes Z/N; the load itself has a side-effect (the
             # register update) so we can't drop it even when Z/N are
             # dead.

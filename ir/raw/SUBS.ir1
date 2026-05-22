@@ -41,7 +41,7 @@ fn ADDTORCHES {
   call calcblue                  ; SUBS.S:148
   y = #0x1d                  ; SUBS.S:150
 :loop:
-  ??? lda (BlueType),y            ; SUBS.S:151
+  a = *(BlueType@0x0024)[y]   ; SUBS.S:151
   a = a & #0x1f              ; SUBS.S:152
   cmp a, #0x13              ; SUBS.S:153
   if ne goto :c1       ; SUBS.S:154
@@ -132,11 +132,11 @@ fn ADDSLICERS {
   a = a + #0x0a + c              ; SUBS.S:264
   ??? sta :sm+1            ; SUBS.S:265
 :loop:
-  ??? lda (BlueType),y            ; SUBS.S:267
+  a = *(BlueType@0x0024)[y]   ; SUBS.S:267
   a = a & #0x1f              ; SUBS.S:268
   cmp a, #0x12              ; SUBS.S:269
   if ne goto :cont       ; SUBS.S:270
-  ??? lda (BlueSpec),y            ; SUBS.S:272
+  a = *(BlueSpec@0x0026)[y]   ; SUBS.S:272
   x = a                            ; SUBS.S:273
   a = a & #0x7f              ; SUBS.S:274
   if eq goto :ok       ; SUBS.S:275
@@ -1134,9 +1134,9 @@ fn REMOVEOBJ {
   x = #0x01                  ; SUBS.S:1418
   *clrbtn@0x00d8 = x            ; SUBS.S:1419
   a = #0x01                  ; SUBS.S:1421
-  ??? sta (BlueType),y            ; SUBS.S:1422
+  *(BlueType@0x0024)[y] = a   ; SUBS.S:1422
   a = #0x00                  ; SUBS.S:1423
-  ??? sta (BlueSpec),y            ; SUBS.S:1424
+  *(BlueSpec@0x0026)[y] = a   ; SUBS.S:1424
   a = #0x23                  ; SUBS.S:1426
   *height@0x0004 = a            ; SUBS.S:1427
   a = #0x02                  ; SUBS.S:1429
@@ -1164,7 +1164,7 @@ fn DoScrn {
 :loop:
   call getinitobj                  ; SUBS.S:1460
   if cc goto :skip       ; SUBS.S:1461
-  ??? sta (BlueSpec),y            ; SUBS.S:1462
+  *(BlueSpec@0x0026)[y] = a   ; SUBS.S:1462
 :skip:
   y -= 1                         ; SUBS.S:1464
   if pl goto :loop       ; SUBS.S:1465
@@ -1189,7 +1189,7 @@ fn STARTKID {
   y = #0x00                  ; SUBS.S:1495
   call rdblock                  ; SUBS.S:1496
   a = #0x00                  ; SUBS.S:1497
-  ??? sta (BlueType),y            ; SUBS.S:1498
+  *(BlueType@0x0024)[y] = a   ; SUBS.S:1498
 :nomile:
   a = *KidStartScrn@0xbf40        ; SUBS.S:1501
   *CharScrn@0x004b = a            ; SUBS.S:1502

@@ -86,14 +86,14 @@ fn loadmob {
 
 fn TRIGSLICER {
   *state@0x00f0 = a            ; MOVER.S:218
-  ??? lda (BlueSpec),y            ; MOVER.S:220
+  a = *(BlueSpec@0x0026)[y]   ; MOVER.S:220
   if eq goto :ok       ; MOVER.S:221
   cmp a, #0x06              ; MOVER.S:222
   if cc goto ]rts       ; MOVER.S:223
 :ok:
   *trloc@0xb600 = y            ; MOVER.S:227
   a = *state@0x00f0        ; MOVER.S:229
-  ??? sta (BlueSpec),y            ; MOVER.S:230
+  *(BlueSpec@0x0026)[y] = a   ; MOVER.S:230
   a = *VisScrn@0x00cb        ; MOVER.S:232
   *trscrn@0xb620 = a            ; MOVER.S:233
   a = #0x01                  ; MOVER.S:235
@@ -107,7 +107,7 @@ fn CLOSEEXIT {
   *trloc@0xb600 = y            ; MOVER.S:247
   *trscrn@0xb620 = a            ; MOVER.S:248
   a = #0xac                  ; MOVER.S:250
-  ??? sta (BlueSpec),y            ; MOVER.S:251
+  *(BlueSpec@0x0026)[y] = a   ; MOVER.S:251
   a = #0x03                  ; MOVER.S:253
   *trdirec@0xb640 = a            ; MOVER.S:254
   tail_call addtrob                ; MOVER.S:256
@@ -115,7 +115,7 @@ fn CLOSEEXIT {
 
 fn SMASHMIRROR {
   a = #0x56                  ; MOVER.S:260
-  ??? sta (BlueSpec),y            ; MOVER.S:261
+  *(BlueSpec@0x0026)[y] = a   ; MOVER.S:261
 ]rts:
   return                           ; MOVER.S:262
 }
@@ -127,8 +127,8 @@ fn TRIGFLASK {
   *trdirec@0xb640 = a            ; MOVER.S:274
   call rnd                  ; MOVER.S:278
   a = a & #0x07              ; MOVER.S:279
-  ??? ora (BlueSpec),y            ; MOVER.S:280
-  ??? sta (BlueSpec),y            ; MOVER.S:281
+  a = a | *(BlueSpec@0x0026)[y]              ; MOVER.S:280
+  *(BlueSpec@0x0026)[y] = a   ; MOVER.S:281
   tail_call addtrob                ; MOVER.S:282
 }
 
@@ -139,7 +139,7 @@ fn TRIGSWORD {
   *trdirec@0xb640 = a            ; MOVER.S:293
   call rnd                  ; MOVER.S:294
   a = a & #0x1f              ; MOVER.S:295
-  ??? sta (BlueSpec),y            ; MOVER.S:296
+  *(BlueSpec@0x0026)[y] = a   ; MOVER.S:296
   tail_call addtrob                ; MOVER.S:297
 }
 
@@ -150,18 +150,18 @@ fn TRIGTORCH {
   *trdirec@0xb640 = a            ; MOVER.S:309
   call rnd                  ; MOVER.S:313
   a = a & #0x0f              ; MOVER.S:314
-  ??? sta (BlueSpec),y            ; MOVER.S:315
+  *(BlueSpec@0x0026)[y] = a   ; MOVER.S:315
   tail_call addtrob                ; MOVER.S:316
 }
 
 fn TRIGSPIKES {
-  ??? lda (BlueSpec),y            ; MOVER.S:324
+  a = *(BlueSpec@0x0026)[y]   ; MOVER.S:324
   if eq goto :ready       ; MOVER.S:325
   if pl goto ]rts       ; MOVER.S:327
   cmp a, #0xff              ; MOVER.S:328
   if eq goto ]rts       ; MOVER.S:329
   a = #0x8f                  ; MOVER.S:330
-  ??? sta (BlueSpec),y            ; MOVER.S:331
+  *(BlueSpec@0x0026)[y] = a   ; MOVER.S:331
 ]rts:
   return                           ; MOVER.S:332
 :ready:
@@ -179,11 +179,11 @@ fn TRIGSPIKES {
 
 fn JAMSPIKES {
   a = #0xff                  ; MOVER.S:355
-  ??? sta (BlueSpec),y            ; MOVER.S:356
+  *(BlueSpec@0x0026)[y] = a   ; MOVER.S:356
   x = #0xff                  ; MOVER.S:357
   if mi goto ]cont       ; MOVER.S:358
 GETSPIKES:
-  ??? lda (BlueSpec),y            ; MOVER.S:366
+  a = *(BlueSpec@0x0026)[y]   ; MOVER.S:366
   if mi goto :sprung       ; MOVER.S:367
   if eq goto :safe       ; MOVER.S:368
   cmp a, #0x05              ; MOVER.S:370
@@ -203,7 +203,7 @@ GETSPIKES:
 }
 
 fn GETSPIKES {
-  ??? lda (BlueSpec),y            ; MOVER.S:366
+  a = *(BlueSpec@0x0026)[y]   ; MOVER.S:366
   if mi goto :sprung       ; MOVER.S:367
   if eq goto :safe       ; MOVER.S:368
   cmp a, #0x05              ; MOVER.S:370
@@ -226,15 +226,15 @@ fn BREAKLOOSE {
   a = #0x01                  ; MOVER.S:390
 BREAKLOOSE1:
   *state@0x00f0 = a            ; MOVER.S:393
-  ??? lda (BlueType),y            ; MOVER.S:395
+  a = *(BlueType@0x0024)[y]   ; MOVER.S:395
   a = a & #0x20              ; MOVER.S:396
   if ne goto ]rts       ; MOVER.S:397
-  ??? lda (BlueSpec),y            ; MOVER.S:399
+  a = *(BlueSpec@0x0026)[y]   ; MOVER.S:399
   if mi goto :ok       ; MOVER.S:400
   if ne goto ]rts       ; MOVER.S:401
 :ok:
   a = *state@0x00f0        ; MOVER.S:403
-  ??? sta (BlueSpec),y            ; MOVER.S:404
+  *(BlueSpec@0x0026)[y] = a   ; MOVER.S:404
   *trloc@0xb600 = y            ; MOVER.S:406
   a = *tempscrn@0x0093        ; MOVER.S:408
   *trscrn@0xb620 = a            ; MOVER.S:409
@@ -248,15 +248,15 @@ BREAKLOOSE1:
 
 fn BREAKLOOSE1 {
   *state@0x00f0 = a            ; MOVER.S:393
-  ??? lda (BlueType),y            ; MOVER.S:395
+  a = *(BlueType@0x0024)[y]   ; MOVER.S:395
   a = a & #0x20              ; MOVER.S:396
   if ne goto ]rts       ; MOVER.S:397
-  ??? lda (BlueSpec),y            ; MOVER.S:399
+  a = *(BlueSpec@0x0026)[y]   ; MOVER.S:399
   if mi goto :ok       ; MOVER.S:400
   if ne goto ]rts       ; MOVER.S:401
 :ok:
   a = *state@0x00f0        ; MOVER.S:403
-  ??? sta (BlueSpec),y            ; MOVER.S:404
+  *(BlueSpec@0x0026)[y] = a   ; MOVER.S:404
   *trloc@0xb600 = y            ; MOVER.S:406
   a = *tempscrn@0x0093        ; MOVER.S:408
   *trscrn@0xb620 = a            ; MOVER.S:409
@@ -269,11 +269,11 @@ fn BREAKLOOSE1 {
 }
 
 fn PUSHPP {
-  ??? lda (BlueType),y            ; MOVER.S:426
+  a = *(BlueType@0x0024)[y]   ; MOVER.S:426
   a = a & #0x1f              ; MOVER.S:427
   *pptype@0x00f4 = a            ; MOVER.S:428
 pushpp1:
-  ??? lda (BlueSpec),y            ; MOVER.S:430
+  a = *(BlueSpec@0x0026)[y]   ; MOVER.S:430
   *linkindex@0x00f3 = a            ; MOVER.S:431
   x = a                            ; MOVER.S:432
   call gettimer                  ; MOVER.S:433
@@ -305,7 +305,7 @@ pushpp1:
 }
 
 fn pushpp1 {
-  ??? lda (BlueSpec),y            ; MOVER.S:430
+  a = *(BlueSpec@0x0026)[y]   ; MOVER.S:430
   *linkindex@0x00f3 = a            ; MOVER.S:431
   x = a                            ; MOVER.S:432
   call gettimer                  ; MOVER.S:433
@@ -337,21 +337,21 @@ fn pushpp1 {
 }
 
 fn JAMPP {
-  ??? lda (BlueType),y            ; MOVER.S:481
+  a = *(BlueType@0x0024)[y]   ; MOVER.S:481
   a = a & #0x1f              ; MOVER.S:482
   *pptype@0x00f4 = a            ; MOVER.S:483
   cmp a, #0x06              ; MOVER.S:484
   if eq goto :1       ; MOVER.S:485
   a = #0x01                  ; MOVER.S:487
-  ??? sta (BlueType),y            ; MOVER.S:488
+  *(BlueType@0x0024)[y] = a   ; MOVER.S:488
   a = #0x00                  ; MOVER.S:489
-  ??? sta (BlueSpec),y            ; MOVER.S:490
+  *(BlueSpec@0x0026)[y] = a   ; MOVER.S:490
   a = #0x0e                  ; MOVER.S:491
   *pptype@0x00f4 = a            ; MOVER.S:492
   if ne goto pushpp1       ; MOVER.S:493
 :1:
   a = #0x05                  ; MOVER.S:495
-  ??? sta (BlueType),y            ; MOVER.S:496
+  *(BlueType@0x0024)[y] = a   ; MOVER.S:496
   if ne goto pushpp1       ; MOVER.S:497
 trigger:
 :loop:
@@ -365,7 +365,7 @@ trigger:
   *trscrn@0xb620 = a            ; MOVER.S:517
   call calcblue                  ; MOVER.S:519
   y = *trloc@0xb600        ; MOVER.S:520
-  ??? lda (BlueType),y            ; MOVER.S:521
+  a = *(BlueType@0x0024)[y]   ; MOVER.S:521
   a = a & #0x1f              ; MOVER.S:522
   call trigobj                  ; MOVER.S:524
   a = *trdirec@0xb640        ; MOVER.S:526
@@ -391,7 +391,7 @@ fn trigger  (aka :loop) {
   *trscrn@0xb620 = a            ; MOVER.S:517
   call calcblue                  ; MOVER.S:519
   y = *trloc@0xb600        ; MOVER.S:520
-  ??? lda (BlueType),y            ; MOVER.S:521
+  a = *(BlueType@0x0024)[y]   ; MOVER.S:521
   a = a & #0x1f              ; MOVER.S:522
   call trigobj                  ; MOVER.S:524
   a = *trdirec@0xb640        ; MOVER.S:526
@@ -420,7 +420,7 @@ fn trigobj {
 }
 
 fn openexit {
-  ??? lda (BlueSpec),y            ; MOVER.S:563
+  a = *(BlueSpec@0x0026)[y]   ; MOVER.S:563
   if ne goto :fail       ; MOVER.S:564
   a = #0x01                  ; MOVER.S:566
   if pl goto :1       ; MOVER.S:567
@@ -432,7 +432,7 @@ fn openexit {
 }
 
 fn triggate {
-  ??? lda (BlueSpec),y            ; MOVER.S:582
+  a = *(BlueSpec@0x0026)[y]   ; MOVER.S:582
   x = *pptype@0x00f4        ; MOVER.S:584
   cmp x, #0x0f              ; MOVER.S:585
   if eq goto :raise       ; MOVER.S:586
@@ -463,7 +463,7 @@ fn triggate {
   if cc goto :1       ; MOVER.S:614
   a = #0xee                  ; MOVER.S:615
 :3:
-  ??? sta (BlueSpec),y            ; MOVER.S:616
+  *(BlueSpec@0x0026)[y] = a   ; MOVER.S:616
   if ne goto :fail       ; MOVER.S:617
 :1:
 ]rts:
@@ -564,9 +564,9 @@ fn animobj {
   a = *trscrn@0xb620        ; MOVER.S:700
   call calcblue                  ; MOVER.S:701
   y = *trloc@0xb600        ; MOVER.S:703
-  ??? lda (BlueSpec),y            ; MOVER.S:704
+  a = *(BlueSpec@0x0026)[y]   ; MOVER.S:704
   *state@0x00f0 = a            ; MOVER.S:705
-  ??? lda (BlueType),y            ; MOVER.S:707
+  a = *(BlueType@0x0024)[y]   ; MOVER.S:707
   a = a & #0x1f              ; MOVER.S:708
   cmp a, #0x13              ; MOVER.S:712
   if ne goto :1       ; MOVER.S:713
@@ -625,7 +625,7 @@ fn animobj {
 :done:
   a = *state@0x00f0        ; MOVER.S:766
   y = *trloc@0xb600        ; MOVER.S:767
-  ??? sta (BlueSpec),y            ; MOVER.S:768
+  *(BlueSpec@0x0026)[y] = a   ; MOVER.S:768
 :rts:
   return                           ; MOVER.S:770
 }
@@ -1366,7 +1366,7 @@ fn mobfloor {
 
 fn knockloose {
   call makespace                  ; MOVER.S:1757
-  ??? sta (BlueSpec),y            ; MOVER.S:1758
+  *(BlueSpec@0x0026)[y] = a   ; MOVER.S:1758
   a = *mobvel@0xb690        ; MOVER.S:1760
   ??? lsr             ; MOVER.S:1761
   *mobvel@0xb690 = a            ; MOVER.S:1762
@@ -1385,7 +1385,7 @@ fn knockloose {
 
 fn makespace {
   a = #0x00                  ; MOVER.S:1789
-  ??? sta (BlueType),y            ; MOVER.S:1790
+  *(BlueType@0x0024)[y] = a   ; MOVER.S:1790
   a = #0x01                  ; MOVER.S:1793
   return                           ; MOVER.S:1794
   a = #0x00                  ; MOVER.S:1797
@@ -1440,13 +1440,13 @@ fn makerubble {
   if ne goto ]rts       ; MOVER.S:1860
 :jampp:
   a = #0x0e                  ; MOVER.S:1862
-  ??? sta (BlueType),y            ; MOVER.S:1863
+  *(BlueType@0x0024)[y] = a   ; MOVER.S:1863
 :pp:
   call PUSHPP                  ; MOVER.S:1865
   call rdblock1                  ; MOVER.S:1866
 :notpp:
   a = #0x0e                  ; MOVER.S:1868
-  ??? sta (BlueType),y            ; MOVER.S:1869
+  *(BlueType@0x0024)[y] = a   ; MOVER.S:1869
   tail_call markmob                ; MOVER.S:1870
 ]rts:
   return                           ; MOVER.S:1828
@@ -1685,11 +1685,11 @@ fn SHAKEM1 {
 }
 
 fn shakeit {
-  ??? lda (BlueSpec),y            ; MOVER.S:2153
+  a = *(BlueSpec@0x0026)[y]   ; MOVER.S:2153
   if mi goto ]rts       ; MOVER.S:2154
   if ne goto ]rts       ; MOVER.S:2155
   a = #0x80                  ; MOVER.S:2157
-  ??? sta (BlueSpec),y            ; MOVER.S:2158
+  *(BlueSpec@0x0026)[y] = a   ; MOVER.S:2158
   *trloc@0xb600 = y            ; MOVER.S:2160
   a = *tempscrn@0x0093        ; MOVER.S:2162
   *trscrn@0xb620 = a            ; MOVER.S:2163

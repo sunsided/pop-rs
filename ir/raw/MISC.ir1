@@ -20,8 +20,8 @@ MOVEMEM:
   *]source@0x00f2 = y            ; MISC.S:105
   *]endsourc@0x00f4 = y            ; MISC.S:106
 :loop:
-  ??? lda (]source),y            ; MISC.S:108
-  ??? sta (]dest),y            ; MISC.S:109
+  a = *(]source@0x00f2)[y]   ; MISC.S:108
+  *(]dest@0x00f0)[y] = a   ; MISC.S:109
   y += 1                         ; MISC.S:110
   if ne goto :loop       ; MISC.S:111
   *]source+1@0x00f3 += 1                         ; MISC.S:113
@@ -41,8 +41,8 @@ fn MOVEMEM {
   *]source@0x00f2 = y            ; MISC.S:105
   *]endsourc@0x00f4 = y            ; MISC.S:106
 :loop:
-  ??? lda (]source),y            ; MISC.S:108
-  ??? sta (]dest),y            ; MISC.S:109
+  a = *(]source@0x00f2)[y]   ; MISC.S:108
+  *(]dest@0x00f0)[y] = a   ; MISC.S:109
   y += 1                         ; MISC.S:110
   if ne goto :loop       ; MISC.S:111
   *]source+1@0x00f3 += 1                         ; MISC.S:113
@@ -441,7 +441,7 @@ fn BONESRISE {
   call rdblock                  ; MISC.S:619
   ??? pha             ; MISC.S:620
   a = #0x01                  ; MISC.S:621
-  ??? sta (BlueType),y            ; MISC.S:622
+  *(BlueType@0x0024)[y] = a   ; MISC.S:622
   a = #0x18                  ; MISC.S:623
   *height@0x0004 = a            ; MISC.S:624
   a = #0x02                  ; MISC.S:625
@@ -722,7 +722,7 @@ fn CHECKALERT {
   if eq goto :view       ; MISC.S:941
   cmp a, #0x04              ; MISC.S:942
   if ne goto :2       ; MISC.S:943
-  ??? lda (BlueSpec),y            ; MISC.S:944
+  a = *(BlueSpec@0x0026)[y]   ; MISC.S:944
   cmp a, #0x70              ; MISC.S:945
   if cs goto :clear       ; MISC.S:946
   if cc goto :view       ; MISC.S:947

@@ -46,16 +46,19 @@ from .ir1 import (
     Clc,
     CmpAbs,
     CmpImm,
+    CmpIndirect,
     Compare,
     DecTarget,
     Goto,
     If,
     Imm,
     IncTarget,
+    IndirectY,
     Label,
     LoadAbs,
     LoadImm,
     LoadIndexed,
+    LoadIndirect,
     ModuleIR1,
     Reg,
     Return,
@@ -63,6 +66,7 @@ from .ir1 import (
     Sec,
     StoreAbs,
     StoreIndexed,
+    StoreIndirect,
     Transfer,
     Unsupported,
 )
@@ -201,6 +205,20 @@ def _resolve(
     return None
 
 
+def _resolve_indirect_y(ind: IndirectY, trace: Trace, ram: bytearray) -> int:
+    """Compute the effective address for `(ptr),y`: read the 16-bit
+    pointer from `mem[ptr.addr]` (lo) + `mem[ptr.addr+1]` (hi), then
+    add Y. Returns a 16-bit address.
+
+    See `IndirectY`'s docstring for the page-wrap caveat — we use
+    `(addr + 1) & 0xffff` rather than the NMOS zero-page wrap, which
+    matches POP's actual pointer layouts (never sitting at $ff).
+    """
+    lo = ram[ind.ptr.addr & 0xffff]
+    hi = ram[(ind.ptr.addr + 1) & 0xffff]
+    return (((hi << 8) | lo) + (trace.y & 0xff)) & 0xffff
+
+
 def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
     """Execute a single non-control-flow IR1 atom against the supplied
     trace/RAM state. Returns True if the item was handled, False if
@@ -332,11 +350,12 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         _set_zn(trace, value)
         return True
     if isinstance(item, Bitwise):
-        rhs = (
-            item.source.value & 0xff
-            if isinstance(item.source, Imm)
-            else ram[item.source.addr & 0xffff]
-        )
+        if isinstance(item.source, Imm):
+            rhs = item.source.value & 0xff
+        elif isinstance(item.source, IndirectY):
+            rhs = ram[_resolve_indirect_y(item.source, trace, ram)]
+        else:
+            rhs = ram[item.source.addr & 0xffff]
         if item.op == "and":
             trace.a = trace.a & rhs
         elif item.op == "or":
@@ -346,6 +365,24 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         else:
             raise InterpError(f"unknown Bitwise op {item.op!r}")
         _set_zn(trace, trace.a)
+        return True
+    if isinstance(item, LoadIndirect):
+        addr = _resolve_indirect_y(item.source, trace, ram)
+        value = ram[addr]
+        trace.a = value
+        _set_zn(trace, value)
+        return True
+    if isinstance(item, StoreIndirect):
+        addr = _resolve_indirect_y(item.target, trace, ram)
+        ram[addr] = trace.a
+        trace.writes[addr] = trace.a
+        return True
+    if isinstance(item, CmpIndirect):
+        addr = _resolve_indirect_y(item.source, trace, ram)
+        rhs = ram[addr]
+        diff = (trace.a - rhs) & 0xff
+        trace.c = 1 if trace.a >= rhs else 0
+        _set_zn(trace, diff)
         return True
     if isinstance(item, Unsupported):
         raise InterpError(
