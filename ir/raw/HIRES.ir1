@@ -1,0 +1,850 @@
+; module HIRES from 01 POP Source/Source/HIRES.S
+
+fn cls {
+  ??? jsr mainmem            ; HIRES.S:89
+  ??? jsr CLS            ; HIRES.S:90
+  tail_call auxmem                ; HIRES.S:91
+}
+
+fn lay {
+  ??? jsr mainmem            ; HIRES.S:93
+  ??? jsr LAY            ; HIRES.S:94
+  tail_call auxmem                ; HIRES.S:95
+}
+
+fn fastlay {
+  ??? jsr FASTLAY            ; HIRES.S:98
+  tail_call auxmem                ; HIRES.S:99
+}
+
+fn layrsave {
+  ??? jsr mainmem            ; HIRES.S:101
+  ??? jsr LAYRSAVE            ; HIRES.S:102
+  tail_call auxmem                ; HIRES.S:103
+}
+
+fn lrcls {
+  ??? jsr mainmem            ; HIRES.S:105
+  ??? jsr LRCLS            ; HIRES.S:106
+  tail_call auxmem                ; HIRES.S:107
+}
+
+fn fastmask {
+  ??? jsr FASTMASK            ; HIRES.S:110
+  tail_call auxmem                ; HIRES.S:111
+}
+
+fn fastblack {
+  ??? jsr mainmem            ; HIRES.S:113
+  ??? jsr FASTBLACK            ; HIRES.S:114
+  tail_call auxmem                ; HIRES.S:115
+}
+
+fn peel {
+  ??? jsr PEEL            ; HIRES.S:118
+  tail_call auxmem                ; HIRES.S:119
+}
+
+fn getwidth {
+  ??? jsr mainmem            ; HIRES.S:121
+  ??? jsr GETWIDTH            ; HIRES.S:122
+  tail_call auxmem                ; HIRES.S:123
+}
+
+fn copyscrnMM {
+  ??? jsr mainmem            ; HIRES.S:126
+]copyscrn:
+  ??? jsr COPYSCRN            ; HIRES.S:127
+  tail_call auxmem                ; HIRES.S:128
+}
+
+fn copyscrnAA {
+  ??? jsr auxmem            ; HIRES.S:131
+  goto ]copyscrn                ; HIRES.S:132
+}
+
+fn copyscrnMA {
+  *$c002@0xc002 = a            ; HIRES.S:135
+  *$c005@0xc005 = a            ; HIRES.S:136
+  goto ]copyscrn                ; HIRES.S:137
+}
+
+fn copyscrnAM {
+  *$c003@0xc003 = a            ; HIRES.S:140
+  *$c004@0xc004 = a            ; HIRES.S:141
+  goto ]copyscrn                ; HIRES.S:142
+}
+
+fn mainmem {
+  *$c004@0xc004 = a            ; HIRES.S:145
+  *$c002@0xc002 = a            ; HIRES.S:146
+  return                           ; HIRES.S:147
+}
+
+fn auxmem {
+  *$c005@0xc005 = a            ; HIRES.S:149
+  *$c003@0xc003 = a            ; HIRES.S:150
+  return                           ; HIRES.S:151
+}
+
+fn CLS {
+  ??? lda PAGE            ; HIRES.S:206
+  ??? clc             ; HIRES.S:207
+  ??? adc #$20            ; HIRES.S:208
+  ??? sta :loop+2            ; HIRES.S:209
+  ??? adc #$10            ; HIRES.S:210
+  ??? sta :smod+2            ; HIRES.S:211
+  a = #0x80                  ; HIRES.S:213
+  x = #0x10                  ; HIRES.S:215
+  y = #0x00                  ; HIRES.S:217
+:loop:
+  ??? sta $2000,y            ; HIRES.S:219
+:smod:
+  ??? sta $3000,y            ; HIRES.S:220
+  ??? iny             ; HIRES.S:221
+  ??? bne :loop            ; HIRES.S:222
+  ??? inc :loop+2            ; HIRES.S:224
+  ??? inc :smod+2            ; HIRES.S:225
+  ??? dex             ; HIRES.S:227
+  ??? bne :loop            ; HIRES.S:228
+  return                           ; HIRES.S:230
+}
+
+fn LRCLS {
+  y = #0xf7                  ; HIRES.S:242
+:2:
+  ??? sta $400,Y            ; HIRES.S:243
+  ??? sta $500,Y            ; HIRES.S:244
+  ??? sta $600,Y            ; HIRES.S:245
+  ??? sta $700,Y            ; HIRES.S:246
+  ??? dey             ; HIRES.S:247
+  ??? cpy #$7F            ; HIRES.S:248
+  ??? bne :3            ; HIRES.S:249
+  y = #0x77                  ; HIRES.S:250
+:3:
+  ??? cpy #$FF            ; HIRES.S:251
+  ??? bne :2            ; HIRES.S:252
+  return                           ; HIRES.S:253
+}
+
+fn setimage {
+  ??? lda IMAGE            ; HIRES.S:264
+  ??? asl             ; HIRES.S:265
+  ??? sec             ; HIRES.S:266
+  ??? sbc #1            ; HIRES.S:267
+  ??? tay             ; HIRES.S:269
+  ??? lda (TABLE),y            ; HIRES.S:270
+  *IMAGE@0x0004 = a            ; HIRES.S:271
+  ??? iny             ; HIRES.S:273
+  ??? lda (TABLE),y            ; HIRES.S:274
+  *IMAGE+1@0x0005 = a            ; HIRES.S:275
+  return                           ; HIRES.S:277
+}
+
+fn GETWIDTH {
+  ??? lda BANK            ; HIRES.S:288
+  ??? sta :RAMRD+1            ; HIRES.S:289
+:RAMRD:
+  *$c003@0xc003 = a            ; HIRES.S:291
+  ??? jsr setimage            ; HIRES.S:293
+  y = #0x01                  ; HIRES.S:295
+  ??? lda (IMAGE),y            ; HIRES.S:296
+  ??? tax             ; HIRES.S:297
+  ??? dey             ; HIRES.S:299
+  ??? lda (IMAGE),y            ; HIRES.S:300
+  return                           ; HIRES.S:301
+}
+
+fn PREPREP {
+  ??? lda IMAGE            ; HIRES.S:315
+  *IMSAVE@0x00f2 = a            ; HIRES.S:316
+  ??? lda XCO            ; HIRES.S:317
+  *XSAVE@0x00f4 = a            ; HIRES.S:318
+  ??? lda YCO            ; HIRES.S:319
+  *YSAVE@0x00f5 = a            ; HIRES.S:320
+  ??? lda BANK            ; HIRES.S:324
+  ??? sta :RAMRD+1            ; HIRES.S:325
+:RAMRD:
+  *$c003@0xc003 = a            ; HIRES.S:327
+  ??? jsr setimage            ; HIRES.S:329
+  y = #0x00                  ; HIRES.S:333
+  ??? lda (IMAGE),Y            ; HIRES.S:334
+  *WIDTH@0x00f6 = a            ; HIRES.S:335
+  ??? iny             ; HIRES.S:337
+  ??? lda (IMAGE),Y            ; HIRES.S:338
+  *HEIGHT@0x00f7 = a            ; HIRES.S:339
+  ??? lda IMAGE            ; HIRES.S:341
+  ??? clc             ; HIRES.S:342
+  ??? adc #2            ; HIRES.S:343
+  *IMAGE@0x0004 = a            ; HIRES.S:344
+  ??? bcc :3            ; HIRES.S:345
+  ??? inc IMAGE+1            ; HIRES.S:346
+:3:
+  *$c002@0xc002 = a            ; HIRES.S:348
+]rts:
+  return                           ; HIRES.S:350
+}
+
+fn CROP {
+  ??? lda YCO            ; HIRES.S:379
+  ??? cmp BOTCUT            ; HIRES.S:380
+  ??? bcs :botoff            ; HIRES.S:381
+  ??? sec             ; HIRES.S:385
+  ??? sbc HEIGHT            ; HIRES.S:386
+  ??? cmp #191            ; HIRES.S:387
+  ??? bcc :topok            ; HIRES.S:388
+  ??? lda TOPCUT            ; HIRES.S:390
+  ??? sec             ; HIRES.S:391
+  ??? sbc #1            ; HIRES.S:392
+  *TOPEDGE@0x00f8 = a            ; HIRES.S:393
+  goto :done                ; HIRES.S:394
+}
+
+fn shiftoffset {
+  ??? cpx #6            ; HIRES.S:518
+  ??? bcs :left            ; HIRES.S:519
+  ??? inx             ; HIRES.S:521
+  return                           ; HIRES.S:522
+}
+
+fn LAYRSAVE {
+  ??? jsr PREPREP            ; HIRES.S:543
+  ??? lda OPACITY            ; HIRES.S:545
+  ??? bpl :normal            ; HIRES.S:546
+  ??? lda XCO            ; HIRES.S:548
+  ??? sec             ; HIRES.S:549
+  ??? sbc WIDTH            ; HIRES.S:550
+  *XCO@0x0001 = a            ; HIRES.S:551
+:normal:
+  ??? inc WIDTH            ; HIRES.S:554
+  ??? jsr CROP            ; HIRES.S:556
+  ??? bmi SKIPIT            ; HIRES.S:557
+  ??? lda PEELBUF            ; HIRES.S:559
+  *PEELIMG@0x000b = a            ; HIRES.S:560
+  ??? lda PEELBUF+1            ; HIRES.S:561
+  *PEELIMG+1@0x000c = a            ; HIRES.S:562
+  ??? lda XCO            ; HIRES.S:564
+  *PEELXCO@0x000d = a            ; HIRES.S:565
+  ??? sta :smXCO+1            ; HIRES.S:566
+  ??? lda YCO            ; HIRES.S:568
+  *PEELYCO@0x000e = a            ; HIRES.S:569
+  ??? lda PAGE            ; HIRES.S:571
+  ??? sta :smPAGE+1            ; HIRES.S:572
+  y = #0x00                  ; HIRES.S:574
+  ??? lda VISWIDTH            ; HIRES.S:576
+  ??? beq SKIPIT            ; HIRES.S:577
+  ??? sta (PEELBUF),y            ; HIRES.S:578
+  ??? sta :smWIDTH+1            ; HIRES.S:579
+  ??? sec             ; HIRES.S:581
+  ??? sbc #1            ; HIRES.S:582
+  ??? sta :smSTART+1            ; HIRES.S:583
+:cont:
+  ??? iny             ; HIRES.S:587
+  ??? lda YCO            ; HIRES.S:589
+  ??? sec             ; HIRES.S:590
+  ??? sbc TOPEDGE            ; HIRES.S:591
+  ??? sta (PEELBUF),y            ; HIRES.S:592
+  ??? lda PEELBUF            ; HIRES.S:594
+  ??? clc             ; HIRES.S:595
+  ??? adc #2            ; HIRES.S:596
+  *PEELBUF@0x0009 = a            ; HIRES.S:597
+  ??? bcc :ok            ; HIRES.S:598
+  ??? inc PEELBUF+1            ; HIRES.S:599
+:ok:
+  ??? ldx YCO            ; HIRES.S:604
+:loop:
+  ??? lda YLO,X            ; HIRES.S:606
+  ??? clc             ; HIRES.S:607
+:smXCO:
+  ??? adc #0            ; HIRES.S:608
+  ??? sta :smBASE+1            ; HIRES.S:609
+  ??? lda YHI,X            ; HIRES.S:611
+:smPAGE:
+  ??? adc #0            ; HIRES.S:612
+  ??? sta :smBASE+2            ; HIRES.S:613
+:smSTART:
+  y = #0x00                  ; HIRES.S:615
+:inloop:
+:smBASE:
+  ??? lda $2000,y            ; HIRES.S:618
+  ??? sta (PEELBUF),Y            ; HIRES.S:619
+  ??? dey             ; HIRES.S:621
+  ??? bpl :inloop            ; HIRES.S:622
+:smWIDTH:
+  a = #0x00                  ; HIRES.S:624
+  ??? adc PEELBUF            ; HIRES.S:625
+  *PEELBUF@0x0009 = a            ; HIRES.S:626
+  ??? bcc :2            ; HIRES.S:627
+  ??? inc PEELBUF+1            ; HIRES.S:628
+:2:
+  ??? dex             ; HIRES.S:630
+  ??? cpx TOPEDGE            ; HIRES.S:631
+  ??? bne :loop            ; HIRES.S:632
+  tail_call DONE                ; HIRES.S:634
+}
+
+fn SKIPIT {
+  a = #0x00                  ; HIRES.S:636
+  *PEELIMG+1@0x000c = a            ; HIRES.S:637
+  tail_call DONE                ; HIRES.S:639
+}
+
+fn LAY {
+  ??? lda OPACITY            ; HIRES.S:659
+  ??? bpl :notmirr            ; HIRES.S:660
+  ??? and #$7f            ; HIRES.S:662
+  *OPACITY@0x0006 = a            ; HIRES.S:663
+  tail_call MLAY                ; HIRES.S:664
+}
+
+fn LayGen {
+  ??? jsr PREPREP            ; HIRES.S:682
+  ??? jsr CROP            ; HIRES.S:684
+  ??? bpl :cont            ; HIRES.S:685
+  tail_call DONE                ; HIRES.S:686
+}
+
+fn DONE {
+  ??? lda IMSAVE            ; HIRES.S:816
+  *IMAGE@0x0004 = a            ; HIRES.S:817
+  ??? lda XSAVE            ; HIRES.S:819
+  *XCO@0x0001 = a            ; HIRES.S:820
+  ??? lda YSAVE            ; HIRES.S:821
+  *YCO@0x0002 = a            ; HIRES.S:822
+  return                           ; HIRES.S:824
+}
+
+fn LayMask {
+  ??? ldx OPACITY            ; HIRES.S:834
+  ??? lda OPCODE,x            ; HIRES.S:835
+  ??? sta :masksm1            ; HIRES.S:836
+  ??? sta :masksm2            ; HIRES.S:837
+  ??? jsr PREPREP            ; HIRES.S:839
+  ??? jsr CROP            ; HIRES.S:841
+  ??? bmi ]done            ; HIRES.S:842
+  ??? lda BANK            ; HIRES.S:844
+  ??? sta :RAMRD1+1            ; HIRES.S:845
+  ??? sta :RAMRD2+1            ; HIRES.S:846
+  ??? ldx OFFSET            ; HIRES.S:848
+  ??? lda SHIFTL,X            ; HIRES.S:850
+  ??? sta :91+1            ; HIRES.S:851
+  ??? sta :93+1            ; HIRES.S:852
+  ??? lda SHIFTH,X            ; HIRES.S:854
+  ??? sta :91+2            ; HIRES.S:855
+  ??? sta :93+2            ; HIRES.S:856
+  ??? lda CARRYL,X            ; HIRES.S:858
+  ??? sta :90+1            ; HIRES.S:859
+  ??? sta :92+1            ; HIRES.S:860
+  ??? sta :94+1            ; HIRES.S:861
+  ??? sta :96+1            ; HIRES.S:862
+  ??? lda CARRYH,X            ; HIRES.S:864
+  ??? sta :90+2            ; HIRES.S:865
+  ??? sta :92+2            ; HIRES.S:866
+  ??? sta :94+2            ; HIRES.S:867
+  ??? sta :96+2            ; HIRES.S:868
+  ??? lda AMASKS,X            ; HIRES.S:870
+  ??? sta :AMASK+1            ; HIRES.S:871
+  ??? lda BMASKS,X            ; HIRES.S:873
+  ??? sta :BMASK+1            ; HIRES.S:874
+  ??? ldy YCO            ; HIRES.S:876
+:nextline:
+  ??? lda YLO,Y            ; HIRES.S:879
+  ??? clc             ; HIRES.S:880
+  ??? adc XCO            ; HIRES.S:881
+  *BASE@0x00f0 = a            ; HIRES.S:882
+  ??? lda YHI,Y            ; HIRES.S:884
+  ??? adc PAGE            ; HIRES.S:885
+  *BASE+1@0x00f1 = a            ; HIRES.S:886
+  ??? ldy OFFLEFT            ; HIRES.S:888
+  ??? beq :2            ; HIRES.S:889
+  ??? dey             ; HIRES.S:894
+:RAMRD1:
+  *$c003@0xc003 = a            ; HIRES.S:896
+  ??? lda (IMAGE),y            ; HIRES.S:897
+  *$c002@0xc002 = a            ; HIRES.S:900
+  ??? tax             ; HIRES.S:902
+:96:
+  ??? lda $FFFF,x            ; HIRES.S:903
+  *carryim@0x001c = a            ; HIRES.S:904
+  ??? lda MASKTAB-$80,x            ; HIRES.S:906
+  ??? tax             ; HIRES.S:907
+:90:
+  ??? lda $FFFF,x            ; HIRES.S:908
+  *CARRY@0x00fc = a            ; HIRES.S:909
+  ??? lda IMAGE            ; HIRES.S:911
+  ??? clc             ; HIRES.S:912
+  ??? adc OFFLEFT            ; HIRES.S:913
+  *IMAGE@0x0004 = a            ; HIRES.S:914
+  ??? bcc :1            ; HIRES.S:915
+  ??? inc IMAGE+1            ; HIRES.S:916
+:1:
+  y = #0x00                  ; HIRES.S:918
+  ??? lda VISWIDTH            ; HIRES.S:920
+  *WIDTH@0x00f6 = a            ; HIRES.S:921
+  ??? bne :inloop            ; HIRES.S:922
+  ??? beq :4            ; HIRES.S:923
+:2:
+:AMASK:
+  a = #0x00                  ; HIRES.S:929
+  *CARRY@0x00fc = a            ; HIRES.S:930
+  ??? and (BASE),y            ; HIRES.S:932
+  *carryim@0x001c = a            ; HIRES.S:933
+:inloop:
+:RAMRD2:
+  *$c003@0xc003 = a            ; HIRES.S:939
+  ??? lda (IMAGE),y            ; HIRES.S:940
+  *$c002@0xc002 = a            ; HIRES.S:943
+  ??? tax             ; HIRES.S:945
+:93:
+  ??? lda $FFFF,x            ; HIRES.S:947
+  ??? ora carryim            ; HIRES.S:948
+  *imbyte@0x001d = a            ; HIRES.S:949
+:94:
+  ??? lda $FFFF,x            ; HIRES.S:951
+  *carryim@0x001c = a            ; HIRES.S:952
+  ??? lda MASKTAB-$80,x            ; HIRES.S:954
+  ??? tax             ; HIRES.S:955
+:91:
+  ??? lda $FFFF,x            ; HIRES.S:957
+  ??? ora CARRY            ; HIRES.S:958
+:masksm1:
+  ??? and (BASE),y            ; HIRES.S:959
+  ??? ora imbyte            ; HIRES.S:960
+  ??? sta (BASE),y            ; HIRES.S:961
+:92:
+  ??? lda $FFFF,x            ; HIRES.S:963
+  *CARRY@0x00fc = a            ; HIRES.S:964
+  ??? iny             ; HIRES.S:966
+  ??? cpy VISWIDTH            ; HIRES.S:967
+  ??? bcc :inloop            ; HIRES.S:968
+  ??? lda OFFRIGHT            ; HIRES.S:972
+  ??? bne :5            ; HIRES.S:973
+:4:
+:BMASK:
+  a = #0x00                  ; HIRES.S:976
+  ??? ora CARRY            ; HIRES.S:977
+:masksm2:
+  ??? and (BASE),y            ; HIRES.S:978
+  ??? ora carryim            ; HIRES.S:979
+  ??? sta (BASE),y            ; HIRES.S:980
+:5:
+  ??? lda WIDTH            ; HIRES.S:984
+  ??? clc             ; HIRES.S:985
+  ??? adc IMAGE            ; HIRES.S:986
+  *IMAGE@0x0004 = a            ; HIRES.S:987
+  ??? bcc :6            ; HIRES.S:988
+  ??? inc IMAGE+1            ; HIRES.S:989
+:6:
+  ??? dec YCO            ; HIRES.S:991
+  ??? ldy YCO            ; HIRES.S:992
+  ??? cpy TOPEDGE            ; HIRES.S:993
+  ??? beq :done            ; HIRES.S:994
+  goto :nextline                ; HIRES.S:996
+}
+
+fn LayXOR {
+  ??? jsr PREPREP            ; HIRES.S:1009
+  ??? jsr CROP            ; HIRES.S:1011
+  ??? bpl :cont            ; HIRES.S:1012
+  tail_call DONE                ; HIRES.S:1013
+}
+
+fn MLAY {
+  ??? cmp #eor            ; HIRES.S:1187
+  ??? bne :1            ; HIRES.S:1188
+  tail_call MLayXOR                ; HIRES.S:1189
+}
+
+fn MLayGen {
+  ??? jsr PREPREP            ; HIRES.S:1203
+  ??? lda XCO            ; HIRES.S:1205
+  ??? sec             ; HIRES.S:1206
+  ??? sbc WIDTH            ; HIRES.S:1207
+  *XCO@0x0001 = a            ; HIRES.S:1208
+  ??? jsr CROP            ; HIRES.S:1210
+  ??? bpl :cont            ; HIRES.S:1211
+  tail_call DONE                ; HIRES.S:1212
+}
+
+fn MLayMask {
+  ??? ldx OPACITY            ; HIRES.S:1357
+  ??? lda OPCODE,x            ; HIRES.S:1358
+  ??? sta :masksm1            ; HIRES.S:1359
+  ??? sta :masksm2            ; HIRES.S:1360
+  ??? jsr PREPREP            ; HIRES.S:1362
+  ??? lda XCO            ; HIRES.S:1364
+  ??? sec             ; HIRES.S:1365
+  ??? sbc WIDTH            ; HIRES.S:1366
+  *XCO@0x0001 = a            ; HIRES.S:1367
+  ??? jsr CROP            ; HIRES.S:1369
+  ??? bpl :cont            ; HIRES.S:1370
+  tail_call DONE                ; HIRES.S:1371
+}
+
+fn MLayXOR {
+  ??? jsr PREPREP            ; HIRES.S:1542
+  ??? lda XCO            ; HIRES.S:1544
+  ??? sec             ; HIRES.S:1545
+  ??? sbc WIDTH            ; HIRES.S:1546
+  *XCO@0x0001 = a            ; HIRES.S:1547
+  ??? jsr CROP            ; HIRES.S:1549
+  ??? bpl :cont            ; HIRES.S:1550
+  tail_call DONE                ; HIRES.S:1551
+}
+
+fn PEEL {
+  *$c004@0xc004 = a            ; HIRES.S:1722
+]ramrd1:
+  *$c003@0xc003 = a            ; HIRES.S:1723
+  tail_call fastlaySTA                ; HIRES.S:1725
+}
+
+fn FASTLAY {
+  *$c004@0xc004 = a            ; HIRES.S:1741
+]ramrd2:
+  *$c003@0xc003 = a            ; HIRES.S:1742
+  ??? jsr setimage            ; HIRES.S:1744
+  ??? ldx OPACITY            ; HIRES.S:1746
+  ??? cpx #sta            ; HIRES.S:1747
+  ??? beq fastlaySTA            ; HIRES.S:1748
+  ??? lda OPCODE,x            ; HIRES.S:1750
+  ??? sta :smod            ; HIRES.S:1751
+  ??? lda PAGE            ; HIRES.S:1753
+  ??? sta :smPAGE+1            ; HIRES.S:1754
+  ??? lda XCO            ; HIRES.S:1756
+  ??? sta :smXCO+1            ; HIRES.S:1757
+  y = #0x00                  ; HIRES.S:1759
+  ??? lda (IMAGE),y            ; HIRES.S:1760
+  ??? sta :smWIDTH+1            ; HIRES.S:1761
+  ??? sec             ; HIRES.S:1763
+  ??? sbc #1            ; HIRES.S:1764
+  ??? sta :smSTART+1            ; HIRES.S:1765
+  ??? lda YCO            ; HIRES.S:1767
+  ??? tax             ; HIRES.S:1768
+  ??? iny             ; HIRES.S:1769
+  ??? sbc (IMAGE),y            ; HIRES.S:1770
+  ??? bcs :ok            ; HIRES.S:1771
+  a = #0xff                  ; HIRES.S:1772
+:ok:
+  ??? sta :smTOP+1            ; HIRES.S:1773
+  ??? lda IMAGE            ; HIRES.S:1775
+  ??? clc             ; HIRES.S:1776
+  ??? adc #2            ; HIRES.S:1777
+  *IMAGE@0x0004 = a            ; HIRES.S:1778
+  ??? bcc :1            ; HIRES.S:1779
+  ??? inc IMAGE+1            ; HIRES.S:1780
+:1:
+:outloop:
+  ??? lda YLO,x            ; HIRES.S:1784
+  ??? clc             ; HIRES.S:1785
+:smXCO:
+  ??? adc #0            ; HIRES.S:1786
+  *BASE@0x00f0 = a            ; HIRES.S:1787
+  ??? lda YHI,x            ; HIRES.S:1789
+:smPAGE:
+  ??? adc #$20            ; HIRES.S:1790
+  *BASE+1@0x00f1 = a            ; HIRES.S:1791
+:smSTART:
+  y = #0x03                  ; HIRES.S:1793
+:inloop:
+]ramrd3:
+  *$c003@0xc003 = a            ; HIRES.S:1796
+  ??? lda (IMAGE),y            ; HIRES.S:1798
+  *$c002@0xc002 = a            ; HIRES.S:1800
+:smod:
+  ??? ora (BASE),y            ; HIRES.S:1802
+  ??? sta (BASE),y            ; HIRES.S:1803
+  ??? dey             ; HIRES.S:1805
+  ??? bpl :inloop            ; HIRES.S:1806
+:smWIDTH:
+  a = #0x04                  ; HIRES.S:1808
+  ??? adc IMAGE            ; HIRES.S:1809
+  *IMAGE@0x0004 = a            ; HIRES.S:1810
+  ??? bcc :2            ; HIRES.S:1811
+  ??? inc IMAGE+1            ; HIRES.S:1812
+:2:
+  ??? dex             ; HIRES.S:1814
+:smTOP:
+  ??? cpx #$ff            ; HIRES.S:1815
+  ??? bne :outloop            ; HIRES.S:1816
+  return                           ; HIRES.S:1818
+}
+
+fn fastlaySTA {
+  ??? lda PAGE            ; HIRES.S:1826
+  ??? sta :smPAGE+1            ; HIRES.S:1827
+  ??? lda XCO            ; HIRES.S:1829
+  ??? sta :smXCO+1            ; HIRES.S:1830
+  y = #0x00                  ; HIRES.S:1832
+  ??? lda (IMAGE),y            ; HIRES.S:1833
+  ??? sta :smWIDTH+1            ; HIRES.S:1834
+  ??? sec             ; HIRES.S:1836
+  ??? sbc #1            ; HIRES.S:1837
+  ??? sta :smSTART+1            ; HIRES.S:1838
+  ??? lda YCO            ; HIRES.S:1840
+  ??? tax             ; HIRES.S:1841
+  ??? iny             ; HIRES.S:1842
+  ??? sbc (IMAGE),y            ; HIRES.S:1843
+  ??? bcs :ok            ; HIRES.S:1844
+  a = #0xff                  ; HIRES.S:1845
+:ok:
+  ??? sta :smTOP+1            ; HIRES.S:1846
+  ??? lda IMAGE            ; HIRES.S:1848
+  ??? clc             ; HIRES.S:1849
+  ??? adc #2            ; HIRES.S:1850
+  *IMAGE@0x0004 = a            ; HIRES.S:1851
+  ??? bcc :1            ; HIRES.S:1852
+  ??? inc IMAGE+1            ; HIRES.S:1853
+:1:
+:outloop:
+  ??? lda YLO,x            ; HIRES.S:1857
+  ??? clc             ; HIRES.S:1858
+:smXCO:
+  ??? adc #0            ; HIRES.S:1859
+  ??? sta :smod+1            ; HIRES.S:1860
+  ??? lda YHI,x            ; HIRES.S:1862
+:smPAGE:
+  ??? adc #$20            ; HIRES.S:1863
+  ??? sta :smod+2            ; HIRES.S:1864
+:smSTART:
+  y = #0x03                  ; HIRES.S:1866
+:inloop:
+  ??? lda (IMAGE),y            ; HIRES.S:1869
+:smod:
+  ??? sta $2000,y            ; HIRES.S:1870
+  ??? dey             ; HIRES.S:1872
+  ??? bpl :inloop            ; HIRES.S:1873
+:smWIDTH:
+  a = #0x04                  ; HIRES.S:1875
+  ??? adc IMAGE            ; HIRES.S:1876
+  *IMAGE@0x0004 = a            ; HIRES.S:1877
+  ??? bcc :2            ; HIRES.S:1878
+  ??? inc IMAGE+1            ; HIRES.S:1879
+:2:
+  ??? dex             ; HIRES.S:1881
+:smTOP:
+  ??? cpx #$ff            ; HIRES.S:1882
+  ??? bne :outloop            ; HIRES.S:1883
+  return                           ; HIRES.S:1885
+}
+
+fn FASTMASK {
+  *$c004@0xc004 = a            ; HIRES.S:1893
+]ramrd4:
+  *$c003@0xc003 = a            ; HIRES.S:1894
+  ??? jsr setimage            ; HIRES.S:1896
+  ??? lda PAGE            ; HIRES.S:1898
+  ??? sta :smPAGE+1            ; HIRES.S:1899
+  ??? lda XCO            ; HIRES.S:1901
+  ??? sta :smXCO+1            ; HIRES.S:1902
+  y = #0x00                  ; HIRES.S:1904
+  ??? lda (IMAGE),y            ; HIRES.S:1905
+  ??? sta :smWIDTH+1            ; HIRES.S:1906
+  ??? sec             ; HIRES.S:1908
+  ??? sbc #1            ; HIRES.S:1909
+  ??? sta :smSTART+1            ; HIRES.S:1910
+  ??? lda YCO            ; HIRES.S:1912
+  ??? tax             ; HIRES.S:1913
+  ??? iny             ; HIRES.S:1914
+  ??? sbc (IMAGE),y            ; HIRES.S:1915
+  ??? bcs :ok            ; HIRES.S:1916
+  a = #0xff                  ; HIRES.S:1917
+:ok:
+  ??? sta :smTOP+1            ; HIRES.S:1918
+  ??? lda IMAGE            ; HIRES.S:1920
+  ??? clc             ; HIRES.S:1921
+  ??? adc #2            ; HIRES.S:1922
+  *IMAGE@0x0004 = a            ; HIRES.S:1923
+  ??? bcc :1            ; HIRES.S:1924
+  ??? inc IMAGE+1            ; HIRES.S:1925
+:1:
+:outloop:
+  *index@0x00ee = x            ; HIRES.S:1929
+  ??? lda YLO,x            ; HIRES.S:1931
+  ??? clc             ; HIRES.S:1932
+:smXCO:
+  ??? adc #0            ; HIRES.S:1933
+  *BASE@0x00f0 = a            ; HIRES.S:1934
+  ??? lda YHI,x            ; HIRES.S:1936
+:smPAGE:
+  ??? adc #$20            ; HIRES.S:1937
+  *BASE+1@0x00f1 = a            ; HIRES.S:1938
+:smSTART:
+  y = #0x03                  ; HIRES.S:1940
+:inloop:
+]ramrd5:
+  *$c003@0xc003 = a            ; HIRES.S:1943
+  ??? lda (IMAGE),y            ; HIRES.S:1945
+  *$c002@0xc002 = a            ; HIRES.S:1947
+  ??? tax             ; HIRES.S:1949
+  ??? lda MASKTAB-$80,X            ; HIRES.S:1950
+  ??? and (BASE),Y            ; HIRES.S:1952
+  ??? sta (BASE),y            ; HIRES.S:1953
+  ??? dey             ; HIRES.S:1955
+  ??? bpl :inloop            ; HIRES.S:1956
+:smWIDTH:
+  a = #0x04                  ; HIRES.S:1958
+  ??? adc IMAGE            ; HIRES.S:1959
+  *IMAGE@0x0004 = a            ; HIRES.S:1960
+  ??? bcc :2            ; HIRES.S:1961
+  ??? inc IMAGE+1            ; HIRES.S:1962
+:2:
+  ??? ldx index            ; HIRES.S:1964
+  ??? dex             ; HIRES.S:1965
+:smTOP:
+  ??? cpx #$ff            ; HIRES.S:1966
+  ??? bne :outloop            ; HIRES.S:1967
+  return                           ; HIRES.S:1969
+}
+
+fn SETFASTMAIN {
+  a = #0x02                  ; HIRES.S:1981
+]setfast:
+  ??? sta ]ramrd1+1            ; HIRES.S:1983
+  ??? sta ]ramrd2+1            ; HIRES.S:1984
+  ??? sta ]ramrd3+1            ; HIRES.S:1985
+  ??? sta ]ramrd4+1            ; HIRES.S:1986
+  ??? sta ]ramrd5+1            ; HIRES.S:1987
+  return                           ; HIRES.S:1988
+}
+
+fn SETFASTAUX {
+  a = #0x03                  ; HIRES.S:1991
+  ??? bne ]setfast            ; HIRES.S:1992
+FASTBLACK:
+  ??? lda color            ; HIRES.S:2006
+  ??? sta :smCOLOR+1            ; HIRES.S:2007
+  ??? lda PAGE            ; HIRES.S:2009
+  ??? sta :smPAGE+1            ; HIRES.S:2010
+  ??? lda XCO            ; HIRES.S:2012
+  ??? sta :smXCO+1            ; HIRES.S:2013
+  ??? lda width            ; HIRES.S:2015
+  ??? sec             ; HIRES.S:2016
+  ??? sbc #1            ; HIRES.S:2017
+  ??? sta :smSTART+1            ; HIRES.S:2018
+  ??? lda YCO            ; HIRES.S:2020
+  ??? tax             ; HIRES.S:2021
+  ??? sbc height            ; HIRES.S:2022
+  ??? sta :smTOP+1            ; HIRES.S:2023
+:outloop:
+  ??? lda YLO,x            ; HIRES.S:2026
+  ??? clc             ; HIRES.S:2027
+:smXCO:
+  ??? adc #0            ; HIRES.S:2028
+  ??? sta :smod+1            ; HIRES.S:2029
+  ??? lda YHI,x            ; HIRES.S:2031
+:smPAGE:
+  ??? adc #$20            ; HIRES.S:2032
+  ??? sta :smod+2            ; HIRES.S:2033
+:smCOLOR:
+  a = #0x80                  ; HIRES.S:2035
+:smSTART:
+  y = #0x03                  ; HIRES.S:2037
+:inloop:
+:smod:
+  ??? sta $2000,y            ; HIRES.S:2040
+  ??? dey             ; HIRES.S:2041
+  ??? bpl :inloop            ; HIRES.S:2042
+  ??? dex             ; HIRES.S:2044
+:smTOP:
+  ??? cpx #$ff            ; HIRES.S:2045
+  ??? bne :outloop            ; HIRES.S:2046
+  return                           ; HIRES.S:2048
+}
+
+fn FASTBLACK {
+  ??? lda color            ; HIRES.S:2006
+  ??? sta :smCOLOR+1            ; HIRES.S:2007
+  ??? lda PAGE            ; HIRES.S:2009
+  ??? sta :smPAGE+1            ; HIRES.S:2010
+  ??? lda XCO            ; HIRES.S:2012
+  ??? sta :smXCO+1            ; HIRES.S:2013
+  ??? lda width            ; HIRES.S:2015
+  ??? sec             ; HIRES.S:2016
+  ??? sbc #1            ; HIRES.S:2017
+  ??? sta :smSTART+1            ; HIRES.S:2018
+  ??? lda YCO            ; HIRES.S:2020
+  ??? tax             ; HIRES.S:2021
+  ??? sbc height            ; HIRES.S:2022
+  ??? sta :smTOP+1            ; HIRES.S:2023
+:outloop:
+  ??? lda YLO,x            ; HIRES.S:2026
+  ??? clc             ; HIRES.S:2027
+:smXCO:
+  ??? adc #0            ; HIRES.S:2028
+  ??? sta :smod+1            ; HIRES.S:2029
+  ??? lda YHI,x            ; HIRES.S:2031
+:smPAGE:
+  ??? adc #$20            ; HIRES.S:2032
+  ??? sta :smod+2            ; HIRES.S:2033
+:smCOLOR:
+  a = #0x80                  ; HIRES.S:2035
+:smSTART:
+  y = #0x03                  ; HIRES.S:2037
+:inloop:
+:smod:
+  ??? sta $2000,y            ; HIRES.S:2040
+  ??? dey             ; HIRES.S:2041
+  ??? bpl :inloop            ; HIRES.S:2042
+  ??? dex             ; HIRES.S:2044
+:smTOP:
+  ??? cpx #$ff            ; HIRES.S:2045
+  ??? bne :outloop            ; HIRES.S:2046
+  return                           ; HIRES.S:2048
+}
+
+fn COPYSCRN {
+  ??? lda IMAGE+1            ; HIRES.S:2061
+  ??? sta :dst1+2            ; HIRES.S:2062
+  ??? clc             ; HIRES.S:2063
+  ??? adc #$10            ; HIRES.S:2064
+  ??? sta :dst2+2            ; HIRES.S:2065
+  ??? lda IMAGE            ; HIRES.S:2067
+  ??? sta :org1+2            ; HIRES.S:2068
+  ??? adc #$10            ; HIRES.S:2069
+  ??? sta :org2+2            ; HIRES.S:2070
+  x = #0x10                  ; HIRES.S:2072
+  y = #0x00                  ; HIRES.S:2074
+:loop:
+:org1:
+  ??? lda $2000,y            ; HIRES.S:2076
+:dst1:
+  ??? sta $4000,y            ; HIRES.S:2077
+:org2:
+  ??? lda $3000,y            ; HIRES.S:2079
+:dst2:
+  ??? sta $5000,y            ; HIRES.S:2080
+  ??? iny             ; HIRES.S:2082
+  ??? bne :loop            ; HIRES.S:2083
+  ??? inc :org1+2            ; HIRES.S:2085
+  ??? inc :org2+2            ; HIRES.S:2086
+  ??? inc :dst1+2            ; HIRES.S:2087
+  ??? inc :dst2+2            ; HIRES.S:2088
+  ??? dex             ; HIRES.S:2090
+  ??? bne :loop            ; HIRES.S:2091
+  return                           ; HIRES.S:2093
+}
+
+fn INVERTY {
+  x = #0xbf                  ; HIRES.S:2099
+  y = #0x00                  ; HIRES.S:2100
+:loop:
+  ??? lda YLO,x            ; HIRES.S:2104
+  ??? pha             ; HIRES.S:2105
+  ??? lda YLO,y            ; HIRES.S:2106
+  ??? sta YLO,x            ; HIRES.S:2107
+  ??? pla             ; HIRES.S:2108
+  ??? sta YLO,y            ; HIRES.S:2109
+  ??? lda YHI,x            ; HIRES.S:2111
+  ??? pha             ; HIRES.S:2112
+  ??? lda YHI,y            ; HIRES.S:2113
+  ??? sta YHI,x            ; HIRES.S:2114
+  ??? pla             ; HIRES.S:2115
+  ??? sta YHI,y            ; HIRES.S:2116
+  ??? dex             ; HIRES.S:2120
+  ??? iny             ; HIRES.S:2121
+  ??? cpy #96            ; HIRES.S:2122
+  ??? bcc :loop            ; HIRES.S:2123
+]rts:
+  return                           ; HIRES.S:2124
+}

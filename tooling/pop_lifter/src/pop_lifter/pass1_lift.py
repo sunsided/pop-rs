@@ -191,6 +191,49 @@ def _lift_instr(
     return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
 
 
+def discover_entries(file_ast: FileAST) -> list[str]:
+    """Walk a parsed file and return every label that can plausibly
+    serve as a routine entry: a global-style label (no `:` or `]`
+    prefix) attached to a code line, in source order.
+
+    The intent is feeding `lift_file` when the caller wants a full
+    mechanical sweep instead of a hand-picked entry list. Labels on
+    pure-data directives (`db`, `dw`, `hex`, `asc`, `ds`, `=`, etc.)
+    are excluded — those don't introduce executable code and would
+    otherwise produce all-`Unsupported` routines that just clutter the
+    dump. Local (`:foo`) and macro (`]foo`) labels are excluded
+    because they're internal jump targets, not callable entry points.
+
+    A label that appears on a bare-label line gets attributed to the
+    next code line. If two labels stack onto the same instruction
+    (the `DoBlock` / `DoUp` pattern) both are returned; the lifter
+    collapses them into a single routine with `entry_aliases`.
+    """
+    out: list[str] = []
+    pending: list[str] = []
+    for line in file_ast.lines:
+        if line.is_blank:
+            continue
+        if line.label and line.mnemonic is None:
+            if not _is_local_label(line.label):
+                pending.append(line.label)
+            continue
+        if line.mnemonic is None or line.mnemonic in _NON_CODE_DIRECTIVES:
+            # Non-code directive (e.g. `db`, `=`); any pending labels
+            # belong to data, not code — drop them.
+            pending.clear()
+            continue
+        # A code line.
+        for lab in pending:
+            if lab not in out:
+                out.append(lab)
+        pending.clear()
+        if line.label and not _is_local_label(line.label):
+            if line.label not in out:
+                out.append(line.label)
+    return out
+
+
 def lift_file(
     file_ast: FileAST,
     equates: dict[str, int],

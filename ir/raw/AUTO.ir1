@@ -1,0 +1,876 @@
+; module AUTO from 01 POP Source/Source/AUTO.S
+
+fn AUTOCTRL {
+  ??? jsr DoRelease            ; AUTO.S:161
+  ??? lda CharID            ; AUTO.S:163
+  ??? beq :5            ; AUTO.S:164
+  ??? lda justblocked            ; AUTO.S:166
+  ??? beq :jb0            ; AUTO.S:167
+  ??? dec justblocked            ; AUTO.S:168
+:jb0:
+  ??? lda gdtimer            ; AUTO.S:170
+  ??? beq :gt0            ; AUTO.S:171
+  ??? dec gdtimer            ; AUTO.S:172
+:gt0:
+  ??? lda refract            ; AUTO.S:174
+  ??? beq :2            ; AUTO.S:175
+  ??? dec refract            ; AUTO.S:176
+:2:
+  ??? lda CharID            ; AUTO.S:178
+  ??? cmp #24            ; AUTO.S:179
+  ??? beq :6            ; AUTO.S:180
+  ??? cmp #4            ; AUTO.S:181
+  ??? beq :3            ; AUTO.S:182
+  ??? cmp #2            ; AUTO.S:183
+  ??? bcc :1            ; AUTO.S:184
+  ??? lda level            ; AUTO.S:185
+  ??? cmp #13            ; AUTO.S:186
+  ??? beq :4            ; AUTO.S:187
+  tail_call GuardProg                ; AUTO.S:188
+}
+
+fn MouseProg {
+  ??? lda CharFace            ; AUTO.S:199
+  ??? cmp #86            ; AUTO.S:200
+  ??? beq ]rts            ; AUTO.S:201
+  ??? lda CharAction            ; AUTO.S:202
+  ??? beq :1            ; AUTO.S:203
+  ??? lda CharX            ; AUTO.S:204
+  ??? cmp #166            ; AUTO.S:205
+  ??? bcs ]rts            ; AUTO.S:206
+  a = #0x6b                  ; AUTO.S:207
+  ??? jsr jumpseq            ; AUTO.S:208
+  tail_call animchar                ; AUTO.S:209
+}
+
+fn ShadowProg {
+  ??? lda level            ; AUTO.S:227
+  ??? cmp #4            ; AUTO.S:228
+  ??? bne :0            ; AUTO.S:229
+  tail_call ShadLevel4                ; AUTO.S:230
+}
+
+fn SkelProg {
+  a = #0x02                  ; AUTO.S:434
+  *CharSword@0x004e = a            ; AUTO.S:435
+  tail_call GuardProg                ; AUTO.S:436
+}
+
+fn VizierProg {
+  tail_call GuardProg                ; AUTO.S:442
+}
+
+fn ShadLevel6 {
+  ??? lda CharScrn            ; AUTO.S:251
+  ??? cmp #1            ; AUTO.S:252
+  ??? beq Shad6a            ; AUTO.S:253
+  return                           ; AUTO.S:254
+}
+
+fn Shad6a {
+  ??? lda KidPosn            ; AUTO.S:260
+  ??? cmp #43            ; AUTO.S:261
+  ??? bne ]rts            ; AUTO.S:262
+  ??? lda KidX            ; AUTO.S:263
+  ??? cmp #$80            ; AUTO.S:264
+  ??? bcs ]rts            ; AUTO.S:265
+  ??? jsr DoPress            ; AUTO.S:266
+  tail_call DoFwd                ; AUTO.S:267
+}
+
+fn ShadLevel5 {
+  ??? lda CharScrn            ; AUTO.S:273
+  ??? cmp #flaskscrn            ; AUTO.S:274
+  ??? beq Shad5            ; AUTO.S:275
+]rts:
+  return                           ; AUTO.S:276
+}
+
+fn Shad5 {
+  ??? lda PlayCount            ; AUTO.S:282
+  ??? bne :1            ; AUTO.S:283
+  a = #0x18                  ; AUTO.S:285
+  x = #0x01                  ; AUTO.S:286
+  y = #0x00                  ; AUTO.S:287
+  ??? jsr rdblock            ; AUTO.S:288
+  ??? lda (BlueSpec),y            ; AUTO.S:289
+  ??? cmp #20            ; AUTO.S:290
+  ??? bcc ]rts            ; AUTO.S:291
+  a = #0x00                  ; AUTO.S:293
+  *PreRecPtr@0x0309 = a            ; AUTO.S:294
+:1:
+  ??? lda #ShadProg5            ; AUTO.S:296
+  ??? ldx #>ShadProg5            ; AUTO.S:297
+  ??? jsr AutoPlayback            ; AUTO.S:298
+  ??? lda CharX            ; AUTO.S:300
+  ??? cmp #15            ; AUTO.S:301
+  ??? bcs ]rts            ; AUTO.S:302
+  tail_call VanishChar                ; AUTO.S:303
+}
+
+fn ShadLevel4 {
+  ??? lda CharScrn            ; AUTO.S:309
+  ??? cmp #4            ; AUTO.S:310
+  ??? bne ]rts            ; AUTO.S:311
+  ??? lda CharX            ; AUTO.S:312
+  ??? cmp #80            ; AUTO.S:313
+  ??? bcc :gone            ; AUTO.S:314
+  tail_call DoFwd                ; AUTO.S:315
+}
+
+fn FinalShad {
+  ??? lda CharScrn            ; AUTO.S:325
+  ??? cmp #swordscrn            ; AUTO.S:326
+  ??? bne :cont            ; AUTO.S:327
+  ??? lda shadowaction            ; AUTO.S:328
+  ??? bne :cont            ; AUTO.S:329
+  ??? lda OpX            ; AUTO.S:330
+  ??? cmp #150            ; AUTO.S:331
+  ??? bcs :hold            ; AUTO.S:332
+  a = #0x01                  ; AUTO.S:334
+  *shadowaction@0x0217 = a            ; AUTO.S:335
+  ??? bne :cont            ; AUTO.S:336
+:hold:
+  ??? lda #shadpos12            ; AUTO.S:338
+  ??? ldx #>shadpos12            ; AUTO.S:339
+  tail_call csps                ; AUTO.S:340
+}
+
+fn KidProg {
+  tail_call GuardProg                ; AUTO.S:450
+}
+
+fn GuardProg {
+  ??? lda CharSword            ; AUTO.S:456
+  ??? cmp #2            ; AUTO.S:457
+  ??? bcc Alert            ; AUTO.S:458
+  tail_call EnGarde                ; AUTO.S:459
+}
+
+fn Alert {
+  ??? lda KidLife            ; AUTO.S:468
+  ??? bpl ]rts            ; AUTO.S:469
+  ??? jsr getopdist            ; AUTO.S:473
+  ??? ldx OpBlockY            ; AUTO.S:474
+  ??? cpx CharBlockY            ; AUTO.S:475
+  ??? bne :difflevel            ; AUTO.S:476
+  ??? cmp #-8            ; AUTO.S:477
+  ??? bcs :eng            ; AUTO.S:478
+:difflevel:
+  ??? ldx alertguard            ; AUTO.S:480
+  ??? beq :ok            ; AUTO.S:481
+  x = #0x00                  ; AUTO.S:482
+  *alertguard@0x00e4 = x            ; AUTO.S:483
+:alert:
+  ??? cmp #128            ; AUTO.S:485
+  ??? bcc :eng            ; AUTO.S:486
+  ??? cmp #-4            ; AUTO.S:487
+  ??? bcs :ok            ; AUTO.S:488
+  tail_call DoTurn                ; AUTO.S:489
+}
+
+fn EnGarde {
+  ??? lda CharPosn            ; AUTO.S:514
+  ??? cmp #166            ; AUTO.S:515
+  ??? beq ]rts            ; AUTO.S:516
+  ??? cmp #150            ; AUTO.S:517
+  ??? bcc ]rts            ; AUTO.S:518
+  ??? lda EnemyAlert            ; AUTO.S:520
+  ??? cmp #2            ; AUTO.S:521
+  ??? bcs :ea2            ; AUTO.S:522
+  ??? cmp #1            ; AUTO.S:523
+  ??? beq ]rts            ; AUTO.S:524
+  ??? lda droppedout            ; AUTO.S:529
+  ??? beq :1            ; AUTO.S:530
+  tail_call FollowKid                ; AUTO.S:531
+}
+
+fn FollowKid {
+  ??? lda OpAction            ; AUTO.S:639
+  ??? cmp #2            ; AUTO.S:640
+  ??? beq :hanging            ; AUTO.S:641
+  ??? cmp #6            ; AUTO.S:642
+  ??? beq :hanging            ; AUTO.S:643
+  ??? jsr getinfront            ; AUTO.S:645
+  *ztemp@0x00e9 = a            ; AUTO.S:646
+  ??? jsr cmpbarr            ; AUTO.S:647
+  ??? bne :stopped            ; AUTO.S:648
+  ??? lda ztemp            ; AUTO.S:649
+  ??? jsr cmpspace            ; AUTO.S:650
+  ??? beq :atedge            ; AUTO.S:651
+  tail_call DoAdvance                ; AUTO.S:652
+}
+
+fn InRange {
+  ??? lda OpSword            ; AUTO.S:695
+  ??? cmp #2            ; AUTO.S:696
+  ??? beq :fight            ; AUTO.S:697
+  ??? lda refract            ; AUTO.S:701
+  ??? bne ]rts            ; AUTO.S:702
+  ??? jsr getopdist            ; AUTO.S:704
+  ??? cmp #strikethres2            ; AUTO.S:705
+  ??? bcc :1            ; AUTO.S:706
+  tail_call DoAdvance                ; AUTO.S:707
+}
+
+fn GenFight {
+  ??? jsr getopdist            ; AUTO.S:724
+  ??? cmp #blockthres1            ; AUTO.S:725
+  ??? bcc :outofrange            ; AUTO.S:726
+  ??? cmp #blockthres2            ; AUTO.S:727
+  ??? bcs :outofrange            ; AUTO.S:728
+  ??? jsr MaybeBlock            ; AUTO.S:730
+  ??? lda refract            ; AUTO.S:732
+  ??? bne ]rts            ; AUTO.S:733
+  ??? jsr getopdist            ; AUTO.S:735
+  ??? cmp #strikethres1            ; AUTO.S:736
+  ??? bcc :outofrange            ; AUTO.S:737
+  ??? cmp #strikethres2            ; AUTO.S:738
+  ??? bcs :outofrange            ; AUTO.S:739
+  tail_call MaybeStrike                ; AUTO.S:741
+}
+
+fn MaybeAdvance {
+  ??? lda guardprog            ; AUTO.S:754
+  ??? beq :dumb            ; AUTO.S:755
+  ??? lda gdtimer            ; AUTO.S:756
+  ??? bne ]rts            ; AUTO.S:757
+:dumb:
+  ??? jsr rndp            ; AUTO.S:759
+  ??? cmp advprob,x            ; AUTO.S:760
+  ??? bcs ]rts            ; AUTO.S:761
+  tail_call DoAdvance                ; AUTO.S:763
+}
+
+fn MaybeBlock {
+  ??? lda OpPosn            ; AUTO.S:771
+  ??? cmp #152            ; AUTO.S:772
+  ??? beq :99            ; AUTO.S:773
+  ??? cmp #153            ; AUTO.S:774
+  ??? beq :99            ; AUTO.S:775
+  ??? cmp #162            ; AUTO.S:776
+  ??? bne ]rts            ; AUTO.S:777
+:99:
+  ??? lda justblocked            ; AUTO.S:779
+  ??? bne :impaired            ; AUTO.S:780
+  ??? jsr rndp            ; AUTO.S:781
+  ??? cmp blockprob,x            ; AUTO.S:782
+  ??? bcc :block            ; AUTO.S:783
+]rts:
+  return                           ; AUTO.S:784
+}
+
+fn MaybeStrike {
+  ??? ldx OpPosn            ; AUTO.S:798
+  ??? cpx #169            ; AUTO.S:799
+  ??? beq ]rts            ; AUTO.S:800
+  ??? cpx #151            ; AUTO.S:801
+  ??? beq ]rts            ; AUTO.S:802
+  ??? ldx CharPosn            ; AUTO.S:804
+  ??? cpx #161            ; AUTO.S:805
+  ??? beq :restrike            ; AUTO.S:806
+  ??? cpx #150            ; AUTO.S:807
+  ??? beq :restrike            ; AUTO.S:808
+  ??? jsr rndp            ; AUTO.S:810
+  ??? cmp strikeprob,x            ; AUTO.S:811
+  ??? bcs ]rts            ; AUTO.S:812
+  tail_call DoStrike                ; AUTO.S:813
+}
+
+fn DoRelease {
+  a = #0x00                  ; AUTO.S:823
+  *clrF@0x00d4 = a            ; AUTO.S:824
+  *clrB@0x00d5 = a            ; AUTO.S:825
+  *clrU@0x00d6 = a            ; AUTO.S:826
+  *clrD@0x00d7 = a            ; AUTO.S:827
+  *clrbtn@0x00d8 = a            ; AUTO.S:828
+  *JSTKX@0x0018 = a            ; AUTO.S:829
+  *JSTKY@0x0019 = a            ; AUTO.S:830
+  *btn@0x003d = a            ; AUTO.S:831
+  return                           ; AUTO.S:832
+}
+
+fn DoAdvance  (aka DoFwd) {
+  a = #0xff                  ; AUTO.S:836
+  *clrF@0x00d4 = a            ; AUTO.S:837
+  *JSTKX@0x0018 = a            ; AUTO.S:838
+  return                           ; AUTO.S:839
+}
+
+fn DoRetreat  (aka DoBack) {
+  a = #0xff                  ; AUTO.S:843
+  *clrB@0x00d5 = a            ; AUTO.S:844
+  a = #0x01                  ; AUTO.S:845
+  *JSTKX@0x0018 = a            ; AUTO.S:846
+  return                           ; AUTO.S:847
+}
+
+fn DoBlock  (aka DoUp) {
+  a = #0xff                  ; AUTO.S:850
+  *clrU@0x00d6 = a            ; AUTO.S:851
+  *JSTKY@0x0019 = a            ; AUTO.S:852
+  return                           ; AUTO.S:853
+}
+
+fn DoTurn  (aka DoDown) {
+  a = #0xff                  ; AUTO.S:856
+  *clrD@0x00d7 = a            ; AUTO.S:857
+  a = #0x01                  ; AUTO.S:858
+  *JSTKY@0x0019 = a            ; AUTO.S:859
+  return                           ; AUTO.S:860
+}
+
+fn DoStandup {
+  a = #0xff                  ; AUTO.S:863
+  *clrU@0x00d6 = a            ; AUTO.S:864
+  tail_call DoBack                ; AUTO.S:865
+}
+
+fn DoDropguard  (aka DoRunaway) {
+  a = #0xff                  ; AUTO.S:869
+  *clrD@0x00d7 = a            ; AUTO.S:870
+  tail_call DoBack                ; AUTO.S:871
+}
+
+fn DoEngarde {
+  a = #0xff                  ; AUTO.S:874
+  *clrD@0x00d7 = a            ; AUTO.S:875
+  tail_call DoFwd                ; AUTO.S:876
+}
+
+fn DoStrike  (aka DoPress) {
+  a = #0xff                  ; AUTO.S:880
+  *clrbtn@0x00d8 = a            ; AUTO.S:881
+  *btn@0x003d = a            ; AUTO.S:882
+  return                           ; AUTO.S:883
+}
+
+fn DoRelBtn {
+  a = #0x00                  ; AUTO.S:886
+  *btn@0x003d = a            ; AUTO.S:887
+]rts:
+  return                           ; AUTO.S:888
+}
+
+fn rndp {
+  ??? ldx guardprog            ; AUTO.S:898
+  tail_call rnd                ; AUTO.S:899
+}
+
+fn CHECKSTRIKE {
+  ??? lda KidPosn            ; AUTO.S:915
+  ??? beq ]rts            ; AUTO.S:916
+  ??? cmp #219            ; AUTO.S:917
+  ??? bcc :noclimb            ; AUTO.S:918
+  ??? cmp #229            ; AUTO.S:919
+  ??? bcc ]rts            ; AUTO.S:920
+:noclimb:
+  ??? jsr LoadShadwOp            ; AUTO.S:922
+  ??? jsr TestStrike            ; AUTO.S:923
+  ??? jsr SaveShadwOp            ; AUTO.S:924
+  ??? jsr LoadKidwOp            ; AUTO.S:926
+  ??? jsr TestStrike            ; AUTO.S:927
+  ??? jsr SaveKidwOp            ; AUTO.S:928
+]rts:
+  return                           ; AUTO.S:930
+}
+
+fn TestStrike {
+  ??? lda CharSword            ; AUTO.S:935
+  ??? cmp #2            ; AUTO.S:936
+  ??? bne ]rts            ; AUTO.S:937
+  ??? lda CharBlockY            ; AUTO.S:939
+  ??? cmp OpBlockY            ; AUTO.S:940
+  ??? bne ]rts            ; AUTO.S:941
+  ??? lda CharPosn            ; AUTO.S:945
+  ??? cmp #153            ; AUTO.S:946
+  ??? beq :test            ; AUTO.S:947
+  ??? cmp #154            ; AUTO.S:948
+  ??? bne ]rts            ; AUTO.S:949
+:test:
+  ??? jsr getopdist            ; AUTO.S:954
+  ??? cmp #blockrange1            ; AUTO.S:955
+  ??? bcc :nobloc            ; AUTO.S:956
+  ??? cmp #blockrange2            ; AUTO.S:958
+  ??? bcs :nobloc            ; AUTO.S:959
+  ??? lda OpPosn            ; AUTO.S:961
+  ??? cmp #161            ; AUTO.S:962
+  ??? beq :11            ; AUTO.S:963
+  ??? cmp #150            ; AUTO.S:964
+  ??? bne :nobloc            ; AUTO.S:965
+:1:
+  a = #0xa1                  ; AUTO.S:969
+  *OpPosn@0x039c = a            ; AUTO.S:970
+:11:
+  ??? lda CharID            ; AUTO.S:972
+  ??? beq :12            ; AUTO.S:973
+  a = #0x04                  ; AUTO.S:974
+  *justblocked@0x007e = a            ; AUTO.S:975
+:12:
+  a = #0x45                  ; AUTO.S:977
+  ??? jsr jumpseq            ; AUTO.S:978
+  tail_call animchar                ; AUTO.S:979
+}
+
+fn CHECKSTAB {
+  ??? lda ShadAction            ; AUTO.S:1010
+  ??? cmp #99            ; AUTO.S:1011
+  ??? bne :1            ; AUTO.S:1012
+  ??? lda KidAction            ; AUTO.S:1014
+  ??? cmp #99            ; AUTO.S:1015
+  ??? beq :doublestab            ; AUTO.S:1016
+:2:
+  ??? jsr LoadShad            ; AUTO.S:1018
+  ??? jsr StabChar            ; AUTO.S:1019
+  ??? jsr SaveShad            ; AUTO.S:1020
+  ??? jsr rndp            ; AUTO.S:1022
+  ??? lda refractimer,x            ; AUTO.S:1023
+  *refract@0x00a1 = a            ; AUTO.S:1024
+:1:
+  ??? lda KidAction            ; AUTO.S:1026
+  ??? cmp #99            ; AUTO.S:1027
+  ??? bne ]rts            ; AUTO.S:1028
+  ??? jsr LoadKid            ; AUTO.S:1030
+  ??? jsr StabChar            ; AUTO.S:1031
+  tail_call SaveKid                ; AUTO.S:1032
+}
+
+fn chgshadposn {
+  *ztemp@0x00e9 = a            ; AUTO.S:1048
+  *ztemp+1@0x00ea = x            ; AUTO.S:1049
+  y = #0x06                  ; AUTO.S:1050
+:loop:
+  ??? lda (ztemp),y            ; AUTO.S:1051
+  ??? sta Char,y            ; AUTO.S:1052
+  ??? dey             ; AUTO.S:1053
+  ??? bpl :loop            ; AUTO.S:1054
+  y = #0x07                  ; AUTO.S:1056
+  ??? lda (ztemp),y            ; AUTO.S:1057
+  ??? jsr jumpseq            ; AUTO.S:1058
+  a = #0x01                  ; AUTO.S:1060
+  *CharID@0x004d = a            ; AUTO.S:1061
+  a = #0x00                  ; AUTO.S:1063
+  *PlayCount@0x00a0 = a            ; AUTO.S:1064
+  return                           ; AUTO.S:1065
+}
+
+fn csps {
+  ??? jsr chgshadposn            ; AUTO.S:1069
+  a = #0x03                  ; AUTO.S:1071
+  *guardprog@0x00dd = a            ; AUTO.S:1072
+  a = #0x04                  ; AUTO.S:1074
+  *MaxOppStr@0x00dc = a            ; AUTO.S:1075
+  *OppStrength@0x00cc = a            ; AUTO.S:1076
+  tail_call SaveShad                ; AUTO.S:1078
+}
+
+fn AUTOPLAYBACK {
+  *ProgStart@0x00f3 = a            ; AUTO.S:1150
+  *ProgStart+1@0x00f4 = x            ; AUTO.S:1151
+  ??? lda PlayCount            ; AUTO.S:1155
+  ??? cmp #254            ; AUTO.S:1156
+  ??? bcs :rts            ; AUTO.S:1157
+  ??? inc PlayCount            ; AUTO.S:1158
+  ??? ldy PreRecPtr            ; AUTO.S:1162
+  ??? lda PlayCount            ; AUTO.S:1164
+  ??? cmp (ProgStart),y            ; AUTO.S:1165
+  ??? bcs :next            ; AUTO.S:1166
+  ??? dey             ; AUTO.S:1170
+  ??? lda (ProgStart),y            ; AUTO.S:1171
+  goto :ex                ; AUTO.S:1172
+}
+
+fn :endpb  (aka CUTCHECK) {
+  ??? lda CUTTIMER            ; AUTO.S:1231
+  ??? beq :ok            ; AUTO.S:1232
+  ??? dec CUTTIMER            ; AUTO.S:1234
+]rts:
+  return                           ; AUTO.S:1235
+}
+
+fn transferguard {
+  a = #0xff                  ; AUTO.S:1321
+  ??? ldx KidScrn            ; AUTO.S:1322
+  ??? sta GdStartBlock-1,x            ; AUTO.S:1323
+  ??? ldx ShadScrn            ; AUTO.S:1324
+  ??? sta GdStartBlock-1,x            ; AUTO.S:1325
+  ??? jsr LoadShad            ; AUTO.S:1327
+  ??? lda ]cutdir            ; AUTO.S:1329
+  ??? jsr cut            ; AUTO.S:1330
+  tail_call SaveShad                ; AUTO.S:1332
+}
+
+fn updateguard {
+  ??? lda ShadFace            ; AUTO.S:1344
+  ??? cmp #86            ; AUTO.S:1345
+  ??? beq ]rts            ; AUTO.S:1346
+  ??? lda ShadID            ; AUTO.S:1347
+  ??? cmp #1            ; AUTO.S:1348
+  ??? beq ]rts            ; AUTO.S:1349
+  ??? cmp #24            ; AUTO.S:1350
+  ??? beq ]rts            ; AUTO.S:1351
+:gd:
+  a = #0x00                  ; AUTO.S:1353
+  *tempblockx@0x0091 = a            ; AUTO.S:1354
+  ??? lda ShadBlockY            ; AUTO.S:1355
+  *tempblocky@0x0092 = a            ; AUTO.S:1356
+  ??? jsr indexblock            ; AUTO.S:1357
+  ??? tya             ; AUTO.S:1358
+  ??? ldx ShadScrn            ; AUTO.S:1359
+  ??? sta GdStartBlock-1,x            ; AUTO.S:1360
+  ??? lda ShadX            ; AUTO.S:1362
+  ??? sta GdStartX-1,x            ; AUTO.S:1363
+  ??? lda ShadFace            ; AUTO.S:1365
+  ??? sta GdStartFace-1,x            ; AUTO.S:1366
+  ??? lda guardprog            ; AUTO.S:1368
+  ??? sta GdStartProg-1,x            ; AUTO.S:1369
+  ??? lda ShadLife            ; AUTO.S:1371
+  ??? bpl :ok            ; AUTO.S:1372
+  a = #0x00                  ; AUTO.S:1373
+  ??? sta GdStartSeqH-1,x            ; AUTO.S:1374
+  ??? beq :cont            ; AUTO.S:1375
+:ok:
+  ??? lda ShadSeq            ; AUTO.S:1377
+  ??? sta GdStartSeqL-1,x            ; AUTO.S:1378
+  ??? lda ShadSeq+1            ; AUTO.S:1379
+  ??? sta GdStartSeqH-1,x            ; AUTO.S:1380
+:cont:
+  a = #0x56                  ; AUTO.S:1384
+  *ShadFace@0x0063 = a            ; AUTO.S:1385
+  a = #0x00                  ; AUTO.S:1387
+  *OppStrength@0x00cc = a            ; AUTO.S:1388
+]rts:
+  return                           ; AUTO.S:1389
+}
+
+fn CUTGUARD {
+  ??? lda ShadFace            ; AUTO.S:1398
+  ??? cmp #86            ; AUTO.S:1399
+  ??? beq ]rts            ; AUTO.S:1400
+  ??? lda ShadY            ; AUTO.S:1402
+  ??? cmp #BotCutEdge            ; AUTO.S:1403
+  ??? bcc ]rts            ; AUTO.S:1404
+  ??? lda ShadID            ; AUTO.S:1408
+  ??? cmp #4            ; AUTO.S:1409
+  ??? beq :skel            ; AUTO.S:1410
+  ??? cmp #1            ; AUTO.S:1411
+  ??? beq :shad            ; AUTO.S:1412
+]RemoveGd:
+  ??? jsr deadenemy            ; AUTO.S:1415
+  ??? ldx VisScrn            ; AUTO.S:1417
+  a = #0xff                  ; AUTO.S:1418
+  ??? sta GdStartBlock-1,x            ; AUTO.S:1419
+  a = #0x56                  ; AUTO.S:1420
+  *ShadFace@0x0063 = a            ; AUTO.S:1421
+  a = #0x00                  ; AUTO.S:1422
+  *OppStrength@0x00cc = a            ; AUTO.S:1423
+  a = #0xff                  ; AUTO.S:1424
+  *ChgOppStr@0x00d2 = a            ; AUTO.S:1425
+]rts:
+  return                           ; AUTO.S:1426
+}
+
+fn cutchar {
+  ??? lda CharY            ; AUTO.S:1471
+  ??? ldx CharAction            ; AUTO.S:1473
+  ??? cpx #5            ; AUTO.S:1474
+  ??? beq :notup            ; AUTO.S:1475
+  ??? cpx #4            ; AUTO.S:1476
+  ??? beq :notup            ; AUTO.S:1477
+  ??? cpx #3            ; AUTO.S:1478
+  ??? beq :notup            ; AUTO.S:1479
+  ??? cmp #TopCutEdgePl            ; AUTO.S:1483
+  ??? bcc :CUTUP            ; AUTO.S:1484
+  ??? cmp #TopCutEdgeMi            ; AUTO.S:1486
+  ??? bcs :CUTUP            ; AUTO.S:1487
+:notup:
+  ??? cmp #BotCutEdge            ; AUTO.S:1489
+  ??? bcs :CUTDOWN            ; AUTO.S:1490
+  ??? ldx CharPosn            ; AUTO.S:1494
+  ??? cpx #135            ; AUTO.S:1495
+  ??? bcc :nocu            ; AUTO.S:1496
+  ??? cpx #150            ; AUTO.S:1497
+  ??? bcc :nocut            ; AUTO.S:1498
+:nocu:
+  ??? cpx #110            ; AUTO.S:1499
+  ??? bcc :nosu            ; AUTO.S:1500
+  ??? cpx #120            ; AUTO.S:1501
+  ??? bcc :nocut            ; AUTO.S:1502
+:nosu:
+  ??? cpx #150            ; AUTO.S:1503
+  ??? bcc :nost            ; AUTO.S:1504
+  ??? cpx #163            ; AUTO.S:1505
+  ??? bcc :nocut            ; AUTO.S:1506
+  ??? cpx #166            ; AUTO.S:1507
+  ??? bcc :nost            ; AUTO.S:1508
+  ??? cpx #169            ; AUTO.S:1509
+  ??? bcc :nocut            ; AUTO.S:1510
+:nost:
+  ??? lda CharAction            ; AUTO.S:1511
+  ??? cmp #7            ; AUTO.S:1512
+  ??? beq :nocut            ; AUTO.S:1513
+  ??? ldx CharFace            ; AUTO.S:1515
+  ??? beq :faceR            ; AUTO.S:1516
+  ??? lda leftej            ; AUTO.S:1518
+  ??? cmp #LeftCutEdge            ; AUTO.S:1519
+  ??? bcc :CUTLEFT            ; AUTO.S:1520
+  ??? beq :CUTLEFT            ; AUTO.S:1521
+  ??? cmp #ScrnRight+1            ; AUTO.S:1523
+  ??? bcs :CUTRIGHT            ; AUTO.S:1524
+  ??? bcc :nocut            ; AUTO.S:1525
+:faceR:
+  ??? lda CharScrn            ; AUTO.S:1528
+  x = #0x09                  ; AUTO.S:1529
+  ??? ldy CharBlockY            ; AUTO.S:1530
+  ??? jsr rdblock            ; AUTO.S:1531
+  ??? cmp #panelwif            ; AUTO.S:1533
+  ??? beq :nocutr            ; AUTO.S:1534
+  ??? cmp #panelwof            ; AUTO.S:1535
+  ??? beq :nocutr            ; AUTO.S:1536
+  ??? lda rightej            ; AUTO.S:1538
+  ??? cmp #RightCutEdge            ; AUTO.S:1539
+  ??? bcs :CUTRIGHT            ; AUTO.S:1540
+:nocutr:
+  ??? lda rightej            ; AUTO.S:1542
+  ??? cmp #ScrnLeft-1            ; AUTO.S:1543
+  ??? bcc :CUTLEFT            ; AUTO.S:1544
+  ??? beq :CUTLEFT            ; AUTO.S:1545
+:nocut:
+  a = #0xff                  ; AUTO.S:1547
+  return                           ; AUTO.S:1548
+}
+
+fn infinity {
+  return                           ; AUTO.S:1584
+}
+
+fn milestone3 {
+  ??? lda level            ; AUTO.S:1590
+  ??? cmp #3            ; AUTO.S:1591
+  ??? bne ]rts            ; AUTO.S:1592
+  a = #0x07                  ; AUTO.S:1593
+]mcheck:
+  ??? cmp CharScrn            ; AUTO.S:1594
+  ??? bne ]rts            ; AUTO.S:1595
+  a = #0x01                  ; AUTO.S:1596
+  *milestone@0x0212 = a            ; AUTO.S:1597
+  ??? lda MaxKidStr            ; AUTO.S:1598
+  *origstrength@0x00e1 = a            ; AUTO.S:1599
+  return                           ; AUTO.S:1600
+}
+
+fn stealsword {
+  ??? lda level            ; AUTO.S:1606
+  ??? cmp #12            ; AUTO.S:1607
+  ??? bne ]rts            ; AUTO.S:1608
+  ??? lda CharScrn            ; AUTO.S:1609
+  ??? cmp #18            ; AUTO.S:1610
+  ??? bne ]rts            ; AUTO.S:1611
+  a = #0x0f                  ; AUTO.S:1612
+  x = #0x01                  ; AUTO.S:1613
+  y = #0x00                  ; AUTO.S:1614
+  ??? jsr rdblock            ; AUTO.S:1615
+  a = #0x01                  ; AUTO.S:1616
+  ??? sta (BlueType),y            ; AUTO.S:1617
+  return                           ; AUTO.S:1618
+}
+
+fn jaffmusic {
+  ??? lda level            ; AUTO.S:1624
+  ??? cmp #13            ; AUTO.S:1625
+  ??? bne ]rts            ; AUTO.S:1626
+  ??? lda exitopen            ; AUTO.S:1627
+  ??? bne ]rts            ; AUTO.S:1628
+  ??? lda CharScrn            ; AUTO.S:1629
+  ??? cmp #3            ; AUTO.S:1630
+  ??? bne ]rts            ; AUTO.S:1631
+  a = #0x0a                  ; AUTO.S:1632
+  x = #0x19                  ; AUTO.S:1633
+  tail_call cuesong                ; AUTO.S:1634
+}
+
+fn mirrmusic {
+  ??? lda exitopen            ; AUTO.S:1640
+  ??? beq :no4            ; AUTO.S:1641
+  ??? cmp #77            ; AUTO.S:1642
+  ??? beq :no4            ; AUTO.S:1643
+  ??? lda level            ; AUTO.S:1644
+  ??? cmp #4            ; AUTO.S:1645
+  ??? bne :no4            ; AUTO.S:1646
+  ??? lda CharBlockY            ; AUTO.S:1647
+  ??? cmp #miry            ; AUTO.S:1648
+  ??? bne :no4            ; AUTO.S:1649
+  ??? lda CharScrn            ; AUTO.S:1650
+  ??? cmp #11            ; AUTO.S:1651
+  ??? bne :no4            ; AUTO.S:1652
+  a = #0x03                  ; AUTO.S:1653
+  x = #0x32                  ; AUTO.S:1654
+  ??? jsr cuesong            ; AUTO.S:1655
+  a = #0x4d                  ; AUTO.S:1656
+  *exitopen@0x0086 = a            ; AUTO.S:1657
+:no4:
+]rts:
+  return                           ; AUTO.S:1659
+}
+
+fn CUT {
+  ??? cmp #3            ; AUTO.S:1671
+  ??? beq Cdown            ; AUTO.S:1672
+  ??? cmp #1            ; AUTO.S:1673
+  ??? beq Cright            ; AUTO.S:1674
+  ??? cmp #2            ; AUTO.S:1675
+  ??? beq Cup            ; AUTO.S:1676
+Cleft:
+  ??? lda CharScrn            ; AUTO.S:1679
+  ??? jsr getleft            ; AUTO.S:1680
+  *CharScrn@0x004b = a            ; AUTO.S:1681
+  a = #0x8c                  ; AUTO.S:1683
+  ??? clc             ; AUTO.S:1684
+  ??? adc CharX            ; AUTO.S:1685
+  *CharX@0x0041 = a            ; AUTO.S:1686
+  x = #0x01                  ; AUTO.S:1688
+  return                           ; AUTO.S:1689
+}
+
+fn Cleft {
+  ??? lda CharScrn            ; AUTO.S:1679
+  ??? jsr getleft            ; AUTO.S:1680
+  *CharScrn@0x004b = a            ; AUTO.S:1681
+  a = #0x8c                  ; AUTO.S:1683
+  ??? clc             ; AUTO.S:1684
+  ??? adc CharX            ; AUTO.S:1685
+  *CharX@0x0041 = a            ; AUTO.S:1686
+  x = #0x01                  ; AUTO.S:1688
+  return                           ; AUTO.S:1689
+}
+
+fn Cright {
+  ??? lda CharScrn            ; AUTO.S:1692
+  ??? jsr getright            ; AUTO.S:1693
+  *CharScrn@0x004b = a            ; AUTO.S:1694
+  ??? lda CharX            ; AUTO.S:1696
+  ??? sec             ; AUTO.S:1697
+  ??? sbc #140            ; AUTO.S:1698
+  *CharX@0x0041 = a            ; AUTO.S:1699
+  x = #0x00                  ; AUTO.S:1701
+  return                           ; AUTO.S:1702
+}
+
+fn Cup {
+  ??? lda CharScrn            ; AUTO.S:1705
+  ??? jsr getup            ; AUTO.S:1706
+  *CharScrn@0x004b = a            ; AUTO.S:1707
+  ??? lda CharBlockY            ; AUTO.S:1709
+  ??? clc             ; AUTO.S:1710
+  ??? adc #3            ; AUTO.S:1711
+  *CharBlockY@0x0045 = a            ; AUTO.S:1712
+  ??? lda CharY            ; AUTO.S:1714
+  ??? clc             ; AUTO.S:1715
+  ??? adc #189            ; AUTO.S:1716
+  *CharY@0x0042 = a            ; AUTO.S:1717
+  x = #0x03                  ; AUTO.S:1719
+  return                           ; AUTO.S:1720
+}
+
+fn Cdown {
+  ??? lda CharScrn            ; AUTO.S:1723
+  ??? jsr getdown            ; AUTO.S:1724
+  *CharScrn@0x004b = a            ; AUTO.S:1725
+  ??? lda CharBlockY            ; AUTO.S:1727
+  ??? sec             ; AUTO.S:1728
+  ??? sbc #3            ; AUTO.S:1729
+  *CharBlockY@0x0045 = a            ; AUTO.S:1730
+  ??? lda CharY            ; AUTO.S:1732
+  ??? sec             ; AUTO.S:1733
+  ??? sbc #189            ; AUTO.S:1734
+  *CharY@0x0042 = a            ; AUTO.S:1735
+  x = #0x02                  ; AUTO.S:1737
+]rts:
+  return                           ; AUTO.S:1738
+}
+
+fn ADDGUARD {
+  a = #0x00                  ; AUTO.S:1751
+  *offguard@0x008a = a            ; AUTO.S:1752
+  ??? lda level            ; AUTO.S:1756
+  ??? cmp #12            ; AUTO.S:1757
+  ??? bne :not12            ; AUTO.S:1758
+  ??? lda exitopen            ; AUTO.S:1759
+  ??? bne ]rts            ; AUTO.S:1760
+  ??? lda mergetimer            ; AUTO.S:1761
+  ??? bne :1            ; AUTO.S:1762
+  ??? lda VisScrn            ; AUTO.S:1763
+  ??? cmp #swordscrn            ; AUTO.S:1764
+:1:
+  ??? bne ]rts            ; AUTO.S:1765
+  *CharScrn@0x004b = a            ; AUTO.S:1766
+  x = #0x01                  ; AUTO.S:1768
+  y = #0x00                  ; AUTO.S:1769
+  ??? jsr rdblock            ; AUTO.S:1770
+  ??? cmp #sword            ; AUTO.S:1771
+  ??? beq ]rts            ; AUTO.S:1772
+  a = #0x00                  ; AUTO.S:1773
+  *shadowaction@0x0217 = a            ; AUTO.S:1774
+  a = #0x01                  ; AUTO.S:1775
+  *exitopen@0x0086 = a            ; AUTO.S:1776
+  ??? lda #shadpos12            ; AUTO.S:1777
+  ??? ldx #>shadpos12            ; AUTO.S:1778
+  tail_call csps                ; AUTO.S:1779
+}
+
+fn :not5  (aka AddNormalGd) {
+  ??? ldx VisScrn            ; AUTO.S:1831
+  ??? lda GdStartBlock-1,x            ; AUTO.S:1832
+  ??? cmp #30            ; AUTO.S:1833
+  ??? bcs ]rts            ; AUTO.S:1834
+  *CharScrn@0x004b = x            ; AUTO.S:1838
+  ??? jsr unindex            ; AUTO.S:1840
+  *CharBlockY@0x0045 = x            ; AUTO.S:1841
+  ??? lda FloorY+1,x            ; AUTO.S:1843
+  *CharY@0x0042 = a            ; AUTO.S:1844
+  ??? ldx VisScrn            ; AUTO.S:1846
+  ??? lda GdStartX-1,x            ; AUTO.S:1847
+  *CharX@0x0041 = a            ; AUTO.S:1848
+  ??? jsr getblockxp            ; AUTO.S:1849
+  *CharBlockX@0x0044 = a            ; AUTO.S:1850
+  ??? ldx VisScrn            ; AUTO.S:1852
+  ??? lda GdStartFace-1,x            ; AUTO.S:1853
+  *CharFace@0x0043 = a            ; AUTO.S:1854
+  ??? lda level            ; AUTO.S:1856
+  ??? cmp #3            ; AUTO.S:1857
+  ??? bne :3            ; AUTO.S:1858
+  a = #0x04                  ; AUTO.S:1860
+  ??? bne :4            ; AUTO.S:1861
+:3:
+  a = #0x02                  ; AUTO.S:1862
+:4:
+  *CharID@0x004d = a            ; AUTO.S:1863
+  ??? lda GdStartSeqH-1,x            ; AUTO.S:1865
+  ??? bne :1            ; AUTO.S:1866
+  ??? lda CharID            ; AUTO.S:1868
+  ??? cmp #4            ; AUTO.S:1869
+  ??? bne :5            ; AUTO.S:1870
+  a = #0x02                  ; AUTO.S:1871
+  *CharSword@0x004e = a            ; AUTO.S:1872
+  a = #0x3f                  ; AUTO.S:1873
+  ??? bne :6            ; AUTO.S:1874
+:5:
+  a = #0x00                  ; AUTO.S:1875
+  *CharSword@0x004e = a            ; AUTO.S:1876
+  a = #0x4d                  ; AUTO.S:1877
+:6:
+  ??? jsr jumpseq            ; AUTO.S:1878
+  goto :2                ; AUTO.S:1879
+}
+
+fn getgdstrength {
+  ??? ldx level            ; AUTO.S:1942
+  ??? lda basicstrength,x            ; AUTO.S:1943
+  ??? ldx guardprog            ; AUTO.S:1944
+  ??? clc             ; AUTO.S:1945
+  ??? adc extrastrength,x            ; AUTO.S:1946
+  *MaxOppStr@0x00dc = a            ; AUTO.S:1947
+  *OppStrength@0x00cc = a            ; AUTO.S:1948
+]rts:
+  return                           ; AUTO.S:1949
+}

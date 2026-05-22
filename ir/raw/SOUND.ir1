@@ -1,0 +1,189 @@
+; module SOUND from 01 POP Source/Source/SOUND.S
+
+fn ZEROSOUND  (aka lookup, endlook) {
+  a = #0x00                  ; SOUND.S:65
+  *soundtable@0xb6c0 = a            ; SOUND.S:66
+  return                           ; SOUND.S:67
+}
+
+fn ADDSOUND {
+  ??? stx savex            ; SOUND.S:80
+  ??? ldx soundtable            ; SOUND.S:82
+  ??? cpx #maxsfx            ; SOUND.S:83
+  ??? bcs :rts            ; SOUND.S:84
+  ??? inx             ; SOUND.S:86
+  ??? sta soundtable,x            ; SOUND.S:87
+  *soundtable@0xb6c0 = x            ; SOUND.S:88
+:rts:
+  ??? ldx savex            ; SOUND.S:90
+  return                           ; SOUND.S:91
+}
+
+fn PLAYBACK {
+  ??? lda soundon            ; SOUND.S:101
+  ??? beq :rts            ; SOUND.S:102
+  ??? ldx soundtable            ; SOUND.S:104
+  ??? beq :rts            ; SOUND.S:105
+:loop:
+  ??? lda soundtable,x            ; SOUND.S:107
+  ??? stx savex            ; SOUND.S:109
+  ??? jsr makesound            ; SOUND.S:111
+  ??? ldx savex            ; SOUND.S:113
+  ??? dex             ; SOUND.S:115
+  ??? bne :loop            ; SOUND.S:116
+:rts:
+  return                           ; SOUND.S:118
+}
+
+fn makesound {
+  ??? asl             ; SOUND.S:128
+  ??? cmp #maxaddr            ; SOUND.S:129
+  ??? bcs :rts            ; SOUND.S:130
+  ??? tax             ; SOUND.S:132
+  ??? lda lookup,x            ; SOUND.S:133
+  ??? sta :sm+1            ; SOUND.S:134
+  ??? lda lookup+1,x            ; SOUND.S:135
+  ??? sta :sm+2            ; SOUND.S:136
+:sm:
+  tail_call $ffff                ; SOUND.S:138
+}
+
+fn DoPlateDown {
+  y = #0x46                  ; SOUND.S:150
+  x = #0x00                  ; SOUND.S:151
+  a = #0x04                  ; SOUND.S:152
+  tail_call tone                ; SOUND.S:153
+}
+
+fn DoPlateUp {
+  y = #0x5a                  ; SOUND.S:159
+  x = #0x00                  ; SOUND.S:160
+  a = #0x04                  ; SOUND.S:161
+  tail_call tone                ; SOUND.S:162
+}
+
+fn DoGateDown {
+  y = #0x46                  ; SOUND.S:168
+  x = #0x00                  ; SOUND.S:169
+  a = #0x04                  ; SOUND.S:170
+  tail_call tone                ; SOUND.S:171
+}
+
+fn DoJawsClash {
+  y = #0x0a                  ; SOUND.S:177
+  x = #0x00                  ; SOUND.S:178
+  a = #0x32                  ; SOUND.S:179
+  tail_call tone                ; SOUND.S:180
+}
+
+fn DoSpecialKey1  (aka DoSwordClash1, DoSwordClash2) {
+  y = #0x0f                  ; SOUND.S:194
+  x = #0x0f                  ; SOUND.S:195
+  a = #0x32                  ; SOUND.S:196
+  tail_call tone                ; SOUND.S:197
+}
+
+fn DoSpecialKey2 {
+  y = #0x28                  ; SOUND.S:200
+  x = #0x28                  ; SOUND.S:201
+  a = #0x32                  ; SOUND.S:202
+  tail_call tone                ; SOUND.S:203
+}
+
+fn DoSplat {
+  y = #0xe8                  ; SOUND.S:212
+  x = #0xe8                  ; SOUND.S:213
+  a = #0x03                  ; SOUND.S:214
+  tail_call tone                ; SOUND.S:215
+}
+
+fn DoMirrorCrack {
+  tail_call DoSplat                ; SOUND.S:221
+}
+
+fn DoLooseCrash {
+  tail_call DoSplat                ; SOUND.S:228
+}
+
+fn DoGotKey  (aka DoFlashMsg) {
+  a = #0x02                  ; SOUND.S:240
+:loop:
+  ??? pha             ; SOUND.S:241
+  y = #0xf4                  ; SOUND.S:243
+  x = #0xf4                  ; SOUND.S:244
+  a = #0x0f                  ; SOUND.S:245
+  ??? jsr tone            ; SOUND.S:246
+  y = #0x64                  ; SOUND.S:248
+  x = #0x64                  ; SOUND.S:249
+  a = #0x19                  ; SOUND.S:250
+  ??? jsr tone            ; SOUND.S:251
+  ??? pla             ; SOUND.S:253
+  ??? sec             ; SOUND.S:254
+  ??? sbc #1            ; SOUND.S:255
+  ??? bne :loop            ; SOUND.S:256
+  return                           ; SOUND.S:258
+}
+
+fn DoFootstep {
+  y = #0x23                  ; SOUND.S:264
+  x = #0x00                  ; SOUND.S:265
+  a = #0x03                  ; SOUND.S:266
+  tail_call tone                ; SOUND.S:267
+}
+
+fn DoRaisingExit {
+  y = #0x28                  ; SOUND.S:273
+  x = #0x00                  ; SOUND.S:274
+  a = #0x06                  ; SOUND.S:275
+  tail_call tone                ; SOUND.S:276
+}
+
+fn DoRaisingGate {
+  y = #0x14                  ; SOUND.S:282
+  x = #0x00                  ; SOUND.S:283
+  a = #0x02                  ; SOUND.S:284
+  tail_call tone                ; SOUND.S:285
+}
+
+fn DoLowerGate {
+  y = #0x07                  ; SOUND.S:291
+  x = #0x00                  ; SOUND.S:292
+  a = #0x08                  ; SOUND.S:293
+  tail_call tone                ; SOUND.S:294
+}
+
+fn DoSmackWall {
+  y = #0xe8                  ; SOUND.S:303
+  x = #0xe8                  ; SOUND.S:304
+  a = #0x03                  ; SOUND.S:305
+  tail_call tone                ; SOUND.S:306
+}
+
+fn DoImpaled {
+  tail_call DoSmackWall                ; SOUND.S:314
+}
+
+fn DoGateSlam {
+  tail_call DoSmackWall                ; SOUND.S:320
+}
+
+fn tone {
+  ??? sty :pitch            ; SOUND.S:332
+  ??? stx :pitch+1            ; SOUND.S:333
+:outloop:
+  ??? bit spkr            ; SOUND.S:335
+  x = #0x00                  ; SOUND.S:337
+:midloop:
+  y = #0x00                  ; SOUND.S:338
+:inloop:
+  ??? iny             ; SOUND.S:340
+  ??? cpy :pitch            ; SOUND.S:341
+  ??? bcc :inloop            ; SOUND.S:342
+  ??? inx             ; SOUND.S:344
+  ??? cpx :pitch+1            ; SOUND.S:345
+  ??? bcc :midloop            ; SOUND.S:346
+  ??? sec             ; SOUND.S:348
+  ??? sbc #1            ; SOUND.S:349
+  ??? bne :outloop            ; SOUND.S:350
+  return                           ; SOUND.S:352
+}

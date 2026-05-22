@@ -1,0 +1,1204 @@
+; module MOVER from 01 POP Source/Source/MOVER.S
+
+fn searchtrob {
+  ??? ldx numtrans            ; MOVER.S:106
+  ??? beq :rts            ; MOVER.S:107
+:loop:
+  ??? lda trloc,x            ; MOVER.S:109
+  ??? cmp trloc            ; MOVER.S:110
+  ??? bne :next            ; MOVER.S:111
+  ??? lda trscrn,x            ; MOVER.S:112
+  ??? cmp trscrn            ; MOVER.S:113
+  ??? beq :rts            ; MOVER.S:114
+:next:
+  ??? dex             ; MOVER.S:116
+  ??? bne :loop            ; MOVER.S:117
+:rts:
+  return                           ; MOVER.S:119
+}
+
+fn addtrob {
+  ??? jsr searchtrob            ; MOVER.S:130
+  ??? cpx #0            ; MOVER.S:132
+  ??? bne :chdir            ; MOVER.S:133
+  ??? ldx numtrans            ; MOVER.S:137
+  ??? cpx #maxtr            ; MOVER.S:138
+  ??? beq :rts            ; MOVER.S:139
+  ??? inx             ; MOVER.S:141
+  *numtrans@0x0095 = x            ; MOVER.S:142
+  ??? lda trdirec            ; MOVER.S:144
+  ??? sta trdirec,x            ; MOVER.S:145
+  ??? lda trloc            ; MOVER.S:146
+  ??? sta trloc,x            ; MOVER.S:147
+  ??? lda trscrn            ; MOVER.S:148
+  ??? sta trscrn,x            ; MOVER.S:149
+  return                           ; MOVER.S:150
+}
+
+fn addamob {
+  ??? ldx nummob            ; MOVER.S:164
+  ??? cpx #maxmob            ; MOVER.S:165
+  ??? beq :rts            ; MOVER.S:166
+  ??? inx             ; MOVER.S:168
+  *nummob@0x030d = x            ; MOVER.S:169
+  tail_call savemob                ; MOVER.S:171
+}
+
+fn savemob {
+  ??? lda mobx            ; MOVER.S:181
+  ??? sta mobx,x            ; MOVER.S:182
+  ??? lda moby            ; MOVER.S:183
+  ??? sta moby,x            ; MOVER.S:184
+  ??? lda mobscrn            ; MOVER.S:185
+  ??? sta mobscrn,x            ; MOVER.S:186
+  ??? lda mobvel            ; MOVER.S:187
+  ??? sta mobvel,x            ; MOVER.S:188
+  ??? lda mobtype            ; MOVER.S:189
+  ??? sta mobtype,x            ; MOVER.S:190
+  ??? lda moblevel            ; MOVER.S:191
+  ??? sta moblevel,x            ; MOVER.S:192
+  return                           ; MOVER.S:193
+}
+
+fn loadmob {
+  ??? lda mobx,x            ; MOVER.S:196
+  *mobx@0xb660 = a            ; MOVER.S:197
+  ??? lda moby,x            ; MOVER.S:198
+  *moby@0xb670 = a            ; MOVER.S:199
+  ??? lda mobscrn,x            ; MOVER.S:200
+  *mobscrn@0xb680 = a            ; MOVER.S:201
+  ??? lda mobvel,x            ; MOVER.S:202
+  *mobvel@0xb690 = a            ; MOVER.S:203
+  ??? lda mobtype,x            ; MOVER.S:204
+  *mobtype@0xb6a0 = a            ; MOVER.S:205
+  ??? lda moblevel,x            ; MOVER.S:206
+  *moblevel@0xb6b0 = a            ; MOVER.S:207
+]rts:
+  return                           ; MOVER.S:208
+}
+
+fn TRIGSLICER {
+  *state@0x00f0 = a            ; MOVER.S:218
+  ??? lda (BlueSpec),y            ; MOVER.S:220
+  ??? beq :ok            ; MOVER.S:221
+  ??? cmp #slicerRet            ; MOVER.S:222
+  ??? bcc ]rts            ; MOVER.S:223
+:ok:
+  *trloc@0xb600 = y            ; MOVER.S:227
+  ??? lda state            ; MOVER.S:229
+  ??? sta (BlueSpec),y            ; MOVER.S:230
+  ??? lda VisScrn            ; MOVER.S:232
+  *trscrn@0xb620 = a            ; MOVER.S:233
+  a = #0x01                  ; MOVER.S:235
+  *trdirec@0xb640 = a            ; MOVER.S:236
+  tail_call addtrob                ; MOVER.S:238
+}
+
+fn CLOSEEXIT {
+  *trloc@0xb600 = y            ; MOVER.S:247
+  *trscrn@0xb620 = a            ; MOVER.S:248
+  a = #0xac                  ; MOVER.S:250
+  ??? sta (BlueSpec),y            ; MOVER.S:251
+  a = #0x03                  ; MOVER.S:253
+  *trdirec@0xb640 = a            ; MOVER.S:254
+  tail_call addtrob                ; MOVER.S:256
+}
+
+fn SMASHMIRROR {
+  a = #0x56                  ; MOVER.S:260
+  ??? sta (BlueSpec),y            ; MOVER.S:261
+]rts:
+  return                           ; MOVER.S:262
+}
+
+fn TRIGFLASK {
+  *trloc@0xb600 = y            ; MOVER.S:270
+  *trscrn@0xb620 = a            ; MOVER.S:271
+  a = #0x01                  ; MOVER.S:273
+  *trdirec@0xb640 = a            ; MOVER.S:274
+  ??? jsr rnd            ; MOVER.S:278
+  ??? and #7            ; MOVER.S:279
+  ??? ora (BlueSpec),y            ; MOVER.S:280
+  ??? sta (BlueSpec),y            ; MOVER.S:281
+  tail_call addtrob                ; MOVER.S:282
+}
+
+fn TRIGSWORD {
+  *trloc@0xb600 = y            ; MOVER.S:290
+  *trscrn@0xb620 = a            ; MOVER.S:291
+  a = #0x01                  ; MOVER.S:292
+  *trdirec@0xb640 = a            ; MOVER.S:293
+  ??? jsr rnd            ; MOVER.S:294
+  ??? and #$1f            ; MOVER.S:295
+  ??? sta (BlueSpec),y            ; MOVER.S:296
+  tail_call addtrob                ; MOVER.S:297
+}
+
+fn TRIGTORCH {
+  *trloc@0xb600 = y            ; MOVER.S:305
+  *trscrn@0xb620 = a            ; MOVER.S:306
+  a = #0x01                  ; MOVER.S:308
+  *trdirec@0xb640 = a            ; MOVER.S:309
+  ??? jsr rnd            ; MOVER.S:313
+  ??? and #$f            ; MOVER.S:314
+  ??? sta (BlueSpec),y            ; MOVER.S:315
+  tail_call addtrob                ; MOVER.S:316
+}
+
+fn TRIGSPIKES {
+  ??? lda (BlueSpec),y            ; MOVER.S:324
+  ??? beq :ready            ; MOVER.S:325
+  ??? bpl ]rts            ; MOVER.S:327
+  ??? cmp #$ff            ; MOVER.S:328
+  ??? beq ]rts            ; MOVER.S:329
+  a = #0x8f                  ; MOVER.S:330
+  ??? sta (BlueSpec),y            ; MOVER.S:331
+]rts:
+  return                           ; MOVER.S:332
+}
+
+fn JAMSPIKES {
+  a = #0xff                  ; MOVER.S:355
+  ??? sta (BlueSpec),y            ; MOVER.S:356
+  x = #0xff                  ; MOVER.S:357
+  ??? bmi ]cont            ; MOVER.S:358
+GETSPIKES:
+  ??? lda (BlueSpec),y            ; MOVER.S:366
+  ??? bmi :sprung            ; MOVER.S:367
+  ??? beq :safe            ; MOVER.S:368
+  ??? cmp #spikeExt            ; MOVER.S:370
+  ??? bcc :springing            ; MOVER.S:371
+:safe:
+  a = #0x00                  ; MOVER.S:373
+  return                           ; MOVER.S:374
+}
+
+fn GETSPIKES {
+  ??? lda (BlueSpec),y            ; MOVER.S:366
+  ??? bmi :sprung            ; MOVER.S:367
+  ??? beq :safe            ; MOVER.S:368
+  ??? cmp #spikeExt            ; MOVER.S:370
+  ??? bcc :springing            ; MOVER.S:371
+:safe:
+  a = #0x00                  ; MOVER.S:373
+  return                           ; MOVER.S:374
+}
+
+fn BREAKLOOSE {
+  a = #0x01                  ; MOVER.S:390
+BREAKLOOSE1:
+  *state@0x00f0 = a            ; MOVER.S:393
+  ??? lda (BlueType),y            ; MOVER.S:395
+  ??? and #reqmask            ; MOVER.S:396
+  ??? bne ]rts            ; MOVER.S:397
+  ??? lda (BlueSpec),y            ; MOVER.S:399
+  ??? bmi :ok            ; MOVER.S:400
+  ??? bne ]rts            ; MOVER.S:401
+:ok:
+  ??? lda state            ; MOVER.S:403
+  ??? sta (BlueSpec),y            ; MOVER.S:404
+  *trloc@0xb600 = y            ; MOVER.S:406
+  ??? lda tempscrn            ; MOVER.S:408
+  *trscrn@0xb620 = a            ; MOVER.S:409
+  a = #0x00                  ; MOVER.S:411
+  *trdirec@0xb640 = a            ; MOVER.S:412
+  ??? jsr addtrob            ; MOVER.S:414
+  tail_call redloose                ; MOVER.S:415
+}
+
+fn BREAKLOOSE1 {
+  *state@0x00f0 = a            ; MOVER.S:393
+  ??? lda (BlueType),y            ; MOVER.S:395
+  ??? and #reqmask            ; MOVER.S:396
+  ??? bne ]rts            ; MOVER.S:397
+  ??? lda (BlueSpec),y            ; MOVER.S:399
+  ??? bmi :ok            ; MOVER.S:400
+  ??? bne ]rts            ; MOVER.S:401
+:ok:
+  ??? lda state            ; MOVER.S:403
+  ??? sta (BlueSpec),y            ; MOVER.S:404
+  *trloc@0xb600 = y            ; MOVER.S:406
+  ??? lda tempscrn            ; MOVER.S:408
+  *trscrn@0xb620 = a            ; MOVER.S:409
+  a = #0x00                  ; MOVER.S:411
+  *trdirec@0xb640 = a            ; MOVER.S:412
+  ??? jsr addtrob            ; MOVER.S:414
+  tail_call redloose                ; MOVER.S:415
+}
+
+fn PUSHPP {
+  ??? lda (BlueType),y            ; MOVER.S:426
+  ??? and #idmask            ; MOVER.S:427
+  *pptype@0x00f4 = a            ; MOVER.S:428
+pushpp1:
+  ??? lda (BlueSpec),y            ; MOVER.S:430
+  *linkindex@0x00f3 = a            ; MOVER.S:431
+  ??? tax             ; MOVER.S:432
+  ??? jsr gettimer            ; MOVER.S:433
+  ??? cmp #31            ; MOVER.S:435
+  ??? beq ]rts            ; MOVER.S:436
+  ??? cmp #2            ; MOVER.S:438
+  ??? bcs :starttimer            ; MOVER.S:439
+  a = #0x05                  ; MOVER.S:444
+  ??? jsr chgtimer            ; MOVER.S:445
+  *trloc@0xb600 = y            ; MOVER.S:447
+  ??? lda tempscrn            ; MOVER.S:449
+  *trscrn@0xb620 = a            ; MOVER.S:450
+  a = #0x01                  ; MOVER.S:452
+  *trdirec@0xb640 = a            ; MOVER.S:453
+  ??? jsr addtrob            ; MOVER.S:455
+  ??? jsr redplate            ; MOVER.S:457
+  a = #0x01                  ; MOVER.S:459
+  *alertguard@0x00e4 = a            ; MOVER.S:460
+  a = #0x00                  ; MOVER.S:461
+  ??? jsr addsound            ; MOVER.S:462
+:trig:
+  tail_call trigger                ; MOVER.S:464
+}
+
+fn pushpp1 {
+  ??? lda (BlueSpec),y            ; MOVER.S:430
+  *linkindex@0x00f3 = a            ; MOVER.S:431
+  ??? tax             ; MOVER.S:432
+  ??? jsr gettimer            ; MOVER.S:433
+  ??? cmp #31            ; MOVER.S:435
+  ??? beq ]rts            ; MOVER.S:436
+  ??? cmp #2            ; MOVER.S:438
+  ??? bcs :starttimer            ; MOVER.S:439
+  a = #0x05                  ; MOVER.S:444
+  ??? jsr chgtimer            ; MOVER.S:445
+  *trloc@0xb600 = y            ; MOVER.S:447
+  ??? lda tempscrn            ; MOVER.S:449
+  *trscrn@0xb620 = a            ; MOVER.S:450
+  a = #0x01                  ; MOVER.S:452
+  *trdirec@0xb640 = a            ; MOVER.S:453
+  ??? jsr addtrob            ; MOVER.S:455
+  ??? jsr redplate            ; MOVER.S:457
+  a = #0x01                  ; MOVER.S:459
+  *alertguard@0x00e4 = a            ; MOVER.S:460
+  a = #0x00                  ; MOVER.S:461
+  ??? jsr addsound            ; MOVER.S:462
+:trig:
+  tail_call trigger                ; MOVER.S:464
+}
+
+fn JAMPP {
+  ??? lda (BlueType),y            ; MOVER.S:481
+  ??? and #idmask            ; MOVER.S:482
+  *pptype@0x00f4 = a            ; MOVER.S:483
+  ??? cmp #pressplate            ; MOVER.S:484
+  ??? beq :1            ; MOVER.S:485
+  a = #0x01                  ; MOVER.S:487
+  ??? sta (BlueType),y            ; MOVER.S:488
+  a = #0x00                  ; MOVER.S:489
+  ??? sta (BlueSpec),y            ; MOVER.S:490
+  a = #0x0e                  ; MOVER.S:491
+  *pptype@0x00f4 = a            ; MOVER.S:492
+  ??? bne pushpp1            ; MOVER.S:493
+:1:
+  a = #0x05                  ; MOVER.S:495
+  ??? sta (BlueType),y            ; MOVER.S:496
+  ??? bne pushpp1            ; MOVER.S:497
+trigger:
+:loop:
+  ??? ldx linkindex            ; MOVER.S:507
+  ??? lda LINKLOC,x            ; MOVER.S:509
+  ??? cmp #$ff            ; MOVER.S:510
+  ??? beq :rts            ; MOVER.S:511
+  ??? jsr getloc            ; MOVER.S:513
+  *trloc@0xb600 = a            ; MOVER.S:514
+  ??? jsr getscrn            ; MOVER.S:516
+  *trscrn@0xb620 = a            ; MOVER.S:517
+  ??? jsr calcblue            ; MOVER.S:519
+  ??? ldy trloc            ; MOVER.S:520
+  ??? lda (BlueType),y            ; MOVER.S:521
+  ??? and #idmask            ; MOVER.S:522
+  ??? jsr trigobj            ; MOVER.S:524
+  ??? lda trdirec            ; MOVER.S:526
+  ??? bmi :skip            ; MOVER.S:527
+  ??? jsr addtrob            ; MOVER.S:529
+:skip:
+  ??? ldx linkindex            ; MOVER.S:531
+  ??? inc linkindex            ; MOVER.S:532
+  ??? jsr getlastflag            ; MOVER.S:534
+  ??? beq :loop            ; MOVER.S:535
+:rts:
+  return                           ; MOVER.S:537
+}
+
+fn trigger  (aka :loop) {
+  ??? ldx linkindex            ; MOVER.S:507
+  ??? lda LINKLOC,x            ; MOVER.S:509
+  ??? cmp #$ff            ; MOVER.S:510
+  ??? beq :rts            ; MOVER.S:511
+  ??? jsr getloc            ; MOVER.S:513
+  *trloc@0xb600 = a            ; MOVER.S:514
+  ??? jsr getscrn            ; MOVER.S:516
+  *trscrn@0xb620 = a            ; MOVER.S:517
+  ??? jsr calcblue            ; MOVER.S:519
+  ??? ldy trloc            ; MOVER.S:520
+  ??? lda (BlueType),y            ; MOVER.S:521
+  ??? and #idmask            ; MOVER.S:522
+  ??? jsr trigobj            ; MOVER.S:524
+  ??? lda trdirec            ; MOVER.S:526
+  ??? bmi :skip            ; MOVER.S:527
+  ??? jsr addtrob            ; MOVER.S:529
+:skip:
+  ??? ldx linkindex            ; MOVER.S:531
+  ??? inc linkindex            ; MOVER.S:532
+  ??? jsr getlastflag            ; MOVER.S:534
+  ??? beq :loop            ; MOVER.S:535
+:rts:
+  return                           ; MOVER.S:537
+}
+
+fn trigobj {
+  ??? cmp #gate            ; MOVER.S:547
+  ??? bne :1            ; MOVER.S:548
+  tail_call triggate                ; MOVER.S:549
+}
+
+fn openexit {
+  ??? lda (BlueSpec),y            ; MOVER.S:563
+  ??? bne :fail            ; MOVER.S:564
+  a = #0x01                  ; MOVER.S:566
+  ??? bpl :1            ; MOVER.S:567
+:fail:
+  a = #0xff                  ; MOVER.S:569
+:1:
+  *trdirec@0xb640 = a            ; MOVER.S:570
+  return                           ; MOVER.S:571
+}
+
+fn triggate {
+  ??? lda (BlueSpec),y            ; MOVER.S:582
+  ??? ldx pptype            ; MOVER.S:584
+  ??? cpx #upressplate            ; MOVER.S:585
+  ??? beq :raise            ; MOVER.S:586
+  ??? cpx #rubble            ; MOVER.S:587
+  ??? beq :jam            ; MOVER.S:588
+:lower:
+  ??? cmp #gminval            ; MOVER.S:592
+  ??? bne :yeslower            ; MOVER.S:593
+:fail:
+  tail_call stopobj                ; MOVER.S:595
+}
+
+fn ANIMTRANS {
+  a = #0x00                  ; MOVER.S:630
+  *trobcount@0xb6e0 = a            ; MOVER.S:631
+  ??? ldx numtrans            ; MOVER.S:633
+  ??? beq ]rts            ; MOVER.S:634
+  a = #0x00                  ; MOVER.S:636
+  ??? sta ]cleanflag            ; MOVER.S:637
+:loop:
+  *tempnt@0x0096 = x            ; MOVER.S:639
+  ??? jsr animobj            ; MOVER.S:641
+  ??? ldx tempnt            ; MOVER.S:643
+  ??? lda trdirec            ; MOVER.S:645
+  ??? bpl :1            ; MOVER.S:646
+  a = #0xff                  ; MOVER.S:648
+  ??? sta ]cleanflag            ; MOVER.S:649
+:1:
+  ??? sta trdirec,x            ; MOVER.S:651
+  ??? dex             ; MOVER.S:653
+  ??? bne :loop            ; MOVER.S:654
+  ??? lda ]cleanflag            ; MOVER.S:656
+  ??? beq ]rts            ; MOVER.S:657
+  x = #0x01                  ; MOVER.S:663
+  y = #0x00                  ; MOVER.S:664
+:dloop:
+  ??? lda trdirec,x            ; MOVER.S:666
+  ??? cmp #$ff            ; MOVER.S:667
+  ??? beq :next            ; MOVER.S:668
+  ??? iny             ; MOVER.S:670
+  ??? sta trdirec,y            ; MOVER.S:671
+  ??? lda trloc,x            ; MOVER.S:672
+  ??? sta trloc,y            ; MOVER.S:673
+  ??? lda trscrn,x            ; MOVER.S:674
+  ??? sta trscrn,y            ; MOVER.S:675
+:next:
+  ??? inx             ; MOVER.S:677
+  ??? cpx numtrans            ; MOVER.S:679
+  ??? bcc :dloop            ; MOVER.S:680
+  ??? beq :dloop            ; MOVER.S:681
+  *numtrans@0x0095 = y            ; MOVER.S:683
+  return                           ; MOVER.S:684
+}
+
+fn animobj {
+  ??? lda trloc,x            ; MOVER.S:691
+  *trloc@0xb600 = a            ; MOVER.S:692
+  ??? lda trscrn,x            ; MOVER.S:693
+  *trscrn@0xb620 = a            ; MOVER.S:694
+  ??? lda trdirec,x            ; MOVER.S:695
+  *trdirec@0xb640 = a            ; MOVER.S:696
+  ??? lda trscrn            ; MOVER.S:700
+  ??? jsr calcblue            ; MOVER.S:701
+  ??? ldy trloc            ; MOVER.S:703
+  ??? lda (BlueSpec),y            ; MOVER.S:704
+  *state@0x00f0 = a            ; MOVER.S:705
+  ??? lda (BlueType),y            ; MOVER.S:707
+  ??? and #idmask            ; MOVER.S:708
+  ??? cmp #torch            ; MOVER.S:712
+  ??? bne :1            ; MOVER.S:713
+  ??? jsr animtorch            ; MOVER.S:714
+  goto :done                ; MOVER.S:715
+}
+
+fn animexit {
+  ??? ldx trdirec            ; MOVER.S:778
+  ??? bmi :cont            ; MOVER.S:779
+  ??? cpx #3            ; MOVER.S:780
+  ??? bcs :downfast            ; MOVER.S:781
+  a = #0x0a                  ; MOVER.S:783
+  ??? jsr addsound            ; MOVER.S:784
+  ??? lda state            ; MOVER.S:786
+  ??? clc             ; MOVER.S:787
+  ??? adc #exitinc            ; MOVER.S:788
+  *state@0x00f0 = a            ; MOVER.S:789
+  ??? cmp #emaxval            ; MOVER.S:791
+  ??? bcs :stop            ; MOVER.S:792
+:cont:
+  tail_call redexit                ; MOVER.S:794
+}
+
+fn animgate {
+  ??? ldx trdirec            ; MOVER.S:838
+  ??? bmi :cont            ; MOVER.S:839
+  ??? cpx #3            ; MOVER.S:841
+  ??? bcs :downfast            ; MOVER.S:842
+  ??? lda state            ; MOVER.S:844
+  ??? cmp #$ff            ; MOVER.S:845
+  ??? beq :stop            ; MOVER.S:846
+  ??? clc             ; MOVER.S:847
+  ??? adc gateinc,x            ; MOVER.S:848
+  *state@0x00f0 = a            ; MOVER.S:849
+  ??? cpx #0            ; MOVER.S:851
+  ??? beq :goingdown            ; MOVER.S:852
+  ??? cmp #gmaxval            ; MOVER.S:854
+  ??? bcs :attop            ; MOVER.S:855
+  a = #0x0b                  ; MOVER.S:857
+  ??? jsr addsound            ; MOVER.S:858
+  goto :cont                ; MOVER.S:860
+}
+
+fn animplate {
+  ??? ldx trdirec            ; MOVER.S:928
+  ??? bmi ]rts            ; MOVER.S:929
+  ??? lda state            ; MOVER.S:931
+  ??? tax             ; MOVER.S:932
+  ??? jsr gettimer            ; MOVER.S:933
+  ??? sec             ; MOVER.S:934
+  ??? sbc #1            ; MOVER.S:935
+  ??? pha             ; MOVER.S:936
+  ??? jsr chgtimer            ; MOVER.S:937
+  ??? pla             ; MOVER.S:938
+  ??? cmp #2            ; MOVER.S:939
+  ??? bcs ]rts            ; MOVER.S:940
+  a = #0x01                  ; MOVER.S:942
+  ??? jsr addsound            ; MOVER.S:943
+  ??? jsr stopobj            ; MOVER.S:945
+  tail_call redplate                ; MOVER.S:947
+}
+
+fn animslicer {
+  ??? ldx trdirec            ; MOVER.S:956
+  ??? bmi :done            ; MOVER.S:957
+  ??? lda state            ; MOVER.S:959
+  ??? tax             ; MOVER.S:960
+  ??? and #$80            ; MOVER.S:961
+  *state@0x00f0 = a            ; MOVER.S:962
+  ??? txa             ; MOVER.S:963
+  ??? and #$7f            ; MOVER.S:964
+  ??? clc             ; MOVER.S:965
+  ??? adc #1            ; MOVER.S:966
+  ??? cmp #slicetimer+1            ; MOVER.S:967
+  ??? bcc :1            ; MOVER.S:968
+  a = #0x01                  ; MOVER.S:969
+:1:
+  ??? ora state            ; MOVER.S:970
+  *state@0x00f0 = a            ; MOVER.S:971
+  ??? and #$7f            ; MOVER.S:972
+  ??? cmp #slicerExt            ; MOVER.S:973
+  ??? bne :2            ; MOVER.S:974
+  a = #0x13                  ; MOVER.S:976
+  ??? jsr addsound            ; MOVER.S:977
+:2:
+  ??? lda trscrn            ; MOVER.S:979
+  ??? cmp VisScrn            ; MOVER.S:980
+  ??? bne :os            ; MOVER.S:981
+  ??? lda trloc            ; MOVER.S:983
+  ??? jsr unindex            ; MOVER.S:984
+  ??? cpx KidBlockY            ; MOVER.S:985
+  ??? bne :os            ; MOVER.S:986
+  ??? lda KidLife            ; MOVER.S:988
+  ??? bmi :done            ; MOVER.S:989
+  ??? lda state            ; MOVER.S:991
+  ??? and #$80            ; MOVER.S:992
+  ??? bne :done            ; MOVER.S:993
+:os:
+  ??? lda state            ; MOVER.S:997
+  ??? and #$7f            ; MOVER.S:998
+  ??? cmp #slicerRet            ; MOVER.S:999
+  ??? bcc :done            ; MOVER.S:1000
+:purge:
+  ??? jsr stopobj            ; MOVER.S:1002
+:done:
+  ??? lda state            ; MOVER.S:1004
+  ??? and #$7f            ; MOVER.S:1005
+  ??? cmp #slicerRet            ; MOVER.S:1006
+  ??? bcs ]rts            ; MOVER.S:1007
+  tail_call redslicer                ; MOVER.S:1009
+}
+
+fn animflask {
+  ??? ldx trdirec            ; MOVER.S:1017
+  ??? bmi ]rts            ; MOVER.S:1018
+  ??? lda trscrn            ; MOVER.S:1020
+  ??? cmp VisScrn            ; MOVER.S:1021
+  ??? bne :purge            ; MOVER.S:1022
+  ??? lda state            ; MOVER.S:1024
+  ??? and #%11100000            ; MOVER.S:1025
+  *temp1@0x00f1 = a            ; MOVER.S:1026
+  ??? lda state            ; MOVER.S:1027
+  ??? and #%00011111            ; MOVER.S:1028
+  ??? jsr GETFLASKFRAME            ; MOVER.S:1029
+  ??? ora temp1            ; MOVER.S:1030
+  *state@0x00f0 = a            ; MOVER.S:1031
+  tail_call redflask                ; MOVER.S:1033
+}
+
+fn animsword {
+  ??? lda trscrn            ; MOVER.S:1043
+  ??? cmp VisScrn            ; MOVER.S:1044
+  ??? bne ]purge            ; MOVER.S:1045
+  ??? dec state            ; MOVER.S:1047
+  ??? bne :1            ; MOVER.S:1048
+  ??? jsr rnd            ; MOVER.S:1049
+  ??? and #$3f            ; MOVER.S:1050
+  ??? clc             ; MOVER.S:1051
+  ??? adc #40            ; MOVER.S:1052
+  *state@0x00f0 = a            ; MOVER.S:1053
+:1:
+  tail_call redsword                ; MOVER.S:1055
+}
+
+fn animtorch {
+  ??? ldx trdirec            ; MOVER.S:1064
+  ??? bmi ]rts            ; MOVER.S:1065
+  ??? lda trscrn            ; MOVER.S:1067
+  ??? cmp VisScrn            ; MOVER.S:1068
+  ??? bne ]purge            ; MOVER.S:1069
+  ??? lda state            ; MOVER.S:1071
+  ??? jsr GETFLAMEFRAME            ; MOVER.S:1072
+  *state@0x00f0 = a            ; MOVER.S:1073
+  tail_call redtorch                ; MOVER.S:1075
+}
+
+fn GETFLAMEFRAME {
+  *state@0x00f0 = a            ; MOVER.S:1085
+  ??? jsr rnd            ; MOVER.S:1087
+  ??? cmp state            ; MOVER.S:1089
+  ??? beq :2            ; MOVER.S:1090
+  ??? cmp #torchLast+1            ; MOVER.S:1091
+  ??? bcc :1            ; MOVER.S:1092
+  ??? lda state            ; MOVER.S:1094
+:2:
+  ??? clc             ; MOVER.S:1095
+  ??? adc #1            ; MOVER.S:1096
+  ??? cmp #torchLast+1            ; MOVER.S:1097
+  ??? bcc :1            ; MOVER.S:1098
+  a = #0x00                  ; MOVER.S:1100
+:1:
+]rts:
+  return                           ; MOVER.S:1102
+}
+
+fn GETFLASKFRAME {
+  ??? clc             ; MOVER.S:1112
+  ??? adc #1            ; MOVER.S:1113
+  ??? cmp #bubbLast+1            ; MOVER.S:1114
+  ??? bcc ]rts            ; MOVER.S:1115
+  a = #0x01                  ; MOVER.S:1116
+]rts:
+  return                           ; MOVER.S:1117
+}
+
+fn animspikes {
+  ??? ldx trdirec            ; MOVER.S:1125
+  ??? bmi :done            ; MOVER.S:1126
+  ??? lda state            ; MOVER.S:1128
+  ??? bmi :timerloop            ; MOVER.S:1129
+  ??? inc state            ; MOVER.S:1134
+  ??? cmp #spikeExt            ; MOVER.S:1136
+  ??? beq :starttimer            ; MOVER.S:1137
+  ??? cmp #spikeRet            ; MOVER.S:1139
+  ??? bne :done            ; MOVER.S:1140
+  a = #0x00                  ; MOVER.S:1142
+  *state@0x00f0 = a            ; MOVER.S:1143
+  ??? jsr stopobj            ; MOVER.S:1145
+:done:
+  tail_call redspikes                ; MOVER.S:1147
+}
+
+fn animfloor {
+  ??? ldx trdirec            ; MOVER.S:1177
+  ??? bmi :red            ; MOVER.S:1178
+  ??? inc state            ; MOVER.S:1184
+  ??? lda state            ; MOVER.S:1186
+  ??? bmi :wiggle            ; MOVER.S:1187
+  ??? cmp #loosetimer            ; MOVER.S:1189
+  ??? bcc :red            ; MOVER.S:1190
+  ??? jsr makespace            ; MOVER.S:1194
+  *state@0x00f0 = a            ; MOVER.S:1195
+  ??? jsr stopobj            ; MOVER.S:1197
+  ??? lda trloc            ; MOVER.S:1201
+  ??? jsr unindex            ; MOVER.S:1202
+  ??? asl             ; MOVER.S:1204
+  ??? asl             ; MOVER.S:1205
+  *mobx@0xb660 = a            ; MOVER.S:1206
+  *moblevel@0xb6b0 = x            ; MOVER.S:1207
+  ??? lda BlockBot+1,x            ; MOVER.S:1209
+  *moby@0xb670 = a            ; MOVER.S:1210
+  ??? lda trscrn            ; MOVER.S:1212
+  *mobscrn@0xb680 = a            ; MOVER.S:1213
+  a = #0x00                  ; MOVER.S:1215
+  *mobvel@0xb690 = a            ; MOVER.S:1216
+  *mobtype@0xb6a0 = a            ; MOVER.S:1217
+  ??? jsr addamob            ; MOVER.S:1219
+:red:
+  tail_call redloose                ; MOVER.S:1221
+}
+
+fn animspace {
+  ??? jsr stopobj            ; MOVER.S:1238
+  tail_call redloose                ; MOVER.S:1239
+}
+
+fn stopobj {
+  a = #0xff                  ; MOVER.S:1246
+  *trdirec@0xb640 = a            ; MOVER.S:1247
+  return                           ; MOVER.S:1248
+}
+
+fn redtrobj {
+  ??? jsr check            ; MOVER.S:1254
+  a = #0x02                  ; MOVER.S:1255
+  ??? jsr markred            ; MOVER.S:1256
+  ??? jsr markwipe            ; MOVER.S:1257
+  ??? jsr checkright            ; MOVER.S:1258
+  a = #0x02                  ; MOVER.S:1259
+  ??? jsr markred            ; MOVER.S:1260
+  tail_call markwipe                ; MOVER.S:1261
+}
+
+fn redexit  (aka redtorch) {
+  ??? jsr checkright            ; MOVER.S:1268
+  a = #0x02                  ; MOVER.S:1269
+  tail_call markmove                ; MOVER.S:1270
+}
+
+fn redsword  (aka redflask) {
+  ??? jsr check            ; MOVER.S:1277
+  a = #0x02                  ; MOVER.S:1278
+  tail_call markmove                ; MOVER.S:1279
+}
+
+fn redloose {
+  ??? inc trobcount            ; MOVER.S:1285
+  a = #0x1f                  ; MOVER.S:1286
+  *height@0x0004 = a            ; MOVER.S:1287
+  tail_call redtrobj                ; MOVER.S:1288
+}
+
+fn redgate {
+  ??? jsr checkright            ; MOVER.S:1294
+  a = #0x02                  ; MOVER.S:1295
+  ??? jsr markmove            ; MOVER.S:1296
+  ??? jsr markfred            ; MOVER.S:1297
+  ??? jsr checkabover            ; MOVER.S:1298
+  a = #0x02                  ; MOVER.S:1299
+  tail_call markmove                ; MOVER.S:1300
+}
+
+fn redspikes {
+  ??? inc trobcount            ; MOVER.S:1306
+  a = #0x1f                  ; MOVER.S:1307
+  *height@0x0004 = a            ; MOVER.S:1308
+  tail_call redtrobj                ; MOVER.S:1309
+}
+
+fn redslicer {
+  ??? inc trobcount            ; MOVER.S:1315
+  a = #0x3f                  ; MOVER.S:1316
+  *height@0x0004 = a            ; MOVER.S:1317
+  ??? jsr check            ; MOVER.S:1318
+  a = #0x02                  ; MOVER.S:1319
+  ??? jsr markred            ; MOVER.S:1320
+  tail_call markwipe                ; MOVER.S:1321
+}
+
+fn redplate {
+  a = #0x10                  ; MOVER.S:1327
+  *height@0x0004 = a            ; MOVER.S:1328
+  tail_call redtrobj                ; MOVER.S:1329
+}
+
+fn check {
+  ??? lda trscrn            ; MOVER.S:1361
+  ??? cmp VisScrn            ; MOVER.S:1362
+  ??? bne ]above            ; MOVER.S:1363
+  ??? ldy trloc            ; MOVER.S:1365
+  ??? cpy #30            ; MOVER.S:1366
+  return                           ; MOVER.S:1367
+}
+
+fn checkleft {
+  ??? lda trscrn            ; MOVER.S:1373
+  ??? cmp VisScrn            ; MOVER.S:1374
+  ??? bne :notonscrn            ; MOVER.S:1375
+  ??? cpy #0            ; MOVER.S:1377
+  ??? beq ]no            ; MOVER.S:1378
+  ??? cpy #10            ; MOVER.S:1379
+  ??? beq ]no            ; MOVER.S:1380
+  ??? cpy #20            ; MOVER.S:1381
+  ??? beq ]no            ; MOVER.S:1382
+  ??? dey             ; MOVER.S:1384
+  ??? clc             ; MOVER.S:1385
+  return                           ; MOVER.S:1386
+}
+
+fn checkright {
+  ??? lda trscrn            ; MOVER.S:1412
+  ??? cmp VisScrn            ; MOVER.S:1413
+  ??? bne :notonscrn            ; MOVER.S:1414
+  ??? ldy trloc            ; MOVER.S:1416
+  ??? cpy #9            ; MOVER.S:1417
+  ??? beq ]no            ; MOVER.S:1418
+  ??? cpy #19            ; MOVER.S:1420
+  ??? beq ]no            ; MOVER.S:1421
+  ??? cpy #29            ; MOVER.S:1423
+  ??? beq ]no            ; MOVER.S:1424
+  ??? iny             ; MOVER.S:1426
+  ??? clc             ; MOVER.S:1427
+  return                           ; MOVER.S:1428
+}
+
+fn checkabover {
+  ??? lda trscrn            ; MOVER.S:1460
+  ??? cmp VisScrn            ; MOVER.S:1461
+  ??? bne :notonscrn            ; MOVER.S:1462
+  ??? ldy trloc            ; MOVER.S:1464
+  ??? cpy #10            ; MOVER.S:1465
+  ??? bcc :above            ; MOVER.S:1466
+  ??? cpy #19            ; MOVER.S:1468
+  ??? beq ]no            ; MOVER.S:1469
+  ??? cpy #29            ; MOVER.S:1471
+  ??? beq ]no            ; MOVER.S:1472
+  ??? tya             ; MOVER.S:1474
+  ??? sec             ; MOVER.S:1475
+  ??? sbc #9            ; MOVER.S:1476
+  ??? tay             ; MOVER.S:1477
+  ??? clc             ; MOVER.S:1479
+  return                           ; MOVER.S:1480
+}
+
+fn gettimer {
+  ??? lda LINKMAP,x            ; MOVER.S:1550
+  ??? and #%00011111            ; MOVER.S:1551
+  return                           ; MOVER.S:1552
+}
+
+fn chgtimer {
+  ??? and #%00011111            ; MOVER.S:1554
+  *temp1@0x00f1 = a            ; MOVER.S:1555
+  ??? lda LINKMAP,x            ; MOVER.S:1556
+  ??? and #%11100000            ; MOVER.S:1557
+  ??? ora temp1            ; MOVER.S:1558
+  ??? sta LINKMAP,x            ; MOVER.S:1559
+  return                           ; MOVER.S:1560
+}
+
+fn getloc {
+  ??? lda LINKLOC,x            ; MOVER.S:1562
+  ??? and #%00011111            ; MOVER.S:1563
+  return                           ; MOVER.S:1564
+}
+
+fn getlastflag {
+  ??? lda LINKLOC,x            ; MOVER.S:1566
+  ??? and #%10000000            ; MOVER.S:1567
+  return                           ; MOVER.S:1568
+}
+
+fn getscrn {
+  ??? lda LINKLOC,x            ; MOVER.S:1570
+  ??? and #%01100000            ; MOVER.S:1571
+  ??? lsr             ; MOVER.S:1572
+  ??? lsr             ; MOVER.S:1573
+  *temp1@0x00f1 = a            ; MOVER.S:1574
+  ??? lda LINKMAP,x            ; MOVER.S:1575
+  ??? and #%11100000            ; MOVER.S:1576
+  ??? adc temp1            ; MOVER.S:1577
+  ??? lsr             ; MOVER.S:1578
+  ??? lsr             ; MOVER.S:1579
+  ??? lsr             ; MOVER.S:1580
+]rts:
+  return                           ; MOVER.S:1581
+}
+
+fn ANIMMOBS {
+  ??? ldx nummob            ; MOVER.S:1589
+  ??? beq ]rts            ; MOVER.S:1590
+:loop:
+  *tempnt@0x0096 = x            ; MOVER.S:1592
+  ??? jsr loadmob            ; MOVER.S:1593
+  ??? jsr animmob            ; MOVER.S:1595
+  ??? jsr checkcrush            ; MOVER.S:1597
+  ??? ldx tempnt            ; MOVER.S:1599
+  ??? jsr savemob            ; MOVER.S:1600
+  ??? dex             ; MOVER.S:1602
+  ??? bne :loop            ; MOVER.S:1603
+  x = #0x01                  ; MOVER.S:1607
+  y = #0x00                  ; MOVER.S:1608
+:dloop:
+  ??? lda mobvel,x            ; MOVER.S:1610
+  ??? cmp #$ff            ; MOVER.S:1611
+  ??? beq :next            ; MOVER.S:1612
+  ??? iny             ; MOVER.S:1614
+  ??? sta mobvel,y            ; MOVER.S:1615
+  ??? lda mobx,x            ; MOVER.S:1616
+  ??? sta mobx,y            ; MOVER.S:1617
+  ??? lda moby,x            ; MOVER.S:1618
+  ??? sta moby,y            ; MOVER.S:1619
+  ??? lda mobscrn,x            ; MOVER.S:1620
+  ??? sta mobscrn,y            ; MOVER.S:1621
+  ??? lda mobtype,x            ; MOVER.S:1622
+  ??? sta mobtype,y            ; MOVER.S:1623
+  ??? lda moblevel,x            ; MOVER.S:1624
+  ??? sta moblevel,y            ; MOVER.S:1625
+:next:
+  ??? inx             ; MOVER.S:1627
+  ??? cpx nummob            ; MOVER.S:1629
+  ??? bcc :dloop            ; MOVER.S:1630
+  ??? beq :dloop            ; MOVER.S:1631
+  *nummob@0x030d = y            ; MOVER.S:1633
+]rts:
+  return                           ; MOVER.S:1635
+}
+
+fn animmob {
+  ??? lda mobtype            ; MOVER.S:1643
+  ??? bne :done            ; MOVER.S:1644
+  ??? jsr mobfloor            ; MOVER.S:1645
+:done:
+  ??? lda mobvel            ; MOVER.S:1647
+  ??? bpl ]rts            ; MOVER.S:1648
+  ??? inc mobvel            ; MOVER.S:1649
+]rts:
+  return                           ; MOVER.S:1650
+}
+
+fn mobfloor {
+  ??? lda mobvel            ; MOVER.S:1658
+  ??? bmi ]rts            ; MOVER.S:1659
+:ok1:
+  ??? cmp #FFtermvel            ; MOVER.S:1661
+  ??? bcs :tv            ; MOVER.S:1662
+  ??? clc             ; MOVER.S:1663
+  ??? adc #FFaccel            ; MOVER.S:1664
+  *mobvel@0xb690 = a            ; MOVER.S:1665
+:tv:
+  ??? clc             ; MOVER.S:1667
+  ??? adc moby            ; MOVER.S:1668
+  *moby@0xb670 = a            ; MOVER.S:1669
+  ??? ldx mobscrn            ; MOVER.S:1673
+  ??? beq :null            ; MOVER.S:1674
+  ??? cmp #-30            ; MOVER.S:1676
+  ??? bcs :fallon            ; MOVER.S:1677
+  ??? ldx moblevel            ; MOVER.S:1679
+  ??? cmp BlockAy+1,x            ; MOVER.S:1680
+  ??? bcc :fallon            ; MOVER.S:1681
+  ??? ldx moblevel            ; MOVER.S:1686
+  *tempblocky@0x0092 = x            ; MOVER.S:1687
+  ??? lda mobx            ; MOVER.S:1689
+  ??? lsr             ; MOVER.S:1690
+  ??? lsr             ; MOVER.S:1691
+  *tempblockx@0x0091 = a            ; MOVER.S:1692
+  ??? lda mobscrn            ; MOVER.S:1694
+  *tempscrn@0x0093 = a            ; MOVER.S:1695
+  ??? jsr rdblock1            ; MOVER.S:1697
+  *underFF@0x00f6 = a            ; MOVER.S:1698
+  ??? cmp #space            ; MOVER.S:1700
+  ??? beq :passthru            ; MOVER.S:1701
+  ??? cmp #loose            ; MOVER.S:1703
+  ??? bne :crash            ; MOVER.S:1704
+  ??? jsr knockloose            ; MOVER.S:1709
+  goto :passthru                ; MOVER.S:1711
+}
+
+fn knockloose {
+  ??? jsr makespace            ; MOVER.S:1757
+  ??? sta (BlueSpec),y            ; MOVER.S:1758
+  ??? lda mobvel            ; MOVER.S:1760
+  ??? lsr             ; MOVER.S:1761
+  *mobvel@0xb690 = a            ; MOVER.S:1762
+  ??? ldx tempnt            ; MOVER.S:1764
+  ??? jsr savemob            ; MOVER.S:1765
+  ??? lda moby            ; MOVER.S:1769
+  ??? clc             ; MOVER.S:1770
+  ??? adc #6            ; MOVER.S:1771
+  *moby@0xb670 = a            ; MOVER.S:1772
+  ??? jsr passthru            ; MOVER.S:1774
+  ??? jsr addamob            ; MOVER.S:1776
+  ??? ldx tempnt            ; MOVER.S:1780
+  ??? jsr loadmob            ; MOVER.S:1781
+  tail_call markmob                ; MOVER.S:1783
+}
+
+fn makespace {
+  a = #0x00                  ; MOVER.S:1789
+  ??? sta (BlueType),y            ; MOVER.S:1790
+  a = #0x01                  ; MOVER.S:1793
+  return                           ; MOVER.S:1794
+}
+
+fn passthru {
+  ??? inc moblevel            ; MOVER.S:1808
+  ??? lda moblevel            ; MOVER.S:1810
+  ??? cmp #3            ; MOVER.S:1811
+  ??? bcc ]rts            ; MOVER.S:1812
+  ??? lda moby            ; MOVER.S:1817
+  ??? sec             ; MOVER.S:1818
+  ??? sbc #192            ; MOVER.S:1819
+  *moby@0xb670 = a            ; MOVER.S:1820
+  a = #0x00                  ; MOVER.S:1822
+  *moblevel@0xb6b0 = a            ; MOVER.S:1823
+  ??? lda mobscrn            ; MOVER.S:1825
+  ??? jsr getdown            ; MOVER.S:1826
+  *mobscrn@0xb680 = a            ; MOVER.S:1827
+]rts:
+  return                           ; MOVER.S:1828
+}
+
+fn makerubble {
+  ??? lda moblevel            ; MOVER.S:1835
+  *tempblocky@0x0092 = a            ; MOVER.S:1836
+  ??? lda mobx            ; MOVER.S:1838
+  ??? lsr             ; MOVER.S:1839
+  ??? lsr             ; MOVER.S:1840
+  *tempblockx@0x0091 = a            ; MOVER.S:1841
+  ??? lda mobscrn            ; MOVER.S:1843
+  *tempscrn@0x0093 = a            ; MOVER.S:1844
+  ??? jsr rdblock1            ; MOVER.S:1846
+  ??? cmp #pressplate            ; MOVER.S:1848
+  ??? beq :pp            ; MOVER.S:1849
+  ??? cmp #upressplate            ; MOVER.S:1850
+  ??? beq :jampp            ; MOVER.S:1851
+  ??? cmp #floor            ; MOVER.S:1852
+  ??? beq :notpp            ; MOVER.S:1853
+  ??? cmp #spikes            ; MOVER.S:1854
+  ??? beq :notpp            ; MOVER.S:1855
+  ??? cmp #flask            ; MOVER.S:1856
+  ??? beq :notpp            ; MOVER.S:1857
+  ??? cmp #torch            ; MOVER.S:1858
+  ??? beq :notpp            ; MOVER.S:1859
+  ??? bne ]rts            ; MOVER.S:1860
+:jampp:
+  a = #0x0e                  ; MOVER.S:1862
+  ??? sta (BlueType),y            ; MOVER.S:1863
+:pp:
+  ??? jsr PUSHPP            ; MOVER.S:1865
+  ??? jsr rdblock1            ; MOVER.S:1866
+:notpp:
+  a = #0x0e                  ; MOVER.S:1868
+  ??? sta (BlueType),y            ; MOVER.S:1869
+  tail_call markmob                ; MOVER.S:1870
+}
+
+fn markmob {
+  ??? lda mobscrn            ; MOVER.S:1876
+  ??? cmp VisScrn            ; MOVER.S:1877
+  ??? bne ]rts            ; MOVER.S:1878
+  a = #0x1f                  ; MOVER.S:1880
+  *height@0x0004 = a            ; MOVER.S:1881
+  ??? jsr indexblock            ; MOVER.S:1883
+  a = #0x02                  ; MOVER.S:1884
+  ??? jsr markred            ; MOVER.S:1885
+  ??? jsr markwipe            ; MOVER.S:1886
+  ??? inc tempblockx            ; MOVER.S:1888
+  ??? jsr indexblock            ; MOVER.S:1890
+  a = #0x02                  ; MOVER.S:1891
+  ??? jsr markred            ; MOVER.S:1892
+  ??? jsr markfred            ; MOVER.S:1893
+  tail_call markwipe                ; MOVER.S:1894
+}
+
+fn checkcrush {
+  ??? jsr LoadKid            ; MOVER.S:1904
+  ??? jsr chcrush1            ; MOVER.S:1905
+  ??? bcc ]rts            ; MOVER.S:1906
+  ??? jsr crushchar            ; MOVER.S:1907
+  tail_call SaveKid                ; MOVER.S:1908
+}
+
+fn chcrush1 {
+  ??? lda mobscrn            ; MOVER.S:1911
+  ??? cmp CharScrn            ; MOVER.S:1912
+  ??? bne :no            ; MOVER.S:1913
+  ??? lda mobx            ; MOVER.S:1915
+  ??? lsr             ; MOVER.S:1916
+  ??? lsr             ; MOVER.S:1917
+  ??? cmp CharBlockX            ; MOVER.S:1918
+  ??? bne :no            ; MOVER.S:1919
+  ??? lda moby            ; MOVER.S:1921
+  ??? cmp CharY            ; MOVER.S:1922
+  ??? bcs :no            ; MOVER.S:1923
+  ??? lda CharY            ; MOVER.S:1925
+  ??? sec             ; MOVER.S:1926
+  ??? sbc #CrushDist            ; MOVER.S:1927
+  ??? cmp moby            ; MOVER.S:1928
+  ??? bcs :no            ; MOVER.S:1929
+  ??? sec             ; MOVER.S:1930
+  return                           ; MOVER.S:1931
+}
+
+fn crushchar {
+  ??? lda level            ; MOVER.S:1943
+  ??? cmp #13            ; MOVER.S:1944
+  ??? beq :1            ; MOVER.S:1945
+  ??? lda CharPosn            ; MOVER.S:1946
+  ??? cmp #5            ; MOVER.S:1947
+  ??? bcc :1            ; MOVER.S:1948
+  ??? cmp #15            ; MOVER.S:1949
+  ??? bcc ]rts            ; MOVER.S:1950
+:1:
+  ??? lda CharAction            ; MOVER.S:1952
+  ??? cmp #2            ; MOVER.S:1953
+  ??? bcc :ground            ; MOVER.S:1954
+  ??? cmp #7            ; MOVER.S:1955
+  ??? bne ]rts            ; MOVER.S:1956
+:ground:
+  ??? ldx CharBlockY            ; MOVER.S:1961
+  ??? inx             ; MOVER.S:1962
+  ??? lda FloorY,x            ; MOVER.S:1963
+  *CharY@0x0042 = a            ; MOVER.S:1964
+  a = #0x01                  ; MOVER.S:1966
+  ??? jsr decstr            ; MOVER.S:1967
+  ??? beq :kill            ; MOVER.S:1968
+  ??? lda CharPosn            ; MOVER.S:1970
+  ??? cmp #109            ; MOVER.S:1971
+  ??? beq ]rts            ; MOVER.S:1972
+  a = #0x34                  ; MOVER.S:1973
+  tail_call jumpseq                ; MOVER.S:1974
+}
+
+fn ADDMOBS {
+  ??? ldx nummob            ; MOVER.S:1985
+  ??? beq :rts            ; MOVER.S:1986
+:loop:
+  *tempnt@0x0096 = x            ; MOVER.S:1988
+  ??? jsr loadmob            ; MOVER.S:1989
+  ??? lda mobtype            ; MOVER.S:1991
+  ??? bne :1            ; MOVER.S:1992
+  ??? jsr ATM            ; MOVER.S:1993
+:1:
+  ??? ldx tempnt            ; MOVER.S:1995
+  ??? dex             ; MOVER.S:1996
+  ??? bne :loop            ; MOVER.S:1997
+:rts:
+]rts:
+  return                           ; MOVER.S:1999
+}
+
+fn ATM {
+  ??? lda mobscrn            ; MOVER.S:2010
+  ??? cmp VisScrn            ; MOVER.S:2011
+  ??? bne :ok2            ; MOVER.S:2012
+  ??? lda moby            ; MOVER.S:2014
+  ??? cmp #192+17            ; MOVER.S:2015
+  ??? bcc :ok            ; MOVER.S:2016
+  return                           ; MOVER.S:2017
+}
+
+fn addmobobj {
+  ??? inc objX            ; MOVER.S:2087
+  ??? ldx objX            ; MOVER.S:2088
+  ??? lda mobtype            ; MOVER.S:2090
+  ??? ora #$80            ; MOVER.S:2091
+  ??? sta objTYP,x            ; MOVER.S:2092
+  ??? lda mobx            ; MOVER.S:2094
+  ??? sta objX,x            ; MOVER.S:2095
+  a = #0x00                  ; MOVER.S:2096
+  ??? sta objOFF,x            ; MOVER.S:2097
+  ??? lda moby            ; MOVER.S:2099
+  ??? sta objY,x            ; MOVER.S:2100
+  ??? lda mobframe            ; MOVER.S:2102
+  ??? sta objIMG,x            ; MOVER.S:2103
+  a = #0x00                  ; MOVER.S:2105
+  ??? sta objCU,x            ; MOVER.S:2106
+  ??? sta objCL,x            ; MOVER.S:2107
+  a = #0x28                  ; MOVER.S:2108
+  ??? sta objCR,x            ; MOVER.S:2109
+  tail_call setobjindx                ; MOVER.S:2111
+}
+
+fn SHAKEM {
+  ??? ldx level            ; MOVER.S:2121
+  ??? cpx #13            ; MOVER.S:2122
+  ??? beq ]rts            ; MOVER.S:2123
+  *tempblocky@0x0092 = a            ; MOVER.S:2125
+  ??? lda VisScrn            ; MOVER.S:2127
+  *tempscrn@0x0093 = a            ; MOVER.S:2128
+SHAKEM1:
+  x = #0x09                  ; MOVER.S:2131
+:loop:
+  ??? txa             ; MOVER.S:2132
+  ??? pha             ; MOVER.S:2133
+  *tempblockx@0x0091 = a            ; MOVER.S:2134
+  ??? jsr rdblock1            ; MOVER.S:2136
+  ??? cmp #loose            ; MOVER.S:2137
+  ??? bne :cont            ; MOVER.S:2138
+  ??? jsr shakeit            ; MOVER.S:2140
+:cont:
+  ??? pla             ; MOVER.S:2142
+  ??? tax             ; MOVER.S:2143
+  ??? dex             ; MOVER.S:2144
+  ??? bpl :loop            ; MOVER.S:2145
+]rts:
+  return                           ; MOVER.S:2147
+}
+
+fn SHAKEM1 {
+  x = #0x09                  ; MOVER.S:2131
+:loop:
+  ??? txa             ; MOVER.S:2132
+  ??? pha             ; MOVER.S:2133
+  *tempblockx@0x0091 = a            ; MOVER.S:2134
+  ??? jsr rdblock1            ; MOVER.S:2136
+  ??? cmp #loose            ; MOVER.S:2137
+  ??? bne :cont            ; MOVER.S:2138
+  ??? jsr shakeit            ; MOVER.S:2140
+:cont:
+  ??? pla             ; MOVER.S:2142
+  ??? tax             ; MOVER.S:2143
+  ??? dex             ; MOVER.S:2144
+  ??? bpl :loop            ; MOVER.S:2145
+]rts:
+  return                           ; MOVER.S:2147
+}
+
+fn shakeit {
+  ??? lda (BlueSpec),y            ; MOVER.S:2153
+  ??? bmi ]rts            ; MOVER.S:2154
+  ??? bne ]rts            ; MOVER.S:2155
+  a = #0x80                  ; MOVER.S:2157
+  ??? sta (BlueSpec),y            ; MOVER.S:2158
+  *trloc@0xb600 = y            ; MOVER.S:2160
+  ??? lda tempscrn            ; MOVER.S:2162
+  *trscrn@0xb620 = a            ; MOVER.S:2163
+  a = #0x01                  ; MOVER.S:2165
+  *trdirec@0xb640 = a            ; MOVER.S:2166
+  tail_call addtrob                ; MOVER.S:2168
+}

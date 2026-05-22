@@ -21,7 +21,7 @@ from pop_lifter.ir1 import (
     StoreAbs,
 )
 from pop_lifter.pass0_parse import parse_files
-from pop_lifter.pass1_lift import lift_file
+from pop_lifter.pass1_lift import discover_entries, lift_file
 
 
 PILOT_ENTRIES = [
@@ -118,3 +118,50 @@ def test_source_refs_preserved(source_dir):
             assert item.src.line >= 1
             assert item.src.file.endswith("AUTO.S")
             assert item.src.raw.strip() != ""
+
+
+def test_discover_entries_finds_pilot_labels(source_dir):
+    auto = source_dir / "AUTO.S"
+    ast = parse_files(
+        [source_dir / "EQ.S", source_dir / "GAMEEQ.S", auto],
+        search_paths=[source_dir],
+    )
+    file_ast = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
+    entries = discover_entries(file_ast)
+
+    # Every entry must be a global-style label.
+    for name in entries:
+        assert not name.startswith(":")
+        assert not name.startswith("]")
+
+    # The combat pilot labels must all be discovered, including bare
+    # labels on consecutive lines (`DoUp`, `DoDown`, `DoFwd`, `DoBack`,
+    # `DoPress`).
+    found = set(entries)
+    for name in [
+        "DoStrike", "DoPress", "DoBlock", "DoUp", "DoTurn", "DoDown",
+        "DoStandup", "DoEngarde", "DoRelBtn", "DoRelease",
+        "DoAdvance", "DoFwd", "DoRetreat", "DoBack",
+    ]:
+        assert name in found, f"discover_entries missed {name!r}"
+
+
+def test_discover_entries_skips_data_only_labels(source_dir):
+    # AUTO.S has `plus1 db -1,1` — a label bound to a data directive,
+    # not a code instruction. The discovery pass must not return it as
+    # an entry point.
+    auto = source_dir / "AUTO.S"
+    ast = parse_files([auto], search_paths=[source_dir])
+    file_ast = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
+    entries = discover_entries(file_ast)
+    assert "plus1" not in entries
+    assert "minus1" not in entries
+
+
+def test_discover_entries_skips_equate_only_files(source_dir):
+    # EQ.S and GAMEEQ.S contain only equates and dum overlays. There
+    # is nothing to lift, so discovery must return an empty list.
+    for name in ("EQ.S", "GAMEEQ.S"):
+        ast = parse_files([source_dir / name], search_paths=[source_dir])
+        file_ast = next(f for f in ast.files if Path(f.path).name == name)
+        assert discover_entries(file_ast) == []
