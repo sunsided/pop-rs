@@ -69,11 +69,14 @@ from .ir1 import (
     Pla,
     Reg,
     Return,
+    Rol,
+    Ror,
     Routine,
     SbcAbs,
     SbcImm,
     SbcIndexed,
     Sec,
+    ShiftMem,
     StoreAbs,
     StoreIndexed,
     StoreIndirect,
@@ -414,6 +417,47 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         # always 0 anyway — but we spell it out for clarity.
         trace.n = 0
         trace.z = 1 if new == 0 else 0
+        return True
+    if isinstance(item, Rol):
+        old = trace.a & 0xff
+        new = ((old << 1) | (trace.c & 1)) & 0xff
+        trace.a = new
+        trace.c = (old >> 7) & 1
+        _set_zn(trace, new)
+        return True
+    if isinstance(item, Ror):
+        old = trace.a & 0xff
+        new = ((old >> 1) | ((trace.c & 1) << 7)) & 0xff
+        trace.a = new
+        trace.c = old & 1
+        _set_zn(trace, new)
+        return True
+    if isinstance(item, ShiftMem):
+        # Memory shift/rotate. The flag effects mirror the accumulator
+        # variants; just the operand lives in RAM.
+        addr = _real_addr(item.target.addr, item.src)
+        old = ram[addr]
+        if item.op == "asl":
+            new = (old << 1) & 0xff
+            trace.c = (old >> 7) & 1
+            _set_zn(trace, new)
+        elif item.op == "lsr":
+            new = old >> 1
+            trace.c = old & 1
+            trace.n = 0
+            trace.z = 1 if new == 0 else 0
+        elif item.op == "rol":
+            new = ((old << 1) | (trace.c & 1)) & 0xff
+            trace.c = (old >> 7) & 1
+            _set_zn(trace, new)
+        elif item.op == "ror":
+            new = ((old >> 1) | ((trace.c & 1) << 7)) & 0xff
+            trace.c = old & 1
+            _set_zn(trace, new)
+        else:
+            raise InterpError(f"unknown ShiftMem op {item.op!r}")
+        ram[addr] = new
+        trace.writes[addr] = new
         return True
     if isinstance(item, Bit):
         operand = (

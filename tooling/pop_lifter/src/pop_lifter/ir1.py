@@ -245,9 +245,49 @@ class Lsr:
     `C = old A bit 0`, `A = A >> 1`. N is always 0 (the shifted-in
     bit). Z = (A == 0).
 
-    Memory `lsr addr` would need a separate node; none of the
-    routines lifted so far emit it."""
+    Memory variants go through `ShiftMem(op="lsr", target=addr)`."""
 
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class Rol:
+    """`rol a` / `rol` — accumulator rotate left through carry.
+    `new C = old A bit 7`, `new A = (A << 1) | old C`. Sets Z/N from
+    the result. Symmetric with `Asl` but rotates the carry bit in
+    from the bottom instead of shifting in a 0."""
+
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class Ror:
+    """`ror a` / `ror` — accumulator rotate right through carry.
+    `new C = old A bit 0`, `new A = (A >> 1) | (old C << 7)`. Sets
+    Z/N from the result. Symmetric with `Lsr` but rotates the carry
+    bit in from the top instead of shifting in a 0."""
+
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class ShiftMem:
+    """Memory shift / rotate. `op` ∈ {"asl", "lsr", "rol", "ror"}.
+    The target byte is read from memory, shifted/rotated, and
+    written back. Same flag effects as the accumulator variants
+    (`Asl`/`Lsr`/`Rol`/`Ror`).
+
+    POP uses these mostly for the 16-bit-shift idiom:
+
+        asl framepoint          ; low byte: bit 7 → C, shift left
+        rol framepoint+1        ; high byte: rotate in C from low
+
+    That two-instruction pair is a 16-bit `framepoint <<= 1`. Lifted
+    pairwise as two `ShiftMem` nodes; pass 3 can fold them into the
+    16-bit operation later."""
+
+    op: str
+    target: Abs
     src: SourceRef
 
 
@@ -635,6 +675,7 @@ Instr = (
     | SbcImm | SbcAbs | Lsr | Bit
     | Pha | Pla
     | CmpIndexed | AdcIndexed | SbcIndexed
+    | Rol | Ror | ShiftMem
     | Unsupported
 )
 Item = Label | Instr
@@ -760,6 +801,18 @@ def format_item(item: Item) -> str:
         return f"  a = a - *{_fmt_abs(item.source)} - (1 - c) ; {item.src.short()}"
     if isinstance(item, Lsr):
         return f"  a = a >> 1                       ; {item.src.short()}"
+    if isinstance(item, Rol):
+        return f"  a = (a << 1) | c                 ; {item.src.short()}"
+    if isinstance(item, Ror):
+        return f"  a = (a >> 1) | (c << 7)          ; {item.src.short()}"
+    if isinstance(item, ShiftMem):
+        sym = {
+            "asl": "<<",
+            "lsr": ">>",
+            "rol": "<rol",
+            "ror": "ror>",
+        }[item.op]
+        return f"  *{_fmt_abs(item.target)} {sym}= 1                 ; {item.src.short()}"
     if isinstance(item, Bit):
         rhs = _fmt_imm(item.source) if isinstance(item.source, Imm) else f"*{_fmt_abs(item.source)}"
         return f"  bit {rhs}                ; {item.src.short()}"

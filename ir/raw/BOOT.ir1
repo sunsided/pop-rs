@@ -67,7 +67,7 @@ fn CHECKER {
   a = *$0C00@0x0c00        ; BOOT.S:126
   cmp a, #0xee              ; BOOT.S:127
   if ne goto :0       ; BOOT.S:128
-  ??? asl $0C00            ; BOOT.S:129
+  *$0C00@0x0c00 <<= 1                 ; BOOT.S:129
   a = *$0800@0x0800        ; BOOT.S:130
   cmp a, *$0C00@0x0c00    ; BOOT.S:131
   if eq goto :1       ; BOOT.S:132

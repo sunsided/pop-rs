@@ -106,11 +106,14 @@ from .ir1 import (
     ModuleIR1,
     Pla,
     Return,
+    Rol,
+    Ror,
     Routine,
     SbcAbs,
     SbcImm,
     SbcIndexed,
     Sec,
+    ShiftMem,
     Transfer,
     Unsupported,
 )
@@ -168,9 +171,12 @@ def _affected_register(item: Item):
     if isinstance(item, Bitwise):
         from .ir1 import Reg
         return Reg.A
-    if isinstance(item, (SbcImm, SbcAbs, SbcIndexed, Lsr)):
-        # All four define A's new value as their flag-side-effect,
+    if isinstance(item, (SbcImm, SbcAbs, SbcIndexed, Lsr, Rol, Ror)):
+        # All six define A's new value as their flag-side-effect,
         # so a subsequent `beq`/`bne`/`bpl`/`bmi` reads Z/N of A.
+        # Rol/Ror are added here for symmetry with Asl/Lsr; the
+        # accumulator rotate forms expose A's new value the same
+        # way the shift forms do.
         from .ir1 import Reg
         return Reg.A
     # Adc{Imm,Abs,Indexed} deliberately NOT here — Adc both reads
@@ -255,7 +261,7 @@ def _defines_flags(item: Item) -> bool:
             CmpImm, CmpAbs, CmpIndexed,
             LoadImm, LoadAbs, LoadIndexed, LoadIndirect,
             IncTarget, DecTarget, Transfer, Bitwise,
-            SbcImm, SbcAbs, SbcIndexed, Lsr, Bit,
+            SbcImm, SbcAbs, SbcIndexed, Lsr, Rol, Ror, Bit, ShiftMem,
             Pla,
             # AdcIndexed: see `_affected_register` note — adc lacks
             # the symmetric fusion path the others have, so its
@@ -556,10 +562,18 @@ def _backward_sweep(
             live -= {"Z", "N", "C"}
             continue
 
-        if isinstance(item, (Asl, Lsr)):
-            # Both accumulator shifts write Z,N,C and mutate A, so
-            # they're never eligible for elision even when the flags
-            # are dead — but their flag writes do clear the live set.
+        if isinstance(item, (Asl, Lsr, Rol, Ror)):
+            # All four accumulator shifts/rotates write Z,N,C and
+            # mutate A, so they're never eligible for elision even
+            # when the flags are dead — but their flag writes do
+            # clear the live set.
+            live -= {"Z", "N", "C"}
+            continue
+
+        if isinstance(item, ShiftMem):
+            # Memory shift/rotate. Same flag effect (writes Z,N,C)
+            # but the side effect is on RAM rather than A. Never
+            # elidable — the memory write is the whole point.
             live -= {"Z", "N", "C"}
             continue
 
