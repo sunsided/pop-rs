@@ -9,10 +9,10 @@ fn ZEROSOUND  (aka lookup, endlook) {
 fn ADDSOUND {
   ??? stx savex            ; SOUND.S:80
   x = *soundtable@0xb6c0        ; SOUND.S:82
-  ??? cpx #maxsfx            ; SOUND.S:83
-  ??? bcs :rts            ; SOUND.S:84
+  cmp x, #0x20              ; SOUND.S:83
+  if cs goto :rts       ; SOUND.S:84
   ??? inx             ; SOUND.S:86
-  ??? sta soundtable,x            ; SOUND.S:87
+  *(soundtable@0xb6c0 + x) = a   ; SOUND.S:87
   *soundtable@0xb6c0 = x            ; SOUND.S:88
 :rts:
   ??? ldx savex            ; SOUND.S:90
@@ -21,16 +21,16 @@ fn ADDSOUND {
 
 fn PLAYBACK {
   a = *soundon@0x0203        ; SOUND.S:101
-  ??? beq :rts            ; SOUND.S:102
+  if eq goto :rts       ; SOUND.S:102
   x = *soundtable@0xb6c0        ; SOUND.S:104
-  ??? beq :rts            ; SOUND.S:105
+  if eq goto :rts       ; SOUND.S:105
 :loop:
-  ??? lda soundtable,x            ; SOUND.S:107
+  a = *(soundtable@0xb6c0 + x)   ; SOUND.S:107
   ??? stx savex            ; SOUND.S:109
   call makesound                  ; SOUND.S:111
   ??? ldx savex            ; SOUND.S:113
   ??? dex             ; SOUND.S:115
-  ??? bne :loop            ; SOUND.S:116
+  if ne goto :loop       ; SOUND.S:116
 :rts:
   return                           ; SOUND.S:118
 }
@@ -38,7 +38,7 @@ fn PLAYBACK {
 fn makesound {
   a = a << 1                       ; SOUND.S:128
   ??? cmp #maxaddr            ; SOUND.S:129
-  ??? bcs :rts            ; SOUND.S:130
+  if cs goto :rts       ; SOUND.S:130
   ??? tax             ; SOUND.S:132
   ??? lda lookup,x            ; SOUND.S:133
   ??? sta :sm+1            ; SOUND.S:134
@@ -46,6 +46,8 @@ fn makesound {
   ??? sta :sm+2            ; SOUND.S:136
 :sm:
   tail_call $ffff                ; SOUND.S:138
+:rts:
+  return                           ; SOUND.S:140
 }
 
 fn DoPlateDown {
@@ -99,10 +101,29 @@ fn DoSplat {
 
 fn DoMirrorCrack {
   tail_call DoSplat                ; SOUND.S:221
+  return                           ; SOUND.S:222
 }
 
 fn DoLooseCrash {
   tail_call DoSplat                ; SOUND.S:228
+DoGotKey:
+DoFlashMsg:
+  a = #0x02                  ; SOUND.S:240
+:loop:
+  ??? pha             ; SOUND.S:241
+  y = #0xf4                  ; SOUND.S:243
+  x = #0xf4                  ; SOUND.S:244
+  a = #0x0f                  ; SOUND.S:245
+  call tone                  ; SOUND.S:246
+  y = #0x64                  ; SOUND.S:248
+  x = #0x64                  ; SOUND.S:249
+  a = #0x19                  ; SOUND.S:250
+  call tone                  ; SOUND.S:251
+  ??? pla             ; SOUND.S:253
+  c = 1                            ; SOUND.S:254
+  ??? sbc #1            ; SOUND.S:255
+  if ne goto :loop       ; SOUND.S:256
+  return                           ; SOUND.S:258
 }
 
 fn DoGotKey  (aka DoFlashMsg) {
@@ -120,7 +141,7 @@ fn DoGotKey  (aka DoFlashMsg) {
   ??? pla             ; SOUND.S:253
   c = 1                            ; SOUND.S:254
   ??? sbc #1            ; SOUND.S:255
-  ??? bne :loop            ; SOUND.S:256
+  if ne goto :loop       ; SOUND.S:256
   return                           ; SOUND.S:258
 }
 
@@ -157,6 +178,8 @@ fn DoSmackWall {
   x = #0xe8                  ; SOUND.S:304
   a = #0x03                  ; SOUND.S:305
   tail_call tone                ; SOUND.S:306
+]rts:
+  return                           ; SOUND.S:308
 }
 
 fn DoImpaled {
@@ -178,12 +201,13 @@ fn tone {
 :inloop:
   ??? iny             ; SOUND.S:340
   ??? cpy :pitch            ; SOUND.S:341
-  ??? bcc :inloop            ; SOUND.S:342
+  if cc goto :inloop       ; SOUND.S:342
   ??? inx             ; SOUND.S:344
   ??? cpx :pitch+1            ; SOUND.S:345
-  ??? bcc :midloop            ; SOUND.S:346
+  if cc goto :midloop       ; SOUND.S:346
   c = 1                            ; SOUND.S:348
   ??? sbc #1            ; SOUND.S:349
-  ??? bne :outloop            ; SOUND.S:350
+  if ne goto :outloop       ; SOUND.S:350
   return                           ; SOUND.S:352
+  ??? usr $a9,20,$e00,*-org            ; SOUND.S:359
 }

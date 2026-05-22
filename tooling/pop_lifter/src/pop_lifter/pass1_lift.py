@@ -42,13 +42,17 @@ from .ir1 import (
     AdcAbs,
     AdcImm,
     Asl,
+    Branch,
     Call,
     Clc,
+    CmpAbs,
+    CmpImm,
     Goto,
     Imm,
     Label,
     LoadAbs,
     LoadImm,
+    LoadIndexed,
     ModuleIR1,
     Reg,
     Return,
@@ -56,6 +60,7 @@ from .ir1 import (
     Sec,
     SourceRef,
     StoreAbs,
+    StoreIndexed,
     Unsupported,
 )
 from .pass0_lex import Line
@@ -131,6 +136,32 @@ def _parse_absolute(operand: str, equates: dict[str, int]) -> Abs | None:
     return Abs(name=s, addr=addr & 0xffff)
 
 
+def _parse_indexed(
+    operand: str,
+    equates: dict[str, int],
+) -> tuple[Abs, Reg] | None:
+    """Parse `expr,x` or `expr,y` — the 6502 indexed-absolute / indexed-
+    zero-page form. Returns the base address and the index register, or
+    `None` if the operand isn't a comma-suffixed form we recognise."""
+    s = operand.strip()
+    if "," not in s or s.startswith("("):
+        return None
+    base_str, _, idx_str = s.rpartition(",")
+    base_str = base_str.strip()
+    idx_str = idx_str.strip().lower()
+    if idx_str == "x":
+        idx_reg = Reg.X
+    elif idx_str == "y":
+        idx_reg = Reg.Y
+    else:
+        return None
+    try:
+        addr = eval_expr(base_str, equates)
+    except ValueError:
+        return None
+    return Abs(name=base_str, addr=addr & 0xffff), idx_reg
+
+
 def _reg_of_load(mnemonic: str) -> Reg:
     return {"lda": Reg.A, "ldx": Reg.X, "ldy": Reg.Y}[mnemonic]
 
@@ -179,20 +210,49 @@ def _lift_instr(
         imm = _parse_immediate(line.operand, equates)
         if imm is not None:
             return LoadImm(reg=_reg_of_load(mnemonic), imm=imm, src=src)
+        idx = _parse_indexed(line.operand, equates)
+        if idx is not None:
+            base, idx_reg = idx
+            return LoadIndexed(
+                reg=_reg_of_load(mnemonic), base=base, index=idx_reg, src=src,
+            )
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return LoadAbs(reg=_reg_of_load(mnemonic), source=addr, src=src)
-        # Indexed / indirect-indexed loads (`,x`, `,y`, `(ptr),y`) land
-        # with the CheckFloor slice.
+        # Indirect-indexed `(ptr),y` lands in a later slice.
         return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
 
     if mnemonic in ("sta", "stx", "sty"):
         if line.operand is None:
             return Unsupported(mnemonic=mnemonic, operand=None, src=src)
+        idx = _parse_indexed(line.operand, equates)
+        if idx is not None:
+            base, idx_reg = idx
+            return StoreIndexed(
+                reg=_reg_of_store(mnemonic), base=base, index=idx_reg, src=src,
+            )
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return StoreAbs(reg=_reg_of_store(mnemonic), target=addr, src=src)
         return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
+
+    if mnemonic in ("cmp", "cpx", "cpy"):
+        if line.operand is None:
+            return Unsupported(mnemonic=mnemonic, operand=None, src=src)
+        reg = {"cmp": Reg.A, "cpx": Reg.X, "cpy": Reg.Y}[mnemonic]
+        imm = _parse_immediate(line.operand, equates)
+        if imm is not None:
+            return CmpImm(reg=reg, imm=imm, src=src)
+        addr = _parse_absolute(line.operand, equates)
+        if addr is not None:
+            return CmpAbs(reg=reg, source=addr, src=src)
+        return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
+
+    if mnemonic in ("beq", "bne", "bcc", "bcs", "bpl", "bmi", "bvc", "bvs"):
+        if not line.operand:
+            return Unsupported(mnemonic=mnemonic, operand=None, src=src)
+        cond = mnemonic[1:]      # strip the leading `b`
+        return Branch(cond=cond, target=line.operand.strip(), src=src)
 
     if mnemonic == "jsr":
         if not line.operand:
@@ -329,6 +389,24 @@ def lift_file(
             # binding wins. That matches Merlin's pass-2 assemble order.
             label_to_instr_index[lab] = i
 
+    def _nearest_macro_label_before(start_idx: int, name: str) -> Line | None:
+        """Walk backwards from `start_idx` looking for `name` defined on
+        its own code line (`]rts rts` and similar). Returns the matching
+        `Line`, or `None` if nothing's found before the file start.
+
+        Used to attach the implicit `]rts:` trampoline that Merlin
+        routines branch to but don't define locally."""
+        scan = start_idx - 1
+        while scan >= 0:
+            ln = lines[scan]
+            if ln.is_blank:
+                scan -= 1
+                continue
+            if ln.label == name and ln.mnemonic == "rts":
+                return ln
+            scan -= 1
+        return None
+
     def walk_from(start_idx: int, entry_labels: list[str]) -> Routine:
         # First label in source order is the canonical name.
         name, *aliases = entry_labels
@@ -395,11 +473,70 @@ def lift_file(
                 # interpreter will refuse to execute.
 
             if line.mnemonic in _TERMINATORS:
-                return routine
+                # An unconditional terminator (rts/jmp/bra) doesn't
+                # necessarily end the routine — Merlin routines often
+                # branch *forward* past a `jmp`, e.g. CHECKFLOOR's
+                # `bne :2` skips over `:ong jmp onground`. The routine
+                # really ends at the next *global* label, since that
+                # marks where a new entry point starts. Walk forward
+                # looking for either a global label (stop) or a local
+                # label / further code (keep going).
+                lookahead = idx + 1
+                while lookahead < len(lines):
+                    nxt = lines[lookahead]
+                    if nxt.is_blank or (
+                        nxt.mnemonic is None and nxt.label is None
+                    ):
+                        lookahead += 1
+                        continue
+                    if nxt.label and not _is_local_label(nxt.label):
+                        # A new global-named routine starts here.
+                        return routine
+                    # A local label, or unlabeled code that follows
+                    # the terminator — keep walking.
+                    break
+                else:
+                    # Hit EOF without finding any further code.
+                    return routine
 
             idx += 1
 
         return routine
+
+    def _attach_macro_returns(routine: Routine, start_idx: int) -> None:
+        """Merlin's shared `]rts rts` trampolines live *before* a
+        routine's entry point, so the lifter doesn't naturally include
+        them in the body. If the routine branches to a macro label like
+        `]rts` and doesn't define it locally, synthesize the trampoline:
+        a `Label` + `Return` tail attached after the routine's last
+        terminator. Source-ref points at the original trampoline line
+        (or, if none was found, the routine's first instruction).
+        """
+        wanted: set[str] = set()
+        defined: set[str] = set()
+        for item in routine.body:
+            if isinstance(item, Label):
+                defined.add(item.name)
+            elif isinstance(item, Branch):
+                if item.target.startswith("]"):
+                    wanted.add(item.target)
+        needed = wanted - defined
+        if not needed:
+            return
+        for target in sorted(needed):
+            origin = _nearest_macro_label_before(start_idx, target)
+            if origin is None:
+                # No matching trampoline anywhere — leave the branch
+                # unresolved; the interpreter will surface a clear
+                # error pointing at the branch site.
+                continue
+            ref = SourceRef(
+                file=str(origin.file),
+                line=origin.lineno,
+                raw=origin.raw.rstrip("\n"),
+            )
+            routine.body.append(Label(name=target, src=ref))
+            routine.body.append(Return(src=ref))
 
     while requested:
         name = requested.pop(0)
@@ -459,6 +596,7 @@ def lift_file(
                 ordered.append(extra)
 
         routine = walk_from(idx, ordered)
+        _attach_macro_returns(routine, idx)
         module.routines.append(routine)
         for n in routine.all_entry_names():
             lifted_names.add(n)

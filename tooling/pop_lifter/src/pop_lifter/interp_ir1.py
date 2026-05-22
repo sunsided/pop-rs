@@ -39,18 +39,23 @@ from .ir1 import (
     AdcAbs,
     AdcImm,
     Asl,
+    Branch,
     Call,
     Clc,
+    CmpAbs,
+    CmpImm,
     Goto,
     Label,
     LoadAbs,
     LoadImm,
+    LoadIndexed,
     ModuleIR1,
     Reg,
     Return,
     Routine,
     Sec,
     StoreAbs,
+    StoreIndexed,
     Unsupported,
 )
 
@@ -61,13 +66,25 @@ class InterpError(RuntimeError):
 
 @dataclass
 class Trace:
-    """The observable post-state of an interpreter run."""
+    """The observable post-state of an interpreter run.
+
+    Flag semantics follow the 6502 datasheet, restricted to the bits
+    pass 1 actually needs:
+
+    * `c` — carry. Set by `asl`, `adc`, `cmp`. Read by `adc`, `bcc/bcs`.
+    * `z` — zero. Set by every defining op (`lda*/adc/asl/cmp`).
+    * `n` — negative (bit 7 of result). Same set of definers as `z`.
+    * `v` (overflow) is not modelled; pass 1 never emits `bvc`/`bvs`
+      and Mechner's source doesn't either in the sections lifted so far.
+    """
 
     ram: bytearray
     a: int
     x: int
     y: int
-    c: int = 0          # carry flag (0 or 1)
+    c: int = 0          # carry
+    z: int = 0          # zero
+    n: int = 0          # negative
     writes: dict[int, int] = field(default_factory=dict)  # addr -> last value
     steps: int = 0
     max_stack_depth: int = 0
@@ -82,13 +99,45 @@ class Trace:
         return out
 
 
-def _find_label_index(routine: Routine, name: str) -> int:
+def _set_zn(trace: Trace, value: int) -> None:
+    """Update Z and N from an 8-bit result. Matches the 6502: Z is set
+    when the value is exactly zero; N mirrors bit 7."""
+    v = value & 0xff
+    trace.z = 1 if v == 0 else 0
+    trace.n = (v >> 7) & 1
+
+
+def _branch_taken(cond: str, trace: Trace) -> bool:
+    """Evaluate a `Branch.cond` against the current flag state. Raises
+    `InterpError` for conditions whose flags aren't tracked yet."""
+    if cond == "eq":
+        return trace.z == 1
+    if cond == "ne":
+        return trace.z == 0
+    if cond == "cc":
+        return trace.c == 0
+    if cond == "cs":
+        return trace.c == 1
+    if cond == "pl":
+        return trace.n == 0
+    if cond == "mi":
+        return trace.n == 1
+    if cond in ("vc", "vs"):
+        raise InterpError(
+            f"branch condition {cond!r} reads the overflow flag, "
+            f"which the interpreter does not track yet"
+        )
+    raise InterpError(f"unknown branch condition: {cond!r}")
+
+
+def _find_label_index(routine: Routine, name: str) -> int | None:
+    """Return the index of `Label(name=name)` inside `routine.body`, or
+    `None` if the label isn't local to this routine. The caller decides
+    whether a `None` is fatal or a cue to look across modules."""
     for idx, item in enumerate(routine.body):
         if isinstance(item, Label) and item.name == name:
             return idx
-    raise InterpError(
-        f"local goto target {name!r} not found in routine {routine.name!r}"
-    )
+    return None
 
 
 def _resolve(
@@ -183,6 +232,7 @@ def run(
                 trace.x = value
             else:
                 trace.y = value
+            _set_zn(trace, value)
             idx += 1
             continue
 
@@ -194,6 +244,21 @@ def run(
                 trace.x = value
             else:
                 trace.y = value
+            _set_zn(trace, value)
+            idx += 1
+            continue
+
+        if isinstance(item, LoadIndexed):
+            idx_val = trace.x if item.index is Reg.X else trace.y
+            addr = (item.base.addr + idx_val) & 0xffff
+            value = ram[addr]
+            if item.reg is Reg.A:
+                trace.a = value
+            elif item.reg is Reg.X:
+                trace.x = value
+            else:
+                trace.y = value
+            _set_zn(trace, value)
             idx += 1
             continue
 
@@ -209,10 +274,25 @@ def run(
             idx += 1
             continue
 
+        if isinstance(item, StoreIndexed):
+            value = {
+                Reg.A: trace.a,
+                Reg.X: trace.x,
+                Reg.Y: trace.y,
+            }[item.reg]
+            idx_val = trace.x if item.index is Reg.X else trace.y
+            addr = (item.base.addr + idx_val) & 0xffff
+            ram[addr] = value
+            trace.writes[addr] = value
+            idx += 1
+            continue
+
         if isinstance(item, Asl):
             old = trace.a & 0xff
-            trace.a = (old << 1) & 0xff
+            new = (old << 1) & 0xff
+            trace.a = new
             trace.c = (old >> 7) & 1
+            _set_zn(trace, new)
             idx += 1
             continue
 
@@ -230,6 +310,7 @@ def run(
             total = (trace.a & 0xff) + (item.imm.value & 0xff) + trace.c
             trace.a = total & 0xff
             trace.c = 1 if total > 0xff else 0
+            _set_zn(trace, trace.a)
             idx += 1
             continue
 
@@ -237,7 +318,46 @@ def run(
             total = (trace.a & 0xff) + ram[item.source.addr & 0xffff] + trace.c
             trace.a = total & 0xff
             trace.c = 1 if total > 0xff else 0
+            _set_zn(trace, trace.a)
             idx += 1
+            continue
+
+        if isinstance(item, (CmpImm, CmpAbs)):
+            reg_val = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
+            if isinstance(item, CmpImm):
+                rhs = item.imm.value & 0xff
+            else:
+                rhs = ram[item.source.addr & 0xffff]
+            # 6502 CMP: compute reg - rhs without storing. C = no-borrow
+            # (i.e. reg >= rhs); Z = (reg == rhs); N = bit 7 of result.
+            diff = (reg_val - rhs) & 0xff
+            trace.c = 1 if reg_val >= rhs else 0
+            _set_zn(trace, diff)
+            idx += 1
+            continue
+
+        if isinstance(item, Branch):
+            if _branch_taken(item.cond, trace):
+                # Local label takes precedence — common case (e.g.
+                # `beq :2`). If absent, treat the branch as a
+                # conditional tail call into another routine (e.g.
+                # CHECKFLOOR's `beq falling`).
+                local = _find_label_index(routine, item.target)
+                if local is not None:
+                    idx = local
+                else:
+                    target_routine = _resolve(modules, aliases, item.target)
+                    if target_routine is None:
+                        raise InterpError(
+                            f"branch target {item.target!r} not found "
+                            f"locally in {routine.name!r} or in any "
+                            f"loaded module (aliases: {aliases!r})"
+                        )
+                    routine = target_routine
+                    body = routine.body
+                    idx = 0
+            else:
+                idx += 1
             continue
 
         if isinstance(item, Call):
@@ -267,7 +387,13 @@ def run(
                 idx = 0
                 continue
             # local goto
-            idx = _find_label_index(routine, item.target)
+            local = _find_label_index(routine, item.target)
+            if local is None:
+                raise InterpError(
+                    f"local goto target {item.target!r} not found in "
+                    f"routine {routine.name!r}"
+                )
+            idx = local
             continue
 
         if isinstance(item, Return):

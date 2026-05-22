@@ -233,6 +233,53 @@ def test_rnd_lift_shape(source_dir):
     assert isinstance(body[-1], Return)
 
 
+# ---- CheckFloor slice: cmp, conditional branches, ]rts trampoline
+
+
+def test_checkfloor_lift_shape(source_dir):
+    """`CHECKFLOOR` exercises the new cmp/branch surface plus the
+    routine-extension and `]rts` macro-return synthesis that the
+    lifter needed for this slice."""
+    from pop_lifter.ir1 import (
+        Branch,
+        CmpImm,
+        Goto,
+        Label,
+        LoadAbs,
+        Return,
+    )
+
+    module = _lift(source_dir, "CTRL.S", ["CHECKFLOOR"])
+    routine = module.find("CHECKFLOOR")
+    assert routine is not None
+
+    # The synthesized `]rts:` trampoline must appear as the last two
+    # items so branches to `]rts` from within the body resolve.
+    assert isinstance(routine.body[-1], Return)
+    assert isinstance(routine.body[-2], Label)
+    assert routine.body[-2].name == "]rts"
+
+    # The body must reach past the first `jmp onground` — `:2` is
+    # defined *after* it in source order and is the entry for the
+    # action-4 / action-3 paths.
+    label_names = [item.name for item in routine.body if isinstance(item, Label)]
+    assert ":2" in label_names
+    assert ":1" in label_names
+    assert ":ong" in label_names
+
+    # Spot-check key instructions: the first lda + cmp + beq triple.
+    assert isinstance(routine.body[0], LoadAbs)
+    assert routine.body[0].source.name == "CharAction"
+    assert isinstance(routine.body[1], CmpImm)
+    assert routine.body[1].imm.value == 6
+    assert isinstance(routine.body[2], Branch)
+    assert routine.body[2].cond == "eq" and routine.body[2].target == "]rts"
+
+    # One of the tail-calls is `jmp onground` — confirmed via Goto.
+    gotos = [item for item in routine.body if isinstance(item, Goto)]
+    assert any(g.target == "onground" and g.kind == "tail_call" for g in gotos)
+
+
 def test_jsr_lifts_to_call(source_dir):
     """Every `jsr X` becomes a `Call(X)` IR node. AUTOCTRL's first
     instruction is `jsr DoRelease`, which is a stable anchor across
