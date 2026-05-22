@@ -22,7 +22,7 @@ Inspectable intermediate artifacts:
 | `ir/pilot/auto_combat.ir1`    | Pass-1 IR1: the combat-button routines from `AUTO.S` (first pilot slice).                           |
 | `ir/pilot/rndp.ir1`           | Pass-1 IR1: `rndp` (AUTO.S) + `RND` (GRAFIX.S) — the cross-module RNG slice.                        |
 | `ir/pilot/checkfloor.ir1`     | Pass-1 IR1: `CHECKFLOOR` (CTRL.S) — the cmp / conditional-branch / `]rts`-trampoline slice.         |
-| `ir/pilot/checkfloor.ir2`     | Pass-2 IR2: same routines after `cmp + branch` → `if reg op rhs goto` fusion.                       |
+| `ir/pilot/checkfloor.ir2`     | Pass-2 IR2: after `cmp + branch` → `if reg op rhs goto` fusion and flag-liveness elision (CHECKFLOOR ends up cmp-free). |
 | `ir/raw/*.ir1` + `SUMMARY.md` | Pass-1 mechanical sweep across every code file. Unlifted opcodes appear as `??? ...` for review.    |
 
 Regenerate after lifter changes:

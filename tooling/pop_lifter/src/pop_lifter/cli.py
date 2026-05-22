@@ -22,7 +22,7 @@ from pathlib import Path
 from . import ir1 as ir1_mod
 from .pass0_parse import ProgramAST, parse_files
 from .pass1_lift import discover_entries, lift_file
-from .pass2_struct import fusion_stats, structure_module
+from .pass2_struct import elision_stats, fusion_stats, structure_module
 
 DEFAULT_SOURCE_REL = Path("01 POP Source/Source")
 
@@ -234,6 +234,8 @@ def _cmd_struct(args: argparse.Namespace) -> int:
     dumps: list[str] = []
     total_fused = 0
     total_unfused = 0
+    total_cmp_left = 0
+    total_setc_left = 0
     total_routines = 0
     handled: set[str] = set()
     for file_path in file_paths:
@@ -254,8 +256,11 @@ def _cmd_struct(args: argparse.Namespace) -> int:
         ir1_module = lift_file(file_ast, ast.equates, local_entries).module
         ir2_module = structure_module(ir1_module)
         f, u = fusion_stats(ir2_module)
+        cmp_left, setc_left = elision_stats(ir2_module)
         total_fused += f
         total_unfused += u
+        total_cmp_left += cmp_left
+        total_setc_left += setc_left
         total_routines += len(ir2_module.routines)
         dumps.append(ir1_mod.format_module(ir2_module))
         handled.update(local_entries)
@@ -275,7 +280,9 @@ def _cmd_struct(args: argparse.Namespace) -> int:
         out_path.write_text(text, encoding="utf-8")
         print(
             f"wrote {out_path} ({total_routines} routines, "
-            f"{total_fused} fused-if, {total_unfused} unfused-branch)"
+            f"{total_fused} fused-if, {total_unfused} unfused-branch, "
+            f"{total_cmp_left} cmp left, "
+            f"{total_setc_left} clc/sec left)"
         )
     else:
         sys.stdout.write(text)

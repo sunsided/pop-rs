@@ -2,30 +2,21 @@
 
 fn CHECKFLOOR {
   a = *CharAction@0x0046        ; CTRL.S:107
-  cmp a, #0x06              ; CTRL.S:108
   if a == #0x06 goto ]rts  ; CTRL.S:109
-  cmp a, #0x05              ; CTRL.S:111
   if a != #0x05 goto :2  ; CTRL.S:112
   a = *CharPosn@0x0040        ; CTRL.S:113
-  cmp a, #0x6d              ; CTRL.S:114
   if a == #0x6d goto :ong  ; CTRL.S:115
-  cmp a, #0xb9              ; CTRL.S:116
   if a != #0xb9 goto ]rts  ; CTRL.S:117
 :ong:
   tail_call onground                ; CTRL.S:118
 :2:
-  cmp a, #0x04              ; CTRL.S:120
   if a == #0x04 goto falling  ; CTRL.S:121
-  cmp a, #0x03              ; CTRL.S:122
   if a != #0x03 goto :1  ; CTRL.S:123
   a = *CharPosn@0x0040        ; CTRL.S:124
-  cmp a, #0x66              ; CTRL.S:125
   if a < #0x66 goto ]rts  ; CTRL.S:126
-  cmp a, #0x6a              ; CTRL.S:127
   if a >= #0x6a goto ]rts  ; CTRL.S:128
   tail_call fallon                ; CTRL.S:129
 :1:
-  cmp a, #0x02              ; CTRL.S:131
   if a == #0x02 goto ]rts  ; CTRL.S:132
   tail_call onground                ; CTRL.S:133
 ]rts:
@@ -153,7 +144,6 @@ fn fallon {
   ??? and CharLife            ; CTRL.S:250
   if pl goto ]rts       ; CTRL.S:251
   a = *CharYVel@0x0048        ; CTRL.S:253
-  cmp a, #0x20              ; CTRL.S:254
   if a >= #0x20 goto ]rts  ; CTRL.S:255
   a = *CharY@0x0042        ; CTRL.S:257
   c = 0                            ; CTRL.S:258
@@ -317,10 +307,8 @@ startfall:
 
 fn CDpatch {
   a = *rjumpflag@0x023a        ; CTRL.S:439
-  cmp a, #0x2c              ; CTRL.S:440
   if a != #0x2c goto :patchX  ; CTRL.S:441
   call getdist                  ; CTRL.S:443
-  cmp a, #0x06              ; CTRL.S:444
   if a >= #0x06 goto :patchX  ; CTRL.S:445
   a = #0x68                  ; CTRL.S:447
   call jumpseq                  ; CTRL.S:448

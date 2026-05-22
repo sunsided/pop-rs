@@ -3,6 +3,7 @@ equivalence with pass 1, and the CHECKFLOOR pilot end-to-end."""
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from pop_lifter.ir1 import (
@@ -265,3 +266,165 @@ def test_pass2_fusion_count_matches_expected(source_dir):
     # require updating this test on every push.
     assert 50 <= fused <= 70, f"unexpected fused-If count: {fused}"
     assert unfused <= 20, f"too many unfused Branches: {unfused}"
+
+
+# ---- flag-liveness elision
+
+
+def test_elision_drops_every_cmp_in_checkfloor(source_dir):
+    """Every `cmp` in CHECKFLOOR proper feeds a fused `If` (no flag
+    readers between them and the next overwrite), so all 14 of them
+    should be dropped by the liveness sweep. The callees onground /
+    fallon / etc. still have unfused branches (their `and` predecessors
+    aren't lifted yet) so those keep their cmps — but CHECKFLOOR
+    itself should end up cmp-free."""
+    from pop_lifter.ir1 import CmpAbs, CmpImm
+
+    ir2 = structure_module(_ir1_module(source_dir, "CTRL.S", ["CHECKFLOOR"]))
+    cf = ir2.find("CHECKFLOOR")
+    cmps_left = [
+        item for item in cf.body if isinstance(item, (CmpImm, CmpAbs))
+    ]
+    assert cmps_left == [], (
+        f"expected CHECKFLOOR to have zero cmp left after elision, got "
+        f"{[(c.imm.value if hasattr(c, 'imm') else c.source.name) for c in cmps_left]}"
+    )
+
+
+def test_elision_keeps_cmp_before_unfused_branch():
+    """When the branch wasn't fused (predecessor wasn't a recognised
+    flag-setter — e.g. `and`), the `cmp`'s flags are still consumed.
+    Specifically: `cmp #N ; <opaque> ; bne L` shape — here we model
+    that with Unsupported as the opaque op."""
+    from pop_lifter.ir1 import (
+        Branch,
+        CmpImm,
+        Imm,
+        Reg,
+        Return,
+        Routine,
+        SourceRef,
+        Unsupported,
+    )
+
+    src = SourceRef(file="synthetic", line=0, raw="")
+    r = Routine(
+        name="f",
+        body=[
+            CmpImm(reg=Reg.A, imm=Imm(value=5, text="#5"), src=src),
+            Unsupported(mnemonic="???", operand="and #1", src=src),
+            Branch(cond="ne", target="]rts", src=src),
+            Return(src=src),
+            # synthetic local target so the Branch resolves locally
+            # (we won't actually reach it).
+        ],
+    )
+    # We need a ]rts label for the Branch to be "local". Add one.
+    from pop_lifter.ir1 import Label
+    r = replace(r, body=[*r.body, Label(name="]rts", src=src), Return(src=src)])
+
+    from pop_lifter.pass2_struct import _eliminate_dead_flags
+    out = _eliminate_dead_flags(r)
+    assert any(isinstance(item, CmpImm) for item in out.body), (
+        "cmp before an opaque flag-reader must NOT be elided — its "
+        "flags are still live"
+    )
+
+
+def test_elision_keeps_clc_before_adc():
+    """`clc; adc #1` — the clc is alive because adc reads C. Without
+    it, adc would inherit whatever C the caller set."""
+    from pop_lifter.ir1 import (
+        AdcImm,
+        Clc,
+        Imm,
+        Return,
+        Routine,
+        SourceRef,
+    )
+
+    src = SourceRef(file="synthetic", line=0, raw="")
+    r = Routine(
+        name="f",
+        body=[
+            Clc(src=src),
+            AdcImm(imm=Imm(value=1, text="#1"), src=src),
+            Return(src=src),
+        ],
+    )
+    from pop_lifter.pass2_struct import _eliminate_dead_flags
+    out = _eliminate_dead_flags(r)
+    assert any(isinstance(item, Clc) for item in out.body), (
+        "clc feeding adc must not be elided"
+    )
+
+
+def test_elision_drops_clc_with_no_adc():
+    """A bare `clc` with no carry-reader downstream is dead."""
+    from pop_lifter.ir1 import Clc, Return, Routine, SourceRef
+
+    src = SourceRef(file="synthetic", line=0, raw="")
+    r = Routine(
+        name="f",
+        body=[Clc(src=src), Return(src=src)],
+    )
+    from pop_lifter.pass2_struct import _eliminate_dead_flags
+    out = _eliminate_dead_flags(r)
+    assert not any(isinstance(item, Clc) for item in out.body)
+
+
+def test_elision_bails_on_backward_branch():
+    """If a routine contains a backward local jump (loop), elision
+    bails — the single-pass liveness sweep isn't fixed-point and
+    might drop a flag-setter that's still live across the back-edge.
+    Verify the cmp survives."""
+    from pop_lifter.ir1 import (
+        Branch,
+        CmpImm,
+        Imm,
+        Label,
+        Reg,
+        Return,
+        Routine,
+        SourceRef,
+    )
+
+    src = SourceRef(file="synthetic", line=0, raw="")
+    # do { ... cmp; bne loop } — backward branch from bne to :loop
+    r = Routine(
+        name="f",
+        body=[
+            Label(name=":loop", src=src),
+            CmpImm(reg=Reg.A, imm=Imm(value=0, text="#0"), src=src),
+            Branch(cond="ne", target=":loop", src=src),
+            Return(src=src),
+        ],
+    )
+    from pop_lifter.pass2_struct import _eliminate_dead_flags
+    out = _eliminate_dead_flags(r)
+    assert any(isinstance(item, CmpImm) for item in out.body), (
+        "elision should bail on a loop and keep the cmp"
+    )
+
+
+def test_elision_preserves_behavioural_equivalence(source_dir):
+    """Combined fusion + elision must still produce identical sentinel-
+    touch sets across every CHECKFLOOR path — the strongest end-to-end
+    check that the rewrite is sound."""
+    ir1, ir2, stubs = _checkfloor_modules(source_dir)
+    for action, posn, expected in _PATHS:
+        ram1 = bytearray(0x10000)
+        ram1[CHAR_ACTION] = action
+        ram1[CHAR_POSN] = posn
+        run([ir1, stubs], "CHECKFLOOR", ram=ram1)
+        touched1 = {a for a in (0x200, 0x201, 0x202) if ram1[a] != 0}
+
+        ram2 = bytearray(0x10000)
+        ram2[CHAR_ACTION] = action
+        ram2[CHAR_POSN] = posn
+        run([ir2, stubs], "CHECKFLOOR", ram=ram2)
+        touched2 = {a for a in (0x200, 0x201, 0x202) if ram2[a] != 0}
+        assert touched2 == touched1 == expected, (
+            f"divergence for action={action} posn={posn}: "
+            f"pass1={touched1} pass2={touched2} expected={expected}"
+        )
