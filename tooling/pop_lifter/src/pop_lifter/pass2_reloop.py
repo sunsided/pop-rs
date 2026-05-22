@@ -24,9 +24,16 @@ What this slice covers — enough for CHECKFLOOR's shape:
 
 Out of scope:
 
-* Loops. The relooper bails out (returns the routine unchanged in IR1
-  form via a single `RawStmt` wrapper) on any backward local jump.
-  CHECKFLOOR has none.
+* Loops. The relooper bails out on any backward local jump — see
+  `_wrap_unstructured` below. The fallback walks the IR2 body in
+  order and emits a 1-for-1 IR3 stream (`Label`/`Goto`/`Return`/
+  `TailCall`/`Call` map to their IR3 counterparts; `If`/`Branch`
+  become a structured `IfStmt`/`RawIfStmt` whose then-block holds a
+  `GotoStmt` to the original target; atoms become `RawStmt`). The
+  shape isn't *structured* but it round-trips through `format_module`
+  and survives downstream passes' shape assumptions. CHECKFLOOR has
+  no loops, so the fallback only triggers for chase callees in the
+  pilot.
 * Post-dominator analysis. The current algorithm may emit a small
   amount of code duplication when a block is reached from both the
   taken edge of an `if` and the fall-through path of the next block.
@@ -38,7 +45,7 @@ Out of scope:
 
 from __future__ import annotations
 
-from .cfg import CFG, BasicBlock, build_cfg
+from .cfg import CFG, build_cfg
 from .ir1 import (
     Branch,
     Goto,
@@ -47,7 +54,6 @@ from .ir1 import (
     ModuleIR1,
     Return,
     Routine,
-    SourceRef,
 )
 from .ir1 import (
     Call as IR1Call,
@@ -111,35 +117,90 @@ def reloop_module(module: ModuleIR1) -> ModuleIR3:
     )
 
 
+def is_unstructured(routine: RoutineIR3) -> bool:
+    """True if `routine` came out of the fallback path — its body
+    contains a `GotoStmt` or a `LabelStmt`. Reported by the CLI so
+    callers can see at a glance how many routines pass 2 had to
+    punt on."""
+    def walk(stmts) -> bool:
+        for s in stmts:
+            if isinstance(s, (GotoStmt, LabelStmt)):
+                return True
+            inner_then = getattr(s, "then_block", None)
+            if inner_then is not None and walk(inner_then.stmts):
+                return True
+            inner_else = getattr(s, "else_block", None)
+            if inner_else is not None and walk(inner_else.stmts):
+                return True
+        return False
+    return walk(routine.body.stmts)
+
+
 def _wrap_unstructured(routine: Routine) -> RoutineIR3:
-    """Fallback: emit every item as either a RawStmt (atoms) or the
-    closest IR3 control-flow shape (Label/Goto/Return/...). The
-    routine isn't *structured* but is at least serialisable in IR3."""
+    """Fallback path for routines the relooper can't structure (loops,
+    irreducible flow). Walks the IR2 body in order and emits a 1-for-1
+    IR3 stream. The result preserves semantics — every IR1/IR2 atom
+    has an IR3 representation — but the routine remains a sequence of
+    gotos and labels rather than a tree of structured blocks.
+
+    Per-item mapping:
+
+    * `Label` → `LabelStmt`.
+    * `Return` → `ReturnStmt`.
+    * `Goto(tail_call)` → `TailCallStmt`. `Goto(local)` → `GotoStmt`.
+    * `Call` → `CallStmt`. (Was previously folded into `RawStmt`,
+       which left downstream consumers without a structured handle on
+       the call.)
+    * `If`/`Branch` whose target is **local** (some `Label` in this
+       routine's body) → `IfStmt`/`RawIfStmt` whose then-block holds
+       a `GotoStmt` to that label.
+    * `If`/`Branch` whose target is **not local** → conditional
+       tail-call: `IfStmt`/`RawIfStmt` whose then-block holds a
+       `TailCallStmt`. IR1 executes a non-local branch by switching
+       routines (see `interp_ir1`'s Branch/If handlers), so an
+       unconditional `GotoStmt` here would silently change semantics
+       for routines that take the fallback.
+    * Anything else (loads/stores/arithmetic/cmp/clc/sec/...) →
+       `RawStmt`.
+    """
+    local_labels = {
+        item.name for item in routine.body if isinstance(item, Label)
+    }
     stmts: list[Stmt] = []
     for item in routine.body:
         if isinstance(item, Label):
             stmts.append(LabelStmt(name=item.name, src=item.src))
         elif isinstance(item, Return):
             stmts.append(ReturnStmt(src=item.src))
+        elif isinstance(item, IR1Call):
+            stmts.append(CallStmt(target=item.target, src=item.src))
         elif isinstance(item, Goto):
             if item.kind == "tail_call":
                 stmts.append(TailCallStmt(target=item.target, src=item.src))
             else:
                 stmts.append(GotoStmt(target=item.target, src=item.src))
-        elif isinstance(item, If):
-            stmts.append(IfStmt(
-                cond=item.cond,
-                then_block=Block.of([GotoStmt(target=item.target, src=item.src)]),
-                else_block=None,
-                src=item.src,
-            ))
-        elif isinstance(item, Branch):
-            stmts.append(RawIfStmt(
-                cond=item.cond,
-                then_block=Block.of([GotoStmt(target=item.target, src=item.src)]),
-                else_block=None,
-                src=item.src,
-            ))
+        elif isinstance(item, (If, Branch)):
+            taken_is_local = item.target in local_labels
+            then_stmt: Stmt = (
+                GotoStmt(target=item.target, src=item.src)
+                if taken_is_local
+                else TailCallStmt(target=item.target, src=item.src)
+            )
+            then_block = Block.of([then_stmt])
+            if isinstance(item, If):
+                stmts.append(IfStmt(
+                    cond=item.cond,
+                    then_block=then_block,
+                    else_block=None,
+                    src=item.src,
+                ))
+            else:
+                stmts.append(RawIfStmt(
+                    cond=item.cond,
+                    then_block=then_block,
+                    else_block=None,
+                    src=item.src,
+                ))
         else:
             stmts.append(RawStmt(item=item))
     return RoutineIR3(

@@ -1,4 +1,4 @@
-; module CTRL from /home/user/pop-rs/vendor/pop-apple2/01 POP Source/Source/CTRL.S
+; module CTRL from 01 POP Source/Source/CTRL.S
 
 fn CHECKFLOOR {
   a = *CharAction@0x0046        ; CTRL.S:107
@@ -40,14 +40,14 @@ fn onground {
   if eq {                ; CTRL.S:316
     goto ]rts              ; CTRL.S:316
   }
-  call getunderft                  ; CTRL.S:318
+  call getunderft                ; CTRL.S:318
   cmp a, #0x14              ; CTRL.S:319
   if a != #0x14 {    ; CTRL.S:320
     goto :1              ; CTRL.S:320
   }
-  call InsideBlock                  ; CTRL.S:321
+  call InsideBlock                ; CTRL.S:321
   :1:
-  call cmpspace                  ; CTRL.S:323
+  call cmpspace                ; CTRL.S:323
   if ne {                ; CTRL.S:324
     goto ]rts              ; CTRL.S:324
   }
@@ -81,12 +81,12 @@ fn onground {
   :yes:
   a = #0x01                  ; CTRL.S:344
   ??? sta (BlueType),y            ; CTRL.S:345
-  call indexblock                  ; CTRL.S:346
+  call indexblock                ; CTRL.S:346
   a = #0x02                  ; CTRL.S:347
-  call :sub                  ; CTRL.S:348
+  call :sub                ; CTRL.S:348
   ??? iny             ; CTRL.S:349
   :sub:
-  call markwipe                  ; CTRL.S:350
+  call markwipe                ; CTRL.S:350
   tail_call markred           ; CTRL.S:351
   :no:
   startfall:
@@ -94,7 +94,7 @@ fn onground {
   *rjumpflag@0x023a = a            ; CTRL.S:358
   *CharSword@0x004e = a            ; CTRL.S:359
   ??? inc CharBlockY            ; CTRL.S:361
-  call addslicers                  ; CTRL.S:362
+  call addslicers                ; CTRL.S:362
   a = *CharPosn@0x0040        ; CTRL.S:364
   *rjumpflag@0x023a = a            ; CTRL.S:367
   cmp a, #0x09              ; CTRL.S:369
@@ -153,9 +153,9 @@ fn onground {
   }
   :hdropfall:
   a = #0x05                  ; CTRL.S:400
-  call addcharx                  ; CTRL.S:401
+  call addcharx                ; CTRL.S:401
   *CharX@0x0041 = a            ; CTRL.S:402
-  call rereadblocks                  ; CTRL.S:403
+  call rereadblocks                ; CTRL.S:403
   goto :stepfall2              ; CTRL.S:404
   ]rts:
   return                           ; CTRL.S:405
@@ -188,16 +188,16 @@ fn onground {
     goto :doit              ; CTRL.S:421
   }
   :doit:
-  call jumpseq                  ; CTRL.S:424
-  call animchar                  ; CTRL.S:425
-  call rereadblocks                  ; CTRL.S:427
-  call getunderft                  ; CTRL.S:428
-  call cmpwall                  ; CTRL.S:429
+  call jumpseq                ; CTRL.S:424
+  call animchar                ; CTRL.S:425
+  call rereadblocks                ; CTRL.S:427
+  call getunderft                ; CTRL.S:428
+  call cmpwall                ; CTRL.S:429
   if eq {                ; CTRL.S:430
     goto :bump              ; CTRL.S:430
   }
-  call getinfront                  ; CTRL.S:431
-  call cmpwall                  ; CTRL.S:432
+  call getinfront                ; CTRL.S:431
+  call cmpwall                ; CTRL.S:432
   if ne {                ; CTRL.S:433
     goto ]rts              ; CTRL.S:433
   }
@@ -255,32 +255,32 @@ fn fallon {
 }
 
 fn InsideBlock {
-  call getdist                  ; CTRL.S:466
+  call getdist                ; CTRL.S:466
   cmp a, #0x08              ; CTRL.S:467
   if a >= #0x08 {    ; CTRL.S:468
     goto :bumpback              ; CTRL.S:468
   }
   :bumpfwd:
-  call getinfront                  ; CTRL.S:471
+  call getinfront                ; CTRL.S:471
   cmp a, #0x14              ; CTRL.S:472
   if a == #0x14 {    ; CTRL.S:473
     goto :bumpback              ; CTRL.S:473
   }
-  call getdist                  ; CTRL.S:475
+  call getdist                ; CTRL.S:475
   c = 0                            ; CTRL.S:476
   a = a + #0x04 + c              ; CTRL.S:477
   :reland:
-  call addcharx                  ; CTRL.S:479
+  call addcharx                ; CTRL.S:479
   *CharX@0x0041 = a            ; CTRL.S:480
-  call rereadblocks                  ; CTRL.S:481
+  call rereadblocks                ; CTRL.S:481
   tail_call getunderft           ; CTRL.S:482
   :bumpback:
-  call getbehind                  ; CTRL.S:485
+  call getbehind                ; CTRL.S:485
   cmp a, #0x14              ; CTRL.S:486
   if a != #0x14 {    ; CTRL.S:487
     goto :1              ; CTRL.S:487
   }
-  call getdist                  ; CTRL.S:490
+  call getdist                ; CTRL.S:490
   c = 0                            ; CTRL.S:491
   a = a + #0x0e + c              ; CTRL.S:492
   ??? eor #$ff            ; CTRL.S:493
@@ -288,7 +288,7 @@ fn InsideBlock {
   a = a + #0x08 + c              ; CTRL.S:495
   goto :reland              ; CTRL.S:496
   :1:
-  call getdist                  ; CTRL.S:498
+  call getdist                ; CTRL.S:498
   ??? eor #$ff            ; CTRL.S:499
   c = 0                            ; CTRL.S:500
   a = a + #0x08 + c              ; CTRL.S:501
@@ -296,7 +296,7 @@ fn InsideBlock {
 }
 
 fn :sub {
-  call markwipe                  ; CTRL.S:350
+  call markwipe                ; CTRL.S:350
   tail_call markred           ; CTRL.S:351
   :no:
   startfall:
@@ -304,7 +304,7 @@ fn :sub {
   *rjumpflag@0x023a = a            ; CTRL.S:358
   *CharSword@0x004e = a            ; CTRL.S:359
   ??? inc CharBlockY            ; CTRL.S:361
-  call addslicers                  ; CTRL.S:362
+  call addslicers                ; CTRL.S:362
   a = *CharPosn@0x0040        ; CTRL.S:364
   *rjumpflag@0x023a = a            ; CTRL.S:367
   cmp a, #0x09              ; CTRL.S:369
@@ -363,9 +363,9 @@ fn :sub {
   }
   :hdropfall:
   a = #0x05                  ; CTRL.S:400
-  call addcharx                  ; CTRL.S:401
+  call addcharx                ; CTRL.S:401
   *CharX@0x0041 = a            ; CTRL.S:402
-  call rereadblocks                  ; CTRL.S:403
+  call rereadblocks                ; CTRL.S:403
   goto :stepfall2              ; CTRL.S:404
   ]rts:
   return                           ; CTRL.S:405
@@ -398,16 +398,16 @@ fn :sub {
     goto :doit              ; CTRL.S:421
   }
   :doit:
-  call jumpseq                  ; CTRL.S:424
-  call animchar                  ; CTRL.S:425
-  call rereadblocks                  ; CTRL.S:427
-  call getunderft                  ; CTRL.S:428
-  call cmpwall                  ; CTRL.S:429
+  call jumpseq                ; CTRL.S:424
+  call animchar                ; CTRL.S:425
+  call rereadblocks                ; CTRL.S:427
+  call getunderft                ; CTRL.S:428
+  call cmpwall                ; CTRL.S:429
   if eq {                ; CTRL.S:430
     goto :bump              ; CTRL.S:430
   }
-  call getinfront                  ; CTRL.S:431
-  call cmpwall                  ; CTRL.S:432
+  call getinfront                ; CTRL.S:431
+  call cmpwall                ; CTRL.S:432
   if ne {                ; CTRL.S:433
     goto ]rts              ; CTRL.S:433
   }

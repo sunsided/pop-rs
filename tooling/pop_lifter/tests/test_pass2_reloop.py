@@ -142,7 +142,7 @@ def test_relooper_fallback_for_loops():
     )
     out = reloop_routine(r)
     # The unstructured fallback wraps the Branch as a RawIfStmt whose
-    # then-block contains a GotoStmt.
+    # then-block contains a GotoStmt (target is local).
     stmts = out.body.stmts
     assert any(isinstance(s, LabelStmt) for s in stmts), (
         "expected LabelStmt in the fallback shape"
@@ -152,6 +152,86 @@ def test_relooper_fallback_for_loops():
     assert any(
         isinstance(t, GotoStmt) for t in raw_if.then_block.stmts
     )
+
+
+def test_fallback_cross_module_branch_becomes_tail_call():
+    """In the unstructured fallback, an `If` whose target isn't any
+    local label is a conditional tail call into another routine —
+    IR1 executes it by switching routines. Emitting `GotoStmt` here
+    would silently change semantics; the fallback must produce a
+    `TailCallStmt` in the then-block instead."""
+    from pop_lifter.ir1 import (
+        Branch,
+        CmpImm,
+        Compare,
+        If as IR1If,
+        Imm,
+        Label,
+        Reg,
+    )
+
+    src = SourceRef(file="syn", line=0, raw="")
+    # do { cmp; if a == 1 goto external_fn; bne :loop } — the
+    # backward `bne :loop` triggers the fallback path.
+    r = Routine(
+        name="loopy_with_tail_call",
+        body=[
+            Label(name=":loop", src=src),
+            CmpImm(reg=Reg.A, imm=Imm(value=0, text="#0"), src=src),
+            IR1If(
+                cond=Compare(
+                    reg=Reg.A,
+                    op="==",
+                    rhs=Imm(value=1, text="#1"),
+                ),
+                target="external_fn",
+                src=src,
+            ),
+            Branch(cond="ne", target=":loop", src=src),
+            Return(src=src),
+        ],
+    )
+    out = reloop_routine(r)
+    # The IR1If with a non-local target must produce a TailCallStmt,
+    # not a GotoStmt.
+    if_stmt = next(s for s in out.body.stmts if isinstance(s, IfStmt))
+    assert any(
+        isinstance(t, TailCallStmt) and t.target == "external_fn"
+        for t in if_stmt.then_block.stmts
+    ), "cross-module If target must lower to TailCallStmt in the fallback"
+
+
+def test_fallback_ir1_call_becomes_callstmt():
+    """In the fallback path, an IR1 `Call` must be emitted as a
+    structured `CallStmt`, not folded into a `RawStmt`. That keeps
+    the IR3 shape consistent for downstream consumers regardless of
+    whether the routine took the structured or unstructured path."""
+    from pop_lifter.ir1 import Branch, Call as IR1Call, Label, Reg, CmpImm, Imm
+    from pop_lifter.ir3 import CallStmt
+
+    src = SourceRef(file="syn", line=0, raw="")
+    r = Routine(
+        name="loopy_with_call",
+        body=[
+            Label(name=":loop", src=src),
+            IR1Call(target="helper", src=src),
+            CmpImm(reg=Reg.A, imm=Imm(value=0, text="#0"), src=src),
+            Branch(cond="ne", target=":loop", src=src),
+            Return(src=src),
+        ],
+    )
+    out = reloop_routine(r)
+    assert any(
+        isinstance(s, CallStmt) and s.target == "helper"
+        for s in out.body.stmts
+    ), "IR1 Call must lower to IR3 CallStmt in the fallback"
+    # And the body must NOT contain a RawStmt wrapping the Call.
+    from pop_lifter.ir3 import RawStmt as IR3RawStmt
+    for s in out.body.stmts:
+        if isinstance(s, IR3RawStmt):
+            assert not isinstance(s.item, IR1Call), (
+                "IR1 Call slipped through as a RawStmt"
+            )
 
 
 # --------------------------------------------------------------- behavioural

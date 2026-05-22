@@ -23,7 +23,7 @@ from . import ir1 as ir1_mod
 from . import ir3 as ir3_mod
 from .pass0_parse import ProgramAST, parse_files
 from .pass1_lift import discover_entries, lift_file
-from .pass2_reloop import reloop_module
+from .pass2_reloop import is_unstructured, reloop_module
 from .pass2_struct import elision_stats, fusion_stats, structure_module
 
 DEFAULT_SOURCE_REL = Path("01 POP Source/Source")
@@ -322,6 +322,7 @@ def _cmd_reloop(args: argparse.Namespace) -> int:
 
     dumps: list[str] = []
     total_routines = 0
+    total_unstructured = 0
     handled: set[str] = set()
     for file_path in file_paths:
         file_ast = next(
@@ -342,6 +343,7 @@ def _cmd_reloop(args: argparse.Namespace) -> int:
         ir2_module = structure_module(ir1_module)
         ir3_module = reloop_module(ir2_module)
         total_routines += len(ir3_module.routines)
+        total_unstructured += sum(1 for r in ir3_module.routines if is_unstructured(r))
         dumps.append(ir3_mod.format_module(ir3_module))
         handled.update(local_entries)
 
@@ -358,7 +360,10 @@ def _cmd_reloop(args: argparse.Namespace) -> int:
         out_path = Path(args.out)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(text, encoding="utf-8")
-        print(f"wrote {out_path} ({total_routines} routines)")
+        print(
+            f"wrote {out_path} ({total_routines} routines, "
+            f"{total_unstructured} unstructured)"
+        )
     else:
         sys.stdout.write(text)
     return 0

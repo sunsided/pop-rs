@@ -218,7 +218,10 @@ def format_routine(routine: RoutineIR3) -> str:
 
 
 def format_module(module: ModuleIR3) -> str:
-    parts = [f"; module {module.name} from {module.file}"]
+    # Mirror ir1.format_module's portable-path behaviour so committed
+    # artifacts diff identically across machines / CI checkouts.
+    from .ir1 import _portable_path
+    parts = [f"; module {module.name} from {_portable_path(module.file)}"]
     parts.append("")
     for r in module.routines:
         parts.append(format_routine(r))
