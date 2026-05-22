@@ -1,0 +1,5807 @@
+{
+  "equates": {
+    "AMtimer": 199,
+    "AutoCtrl": 21504,
+    "AutoPlayback": 21513,
+    "BANK": 18,
+    "BBundID": 1013,
+    "BELOW": 976,
+    "BGset1": 771,
+    "BGset2": 772,
+    "BLUESPEC": 47568,
+    "BLUETYPE": 46848,
+    "BOTCUT": 19,
+    "BTN0": 26,
+    "BTN1": 27,
+    "BUTT0": 28,
+    "BUTT1": 29,
+    "BlockAy": 4739,
+    "BlockBot": 4729,
+    "BlockEdge": 4704,
+    "BlockTable": 4096,
+    "BlockTop": 4724,
+    "BlockYlast": 923,
+    "BlockYthis": 922,
+    "BlueSpec": 38,
+    "BlueType": 36,
+    "ByteTable": 3584,
+    "CDLeftEj": 190,
+    "CDRightEj": 191,
+    "CDabove": 848,
+    "CDbelow": 832,
+    "CDlastframe": 816,
+    "CDthisframe": 800,
+    "CHset": 773,
+    "CUTTIMER": 40,
+    "Char": 64,
+    "CharAction": 70,
+    "CharBlockX": 68,
+    "CharBlockY": 69,
+    "CharFace": 67,
+    "CharID": 77,
+    "CharLife": 79,
+    "CharPosn": 64,
+    "CharRepeat": 76,
+    "CharScrn": 75,
+    "CharSeq": 73,
+    "CharSword": 78,
+    "CharX": 65,
+    "CharXVel": 71,
+    "CharY": 66,
+    "CharYVel": 72,
+    "ChgKidStr": 207,
+    "ChgOppStr": 210,
+    "DblExpand": 59907,
+    "DeltaExpPop": 59910,
+    "DeltaExpWipe": 59916,
+    "DoImpale": 14863,
+    "DoSaveGame": 63786,
+    "DrawGuard": 19495,
+    "DrawGuard2": 19498,
+    "DrawKid": 19465,
+    "DrawKidMeter": 19459,
+    "DrawOppMeter": 19486,
+    "DrawShad": 19468,
+    "DrawSword": 19462,
+    "EnemyAlert": 209,
+    "FCharCD": 119,
+    "FCharCL": 120,
+    "FCharCR": 121,
+    "FCharCU": 118,
+    "FCharFace": 116,
+    "FCharImage": 112,
+    "FCharIndex": 117,
+    "FCharTable": 122,
+    "FCharVars": 112,
+    "FCharX": 113,
+    "FCharY": 115,
+    "Fcheck": 133,
+    "Fcheckmark": 64,
+    "Fdef": 10240,
+    "Fdx": 131,
+    "Fdy": 132,
+    "Ffootmark": 31,
+    "Fimage": 130,
+    "FloorY": 4734,
+    "FrameCount": 774,
+    "Fsword": 217,
+    "Fthinmark": 32,
+    "GdStartBlock": 48967,
+    "GdStartFace": 48991,
+    "GdStartProg": 49063,
+    "GdStartSeqH": 49087,
+    "GdStartSeqL": 49039,
+    "GdStartX": 49015,
+    "GenCtrl": 14866,
+    "GetBaseBlock": 53413,
+    "GetFrameInfo": 53353,
+    "GlassState": 531,
+    "GuardColor": 534,
+    "IIGS": 529,
+    "IMAGE": 4,
+    "INFO": 48896,
+    "JSTKUP": 30,
+    "JSTKX": 24,
+    "JSTKY": 25,
+    "Kid": 80,
+    "KidAction": 86,
+    "KidBlockX": 84,
+    "KidBlockY": 85,
+    "KidFace": 83,
+    "KidID": 93,
+    "KidLife": 95,
+    "KidPosn": 80,
+    "KidRepeat": 92,
+    "KidScrn": 91,
+    "KidSeq": 89,
+    "KidStartBlock": 48961,
+    "KidStartFace": 48962,
+    "KidStartScrn": 48960,
+    "KidStrength": 206,
+    "KidSword": 94,
+    "KidX": 81,
+    "KidXVel": 87,
+    "KidY": 82,
+    "KidYVel": 88,
+    "LEFTCUT": 16,
+    "LINKLOC": 48288,
+    "LINKMAP": 48544,
+    "LoadDesel": 55576,
+    "LoadKid": 53338,
+    "LoadKidwOp": 53416,
+    "LoadLevelX": 63789,
+    "LoadSelect": 55570,
+    "LoadShad": 53341,
+    "LoadShadwOp": 53425,
+    "MAP": 48800,
+    "MSset": 569,
+    "ManCtrl": 222,
+    "MarkKidMeter": 63774,
+    "MarkOppMeter": 63777,
+    "MaxKidStr": 208,
+    "MaxOppStr": 220,
+    "MinLeft": 768,
+    "Mult10": 4608,
+    "Mult30": 4640,
+    "Mult7": 4624,
+    "NextLevel": 796,
+    "NextTimeMsg": 769,
+    "OFFSET": 3,
+    "OPACITY": 6,
+    "OffsetTable": 3840,
+    "Op": 924,
+    "OpAction": 930,
+    "OpBlockX": 928,
+    "OpBlockY": 929,
+    "OpFace": 927,
+    "OpID": 937,
+    "OpLife": 939,
+    "OpPosn": 924,
+    "OpRepeat": 936,
+    "OpScrn": 935,
+    "OpSeq": 933,
+    "OpSword": 938,
+    "OpX": 925,
+    "OpXVel": 931,
+    "OpY": 926,
+    "OpYVel": 932,
+    "OppStrength": 204,
+    "PAGE": 0,
+    "PEELBUF": 9,
+    "PEELIMG": 11,
+    "PEELXCO": 13,
+    "PEELYCO": 14,
+    "PRECED": 41,
+    "PREV": 43,
+    "PageFlip": 57350,
+    "PixelTable": 4352,
+    "PlayCount": 160,
+    "PlayerCtrl": 14848,
+    "PreRecPtr": 777,
+    "RIGHTCUT": 17,
+    "RNDseed": 158,
+    "RemoveObj": 57392,
+    "SBELOW": 992,
+    "SCRNUM": 35,
+    "SINGSTEP": 33,
+    "SNabove": 912,
+    "SNbelow": 896,
+    "SNlastframe": 880,
+    "SNthisframe": 864,
+    "SPEED": 780,
+    "SavLevel": 46832,
+    "SavMaxed": 46834,
+    "SavNextMsg": 46838,
+    "SavStrength": 46833,
+    "SavTimer": 46835,
+    "SaveDesel": 55573,
+    "SaveKid": 53344,
+    "SaveKidwOp": 53419,
+    "SaveSelect": 55567,
+    "SaveShad": 53347,
+    "SaveShadwOp": 53428,
+    "ScrnBottom": 191,
+    "ScrnHeight": 192,
+    "ScrnLeft": 58,
+    "ScrnRight": 197,
+    "ScrnTop": 0,
+    "ScrnWidth": 140,
+    "SecLeft": 770,
+    "Shad": 96,
+    "ShadAction": 102,
+    "ShadBlockX": 100,
+    "ShadBlockY": 101,
+    "ShadCtrl": 14854,
+    "ShadFace": 99,
+    "ShadID": 109,
+    "ShadLife": 111,
+    "ShadPosn": 96,
+    "ShadRepeat": 108,
+    "ShadScrn": 107,
+    "ShadSeq": 105,
+    "ShadSword": 110,
+    "ShadX": 97,
+    "ShadXVel": 103,
+    "ShadY": 98,
+    "ShadYVel": 104,
+    "SngExpand": 59904,
+    "SongCount": 776,
+    "SongCue": 793,
+    "StabChar": 63765,
+    "SwStartBlock": 48965,
+    "SwStartScrn": 48964,
+    "TABLE": 7,
+    "TOPCUT": 15,
+    "TypeComix": 5,
+    "TypeFF": 128,
+    "TypeGd": 2,
+    "TypeKid": 0,
+    "TypeReflect": 4,
+    "TypeShad": 1,
+    "TypeSword": 3,
+    "UseFastlay": 0,
+    "UseLay": 1,
+    "UseLayrsave": 2,
+    "VanishChar": 63744,
+    "VertDist": 11,
+    "VisScrn": 203,
+    "XCO": 1,
+    "XCOORD": 173,
+    "YCO": 2,
+    "YHI": 57536,
+    "YLO": 57344,
+    "_attractmode": 63631,
+    "_boot3": 60928,
+    "_cls": 60931,
+    "_copy2000": 60958,
+    "_copy2000am": 60973,
+    "_copy2000aux": 60961,
+    "_copy2000ma": 60970,
+    "_cutprincess": 63634,
+    "_dostartgame": 63643,
+    "_edreboot": 63631,
+    "_epilog": 63646,
+    "_fastblack": 60949,
+    "_fastlay": 60937,
+    "_fastmask": 60946,
+    "_firstboot": 63616,
+    "_getwidth": 60955,
+    "_gobuild": 63634,
+    "_gogame": 63637,
+    "_inverty": 59913,
+    "_lay": 60934,
+    "_layrsave": 60940,
+    "_loadaltset": 63649,
+    "_loadgame": 63640,
+    "_loadlevel": 63619,
+    "_loadstage2": 63625,
+    "_lrcls": 60943,
+    "_minit": 54272,
+    "_mplay": 54275,
+    "_peel": 60952,
+    "_readdir": 63643,
+    "_reload": 63622,
+    "_savegame": 63637,
+    "_savelevel": 63646,
+    "_savelevelg": 63649,
+    "_screendump": 63652,
+    "_setfastaux": 60964,
+    "_setfastmain": 60967,
+    "_writedir": 63640,
+    "abovey": 144,
+    "addback": 1177,
+    "addcharobj": 19477,
+    "addcharx": 53269,
+    "addfall": 57395,
+    "addfcharx": 53404,
+    "addfore": 1180,
+    "addguard": 21522,
+    "addguardobj": 53293,
+    "addkidobj": 53329,
+    "addlowersound": 57389,
+    "addmid": 1183,
+    "addmidez": 1186,
+    "addmidezo": 1225,
+    "addmobs": 60946,
+    "addmsg": 1192,
+    "addpeel": 1069,
+    "addreflobj": 53335,
+    "addshadobj": 53332,
+    "addslicers": 57374,
+    "addsound": 55561,
+    "addswordobj": 53386,
+    "addtorches": 57344,
+    "addwipe": 1189,
+    "alertguard": 228,
+    "altset1": 11440,
+    "altset2": 11640,
+    "and": 0,
+    "angle": 7,
+    "animchar": 17676,
+    "animmobs": 60943,
+    "animtrans": 60928,
+    "attractmode": 1123,
+    "auto": 21504,
+    "b0down": 31,
+    "b1down": 32,
+    "backtolife": 162,
+    "barrcode": 179,
+    "barrdist": 178,
+    "begrange": 200,
+    "behindx": 143,
+    "bgIMG": 44433,
+    "bgOP": 44633,
+    "bgX": 44033,
+    "bgY": 44233,
+    "bgtable1": 24576,
+    "bgtable2": 33792,
+    "binfoREG": 1011,
+    "binfoTRK": 1010,
+    "blackflag": 34,
+    "blackout": 59925,
+    "blockaddr": 170,
+    "blockedge": 194,
+    "blockid": 139,
+    "blockx": 140,
+    "blocky": 141,
+    "bluecopy": 53248,
+    "bluepREG": 1009,
+    "bluepTRK": 1008,
+    "blueprnt": 46848,
+    "bonesrise": 63780,
+    "boostmeter": 53431,
+    "bottomblock": 189,
+    "breakloose": 60940,
+    "breakloose1": 60937,
+    "btn": 61,
+    "bufindex": 193,
+    "burn": 55588,
+    "butt": 62,
+    "buttons": 1045,
+    "calcblue": 1228,
+    "checkIIGS": 1237,
+    "checkalert": 63792,
+    "checkbarr": 17664,
+    "checkcoll": 17673,
+    "checkfloor": 14851,
+    "checkgate": 17688,
+    "checkimpale": 14869,
+    "checkledge": 53392,
+    "checkpress": 14860,
+    "checkslice": 17679,
+    "checkslice2": 17682,
+    "checkspikes": 53398,
+    "checkstab": 21510,
+    "checkstrike": 21507,
+    "chtable1": 24576,
+    "chtable2": 33792,
+    "chtable3": 2048,
+    "chtable4": 38400,
+    "chtable5": 43008,
+    "chtable6": 24576,
+    "chtable7": 40704,
+    "closeexit": 60949,
+    "clr": 59928,
+    "clrB": 213,
+    "clrD": 215,
+    "clrDESEL": 787,
+    "clrF": 212,
+    "clrSEL": 782,
+    "clrU": 214,
+    "clrbtn": 216,
+    "clrjstk": 55555,
+    "cls": 1081,
+    "cmpbarr": 53326,
+    "cmpspace": 53323,
+    "cmpwall": 53449,
+    "coll": 17664,
+    "collX": 135,
+    "collideL": 195,
+    "collideR": 196,
+    "collisions": 17667,
+    "continuemsg": 19474,
+    "controller": 1030,
+    "copy2000": 1108,
+    "copy2000am": 1138,
+    "copy2000ma": 1111,
+    "copyscrn": 1072,
+    "createshad": 229,
+    "cropchar": 53308,
+    "crumble": 57416,
+    "ctrl": 14848,
+    "ctrlsubs": 53248,
+    "cuesong": 55600,
+    "cut": 21525,
+    "cutcheck": 21516,
+    "cutguard": 21519,
+    "cutorder": 198,
+    "cutplan": 163,
+    "cutprincess": 1132,
+    "cutscrn": 166,
+    "cvtx": 1057,
+    "deadenemy": 57383,
+    "debugkeys": 64515,
+    "debugs": 64512,
+    "decstr": 63783,
+    "delay": 172,
+    "demo": 57353,
+    "demokeys": 55582,
+    "develment": 526,
+    "dimchar": 1054,
+    "direcpp": 169,
+    "dispversion": 63795,
+    "distfallen": 165,
+    "dloop": 55612,
+    "dmirr": 177,
+    "docrosscut": 8207,
+    "doflashoff": 57359,
+    "doflashon": 57347,
+    "doortop": 533,
+    "dostartgame": 1246,
+    "drawall": 1027,
+    "drawglass": 19513,
+    "drawpost": 19510,
+    "droppedout": 231,
+    "edreboot": 1156,
+    "endimspace": 46592,
+    "endrange": 192,
+    "enemycoll": 17694,
+    "eor": 3,
+    "epilog": 1249,
+    "exitopen": 134,
+    "facedx": 53407,
+    "facejstk": 55564,
+    "fadein": 59937,
+    "fadeout": 59943,
+    "fast": 4755,
+    "fastblack": 1099,
+    "fastlay": 1087,
+    "fastmask": 1096,
+    "fastspeed": 1240,
+    "fgIMG": 45033,
+    "fgOP": 45133,
+    "fgX": 44833,
+    "fgY": 44933,
+    "firstguard": 63753,
+    "flipdiskmsg": 19489,
+    "floorbuf": 24214,
+    "floorheight": 15,
+    "flow": 19522,
+    "frameadv": 4752,
+    "framepoint": 128,
+    "fredbuf": 24184,
+    "gamebg": 19456,
+    "gdtimer": 127,
+    "genCLS": 44032,
+    "get2infront": 53395,
+    "getabove": 53443,
+    "getabovebeh": 53278,
+    "getaboveinf": 53446,
+    "getbasex": 53254,
+    "getbehind": 53440,
+    "getblockej": 53266,
+    "getblockx": 53257,
+    "getblockxp": 53260,
+    "getblocky": 53263,
+    "getblocky1": 53389,
+    "getdesel": 1153,
+    "getdist": 53272,
+    "getdist1": 53275,
+    "getdown": 53320,
+    "getedges": 53299,
+    "getflameframe": 60964,
+    "getflaskframe": 60976,
+    "getframe": 53248,
+    "getfwddist": 17670,
+    "getinfront": 53437,
+    "getinitobj": 4758,
+    "getleft": 53311,
+    "getminleft": 55591,
+    "getopdist": 53422,
+    "getright": 53314,
+    "getscrns": 53290,
+    "getselect": 1150,
+    "getseq": 53251,
+    "getspikes": 60952,
+    "getunderft": 53434,
+    "getup": 53317,
+    "getwidth": 1105,
+    "goattract": 8210,
+    "gobuild": 1159,
+    "gogame": 1162,
+    "gotsword": 778,
+    "gr": 1024,
+    "grafix": 1024,
+    "gravity": 57407,
+    "gtone": 1048,
+    "guardprog": 221,
+    "halfbuf": 24124,
+    "height": 4,
+    "heroic": 211,
+    "hires": 60928,
+    "hrtables": 57344,
+    "idmask": 31,
+    "imheight": 181,
+    "imlists": 44032,
+    "imwidth": 180,
+    "inbuilder": 513,
+    "indexblock": 53356,
+    "indexchar": 53302,
+    "ineditor": 514,
+    "infrontx": 142,
+    "initialguards": 57410,
+    "initinput": 55579,
+    "initlay": 19516,
+    "initsystem": 8201,
+    "inmenu": 512,
+    "invert": 159,
+    "inverty": 1219,
+    "jampp": 60982,
+    "jamspikes": 60970,
+    "jarabove": 205,
+    "jbtns": 524,
+    "jctr": 516,
+    "jhoriz": 523,
+    "jmpaddr": 226,
+    "joyX": 59,
+    "joyY": 60,
+    "joyon": 525,
+    "jthres1x": 518,
+    "jthres1y": 519,
+    "jthres2x": 520,
+    "jthres2y": 521,
+    "jumpseq": 53410,
+    "justblocked": 126,
+    "jvert": 522,
+    "kbdX": 57,
+    "kbdY": 58,
+    "keeptime": 55594,
+    "keybuf": 940,
+    "keybuflen": 10,
+    "keybufptr": 202,
+    "keydown": 528,
+    "keypress": 527,
+    "keys": 55552,
+    "lastcmd": 164,
+    "lastpotion": 224,
+    "lay": 1084,
+    "layrsave": 1090,
+    "leadedge": 182,
+    "leftblock": 186,
+    "leftej": 183,
+    "level": 1012,
+    "lightcolor": 137,
+    "lightning": 136,
+    "listtorches": 55585,
+    "loadaltset": 1252,
+    "loadgame": 1198,
+    "loadlevel": 1120,
+    "loadstage2": 1144,
+    "loadsuper": 59940,
+    "locals": 232,
+    "lrcls": 1093,
+    "lrclse": 57362,
+    "markfloor": 53371,
+    "markfred": 53362,
+    "markhalf": 53383,
+    "markmeters": 63756,
+    "markmove": 53368,
+    "markred": 53359,
+    "markwipe": 53365,
+    "mask": 4,
+    "master": 63616,
+    "maxback": 200,
+    "maxfore": 100,
+    "maxmid": 46,
+    "maxmsg": 32,
+    "maxobj": 20,
+    "maxpeel": 46,
+    "maxsfx": 32,
+    "maxwipe": 20,
+    "menubspec": 38475,
+    "menudata": 38415,
+    "menuspec": 38445,
+    "menutype": 38415,
+    "mergetimer": 223,
+    "message": 779,
+    "midCD": 46023,
+    "midCL": 46069,
+    "midCR": 46115,
+    "midCU": 45977,
+    "midIMG": 45839,
+    "midOFF": 45747,
+    "midOP": 45885,
+    "midTAB": 46161,
+    "midTYP": 45931,
+    "midX": 45701,
+    "midY": 45793,
+    "milestone": 530,
+    "minit": 1207,
+    "mirappear": 57413,
+    "mirrx": 176,
+    "misc": 63744,
+    "moblevel": 46768,
+    "mobscrn": 46720,
+    "mobspace": 16,
+    "mobtables": 46592,
+    "mobtype": 46752,
+    "mobvel": 46736,
+    "mobx": 46688,
+    "moby": 46704,
+    "mouserescue": 63762,
+    "moveauxlc": 63750,
+    "movebuf": 24274,
+    "movemem": 1042,
+    "movemusic": 63747,
+    "mover": 60928,
+    "mplay": 1210,
+    "msgIMG": 46543,
+    "msgOFF": 46479,
+    "msgOP": 46575,
+    "msgX": 46447,
+    "msgY": 46511,
+    "msgtimer": 219,
+    "msys": 54272,
+    "musickeys": 1243,
+    "musicon": 794,
+    "normspeed": 1222,
+    "nummob": 781,
+    "numtrans": 149,
+    "objCD": 46367,
+    "objCL": 46387,
+    "objCR": 46407,
+    "objCU": 46347,
+    "objFACE": 46307,
+    "objIMG": 46287,
+    "objINDX": 46207,
+    "objOFF": 46247,
+    "objTAB": 46427,
+    "objTYP": 46327,
+    "objX": 46227,
+    "objY": 46267,
+    "objbuf": 24304,
+    "offguard": 138,
+    "opjumpseq": 53296,
+    "ora": 1,
+    "origstrength": 225,
+    "pause": 57377,
+    "pausetemp": 1015,
+    "peel": 1102,
+    "peelIMGH": 45609,
+    "peelIMGL": 45517,
+    "peelX": 45333,
+    "peelY": 45425,
+    "peelbuf1": 53248,
+    "peelbuf2": 55296,
+    "playback": 59904,
+    "playcut": 57386,
+    "pmask": 19525,
+    "potioneffect": 63759,
+    "pread": 1066,
+    "printlevel": 19483,
+    "prompt": 59922,
+    "psetupflame": 19507,
+    "purple": 59919,
+    "purpleflag": 218,
+    "pushpp": 60934,
+    "quickfg": 53305,
+    "quickfloor": 53377,
+    "rdblock": 53281,
+    "rdblock1": 53284,
+    "readdir": 1168,
+    "rechargemeter": 53401,
+    "recheck0": 1016,
+    "recheckyel": 19534,
+    "redbuf": 24154,
+    "redbufs": 24064,
+    "redherring": 571,
+    "redherring2": 1014,
+    "redkidmeter": 795,
+    "redoppmeter": 798,
+    "redrawflg": 151,
+    "redrawglass": 532,
+    "reflection": 63771,
+    "refract": 161,
+    "reload": 1141,
+    "reloadbinfo": 1216,
+    "reloadblue": 1039,
+    "reqmask": 32,
+    "rereadblocks": 14857,
+    "restart": 8195,
+    "rightblock": 187,
+    "rightej": 184,
+    "rjumpflag": 570,
+    "rnd": 1078,
+    "rw18": 53248,
+    "savebinfo": 1213,
+    "saveblue": 1036,
+    "savedgame": 46832,
+    "savegame": 1195,
+    "savekidx": 175,
+    "savelevel": 1171,
+    "savelevelg": 1174,
+    "savezp": 537,
+    "screendump": 1204,
+    "scrn": 201,
+    "scrnAbove": 51,
+    "scrnAboveL": 54,
+    "scrnAboveR": 55,
+    "scrnBelow": 52,
+    "scrnBelowL": 53,
+    "scrnBelowR": 56,
+    "scrnLeft": 49,
+    "scrnRight": 50,
+    "scrncolor": 797,
+    "secmask": 192,
+    "seqtab": 12288,
+    "seqtable": 10240,
+    "setcenter": 1051,
+    "setdhires": 59934,
+    "setfastaux": 1114,
+    "setfastmain": 1117,
+    "setinitials": 57398,
+    "setobjindx": 19480,
+    "setrecheck0": 19531,
+    "setupchar": 53350,
+    "setupcomix": 19504,
+    "setupflame": 19471,
+    "setupflask": 19501,
+    "setupsword": 53287,
+    "shadowaction": 535,
+    "shakem": 60955,
+    "shortentime": 55597,
+    "showpage": 64512,
+    "showtime": 57356,
+    "skipmessage": 536,
+    "smashmirror": 60967,
+    "sngpeel": 1075,
+    "sortX": 960,
+    "sound": 59904,
+    "soundon": 515,
+    "soundtable": 46784,
+    "specialk": 55552,
+    "spreced": 42,
+    "sprev": 46,
+    "sta": 2,
+    "start": 8192,
+    "startkid": 57401,
+    "startkid1": 57404,
+    "startresume": 8198,
+    "strobe": 55615,
+    "stunned": 230,
+    "subs": 57344,
+    "sure": 4752,
+    "swordtab": 12090,
+    "tables": 3584,
+    "tempblockx": 145,
+    "tempblocky": 146,
+    "tempid": 148,
+    "tempnt": 150,
+    "tempscrn": 147,
+    "text": 59931,
+    "textline": 57304,
+    "timebomb": 125,
+    "timeleftmsg": 19492,
+    "timerequest": 799,
+    "titlescreen": 64521,
+    "topblock": 188,
+    "topbuf": 24364,
+    "topctrl": 8192,
+    "topej": 185,
+    "trdirec": 46656,
+    "trigflask": 60973,
+    "trigppabove": 168,
+    "trigslicer": 60958,
+    "trigspikes": 60931,
+    "trigsword": 60979,
+    "trigtorch": 60961,
+    "trloc": 46592,
+    "trobcount": 46816,
+    "trobspace": 32,
+    "trscrn": 46624,
+    "twinkle": 19519,
+    "unevenfloor": 53380,
+    "unholy": 63768,
+    "unindex": 53374,
+    "unpack": 59904,
+    "updatemeters": 19456,
+    "vblank": 1261,
+    "vbli": 1264,
+    "vibes": 792,
+    "waitingtojump": 167,
+    "weightless": 197,
+    "whitebuf": 24334,
+    "whoop": 1258,
+    "width": 5,
+    "wipeCOL": 45313,
+    "wipeH": 45273,
+    "wipeW": 45293,
+    "wipeX": 45233,
+    "wipeY": 45253,
+    "wipebuf": 24244,
+    "writedir": 1165,
+    "xdiff": 152,
+    "xdir": 156,
+    "xminit": 1126,
+    "xmovemusic": 1255,
+    "xmplay": 1129,
+    "xplaycut": 1234,
+    "xtitle": 1135,
+    "ydiff": 154,
+    "ydir": 157,
+    "yellow": 19528,
+    "yellowflag": 124,
+    "zerolsts": 1201,
+    "zeropeel": 1060,
+    "zeropeels": 1063,
+    "zerored": 1231,
+    "zerosound": 55558
+  },
+  "dum_blocks": [
+    {
+      "start_addr": 63616,
+      "start_expr": "master",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 39,
+      "fields": [
+        {
+          "name": "_firstboot",
+          "offset": 0,
+          "size": 3,
+          "line": 41
+        },
+        {
+          "name": "_loadlevel",
+          "offset": 3,
+          "size": 3,
+          "line": 42
+        },
+        {
+          "name": "_reload",
+          "offset": 6,
+          "size": 3,
+          "line": 43
+        },
+        {
+          "name": "_loadstage2",
+          "offset": 9,
+          "size": 3,
+          "line": 44
+        },
+        {
+          "name": null,
+          "offset": 12,
+          "size": 3,
+          "line": 45
+        },
+        {
+          "name": "_attractmode",
+          "offset": 15,
+          "size": 3,
+          "line": 47
+        },
+        {
+          "name": "_cutprincess",
+          "offset": 18,
+          "size": 3,
+          "line": 48
+        },
+        {
+          "name": "_savegame",
+          "offset": 21,
+          "size": 3,
+          "line": 49
+        },
+        {
+          "name": "_loadgame",
+          "offset": 24,
+          "size": 3,
+          "line": 50
+        },
+        {
+          "name": "_dostartgame",
+          "offset": 27,
+          "size": 3,
+          "line": 51
+        },
+        {
+          "name": "_epilog",
+          "offset": 30,
+          "size": 3,
+          "line": 53
+        },
+        {
+          "name": "_loadaltset",
+          "offset": 33,
+          "size": 3,
+          "line": 54
+        },
+        {
+          "name": null,
+          "offset": 36,
+          "size": 3,
+          "line": 55
+        }
+      ]
+    },
+    {
+      "start_addr": 63616,
+      "start_expr": "master",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 57,
+      "fields": [
+        {
+          "name": null,
+          "offset": 0,
+          "size": 15,
+          "line": 59
+        },
+        {
+          "name": "_edreboot",
+          "offset": 15,
+          "size": 3,
+          "line": 61
+        },
+        {
+          "name": "_gobuild",
+          "offset": 18,
+          "size": 3,
+          "line": 62
+        },
+        {
+          "name": "_gogame",
+          "offset": 21,
+          "size": 3,
+          "line": 63
+        },
+        {
+          "name": "_writedir",
+          "offset": 24,
+          "size": 3,
+          "line": 64
+        },
+        {
+          "name": "_readdir",
+          "offset": 27,
+          "size": 3,
+          "line": 65
+        },
+        {
+          "name": "_savelevel",
+          "offset": 30,
+          "size": 3,
+          "line": 67
+        },
+        {
+          "name": "_savelevelg",
+          "offset": 33,
+          "size": 3,
+          "line": 68
+        },
+        {
+          "name": "_screendump",
+          "offset": 36,
+          "size": 3,
+          "line": 69
+        }
+      ]
+    },
+    {
+      "start_addr": 57344,
+      "start_expr": "hrtables",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 71,
+      "fields": [
+        {
+          "name": "YLO",
+          "offset": 0,
+          "size": 192,
+          "line": 73
+        },
+        {
+          "name": "YHI",
+          "offset": 192,
+          "size": 192,
+          "line": 74
+        }
+      ]
+    },
+    {
+      "start_addr": 60928,
+      "start_expr": "hires",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 76,
+      "fields": [
+        {
+          "name": "_boot3",
+          "offset": 0,
+          "size": 3,
+          "line": 78
+        },
+        {
+          "name": "_cls",
+          "offset": 3,
+          "size": 3,
+          "line": 79
+        },
+        {
+          "name": "_lay",
+          "offset": 6,
+          "size": 3,
+          "line": 80
+        },
+        {
+          "name": "_fastlay",
+          "offset": 9,
+          "size": 3,
+          "line": 81
+        },
+        {
+          "name": "_layrsave",
+          "offset": 12,
+          "size": 3,
+          "line": 82
+        },
+        {
+          "name": "_lrcls",
+          "offset": 15,
+          "size": 3,
+          "line": 84
+        },
+        {
+          "name": "_fastmask",
+          "offset": 18,
+          "size": 3,
+          "line": 85
+        },
+        {
+          "name": "_fastblack",
+          "offset": 21,
+          "size": 3,
+          "line": 86
+        },
+        {
+          "name": "_peel",
+          "offset": 24,
+          "size": 3,
+          "line": 87
+        },
+        {
+          "name": "_getwidth",
+          "offset": 27,
+          "size": 3,
+          "line": 88
+        },
+        {
+          "name": "_copy2000",
+          "offset": 30,
+          "size": 3,
+          "line": 90
+        },
+        {
+          "name": "_copy2000aux",
+          "offset": 33,
+          "size": 3,
+          "line": 91
+        },
+        {
+          "name": "_setfastaux",
+          "offset": 36,
+          "size": 3,
+          "line": 92
+        },
+        {
+          "name": "_setfastmain",
+          "offset": 39,
+          "size": 3,
+          "line": 93
+        },
+        {
+          "name": "_copy2000ma",
+          "offset": 42,
+          "size": 3,
+          "line": 94
+        },
+        {
+          "name": "_copy2000am",
+          "offset": 45,
+          "size": 3,
+          "line": 96
+        }
+      ]
+    },
+    {
+      "start_addr": 59904,
+      "start_expr": "unpack",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 99,
+      "fields": [
+        {
+          "name": "SngExpand",
+          "offset": 0,
+          "size": 3,
+          "line": 101
+        },
+        {
+          "name": "DblExpand",
+          "offset": 3,
+          "size": 3,
+          "line": 102
+        },
+        {
+          "name": "DeltaExpPop",
+          "offset": 6,
+          "size": 3,
+          "line": 103
+        },
+        {
+          "name": "_inverty",
+          "offset": 9,
+          "size": 3,
+          "line": 104
+        },
+        {
+          "name": "DeltaExpWipe",
+          "offset": 12,
+          "size": 3,
+          "line": 105
+        },
+        {
+          "name": "purple",
+          "offset": 15,
+          "size": 3,
+          "line": 107
+        },
+        {
+          "name": "prompt",
+          "offset": 18,
+          "size": 3,
+          "line": 108
+        },
+        {
+          "name": "blackout",
+          "offset": 21,
+          "size": 3,
+          "line": 109
+        },
+        {
+          "name": "clr",
+          "offset": 24,
+          "size": 3,
+          "line": 110
+        },
+        {
+          "name": "text",
+          "offset": 27,
+          "size": 3,
+          "line": 111
+        },
+        {
+          "name": "setdhires",
+          "offset": 30,
+          "size": 3,
+          "line": 113
+        },
+        {
+          "name": "fadein",
+          "offset": 33,
+          "size": 3,
+          "line": 114
+        },
+        {
+          "name": "loadsuper",
+          "offset": 36,
+          "size": 3,
+          "line": 115
+        },
+        {
+          "name": "fadeout",
+          "offset": 39,
+          "size": 3,
+          "line": 116
+        }
+      ]
+    },
+    {
+      "start_addr": 1024,
+      "start_expr": "grafix",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 118,
+      "fields": [
+        {
+          "name": "gr",
+          "offset": 0,
+          "size": 3,
+          "line": 120
+        },
+        {
+          "name": "drawall",
+          "offset": 3,
+          "size": 3,
+          "line": 121
+        },
+        {
+          "name": "controller",
+          "offset": 6,
+          "size": 3,
+          "line": 122
+        },
+        {
+          "name": null,
+          "offset": 9,
+          "size": 3,
+          "line": 123
+        },
+        {
+          "name": "saveblue",
+          "offset": 12,
+          "size": 3,
+          "line": 124
+        },
+        {
+          "name": "reloadblue",
+          "offset": 15,
+          "size": 3,
+          "line": 126
+        },
+        {
+          "name": "movemem",
+          "offset": 18,
+          "size": 3,
+          "line": 127
+        },
+        {
+          "name": "buttons",
+          "offset": 21,
+          "size": 3,
+          "line": 128
+        },
+        {
+          "name": "gtone",
+          "offset": 24,
+          "size": 3,
+          "line": 129
+        },
+        {
+          "name": "setcenter",
+          "offset": 27,
+          "size": 3,
+          "line": 130
+        },
+        {
+          "name": "dimchar",
+          "offset": 30,
+          "size": 3,
+          "line": 132
+        },
+        {
+          "name": "cvtx",
+          "offset": 33,
+          "size": 3,
+          "line": 133
+        },
+        {
+          "name": "zeropeel",
+          "offset": 36,
+          "size": 3,
+          "line": 134
+        },
+        {
+          "name": "zeropeels",
+          "offset": 39,
+          "size": 3,
+          "line": 135
+        },
+        {
+          "name": "pread",
+          "offset": 42,
+          "size": 3,
+          "line": 136
+        },
+        {
+          "name": "addpeel",
+          "offset": 45,
+          "size": 3,
+          "line": 138
+        },
+        {
+          "name": "copyscrn",
+          "offset": 48,
+          "size": 3,
+          "line": 139
+        },
+        {
+          "name": "sngpeel",
+          "offset": 51,
+          "size": 3,
+          "line": 140
+        },
+        {
+          "name": "rnd",
+          "offset": 54,
+          "size": 3,
+          "line": 141
+        },
+        {
+          "name": "cls",
+          "offset": 57,
+          "size": 3,
+          "line": 142
+        },
+        {
+          "name": "lay",
+          "offset": 60,
+          "size": 3,
+          "line": 144
+        },
+        {
+          "name": "fastlay",
+          "offset": 63,
+          "size": 3,
+          "line": 145
+        },
+        {
+          "name": "layrsave",
+          "offset": 66,
+          "size": 3,
+          "line": 146
+        },
+        {
+          "name": "lrcls",
+          "offset": 69,
+          "size": 3,
+          "line": 147
+        },
+        {
+          "name": "fastmask",
+          "offset": 72,
+          "size": 3,
+          "line": 148
+        },
+        {
+          "name": "fastblack",
+          "offset": 75,
+          "size": 3,
+          "line": 150
+        },
+        {
+          "name": "peel",
+          "offset": 78,
+          "size": 3,
+          "line": 151
+        },
+        {
+          "name": "getwidth",
+          "offset": 81,
+          "size": 3,
+          "line": 152
+        },
+        {
+          "name": "copy2000",
+          "offset": 84,
+          "size": 3,
+          "line": 153
+        },
+        {
+          "name": "copy2000ma",
+          "offset": 87,
+          "size": 3,
+          "line": 154
+        },
+        {
+          "name": "setfastaux",
+          "offset": 90,
+          "size": 3,
+          "line": 156
+        },
+        {
+          "name": "setfastmain",
+          "offset": 93,
+          "size": 3,
+          "line": 157
+        },
+        {
+          "name": "loadlevel",
+          "offset": 96,
+          "size": 3,
+          "line": 158
+        },
+        {
+          "name": "attractmode",
+          "offset": 99,
+          "size": 3,
+          "line": 159
+        },
+        {
+          "name": "xminit",
+          "offset": 102,
+          "size": 3,
+          "line": 160
+        },
+        {
+          "name": "xmplay",
+          "offset": 105,
+          "size": 3,
+          "line": 162
+        },
+        {
+          "name": "cutprincess",
+          "offset": 108,
+          "size": 3,
+          "line": 163
+        },
+        {
+          "name": "xtitle",
+          "offset": 111,
+          "size": 3,
+          "line": 164
+        },
+        {
+          "name": "copy2000am",
+          "offset": 114,
+          "size": 3,
+          "line": 165
+        },
+        {
+          "name": "reload",
+          "offset": 117,
+          "size": 3,
+          "line": 166
+        },
+        {
+          "name": "loadstage2",
+          "offset": 120,
+          "size": 3,
+          "line": 168
+        },
+        {
+          "name": null,
+          "offset": 123,
+          "size": 3,
+          "line": 169
+        },
+        {
+          "name": "getselect",
+          "offset": 126,
+          "size": 3,
+          "line": 170
+        },
+        {
+          "name": "getdesel",
+          "offset": 129,
+          "size": 3,
+          "line": 171
+        },
+        {
+          "name": "edreboot",
+          "offset": 132,
+          "size": 3,
+          "line": 172
+        },
+        {
+          "name": "gobuild",
+          "offset": 135,
+          "size": 3,
+          "line": 174
+        },
+        {
+          "name": "gogame",
+          "offset": 138,
+          "size": 3,
+          "line": 175
+        },
+        {
+          "name": "writedir",
+          "offset": 141,
+          "size": 3,
+          "line": 176
+        },
+        {
+          "name": "readdir",
+          "offset": 144,
+          "size": 3,
+          "line": 177
+        },
+        {
+          "name": "savelevel",
+          "offset": 147,
+          "size": 3,
+          "line": 178
+        },
+        {
+          "name": "savelevelg",
+          "offset": 150,
+          "size": 3,
+          "line": 180
+        },
+        {
+          "name": "addback",
+          "offset": 153,
+          "size": 3,
+          "line": 181
+        },
+        {
+          "name": "addfore",
+          "offset": 156,
+          "size": 3,
+          "line": 182
+        },
+        {
+          "name": "addmid",
+          "offset": 159,
+          "size": 3,
+          "line": 183
+        },
+        {
+          "name": "addmidez",
+          "offset": 162,
+          "size": 3,
+          "line": 184
+        },
+        {
+          "name": "addwipe",
+          "offset": 165,
+          "size": 3,
+          "line": 186
+        },
+        {
+          "name": "addmsg",
+          "offset": 168,
+          "size": 3,
+          "line": 187
+        },
+        {
+          "name": "savegame",
+          "offset": 171,
+          "size": 3,
+          "line": 188
+        },
+        {
+          "name": "loadgame",
+          "offset": 174,
+          "size": 3,
+          "line": 189
+        },
+        {
+          "name": "zerolsts",
+          "offset": 177,
+          "size": 3,
+          "line": 190
+        },
+        {
+          "name": "screendump",
+          "offset": 180,
+          "size": 3,
+          "line": 192
+        },
+        {
+          "name": "minit",
+          "offset": 183,
+          "size": 3,
+          "line": 193
+        },
+        {
+          "name": "mplay",
+          "offset": 186,
+          "size": 3,
+          "line": 194
+        },
+        {
+          "name": "savebinfo",
+          "offset": 189,
+          "size": 3,
+          "line": 195
+        },
+        {
+          "name": "reloadbinfo",
+          "offset": 192,
+          "size": 3,
+          "line": 196
+        },
+        {
+          "name": "inverty",
+          "offset": 195,
+          "size": 3,
+          "line": 198
+        },
+        {
+          "name": "normspeed",
+          "offset": 198,
+          "size": 3,
+          "line": 199
+        },
+        {
+          "name": "addmidezo",
+          "offset": 201,
+          "size": 3,
+          "line": 200
+        },
+        {
+          "name": "calcblue",
+          "offset": 204,
+          "size": 3,
+          "line": 201
+        },
+        {
+          "name": "zerored",
+          "offset": 207,
+          "size": 3,
+          "line": 202
+        },
+        {
+          "name": "xplaycut",
+          "offset": 210,
+          "size": 3,
+          "line": 204
+        },
+        {
+          "name": "checkIIGS",
+          "offset": 213,
+          "size": 3,
+          "line": 205
+        },
+        {
+          "name": "fastspeed",
+          "offset": 216,
+          "size": 3,
+          "line": 206
+        },
+        {
+          "name": "musickeys",
+          "offset": 219,
+          "size": 3,
+          "line": 207
+        },
+        {
+          "name": "dostartgame",
+          "offset": 222,
+          "size": 3,
+          "line": 208
+        },
+        {
+          "name": "epilog",
+          "offset": 225,
+          "size": 3,
+          "line": 210
+        },
+        {
+          "name": "loadaltset",
+          "offset": 228,
+          "size": 3,
+          "line": 211
+        },
+        {
+          "name": "xmovemusic",
+          "offset": 231,
+          "size": 3,
+          "line": 212
+        },
+        {
+          "name": "whoop",
+          "offset": 234,
+          "size": 3,
+          "line": 213
+        },
+        {
+          "name": "vblank",
+          "offset": 237,
+          "size": 3,
+          "line": 214
+        },
+        {
+          "name": "vbli",
+          "offset": 240,
+          "size": 3,
+          "line": 216
+        }
+      ]
+    },
+    {
+      "start_addr": 24064,
+      "start_expr": "redbufs",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 218,
+      "fields": [
+        {
+          "name": null,
+          "offset": 0,
+          "size": 60,
+          "line": 220
+        },
+        {
+          "name": "halfbuf",
+          "offset": 60,
+          "size": 30,
+          "line": 221
+        },
+        {
+          "name": "redbuf",
+          "offset": 90,
+          "size": 30,
+          "line": 222
+        },
+        {
+          "name": "fredbuf",
+          "offset": 120,
+          "size": 30,
+          "line": 223
+        },
+        {
+          "name": "floorbuf",
+          "offset": 150,
+          "size": 30,
+          "line": 224
+        },
+        {
+          "name": "wipebuf",
+          "offset": 180,
+          "size": 30,
+          "line": 225
+        },
+        {
+          "name": "movebuf",
+          "offset": 210,
+          "size": 30,
+          "line": 226
+        },
+        {
+          "name": "objbuf",
+          "offset": 240,
+          "size": 30,
+          "line": 227
+        },
+        {
+          "name": "whitebuf",
+          "offset": 270,
+          "size": 30,
+          "line": 228
+        },
+        {
+          "name": "topbuf",
+          "offset": 300,
+          "size": 10,
+          "line": 229
+        }
+      ]
+    },
+    {
+      "start_addr": 38415,
+      "start_expr": "menudata",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 231,
+      "fields": [
+        {
+          "name": "menutype",
+          "offset": 0,
+          "size": 30,
+          "line": 233
+        },
+        {
+          "name": "menuspec",
+          "offset": 30,
+          "size": 30,
+          "line": 234
+        },
+        {
+          "name": "menubspec",
+          "offset": 60,
+          "size": 30,
+          "line": 235
+        }
+      ]
+    },
+    {
+      "start_addr": 4752,
+      "start_expr": "frameadv",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 237,
+      "fields": [
+        {
+          "name": "sure",
+          "offset": 0,
+          "size": 3,
+          "line": 239
+        },
+        {
+          "name": "fast",
+          "offset": 3,
+          "size": 3,
+          "line": 240
+        },
+        {
+          "name": "getinitobj",
+          "offset": 6,
+          "size": 3,
+          "line": 241
+        }
+      ]
+    },
+    {
+      "start_addr": 3584,
+      "start_expr": "tables",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 243,
+      "fields": [
+        {
+          "name": "ByteTable",
+          "offset": 0,
+          "size": 256,
+          "line": 245
+        },
+        {
+          "name": "OffsetTable",
+          "offset": 256,
+          "size": 256,
+          "line": 246
+        },
+        {
+          "name": "BlockTable",
+          "offset": 512,
+          "size": 256,
+          "line": 247
+        },
+        {
+          "name": "PixelTable",
+          "offset": 768,
+          "size": 256,
+          "line": 248
+        },
+        {
+          "name": "Mult10",
+          "offset": 1024,
+          "size": 16,
+          "line": 249
+        },
+        {
+          "name": "Mult7",
+          "offset": 1040,
+          "size": 16,
+          "line": 250
+        },
+        {
+          "name": "Mult30",
+          "offset": 1056,
+          "size": 64,
+          "line": 251
+        },
+        {
+          "name": "BlockEdge",
+          "offset": 1120,
+          "size": 20,
+          "line": 252
+        },
+        {
+          "name": "BlockTop",
+          "offset": 1140,
+          "size": 5,
+          "line": 253
+        },
+        {
+          "name": "BlockBot",
+          "offset": 1145,
+          "size": 5,
+          "line": 254
+        },
+        {
+          "name": "FloorY",
+          "offset": 1150,
+          "size": 5,
+          "line": 255
+        },
+        {
+          "name": "BlockAy",
+          "offset": 1155,
+          "size": 5,
+          "line": 256
+        }
+      ]
+    },
+    {
+      "start_addr": 46848,
+      "start_expr": "blueprnt",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 258,
+      "fields": [
+        {
+          "name": "BLUETYPE",
+          "offset": 0,
+          "size": 720,
+          "line": 260
+        },
+        {
+          "name": "BLUESPEC",
+          "offset": 720,
+          "size": 720,
+          "line": 261
+        },
+        {
+          "name": "LINKLOC",
+          "offset": 1440,
+          "size": 256,
+          "line": 262
+        },
+        {
+          "name": "LINKMAP",
+          "offset": 1696,
+          "size": 256,
+          "line": 263
+        },
+        {
+          "name": "MAP",
+          "offset": 1952,
+          "size": 96,
+          "line": 264
+        },
+        {
+          "name": "INFO",
+          "offset": 2048,
+          "size": 256,
+          "line": 265
+        }
+      ]
+    },
+    {
+      "start_addr": 48896,
+      "start_expr": "INFO",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 272,
+      "fields": [
+        {
+          "name": null,
+          "offset": 0,
+          "size": 64,
+          "line": 274
+        },
+        {
+          "name": "KidStartScrn",
+          "offset": 64,
+          "size": 1,
+          "line": 275
+        },
+        {
+          "name": "KidStartBlock",
+          "offset": 65,
+          "size": 1,
+          "line": 276
+        },
+        {
+          "name": "KidStartFace",
+          "offset": 66,
+          "size": 1,
+          "line": 277
+        },
+        {
+          "name": null,
+          "offset": 67,
+          "size": 1,
+          "line": 278
+        },
+        {
+          "name": "SwStartScrn",
+          "offset": 68,
+          "size": 1,
+          "line": 279
+        },
+        {
+          "name": "SwStartBlock",
+          "offset": 69,
+          "size": 1,
+          "line": 280
+        },
+        {
+          "name": null,
+          "offset": 70,
+          "size": 1,
+          "line": 281
+        },
+        {
+          "name": "GdStartBlock",
+          "offset": 71,
+          "size": 24,
+          "line": 282
+        },
+        {
+          "name": "GdStartFace",
+          "offset": 95,
+          "size": 24,
+          "line": 283
+        },
+        {
+          "name": "GdStartX",
+          "offset": 119,
+          "size": 24,
+          "line": 284
+        },
+        {
+          "name": "GdStartSeqL",
+          "offset": 143,
+          "size": 24,
+          "line": 285
+        },
+        {
+          "name": "GdStartProg",
+          "offset": 167,
+          "size": 24,
+          "line": 286
+        },
+        {
+          "name": "GdStartSeqH",
+          "offset": 191,
+          "size": 24,
+          "line": 287
+        }
+      ]
+    },
+    {
+      "start_addr": 44032,
+      "start_expr": "imlists",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 302,
+      "fields": [
+        {
+          "name": "genCLS",
+          "offset": 0,
+          "size": 1,
+          "line": 304
+        },
+        {
+          "name": "bgX",
+          "offset": 1,
+          "size": 200,
+          "line": 306
+        },
+        {
+          "name": "bgY",
+          "offset": 201,
+          "size": 200,
+          "line": 307
+        },
+        {
+          "name": "bgIMG",
+          "offset": 401,
+          "size": 200,
+          "line": 308
+        },
+        {
+          "name": "bgOP",
+          "offset": 601,
+          "size": 200,
+          "line": 309
+        },
+        {
+          "name": "fgX",
+          "offset": 801,
+          "size": 100,
+          "line": 311
+        },
+        {
+          "name": "fgY",
+          "offset": 901,
+          "size": 100,
+          "line": 312
+        },
+        {
+          "name": "fgIMG",
+          "offset": 1001,
+          "size": 100,
+          "line": 313
+        },
+        {
+          "name": "fgOP",
+          "offset": 1101,
+          "size": 100,
+          "line": 314
+        },
+        {
+          "name": "wipeX",
+          "offset": 1201,
+          "size": 20,
+          "line": 316
+        },
+        {
+          "name": "wipeY",
+          "offset": 1221,
+          "size": 20,
+          "line": 317
+        },
+        {
+          "name": "wipeH",
+          "offset": 1241,
+          "size": 20,
+          "line": 318
+        },
+        {
+          "name": "wipeW",
+          "offset": 1261,
+          "size": 20,
+          "line": 319
+        },
+        {
+          "name": "wipeCOL",
+          "offset": 1281,
+          "size": 20,
+          "line": 320
+        },
+        {
+          "name": "peelX",
+          "offset": 1301,
+          "size": 92,
+          "line": 322
+        },
+        {
+          "name": "peelY",
+          "offset": 1393,
+          "size": 92,
+          "line": 323
+        },
+        {
+          "name": "peelIMGL",
+          "offset": 1485,
+          "size": 92,
+          "line": 324
+        },
+        {
+          "name": "peelIMGH",
+          "offset": 1577,
+          "size": 92,
+          "line": 325
+        },
+        {
+          "name": "midX",
+          "offset": 1669,
+          "size": 46,
+          "line": 327
+        },
+        {
+          "name": "midOFF",
+          "offset": 1715,
+          "size": 46,
+          "line": 328
+        },
+        {
+          "name": "midY",
+          "offset": 1761,
+          "size": 46,
+          "line": 329
+        },
+        {
+          "name": "midIMG",
+          "offset": 1807,
+          "size": 46,
+          "line": 330
+        },
+        {
+          "name": "midOP",
+          "offset": 1853,
+          "size": 46,
+          "line": 331
+        },
+        {
+          "name": "midTYP",
+          "offset": 1899,
+          "size": 46,
+          "line": 332
+        },
+        {
+          "name": "midCU",
+          "offset": 1945,
+          "size": 46,
+          "line": 333
+        },
+        {
+          "name": "midCD",
+          "offset": 1991,
+          "size": 46,
+          "line": 334
+        },
+        {
+          "name": "midCL",
+          "offset": 2037,
+          "size": 46,
+          "line": 335
+        },
+        {
+          "name": "midCR",
+          "offset": 2083,
+          "size": 46,
+          "line": 336
+        },
+        {
+          "name": "midTAB",
+          "offset": 2129,
+          "size": 46,
+          "line": 337
+        },
+        {
+          "name": "objINDX",
+          "offset": 2175,
+          "size": 20,
+          "line": 339
+        },
+        {
+          "name": "objX",
+          "offset": 2195,
+          "size": 20,
+          "line": 340
+        },
+        {
+          "name": "objOFF",
+          "offset": 2215,
+          "size": 20,
+          "line": 341
+        },
+        {
+          "name": "objY",
+          "offset": 2235,
+          "size": 20,
+          "line": 342
+        },
+        {
+          "name": "objIMG",
+          "offset": 2255,
+          "size": 20,
+          "line": 343
+        },
+        {
+          "name": "objFACE",
+          "offset": 2275,
+          "size": 20,
+          "line": 344
+        },
+        {
+          "name": "objTYP",
+          "offset": 2295,
+          "size": 20,
+          "line": 345
+        },
+        {
+          "name": "objCU",
+          "offset": 2315,
+          "size": 20,
+          "line": 346
+        },
+        {
+          "name": "objCD",
+          "offset": 2335,
+          "size": 20,
+          "line": 347
+        },
+        {
+          "name": "objCL",
+          "offset": 2355,
+          "size": 20,
+          "line": 348
+        },
+        {
+          "name": "objCR",
+          "offset": 2375,
+          "size": 20,
+          "line": 349
+        },
+        {
+          "name": "objTAB",
+          "offset": 2395,
+          "size": 20,
+          "line": 350
+        },
+        {
+          "name": "msgX",
+          "offset": 2415,
+          "size": 32,
+          "line": 352
+        },
+        {
+          "name": "msgOFF",
+          "offset": 2447,
+          "size": 32,
+          "line": 353
+        },
+        {
+          "name": "msgY",
+          "offset": 2479,
+          "size": 32,
+          "line": 354
+        },
+        {
+          "name": "msgIMG",
+          "offset": 2511,
+          "size": 32,
+          "line": 355
+        },
+        {
+          "name": "msgOP",
+          "offset": 2543,
+          "size": 32,
+          "line": 356
+        }
+      ]
+    },
+    {
+      "start_addr": 0,
+      "start_expr": "$00",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 365,
+      "fields": [
+        {
+          "name": "PAGE",
+          "offset": 0,
+          "size": 1,
+          "line": 367
+        },
+        {
+          "name": "XCO",
+          "offset": 1,
+          "size": 1,
+          "line": 368
+        },
+        {
+          "name": "YCO",
+          "offset": 2,
+          "size": 1,
+          "line": 369
+        },
+        {
+          "name": "OFFSET",
+          "offset": 3,
+          "size": 1,
+          "line": 370
+        },
+        {
+          "name": "IMAGE",
+          "offset": 4,
+          "size": 2,
+          "line": 371
+        },
+        {
+          "name": "OPACITY",
+          "offset": 6,
+          "size": 1,
+          "line": 372
+        },
+        {
+          "name": "TABLE",
+          "offset": 7,
+          "size": 2,
+          "line": 373
+        },
+        {
+          "name": "PEELBUF",
+          "offset": 9,
+          "size": 2,
+          "line": 374
+        },
+        {
+          "name": "PEELIMG",
+          "offset": 11,
+          "size": 2,
+          "line": 375
+        },
+        {
+          "name": "PEELXCO",
+          "offset": 13,
+          "size": 1,
+          "line": 376
+        },
+        {
+          "name": "PEELYCO",
+          "offset": 14,
+          "size": 1,
+          "line": 377
+        },
+        {
+          "name": "TOPCUT",
+          "offset": 15,
+          "size": 1,
+          "line": 378
+        },
+        {
+          "name": "LEFTCUT",
+          "offset": 16,
+          "size": 1,
+          "line": 379
+        },
+        {
+          "name": "RIGHTCUT",
+          "offset": 17,
+          "size": 1,
+          "line": 380
+        },
+        {
+          "name": "BANK",
+          "offset": 18,
+          "size": 1,
+          "line": 381
+        },
+        {
+          "name": "BOTCUT",
+          "offset": 19,
+          "size": 1,
+          "line": 382
+        }
+      ]
+    },
+    {
+      "start_addr": 24,
+      "start_expr": "$18",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 390,
+      "fields": [
+        {
+          "name": "JSTKX",
+          "offset": 0,
+          "size": 1,
+          "line": 392
+        },
+        {
+          "name": "JSTKY",
+          "offset": 1,
+          "size": 1,
+          "line": 393
+        },
+        {
+          "name": "BTN0",
+          "offset": 2,
+          "size": 1,
+          "line": 394
+        },
+        {
+          "name": "BTN1",
+          "offset": 3,
+          "size": 1,
+          "line": 395
+        },
+        {
+          "name": "BUTT0",
+          "offset": 4,
+          "size": 1,
+          "line": 396
+        },
+        {
+          "name": "BUTT1",
+          "offset": 5,
+          "size": 1,
+          "line": 397
+        },
+        {
+          "name": "JSTKUP",
+          "offset": 6,
+          "size": 1,
+          "line": 398
+        },
+        {
+          "name": "b0down",
+          "offset": 7,
+          "size": 1,
+          "line": 399
+        },
+        {
+          "name": "b1down",
+          "offset": 8,
+          "size": 1,
+          "line": 400
+        },
+        {
+          "name": "SINGSTEP",
+          "offset": 9,
+          "size": 1,
+          "line": 401
+        },
+        {
+          "name": "blackflag",
+          "offset": 10,
+          "size": 1,
+          "line": 402
+        },
+        {
+          "name": "SCRNUM",
+          "offset": 11,
+          "size": 1,
+          "line": 403
+        },
+        {
+          "name": "BlueType",
+          "offset": 12,
+          "size": 2,
+          "line": 404
+        },
+        {
+          "name": "BlueSpec",
+          "offset": 14,
+          "size": 2,
+          "line": 405
+        },
+        {
+          "name": "CUTTIMER",
+          "offset": 16,
+          "size": 1,
+          "line": 406
+        },
+        {
+          "name": "PRECED",
+          "offset": 17,
+          "size": 1,
+          "line": 407
+        },
+        {
+          "name": "spreced",
+          "offset": 18,
+          "size": 1,
+          "line": 408
+        },
+        {
+          "name": "PREV",
+          "offset": 19,
+          "size": 3,
+          "line": 409
+        },
+        {
+          "name": "sprev",
+          "offset": 22,
+          "size": 3,
+          "line": 410
+        },
+        {
+          "name": "scrnLeft",
+          "offset": 25,
+          "size": 1,
+          "line": 411
+        },
+        {
+          "name": "scrnRight",
+          "offset": 26,
+          "size": 1,
+          "line": 412
+        },
+        {
+          "name": "scrnAbove",
+          "offset": 27,
+          "size": 1,
+          "line": 413
+        },
+        {
+          "name": "scrnBelow",
+          "offset": 28,
+          "size": 1,
+          "line": 414
+        },
+        {
+          "name": "scrnBelowL",
+          "offset": 29,
+          "size": 1,
+          "line": 415
+        },
+        {
+          "name": "scrnAboveL",
+          "offset": 30,
+          "size": 1,
+          "line": 416
+        },
+        {
+          "name": "scrnAboveR",
+          "offset": 31,
+          "size": 1,
+          "line": 417
+        },
+        {
+          "name": "scrnBelowR",
+          "offset": 32,
+          "size": 1,
+          "line": 418
+        },
+        {
+          "name": "kbdX",
+          "offset": 33,
+          "size": 1,
+          "line": 419
+        },
+        {
+          "name": "kbdY",
+          "offset": 34,
+          "size": 1,
+          "line": 420
+        },
+        {
+          "name": "joyX",
+          "offset": 35,
+          "size": 1,
+          "line": 421
+        },
+        {
+          "name": "joyY",
+          "offset": 36,
+          "size": 1,
+          "line": 422
+        },
+        {
+          "name": "btn",
+          "offset": 37,
+          "size": 1,
+          "line": 423
+        },
+        {
+          "name": "butt",
+          "offset": 38,
+          "size": 1,
+          "line": 424
+        }
+      ]
+    },
+    {
+      "start_addr": 512,
+      "start_expr": "$200",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 431,
+      "fields": [
+        {
+          "name": "inmenu",
+          "offset": 0,
+          "size": 1,
+          "line": 433
+        },
+        {
+          "name": "inbuilder",
+          "offset": 1,
+          "size": 1,
+          "line": 434
+        },
+        {
+          "name": "ineditor",
+          "offset": 2,
+          "size": 1,
+          "line": 435
+        },
+        {
+          "name": "soundon",
+          "offset": 3,
+          "size": 1,
+          "line": 436
+        },
+        {
+          "name": "jctr",
+          "offset": 4,
+          "size": 2,
+          "line": 437
+        },
+        {
+          "name": "jthres1x",
+          "offset": 6,
+          "size": 1,
+          "line": 438
+        },
+        {
+          "name": "jthres1y",
+          "offset": 7,
+          "size": 1,
+          "line": 439
+        },
+        {
+          "name": "jthres2x",
+          "offset": 8,
+          "size": 1,
+          "line": 440
+        },
+        {
+          "name": "jthres2y",
+          "offset": 9,
+          "size": 1,
+          "line": 441
+        },
+        {
+          "name": "jvert",
+          "offset": 10,
+          "size": 1,
+          "line": 442
+        },
+        {
+          "name": "jhoriz",
+          "offset": 11,
+          "size": 1,
+          "line": 443
+        },
+        {
+          "name": "jbtns",
+          "offset": 12,
+          "size": 1,
+          "line": 444
+        },
+        {
+          "name": "joyon",
+          "offset": 13,
+          "size": 1,
+          "line": 445
+        },
+        {
+          "name": "develment",
+          "offset": 14,
+          "size": 1,
+          "line": 446
+        },
+        {
+          "name": "keypress",
+          "offset": 15,
+          "size": 1,
+          "line": 447
+        },
+        {
+          "name": "keydown",
+          "offset": 16,
+          "size": 1,
+          "line": 448
+        },
+        {
+          "name": "IIGS",
+          "offset": 17,
+          "size": 1,
+          "line": 449
+        }
+      ]
+    },
+    {
+      "start_addr": 960,
+      "start_expr": "$3c0",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 451,
+      "fields": [
+        {
+          "name": "sortX",
+          "offset": 0,
+          "size": 16,
+          "line": 453
+        },
+        {
+          "name": "BELOW",
+          "offset": 16,
+          "size": 16,
+          "line": 454
+        },
+        {
+          "name": "SBELOW",
+          "offset": 32,
+          "size": 16,
+          "line": 455
+        }
+      ]
+    },
+    {
+      "start_addr": 1008,
+      "start_expr": "$3f0",
+      "file": "01 POP Source/Source/EQ.S",
+      "line": 457,
+      "fields": [
+        {
+          "name": "bluepTRK",
+          "offset": 0,
+          "size": 1,
+          "line": 459
+        },
+        {
+          "name": "bluepREG",
+          "offset": 1,
+          "size": 1,
+          "line": 460
+        },
+        {
+          "name": "binfoTRK",
+          "offset": 2,
+          "size": 1,
+          "line": 461
+        },
+        {
+          "name": "binfoREG",
+          "offset": 3,
+          "size": 1,
+          "line": 462
+        },
+        {
+          "name": "level",
+          "offset": 4,
+          "size": 1,
+          "line": 463
+        },
+        {
+          "name": "BBundID",
+          "offset": 5,
+          "size": 1,
+          "line": 464
+        },
+        {
+          "name": "redherring2",
+          "offset": 6,
+          "size": 1,
+          "line": 465
+        },
+        {
+          "name": "pausetemp",
+          "offset": 7,
+          "size": 1,
+          "line": 466
+        },
+        {
+          "name": "recheck0",
+          "offset": 8,
+          "size": 1,
+          "line": 467
+        }
+      ]
+    },
+    {
+      "start_addr": 46592,
+      "start_expr": "mobtables",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 46,
+      "fields": [
+        {
+          "name": "trloc",
+          "offset": 0,
+          "size": 32,
+          "line": 52
+        },
+        {
+          "name": "trscrn",
+          "offset": 32,
+          "size": 32,
+          "line": 53
+        },
+        {
+          "name": "trdirec",
+          "offset": 64,
+          "size": 32,
+          "line": 54
+        },
+        {
+          "name": "mobx",
+          "offset": 96,
+          "size": 16,
+          "line": 56
+        },
+        {
+          "name": "moby",
+          "offset": 112,
+          "size": 16,
+          "line": 57
+        },
+        {
+          "name": "mobscrn",
+          "offset": 128,
+          "size": 16,
+          "line": 58
+        },
+        {
+          "name": "mobvel",
+          "offset": 144,
+          "size": 16,
+          "line": 59
+        },
+        {
+          "name": "mobtype",
+          "offset": 160,
+          "size": 16,
+          "line": 60
+        },
+        {
+          "name": "moblevel",
+          "offset": 176,
+          "size": 16,
+          "line": 61
+        },
+        {
+          "name": "soundtable",
+          "offset": 192,
+          "size": 32,
+          "line": 63
+        },
+        {
+          "name": "trobcount",
+          "offset": 224,
+          "size": 1,
+          "line": 65
+        }
+      ]
+    },
+    {
+      "start_addr": 46832,
+      "start_expr": "savedgame",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 67,
+      "fields": [
+        {
+          "name": "SavLevel",
+          "offset": 0,
+          "size": 1,
+          "line": 69
+        },
+        {
+          "name": "SavStrength",
+          "offset": 1,
+          "size": 1,
+          "line": 70
+        },
+        {
+          "name": "SavMaxed",
+          "offset": 2,
+          "size": 1,
+          "line": 71
+        },
+        {
+          "name": "SavTimer",
+          "offset": 3,
+          "size": 2,
+          "line": 72
+        },
+        {
+          "name": null,
+          "offset": 5,
+          "size": 1,
+          "line": 73
+        },
+        {
+          "name": "SavNextMsg",
+          "offset": 6,
+          "size": 1,
+          "line": 74
+        }
+      ]
+    },
+    {
+      "start_addr": 8192,
+      "start_expr": "topctrl",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 76,
+      "fields": [
+        {
+          "name": "start",
+          "offset": 0,
+          "size": 3,
+          "line": 78
+        },
+        {
+          "name": "restart",
+          "offset": 3,
+          "size": 3,
+          "line": 79
+        },
+        {
+          "name": "startresume",
+          "offset": 6,
+          "size": 3,
+          "line": 80
+        },
+        {
+          "name": "initsystem",
+          "offset": 9,
+          "size": 3,
+          "line": 81
+        },
+        {
+          "name": null,
+          "offset": 12,
+          "size": 3,
+          "line": 82
+        },
+        {
+          "name": "docrosscut",
+          "offset": 15,
+          "size": 3,
+          "line": 84
+        },
+        {
+          "name": "goattract",
+          "offset": 18,
+          "size": 3,
+          "line": 85
+        }
+      ]
+    },
+    {
+      "start_addr": 14848,
+      "start_expr": "ctrl",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 87,
+      "fields": [
+        {
+          "name": "PlayerCtrl",
+          "offset": 0,
+          "size": 3,
+          "line": 89
+        },
+        {
+          "name": "checkfloor",
+          "offset": 3,
+          "size": 3,
+          "line": 90
+        },
+        {
+          "name": "ShadCtrl",
+          "offset": 6,
+          "size": 3,
+          "line": 91
+        },
+        {
+          "name": "rereadblocks",
+          "offset": 9,
+          "size": 3,
+          "line": 92
+        },
+        {
+          "name": "checkpress",
+          "offset": 12,
+          "size": 3,
+          "line": 93
+        },
+        {
+          "name": "DoImpale",
+          "offset": 15,
+          "size": 3,
+          "line": 95
+        },
+        {
+          "name": "GenCtrl",
+          "offset": 18,
+          "size": 3,
+          "line": 96
+        },
+        {
+          "name": "checkimpale",
+          "offset": 21,
+          "size": 3,
+          "line": 97
+        }
+      ]
+    },
+    {
+      "start_addr": 21504,
+      "start_expr": "auto",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 99,
+      "fields": [
+        {
+          "name": "AutoCtrl",
+          "offset": 0,
+          "size": 3,
+          "line": 101
+        },
+        {
+          "name": "checkstrike",
+          "offset": 3,
+          "size": 3,
+          "line": 102
+        },
+        {
+          "name": "checkstab",
+          "offset": 6,
+          "size": 3,
+          "line": 103
+        },
+        {
+          "name": "AutoPlayback",
+          "offset": 9,
+          "size": 3,
+          "line": 104
+        },
+        {
+          "name": "cutcheck",
+          "offset": 12,
+          "size": 3,
+          "line": 105
+        },
+        {
+          "name": "cutguard",
+          "offset": 15,
+          "size": 3,
+          "line": 107
+        },
+        {
+          "name": "addguard",
+          "offset": 18,
+          "size": 3,
+          "line": 108
+        },
+        {
+          "name": "cut",
+          "offset": 21,
+          "size": 3,
+          "line": 109
+        }
+      ]
+    },
+    {
+      "start_addr": 17664,
+      "start_expr": "coll",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 111,
+      "fields": [
+        {
+          "name": "checkbarr",
+          "offset": 0,
+          "size": 3,
+          "line": 113
+        },
+        {
+          "name": "collisions",
+          "offset": 3,
+          "size": 3,
+          "line": 114
+        },
+        {
+          "name": "getfwddist",
+          "offset": 6,
+          "size": 3,
+          "line": 115
+        },
+        {
+          "name": "checkcoll",
+          "offset": 9,
+          "size": 3,
+          "line": 116
+        },
+        {
+          "name": "animchar",
+          "offset": 12,
+          "size": 3,
+          "line": 117
+        },
+        {
+          "name": "checkslice",
+          "offset": 15,
+          "size": 3,
+          "line": 119
+        },
+        {
+          "name": "checkslice2",
+          "offset": 18,
+          "size": 3,
+          "line": 120
+        },
+        {
+          "name": null,
+          "offset": 21,
+          "size": 3,
+          "line": 121
+        },
+        {
+          "name": "checkgate",
+          "offset": 24,
+          "size": 3,
+          "line": 122
+        },
+        {
+          "name": null,
+          "offset": 27,
+          "size": 3,
+          "line": 123
+        },
+        {
+          "name": "enemycoll",
+          "offset": 30,
+          "size": 3,
+          "line": 125
+        }
+      ]
+    },
+    {
+      "start_addr": 19456,
+      "start_expr": "gamebg",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 127,
+      "fields": [
+        {
+          "name": "updatemeters",
+          "offset": 0,
+          "size": 3,
+          "line": 129
+        },
+        {
+          "name": "DrawKidMeter",
+          "offset": 3,
+          "size": 3,
+          "line": 130
+        },
+        {
+          "name": "DrawSword",
+          "offset": 6,
+          "size": 3,
+          "line": 131
+        },
+        {
+          "name": "DrawKid",
+          "offset": 9,
+          "size": 3,
+          "line": 132
+        },
+        {
+          "name": "DrawShad",
+          "offset": 12,
+          "size": 3,
+          "line": 133
+        },
+        {
+          "name": "setupflame",
+          "offset": 15,
+          "size": 3,
+          "line": 135
+        },
+        {
+          "name": "continuemsg",
+          "offset": 18,
+          "size": 3,
+          "line": 136
+        },
+        {
+          "name": "addcharobj",
+          "offset": 21,
+          "size": 3,
+          "line": 137
+        },
+        {
+          "name": "setobjindx",
+          "offset": 24,
+          "size": 3,
+          "line": 138
+        },
+        {
+          "name": "printlevel",
+          "offset": 27,
+          "size": 3,
+          "line": 139
+        },
+        {
+          "name": "DrawOppMeter",
+          "offset": 30,
+          "size": 3,
+          "line": 141
+        },
+        {
+          "name": "flipdiskmsg",
+          "offset": 33,
+          "size": 3,
+          "line": 142
+        },
+        {
+          "name": "timeleftmsg",
+          "offset": 36,
+          "size": 3,
+          "line": 143
+        },
+        {
+          "name": "DrawGuard",
+          "offset": 39,
+          "size": 3,
+          "line": 144
+        },
+        {
+          "name": "DrawGuard2",
+          "offset": 42,
+          "size": 3,
+          "line": 145
+        },
+        {
+          "name": "setupflask",
+          "offset": 45,
+          "size": 3,
+          "line": 147
+        },
+        {
+          "name": "setupcomix",
+          "offset": 48,
+          "size": 3,
+          "line": 148
+        },
+        {
+          "name": "psetupflame",
+          "offset": 51,
+          "size": 3,
+          "line": 149
+        },
+        {
+          "name": "drawpost",
+          "offset": 54,
+          "size": 3,
+          "line": 150
+        },
+        {
+          "name": "drawglass",
+          "offset": 57,
+          "size": 3,
+          "line": 151
+        },
+        {
+          "name": "initlay",
+          "offset": 60,
+          "size": 3,
+          "line": 153
+        },
+        {
+          "name": "twinkle",
+          "offset": 63,
+          "size": 3,
+          "line": 154
+        },
+        {
+          "name": "flow",
+          "offset": 66,
+          "size": 3,
+          "line": 155
+        },
+        {
+          "name": "pmask",
+          "offset": 69,
+          "size": 3,
+          "line": 156
+        },
+        {
+          "name": "yellow",
+          "offset": 72,
+          "size": 3,
+          "line": 157
+        },
+        {
+          "name": "setrecheck0",
+          "offset": 75,
+          "size": 3,
+          "line": 159
+        },
+        {
+          "name": "recheckyel",
+          "offset": 78,
+          "size": 3,
+          "line": 160
+        }
+      ]
+    },
+    {
+      "start_addr": 55552,
+      "start_expr": "specialk",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 162,
+      "fields": [
+        {
+          "name": "keys",
+          "offset": 0,
+          "size": 3,
+          "line": 164
+        },
+        {
+          "name": "clrjstk",
+          "offset": 3,
+          "size": 3,
+          "line": 165
+        },
+        {
+          "name": "zerosound",
+          "offset": 6,
+          "size": 3,
+          "line": 166
+        },
+        {
+          "name": "addsound",
+          "offset": 9,
+          "size": 3,
+          "line": 167
+        },
+        {
+          "name": "facejstk",
+          "offset": 12,
+          "size": 3,
+          "line": 168
+        },
+        {
+          "name": "SaveSelect",
+          "offset": 15,
+          "size": 3,
+          "line": 170
+        },
+        {
+          "name": "LoadSelect",
+          "offset": 18,
+          "size": 3,
+          "line": 171
+        },
+        {
+          "name": "SaveDesel",
+          "offset": 21,
+          "size": 3,
+          "line": 172
+        },
+        {
+          "name": "LoadDesel",
+          "offset": 24,
+          "size": 3,
+          "line": 173
+        },
+        {
+          "name": "initinput",
+          "offset": 27,
+          "size": 3,
+          "line": 174
+        },
+        {
+          "name": "demokeys",
+          "offset": 30,
+          "size": 3,
+          "line": 176
+        },
+        {
+          "name": "listtorches",
+          "offset": 33,
+          "size": 3,
+          "line": 177
+        },
+        {
+          "name": "burn",
+          "offset": 36,
+          "size": 3,
+          "line": 178
+        },
+        {
+          "name": "getminleft",
+          "offset": 39,
+          "size": 3,
+          "line": 179
+        },
+        {
+          "name": "keeptime",
+          "offset": 42,
+          "size": 3,
+          "line": 180
+        },
+        {
+          "name": "shortentime",
+          "offset": 45,
+          "size": 3,
+          "line": 182
+        },
+        {
+          "name": "cuesong",
+          "offset": 48,
+          "size": 3,
+          "line": 183
+        },
+        {
+          "name": null,
+          "offset": 51,
+          "size": 3,
+          "line": 184
+        },
+        {
+          "name": null,
+          "offset": 54,
+          "size": 3,
+          "line": 185
+        },
+        {
+          "name": null,
+          "offset": 57,
+          "size": 3,
+          "line": 186
+        },
+        {
+          "name": "dloop",
+          "offset": 60,
+          "size": 3,
+          "line": 188
+        },
+        {
+          "name": "strobe",
+          "offset": 63,
+          "size": 3,
+          "line": 189
+        }
+      ]
+    },
+    {
+      "start_addr": 60928,
+      "start_expr": "mover",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 191,
+      "fields": [
+        {
+          "name": "animtrans",
+          "offset": 0,
+          "size": 3,
+          "line": 193
+        },
+        {
+          "name": "trigspikes",
+          "offset": 3,
+          "size": 3,
+          "line": 194
+        },
+        {
+          "name": "pushpp",
+          "offset": 6,
+          "size": 3,
+          "line": 195
+        },
+        {
+          "name": "breakloose1",
+          "offset": 9,
+          "size": 3,
+          "line": 196
+        },
+        {
+          "name": "breakloose",
+          "offset": 12,
+          "size": 3,
+          "line": 197
+        },
+        {
+          "name": "animmobs",
+          "offset": 15,
+          "size": 3,
+          "line": 199
+        },
+        {
+          "name": "addmobs",
+          "offset": 18,
+          "size": 3,
+          "line": 200
+        },
+        {
+          "name": "closeexit",
+          "offset": 21,
+          "size": 3,
+          "line": 201
+        },
+        {
+          "name": "getspikes",
+          "offset": 24,
+          "size": 3,
+          "line": 202
+        },
+        {
+          "name": "shakem",
+          "offset": 27,
+          "size": 3,
+          "line": 203
+        },
+        {
+          "name": "trigslicer",
+          "offset": 30,
+          "size": 3,
+          "line": 205
+        },
+        {
+          "name": "trigtorch",
+          "offset": 33,
+          "size": 3,
+          "line": 206
+        },
+        {
+          "name": "getflameframe",
+          "offset": 36,
+          "size": 3,
+          "line": 207
+        },
+        {
+          "name": "smashmirror",
+          "offset": 39,
+          "size": 3,
+          "line": 208
+        },
+        {
+          "name": "jamspikes",
+          "offset": 42,
+          "size": 3,
+          "line": 209
+        },
+        {
+          "name": "trigflask",
+          "offset": 45,
+          "size": 3,
+          "line": 211
+        },
+        {
+          "name": "getflaskframe",
+          "offset": 48,
+          "size": 3,
+          "line": 212
+        },
+        {
+          "name": "trigsword",
+          "offset": 51,
+          "size": 3,
+          "line": 213
+        },
+        {
+          "name": "jampp",
+          "offset": 54,
+          "size": 3,
+          "line": 214
+        }
+      ]
+    },
+    {
+      "start_addr": 53248,
+      "start_expr": "ctrlsubs",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 216,
+      "fields": [
+        {
+          "name": "getframe",
+          "offset": 0,
+          "size": 3,
+          "line": 218
+        },
+        {
+          "name": "getseq",
+          "offset": 3,
+          "size": 3,
+          "line": 219
+        },
+        {
+          "name": "getbasex",
+          "offset": 6,
+          "size": 3,
+          "line": 220
+        },
+        {
+          "name": "getblockx",
+          "offset": 9,
+          "size": 3,
+          "line": 221
+        },
+        {
+          "name": "getblockxp",
+          "offset": 12,
+          "size": 3,
+          "line": 222
+        },
+        {
+          "name": "getblocky",
+          "offset": 15,
+          "size": 3,
+          "line": 224
+        },
+        {
+          "name": "getblockej",
+          "offset": 18,
+          "size": 3,
+          "line": 225
+        },
+        {
+          "name": "addcharx",
+          "offset": 21,
+          "size": 3,
+          "line": 226
+        },
+        {
+          "name": "getdist",
+          "offset": 24,
+          "size": 3,
+          "line": 227
+        },
+        {
+          "name": "getdist1",
+          "offset": 27,
+          "size": 3,
+          "line": 228
+        },
+        {
+          "name": "getabovebeh",
+          "offset": 30,
+          "size": 3,
+          "line": 230
+        },
+        {
+          "name": "rdblock",
+          "offset": 33,
+          "size": 3,
+          "line": 231
+        },
+        {
+          "name": "rdblock1",
+          "offset": 36,
+          "size": 3,
+          "line": 232
+        },
+        {
+          "name": "setupsword",
+          "offset": 39,
+          "size": 3,
+          "line": 233
+        },
+        {
+          "name": "getscrns",
+          "offset": 42,
+          "size": 3,
+          "line": 234
+        },
+        {
+          "name": "addguardobj",
+          "offset": 45,
+          "size": 3,
+          "line": 236
+        },
+        {
+          "name": "opjumpseq",
+          "offset": 48,
+          "size": 3,
+          "line": 237
+        },
+        {
+          "name": "getedges",
+          "offset": 51,
+          "size": 3,
+          "line": 238
+        },
+        {
+          "name": "indexchar",
+          "offset": 54,
+          "size": 3,
+          "line": 239
+        },
+        {
+          "name": "quickfg",
+          "offset": 57,
+          "size": 3,
+          "line": 240
+        },
+        {
+          "name": "cropchar",
+          "offset": 60,
+          "size": 3,
+          "line": 242
+        },
+        {
+          "name": "getleft",
+          "offset": 63,
+          "size": 3,
+          "line": 243
+        },
+        {
+          "name": "getright",
+          "offset": 66,
+          "size": 3,
+          "line": 244
+        },
+        {
+          "name": "getup",
+          "offset": 69,
+          "size": 3,
+          "line": 245
+        },
+        {
+          "name": "getdown",
+          "offset": 72,
+          "size": 3,
+          "line": 246
+        },
+        {
+          "name": "cmpspace",
+          "offset": 75,
+          "size": 3,
+          "line": 248
+        },
+        {
+          "name": "cmpbarr",
+          "offset": 78,
+          "size": 3,
+          "line": 249
+        },
+        {
+          "name": "addkidobj",
+          "offset": 81,
+          "size": 3,
+          "line": 250
+        },
+        {
+          "name": "addshadobj",
+          "offset": 84,
+          "size": 3,
+          "line": 251
+        },
+        {
+          "name": "addreflobj",
+          "offset": 87,
+          "size": 3,
+          "line": 252
+        },
+        {
+          "name": "LoadKid",
+          "offset": 90,
+          "size": 3,
+          "line": 254
+        },
+        {
+          "name": "LoadShad",
+          "offset": 93,
+          "size": 3,
+          "line": 255
+        },
+        {
+          "name": "SaveKid",
+          "offset": 96,
+          "size": 3,
+          "line": 256
+        },
+        {
+          "name": "SaveShad",
+          "offset": 99,
+          "size": 3,
+          "line": 257
+        },
+        {
+          "name": "setupchar",
+          "offset": 102,
+          "size": 3,
+          "line": 258
+        },
+        {
+          "name": "GetFrameInfo",
+          "offset": 105,
+          "size": 3,
+          "line": 260
+        },
+        {
+          "name": "indexblock",
+          "offset": 108,
+          "size": 3,
+          "line": 261
+        },
+        {
+          "name": "markred",
+          "offset": 111,
+          "size": 3,
+          "line": 262
+        },
+        {
+          "name": "markfred",
+          "offset": 114,
+          "size": 3,
+          "line": 263
+        },
+        {
+          "name": "markwipe",
+          "offset": 117,
+          "size": 3,
+          "line": 264
+        },
+        {
+          "name": "markmove",
+          "offset": 120,
+          "size": 3,
+          "line": 266
+        },
+        {
+          "name": "markfloor",
+          "offset": 123,
+          "size": 3,
+          "line": 267
+        },
+        {
+          "name": "unindex",
+          "offset": 126,
+          "size": 3,
+          "line": 268
+        },
+        {
+          "name": "quickfloor",
+          "offset": 129,
+          "size": 3,
+          "line": 269
+        },
+        {
+          "name": "unevenfloor",
+          "offset": 132,
+          "size": 3,
+          "line": 270
+        },
+        {
+          "name": "markhalf",
+          "offset": 135,
+          "size": 3,
+          "line": 272
+        },
+        {
+          "name": "addswordobj",
+          "offset": 138,
+          "size": 3,
+          "line": 273
+        },
+        {
+          "name": "getblocky1",
+          "offset": 141,
+          "size": 3,
+          "line": 274
+        },
+        {
+          "name": "checkledge",
+          "offset": 144,
+          "size": 3,
+          "line": 275
+        },
+        {
+          "name": "get2infront",
+          "offset": 147,
+          "size": 3,
+          "line": 276
+        },
+        {
+          "name": "checkspikes",
+          "offset": 150,
+          "size": 3,
+          "line": 278
+        },
+        {
+          "name": "rechargemeter",
+          "offset": 153,
+          "size": 3,
+          "line": 279
+        },
+        {
+          "name": "addfcharx",
+          "offset": 156,
+          "size": 3,
+          "line": 280
+        },
+        {
+          "name": "facedx",
+          "offset": 159,
+          "size": 3,
+          "line": 281
+        },
+        {
+          "name": "jumpseq",
+          "offset": 162,
+          "size": 3,
+          "line": 282
+        },
+        {
+          "name": "GetBaseBlock",
+          "offset": 165,
+          "size": 3,
+          "line": 284
+        },
+        {
+          "name": "LoadKidwOp",
+          "offset": 168,
+          "size": 3,
+          "line": 285
+        },
+        {
+          "name": "SaveKidwOp",
+          "offset": 171,
+          "size": 3,
+          "line": 286
+        },
+        {
+          "name": "getopdist",
+          "offset": 174,
+          "size": 3,
+          "line": 287
+        },
+        {
+          "name": "LoadShadwOp",
+          "offset": 177,
+          "size": 3,
+          "line": 288
+        },
+        {
+          "name": "SaveShadwOp",
+          "offset": 180,
+          "size": 3,
+          "line": 290
+        },
+        {
+          "name": "boostmeter",
+          "offset": 183,
+          "size": 3,
+          "line": 291
+        },
+        {
+          "name": "getunderft",
+          "offset": 186,
+          "size": 3,
+          "line": 292
+        },
+        {
+          "name": "getinfront",
+          "offset": 189,
+          "size": 3,
+          "line": 293
+        },
+        {
+          "name": "getbehind",
+          "offset": 192,
+          "size": 3,
+          "line": 294
+        },
+        {
+          "name": "getabove",
+          "offset": 195,
+          "size": 3,
+          "line": 296
+        },
+        {
+          "name": "getaboveinf",
+          "offset": 198,
+          "size": 3,
+          "line": 297
+        },
+        {
+          "name": "cmpwall",
+          "offset": 201,
+          "size": 3,
+          "line": 298
+        }
+      ]
+    },
+    {
+      "start_addr": 57344,
+      "start_expr": "subs",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 300,
+      "fields": [
+        {
+          "name": "addtorches",
+          "offset": 0,
+          "size": 3,
+          "line": 302
+        },
+        {
+          "name": "doflashon",
+          "offset": 3,
+          "size": 3,
+          "line": 303
+        },
+        {
+          "name": "PageFlip",
+          "offset": 6,
+          "size": 3,
+          "line": 304
+        },
+        {
+          "name": "demo",
+          "offset": 9,
+          "size": 3,
+          "line": 305
+        },
+        {
+          "name": "showtime",
+          "offset": 12,
+          "size": 3,
+          "line": 306
+        },
+        {
+          "name": "doflashoff",
+          "offset": 15,
+          "size": 3,
+          "line": 308
+        },
+        {
+          "name": "lrclse",
+          "offset": 18,
+          "size": 3,
+          "line": 309
+        },
+        {
+          "name": null,
+          "offset": 21,
+          "size": 3,
+          "line": 310
+        },
+        {
+          "name": null,
+          "offset": 24,
+          "size": 3,
+          "line": 311
+        },
+        {
+          "name": null,
+          "offset": 27,
+          "size": 3,
+          "line": 312
+        },
+        {
+          "name": "addslicers",
+          "offset": 30,
+          "size": 3,
+          "line": 314
+        },
+        {
+          "name": "pause",
+          "offset": 33,
+          "size": 3,
+          "line": 315
+        },
+        {
+          "name": null,
+          "offset": 36,
+          "size": 3,
+          "line": 316
+        },
+        {
+          "name": "deadenemy",
+          "offset": 39,
+          "size": 3,
+          "line": 317
+        },
+        {
+          "name": "playcut",
+          "offset": 42,
+          "size": 3,
+          "line": 318
+        },
+        {
+          "name": "addlowersound",
+          "offset": 45,
+          "size": 3,
+          "line": 320
+        },
+        {
+          "name": "RemoveObj",
+          "offset": 48,
+          "size": 3,
+          "line": 321
+        },
+        {
+          "name": "addfall",
+          "offset": 51,
+          "size": 3,
+          "line": 322
+        },
+        {
+          "name": "setinitials",
+          "offset": 54,
+          "size": 3,
+          "line": 323
+        },
+        {
+          "name": "startkid",
+          "offset": 57,
+          "size": 3,
+          "line": 324
+        },
+        {
+          "name": "startkid1",
+          "offset": 60,
+          "size": 3,
+          "line": 326
+        },
+        {
+          "name": "gravity",
+          "offset": 63,
+          "size": 3,
+          "line": 327
+        },
+        {
+          "name": "initialguards",
+          "offset": 66,
+          "size": 3,
+          "line": 328
+        },
+        {
+          "name": "mirappear",
+          "offset": 69,
+          "size": 3,
+          "line": 329
+        },
+        {
+          "name": "crumble",
+          "offset": 72,
+          "size": 3,
+          "line": 330
+        }
+      ]
+    },
+    {
+      "start_addr": 59904,
+      "start_expr": "sound",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 332,
+      "fields": [
+        {
+          "name": "playback",
+          "offset": 0,
+          "size": 3,
+          "line": 334
+        }
+      ]
+    },
+    {
+      "start_addr": 54272,
+      "start_expr": "msys",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 336,
+      "fields": [
+        {
+          "name": "_minit",
+          "offset": 0,
+          "size": 3,
+          "line": 338
+        },
+        {
+          "name": "_mplay",
+          "offset": 3,
+          "size": 3,
+          "line": 339
+        }
+      ]
+    },
+    {
+      "start_addr": 10240,
+      "start_expr": "seqtable",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 341,
+      "fields": [
+        {
+          "name": "Fdef",
+          "offset": 0,
+          "size": 1200,
+          "line": 343
+        },
+        {
+          "name": "altset1",
+          "offset": 1200,
+          "size": 200,
+          "line": 344
+        },
+        {
+          "name": "altset2",
+          "offset": 1400,
+          "size": 450,
+          "line": 345
+        },
+        {
+          "name": "swordtab",
+          "offset": 1850,
+          "size": 192,
+          "line": 346
+        }
+      ]
+    },
+    {
+      "start_addr": 63744,
+      "start_expr": "misc",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 348,
+      "fields": [
+        {
+          "name": "VanishChar",
+          "offset": 0,
+          "size": 3,
+          "line": 350
+        },
+        {
+          "name": "movemusic",
+          "offset": 3,
+          "size": 3,
+          "line": 351
+        },
+        {
+          "name": "moveauxlc",
+          "offset": 6,
+          "size": 3,
+          "line": 352
+        },
+        {
+          "name": "firstguard",
+          "offset": 9,
+          "size": 3,
+          "line": 353
+        },
+        {
+          "name": "markmeters",
+          "offset": 12,
+          "size": 3,
+          "line": 354
+        },
+        {
+          "name": "potioneffect",
+          "offset": 15,
+          "size": 3,
+          "line": 356
+        },
+        {
+          "name": "mouserescue",
+          "offset": 18,
+          "size": 3,
+          "line": 357
+        },
+        {
+          "name": "StabChar",
+          "offset": 21,
+          "size": 3,
+          "line": 358
+        },
+        {
+          "name": "unholy",
+          "offset": 24,
+          "size": 3,
+          "line": 359
+        },
+        {
+          "name": "reflection",
+          "offset": 27,
+          "size": 3,
+          "line": 360
+        },
+        {
+          "name": "MarkKidMeter",
+          "offset": 30,
+          "size": 3,
+          "line": 362
+        },
+        {
+          "name": "MarkOppMeter",
+          "offset": 33,
+          "size": 3,
+          "line": 363
+        },
+        {
+          "name": "bonesrise",
+          "offset": 36,
+          "size": 3,
+          "line": 364
+        },
+        {
+          "name": "decstr",
+          "offset": 39,
+          "size": 3,
+          "line": 365
+        },
+        {
+          "name": "DoSaveGame",
+          "offset": 42,
+          "size": 3,
+          "line": 366
+        },
+        {
+          "name": "LoadLevelX",
+          "offset": 45,
+          "size": 3,
+          "line": 368
+        },
+        {
+          "name": "checkalert",
+          "offset": 48,
+          "size": 3,
+          "line": 369
+        },
+        {
+          "name": "dispversion",
+          "offset": 51,
+          "size": 3,
+          "line": 370
+        }
+      ]
+    },
+    {
+      "start_addr": 64512,
+      "start_expr": "debugs",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 372,
+      "fields": [
+        {
+          "name": "showpage",
+          "offset": 0,
+          "size": 3,
+          "line": 374
+        },
+        {
+          "name": "debugkeys",
+          "offset": 3,
+          "size": 3,
+          "line": 375
+        },
+        {
+          "name": null,
+          "offset": 6,
+          "size": 3,
+          "line": 376
+        },
+        {
+          "name": "titlescreen",
+          "offset": 9,
+          "size": 3,
+          "line": 377
+        }
+      ]
+    },
+    {
+      "start_addr": 64,
+      "start_expr": "$40",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 389,
+      "fields": [
+        {
+          "name": "Char",
+          "offset": 0,
+          "size": 16,
+          "line": 391
+        },
+        {
+          "name": "Kid",
+          "offset": 16,
+          "size": 16,
+          "line": 392
+        },
+        {
+          "name": "Shad",
+          "offset": 32,
+          "size": 16,
+          "line": 393
+        },
+        {
+          "name": "FCharVars",
+          "offset": 48,
+          "size": 12,
+          "line": 394
+        },
+        {
+          "name": "yellowflag",
+          "offset": 60,
+          "size": 1,
+          "line": 395
+        },
+        {
+          "name": "timebomb",
+          "offset": 61,
+          "size": 1,
+          "line": 396
+        },
+        {
+          "name": "justblocked",
+          "offset": 62,
+          "size": 1,
+          "line": 397
+        },
+        {
+          "name": "gdtimer",
+          "offset": 63,
+          "size": 1,
+          "line": 398
+        },
+        {
+          "name": "framepoint",
+          "offset": 64,
+          "size": 2,
+          "line": 399
+        },
+        {
+          "name": "Fimage",
+          "offset": 66,
+          "size": 1,
+          "line": 400
+        },
+        {
+          "name": "Fdx",
+          "offset": 67,
+          "size": 1,
+          "line": 401
+        },
+        {
+          "name": "Fdy",
+          "offset": 68,
+          "size": 1,
+          "line": 402
+        },
+        {
+          "name": "Fcheck",
+          "offset": 69,
+          "size": 1,
+          "line": 403
+        },
+        {
+          "name": "exitopen",
+          "offset": 70,
+          "size": 1,
+          "line": 404
+        },
+        {
+          "name": "collX",
+          "offset": 71,
+          "size": 1,
+          "line": 405
+        },
+        {
+          "name": "lightning",
+          "offset": 72,
+          "size": 1,
+          "line": 406
+        },
+        {
+          "name": "lightcolor",
+          "offset": 73,
+          "size": 1,
+          "line": 407
+        },
+        {
+          "name": "offguard",
+          "offset": 74,
+          "size": 1,
+          "line": 408
+        },
+        {
+          "name": "blockid",
+          "offset": 75,
+          "size": 1,
+          "line": 409
+        },
+        {
+          "name": "blockx",
+          "offset": 76,
+          "size": 1,
+          "line": 410
+        },
+        {
+          "name": "blocky",
+          "offset": 77,
+          "size": 1,
+          "line": 411
+        },
+        {
+          "name": "infrontx",
+          "offset": 78,
+          "size": 1,
+          "line": 412
+        },
+        {
+          "name": "behindx",
+          "offset": 79,
+          "size": 1,
+          "line": 413
+        },
+        {
+          "name": "abovey",
+          "offset": 80,
+          "size": 1,
+          "line": 414
+        },
+        {
+          "name": "tempblockx",
+          "offset": 81,
+          "size": 1,
+          "line": 415
+        },
+        {
+          "name": "tempblocky",
+          "offset": 82,
+          "size": 1,
+          "line": 416
+        },
+        {
+          "name": "tempscrn",
+          "offset": 83,
+          "size": 1,
+          "line": 417
+        },
+        {
+          "name": "tempid",
+          "offset": 84,
+          "size": 1,
+          "line": 418
+        },
+        {
+          "name": "numtrans",
+          "offset": 85,
+          "size": 1,
+          "line": 419
+        },
+        {
+          "name": "tempnt",
+          "offset": 86,
+          "size": 1,
+          "line": 420
+        },
+        {
+          "name": "redrawflg",
+          "offset": 87,
+          "size": 1,
+          "line": 421
+        },
+        {
+          "name": "xdiff",
+          "offset": 88,
+          "size": 2,
+          "line": 422
+        },
+        {
+          "name": "ydiff",
+          "offset": 90,
+          "size": 2,
+          "line": 423
+        },
+        {
+          "name": "xdir",
+          "offset": 92,
+          "size": 1,
+          "line": 424
+        },
+        {
+          "name": "ydir",
+          "offset": 93,
+          "size": 1,
+          "line": 425
+        },
+        {
+          "name": "RNDseed",
+          "offset": 94,
+          "size": 1,
+          "line": 426
+        },
+        {
+          "name": "invert",
+          "offset": 95,
+          "size": 1,
+          "line": 427
+        },
+        {
+          "name": "PlayCount",
+          "offset": 96,
+          "size": 1,
+          "line": 428
+        },
+        {
+          "name": "refract",
+          "offset": 97,
+          "size": 1,
+          "line": 429
+        },
+        {
+          "name": "backtolife",
+          "offset": 98,
+          "size": 1,
+          "line": 430
+        },
+        {
+          "name": "cutplan",
+          "offset": 99,
+          "size": 1,
+          "line": 431
+        },
+        {
+          "name": "lastcmd",
+          "offset": 100,
+          "size": 1,
+          "line": 432
+        },
+        {
+          "name": "distfallen",
+          "offset": 101,
+          "size": 1,
+          "line": 433
+        },
+        {
+          "name": "cutscrn",
+          "offset": 102,
+          "size": 1,
+          "line": 434
+        },
+        {
+          "name": "waitingtojump",
+          "offset": 103,
+          "size": 1,
+          "line": 435
+        },
+        {
+          "name": "trigppabove",
+          "offset": 104,
+          "size": 1,
+          "line": 436
+        },
+        {
+          "name": "direcpp",
+          "offset": 105,
+          "size": 1,
+          "line": 437
+        },
+        {
+          "name": "blockaddr",
+          "offset": 106,
+          "size": 2,
+          "line": 438
+        },
+        {
+          "name": "delay",
+          "offset": 108,
+          "size": 1,
+          "line": 439
+        },
+        {
+          "name": "XCOORD",
+          "offset": 109,
+          "size": 2,
+          "line": 440
+        },
+        {
+          "name": "savekidx",
+          "offset": 111,
+          "size": 1,
+          "line": 441
+        },
+        {
+          "name": "mirrx",
+          "offset": 112,
+          "size": 1,
+          "line": 442
+        },
+        {
+          "name": "dmirr",
+          "offset": 113,
+          "size": 1,
+          "line": 443
+        },
+        {
+          "name": "barrdist",
+          "offset": 114,
+          "size": 1,
+          "line": 444
+        },
+        {
+          "name": "barrcode",
+          "offset": 115,
+          "size": 1,
+          "line": 445
+        },
+        {
+          "name": "imwidth",
+          "offset": 116,
+          "size": 1,
+          "line": 446
+        },
+        {
+          "name": "imheight",
+          "offset": 117,
+          "size": 1,
+          "line": 447
+        },
+        {
+          "name": "leadedge",
+          "offset": 118,
+          "size": 1,
+          "line": 448
+        },
+        {
+          "name": "leftej",
+          "offset": 119,
+          "size": 1,
+          "line": 449
+        },
+        {
+          "name": "rightej",
+          "offset": 120,
+          "size": 1,
+          "line": 450
+        },
+        {
+          "name": "topej",
+          "offset": 121,
+          "size": 1,
+          "line": 451
+        },
+        {
+          "name": "leftblock",
+          "offset": 122,
+          "size": 1,
+          "line": 452
+        },
+        {
+          "name": "rightblock",
+          "offset": 123,
+          "size": 1,
+          "line": 453
+        },
+        {
+          "name": "topblock",
+          "offset": 124,
+          "size": 1,
+          "line": 454
+        },
+        {
+          "name": "bottomblock",
+          "offset": 125,
+          "size": 1,
+          "line": 455
+        },
+        {
+          "name": "CDLeftEj",
+          "offset": 126,
+          "size": 1,
+          "line": 456
+        },
+        {
+          "name": "CDRightEj",
+          "offset": 127,
+          "size": 1,
+          "line": 457
+        },
+        {
+          "name": "endrange",
+          "offset": 128,
+          "size": 1,
+          "line": 458
+        },
+        {
+          "name": "bufindex",
+          "offset": 129,
+          "size": 1,
+          "line": 459
+        },
+        {
+          "name": "blockedge",
+          "offset": 130,
+          "size": 1,
+          "line": 460
+        },
+        {
+          "name": "collideL",
+          "offset": 131,
+          "size": 1,
+          "line": 461
+        },
+        {
+          "name": "collideR",
+          "offset": 132,
+          "size": 1,
+          "line": 462
+        },
+        {
+          "name": "weightless",
+          "offset": 133,
+          "size": 1,
+          "line": 463
+        },
+        {
+          "name": "cutorder",
+          "offset": 134,
+          "size": 1,
+          "line": 464
+        },
+        {
+          "name": "AMtimer",
+          "offset": 135,
+          "size": 1,
+          "line": 465
+        },
+        {
+          "name": "begrange",
+          "offset": 136,
+          "size": 1,
+          "line": 466
+        },
+        {
+          "name": "scrn",
+          "offset": 137,
+          "size": 1,
+          "line": 467
+        },
+        {
+          "name": "keybufptr",
+          "offset": 138,
+          "size": 1,
+          "line": 468
+        },
+        {
+          "name": "VisScrn",
+          "offset": 139,
+          "size": 1,
+          "line": 469
+        },
+        {
+          "name": "OppStrength",
+          "offset": 140,
+          "size": 1,
+          "line": 470
+        },
+        {
+          "name": "jarabove",
+          "offset": 141,
+          "size": 1,
+          "line": 471
+        },
+        {
+          "name": "KidStrength",
+          "offset": 142,
+          "size": 1,
+          "line": 472
+        },
+        {
+          "name": "ChgKidStr",
+          "offset": 143,
+          "size": 1,
+          "line": 473
+        },
+        {
+          "name": "MaxKidStr",
+          "offset": 144,
+          "size": 1,
+          "line": 474
+        },
+        {
+          "name": "EnemyAlert",
+          "offset": 145,
+          "size": 1,
+          "line": 475
+        },
+        {
+          "name": "ChgOppStr",
+          "offset": 146,
+          "size": 1,
+          "line": 476
+        },
+        {
+          "name": "heroic",
+          "offset": 147,
+          "size": 1,
+          "line": 477
+        },
+        {
+          "name": "clrF",
+          "offset": 148,
+          "size": 1,
+          "line": 478
+        },
+        {
+          "name": "clrB",
+          "offset": 149,
+          "size": 1,
+          "line": 479
+        },
+        {
+          "name": "clrU",
+          "offset": 150,
+          "size": 1,
+          "line": 480
+        },
+        {
+          "name": "clrD",
+          "offset": 151,
+          "size": 1,
+          "line": 481
+        },
+        {
+          "name": "clrbtn",
+          "offset": 152,
+          "size": 1,
+          "line": 482
+        },
+        {
+          "name": "Fsword",
+          "offset": 153,
+          "size": 1,
+          "line": 483
+        },
+        {
+          "name": "purpleflag",
+          "offset": 154,
+          "size": 1,
+          "line": 484
+        },
+        {
+          "name": "msgtimer",
+          "offset": 155,
+          "size": 1,
+          "line": 485
+        },
+        {
+          "name": "MaxOppStr",
+          "offset": 156,
+          "size": 1,
+          "line": 486
+        },
+        {
+          "name": "guardprog",
+          "offset": 157,
+          "size": 1,
+          "line": 487
+        },
+        {
+          "name": "ManCtrl",
+          "offset": 158,
+          "size": 1,
+          "line": 488
+        },
+        {
+          "name": "mergetimer",
+          "offset": 159,
+          "size": 1,
+          "line": 489
+        },
+        {
+          "name": "lastpotion",
+          "offset": 160,
+          "size": 1,
+          "line": 490
+        },
+        {
+          "name": "origstrength",
+          "offset": 161,
+          "size": 1,
+          "line": 491
+        },
+        {
+          "name": "jmpaddr",
+          "offset": 162,
+          "size": 2,
+          "line": 492
+        },
+        {
+          "name": "alertguard",
+          "offset": 164,
+          "size": 1,
+          "line": 493
+        },
+        {
+          "name": "createshad",
+          "offset": 165,
+          "size": 1,
+          "line": 494
+        },
+        {
+          "name": "stunned",
+          "offset": 166,
+          "size": 1,
+          "line": 495
+        },
+        {
+          "name": "droppedout",
+          "offset": 167,
+          "size": 1,
+          "line": 496
+        }
+      ]
+    },
+    {
+      "start_addr": 530,
+      "start_expr": "$212",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 503,
+      "fields": [
+        {
+          "name": "milestone",
+          "offset": 0,
+          "size": 1,
+          "line": 505
+        },
+        {
+          "name": "GlassState",
+          "offset": 1,
+          "size": 1,
+          "line": 506
+        },
+        {
+          "name": "redrawglass",
+          "offset": 2,
+          "size": 1,
+          "line": 507
+        },
+        {
+          "name": "doortop",
+          "offset": 3,
+          "size": 1,
+          "line": 508
+        },
+        {
+          "name": "GuardColor",
+          "offset": 4,
+          "size": 1,
+          "line": 509
+        },
+        {
+          "name": "shadowaction",
+          "offset": 5,
+          "size": 1,
+          "line": 510
+        },
+        {
+          "name": "skipmessage",
+          "offset": 6,
+          "size": 1,
+          "line": 511
+        },
+        {
+          "name": "savezp",
+          "offset": 7,
+          "size": 32,
+          "line": 512
+        },
+        {
+          "name": "MSset",
+          "offset": 39,
+          "size": 1,
+          "line": 513
+        },
+        {
+          "name": "rjumpflag",
+          "offset": 40,
+          "size": 1,
+          "line": 514
+        },
+        {
+          "name": "redherring",
+          "offset": 41,
+          "size": 1,
+          "line": 515
+        }
+      ]
+    },
+    {
+      "start_addr": 768,
+      "start_expr": "$300",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 517,
+      "fields": [
+        {
+          "name": "MinLeft",
+          "offset": 0,
+          "size": 1,
+          "line": 519
+        },
+        {
+          "name": "NextTimeMsg",
+          "offset": 1,
+          "size": 1,
+          "line": 520
+        },
+        {
+          "name": "SecLeft",
+          "offset": 2,
+          "size": 1,
+          "line": 521
+        },
+        {
+          "name": "BGset1",
+          "offset": 3,
+          "size": 1,
+          "line": 522
+        },
+        {
+          "name": "BGset2",
+          "offset": 4,
+          "size": 1,
+          "line": 523
+        },
+        {
+          "name": "CHset",
+          "offset": 5,
+          "size": 1,
+          "line": 524
+        },
+        {
+          "name": "FrameCount",
+          "offset": 6,
+          "size": 2,
+          "line": 525
+        },
+        {
+          "name": "SongCount",
+          "offset": 8,
+          "size": 1,
+          "line": 526
+        },
+        {
+          "name": "PreRecPtr",
+          "offset": 9,
+          "size": 1,
+          "line": 527
+        },
+        {
+          "name": "gotsword",
+          "offset": 10,
+          "size": 1,
+          "line": 528
+        },
+        {
+          "name": "message",
+          "offset": 11,
+          "size": 1,
+          "line": 529
+        },
+        {
+          "name": "SPEED",
+          "offset": 12,
+          "size": 1,
+          "line": 530
+        },
+        {
+          "name": "nummob",
+          "offset": 13,
+          "size": 1,
+          "line": 531
+        },
+        {
+          "name": "clrSEL",
+          "offset": 14,
+          "size": 5,
+          "line": 532
+        },
+        {
+          "name": "clrDESEL",
+          "offset": 19,
+          "size": 5,
+          "line": 533
+        },
+        {
+          "name": "vibes",
+          "offset": 24,
+          "size": 1,
+          "line": 534
+        },
+        {
+          "name": "SongCue",
+          "offset": 25,
+          "size": 1,
+          "line": 535
+        },
+        {
+          "name": "musicon",
+          "offset": 26,
+          "size": 1,
+          "line": 536
+        },
+        {
+          "name": "redkidmeter",
+          "offset": 27,
+          "size": 1,
+          "line": 537
+        },
+        {
+          "name": "NextLevel",
+          "offset": 28,
+          "size": 1,
+          "line": 538
+        },
+        {
+          "name": "scrncolor",
+          "offset": 29,
+          "size": 1,
+          "line": 539
+        },
+        {
+          "name": "redoppmeter",
+          "offset": 30,
+          "size": 1,
+          "line": 540
+        },
+        {
+          "name": "timerequest",
+          "offset": 31,
+          "size": 1,
+          "line": 541
+        }
+      ]
+    },
+    {
+      "start_addr": 800,
+      "start_expr": "$320",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 543,
+      "fields": [
+        {
+          "name": "CDthisframe",
+          "offset": 0,
+          "size": 16,
+          "line": 545
+        },
+        {
+          "name": "CDlastframe",
+          "offset": 16,
+          "size": 16,
+          "line": 546
+        },
+        {
+          "name": "CDbelow",
+          "offset": 32,
+          "size": 16,
+          "line": 547
+        },
+        {
+          "name": "CDabove",
+          "offset": 48,
+          "size": 16,
+          "line": 548
+        },
+        {
+          "name": "SNthisframe",
+          "offset": 64,
+          "size": 16,
+          "line": 549
+        },
+        {
+          "name": "SNlastframe",
+          "offset": 80,
+          "size": 16,
+          "line": 550
+        },
+        {
+          "name": "SNbelow",
+          "offset": 96,
+          "size": 16,
+          "line": 551
+        },
+        {
+          "name": "SNabove",
+          "offset": 112,
+          "size": 10,
+          "line": 552
+        },
+        {
+          "name": "BlockYthis",
+          "offset": 122,
+          "size": 1,
+          "line": 553
+        },
+        {
+          "name": "BlockYlast",
+          "offset": 123,
+          "size": 1,
+          "line": 554
+        },
+        {
+          "name": "Op",
+          "offset": 124,
+          "size": 16,
+          "line": 556
+        },
+        {
+          "name": "keybuf",
+          "offset": 140,
+          "size": 10,
+          "line": 559
+        }
+      ]
+    },
+    {
+      "start_addr": 64,
+      "start_expr": "Char",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 566,
+      "fields": [
+        {
+          "name": "CharPosn",
+          "offset": 0,
+          "size": 1,
+          "line": 567
+        },
+        {
+          "name": "CharX",
+          "offset": 1,
+          "size": 1,
+          "line": 568
+        },
+        {
+          "name": "CharY",
+          "offset": 2,
+          "size": 1,
+          "line": 569
+        },
+        {
+          "name": "CharFace",
+          "offset": 3,
+          "size": 1,
+          "line": 570
+        },
+        {
+          "name": "CharBlockX",
+          "offset": 4,
+          "size": 1,
+          "line": 571
+        },
+        {
+          "name": "CharBlockY",
+          "offset": 5,
+          "size": 1,
+          "line": 572
+        },
+        {
+          "name": "CharAction",
+          "offset": 6,
+          "size": 1,
+          "line": 573
+        },
+        {
+          "name": "CharXVel",
+          "offset": 7,
+          "size": 1,
+          "line": 574
+        },
+        {
+          "name": "CharYVel",
+          "offset": 8,
+          "size": 1,
+          "line": 575
+        },
+        {
+          "name": "CharSeq",
+          "offset": 9,
+          "size": 2,
+          "line": 576
+        },
+        {
+          "name": "CharScrn",
+          "offset": 11,
+          "size": 1,
+          "line": 577
+        },
+        {
+          "name": "CharRepeat",
+          "offset": 12,
+          "size": 1,
+          "line": 578
+        },
+        {
+          "name": "CharID",
+          "offset": 13,
+          "size": 1,
+          "line": 579
+        },
+        {
+          "name": "CharSword",
+          "offset": 14,
+          "size": 1,
+          "line": 580
+        },
+        {
+          "name": "CharLife",
+          "offset": 15,
+          "size": 1,
+          "line": 581
+        }
+      ]
+    },
+    {
+      "start_addr": 924,
+      "start_expr": "Op",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 583,
+      "fields": [
+        {
+          "name": "OpPosn",
+          "offset": 0,
+          "size": 1,
+          "line": 584
+        },
+        {
+          "name": "OpX",
+          "offset": 1,
+          "size": 1,
+          "line": 585
+        },
+        {
+          "name": "OpY",
+          "offset": 2,
+          "size": 1,
+          "line": 586
+        },
+        {
+          "name": "OpFace",
+          "offset": 3,
+          "size": 1,
+          "line": 587
+        },
+        {
+          "name": "OpBlockX",
+          "offset": 4,
+          "size": 1,
+          "line": 588
+        },
+        {
+          "name": "OpBlockY",
+          "offset": 5,
+          "size": 1,
+          "line": 589
+        },
+        {
+          "name": "OpAction",
+          "offset": 6,
+          "size": 1,
+          "line": 590
+        },
+        {
+          "name": "OpXVel",
+          "offset": 7,
+          "size": 1,
+          "line": 591
+        },
+        {
+          "name": "OpYVel",
+          "offset": 8,
+          "size": 1,
+          "line": 592
+        },
+        {
+          "name": "OpSeq",
+          "offset": 9,
+          "size": 2,
+          "line": 593
+        },
+        {
+          "name": "OpScrn",
+          "offset": 11,
+          "size": 1,
+          "line": 594
+        },
+        {
+          "name": "OpRepeat",
+          "offset": 12,
+          "size": 1,
+          "line": 595
+        },
+        {
+          "name": "OpID",
+          "offset": 13,
+          "size": 1,
+          "line": 596
+        },
+        {
+          "name": "OpSword",
+          "offset": 14,
+          "size": 1,
+          "line": 597
+        },
+        {
+          "name": "OpLife",
+          "offset": 15,
+          "size": 1,
+          "line": 598
+        }
+      ]
+    },
+    {
+      "start_addr": 80,
+      "start_expr": "Kid",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 600,
+      "fields": [
+        {
+          "name": "KidPosn",
+          "offset": 0,
+          "size": 1,
+          "line": 601
+        },
+        {
+          "name": "KidX",
+          "offset": 1,
+          "size": 1,
+          "line": 602
+        },
+        {
+          "name": "KidY",
+          "offset": 2,
+          "size": 1,
+          "line": 603
+        },
+        {
+          "name": "KidFace",
+          "offset": 3,
+          "size": 1,
+          "line": 604
+        },
+        {
+          "name": "KidBlockX",
+          "offset": 4,
+          "size": 1,
+          "line": 605
+        },
+        {
+          "name": "KidBlockY",
+          "offset": 5,
+          "size": 1,
+          "line": 606
+        },
+        {
+          "name": "KidAction",
+          "offset": 6,
+          "size": 1,
+          "line": 607
+        },
+        {
+          "name": "KidXVel",
+          "offset": 7,
+          "size": 1,
+          "line": 608
+        },
+        {
+          "name": "KidYVel",
+          "offset": 8,
+          "size": 1,
+          "line": 609
+        },
+        {
+          "name": "KidSeq",
+          "offset": 9,
+          "size": 2,
+          "line": 610
+        },
+        {
+          "name": "KidScrn",
+          "offset": 11,
+          "size": 1,
+          "line": 611
+        },
+        {
+          "name": "KidRepeat",
+          "offset": 12,
+          "size": 1,
+          "line": 612
+        },
+        {
+          "name": "KidID",
+          "offset": 13,
+          "size": 1,
+          "line": 613
+        },
+        {
+          "name": "KidSword",
+          "offset": 14,
+          "size": 1,
+          "line": 614
+        },
+        {
+          "name": "KidLife",
+          "offset": 15,
+          "size": 1,
+          "line": 615
+        }
+      ]
+    },
+    {
+      "start_addr": 96,
+      "start_expr": "Shad",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 617,
+      "fields": [
+        {
+          "name": "ShadPosn",
+          "offset": 0,
+          "size": 1,
+          "line": 618
+        },
+        {
+          "name": "ShadX",
+          "offset": 1,
+          "size": 1,
+          "line": 619
+        },
+        {
+          "name": "ShadY",
+          "offset": 2,
+          "size": 1,
+          "line": 620
+        },
+        {
+          "name": "ShadFace",
+          "offset": 3,
+          "size": 1,
+          "line": 621
+        },
+        {
+          "name": "ShadBlockX",
+          "offset": 4,
+          "size": 1,
+          "line": 622
+        },
+        {
+          "name": "ShadBlockY",
+          "offset": 5,
+          "size": 1,
+          "line": 623
+        },
+        {
+          "name": "ShadAction",
+          "offset": 6,
+          "size": 1,
+          "line": 624
+        },
+        {
+          "name": "ShadXVel",
+          "offset": 7,
+          "size": 1,
+          "line": 625
+        },
+        {
+          "name": "ShadYVel",
+          "offset": 8,
+          "size": 1,
+          "line": 626
+        },
+        {
+          "name": "ShadSeq",
+          "offset": 9,
+          "size": 2,
+          "line": 627
+        },
+        {
+          "name": "ShadScrn",
+          "offset": 11,
+          "size": 1,
+          "line": 628
+        },
+        {
+          "name": "ShadRepeat",
+          "offset": 12,
+          "size": 1,
+          "line": 629
+        },
+        {
+          "name": "ShadID",
+          "offset": 13,
+          "size": 1,
+          "line": 630
+        },
+        {
+          "name": "ShadSword",
+          "offset": 14,
+          "size": 1,
+          "line": 631
+        },
+        {
+          "name": "ShadLife",
+          "offset": 15,
+          "size": 1,
+          "line": 632
+        }
+      ]
+    },
+    {
+      "start_addr": 112,
+      "start_expr": "FCharVars",
+      "file": "01 POP Source/Source/GAMEEQ.S",
+      "line": 634,
+      "fields": [
+        {
+          "name": "FCharImage",
+          "offset": 0,
+          "size": 1,
+          "line": 635
+        },
+        {
+          "name": "FCharX",
+          "offset": 1,
+          "size": 2,
+          "line": 636
+        },
+        {
+          "name": "FCharY",
+          "offset": 3,
+          "size": 1,
+          "line": 637
+        },
+        {
+          "name": "FCharFace",
+          "offset": 4,
+          "size": 1,
+          "line": 638
+        },
+        {
+          "name": "FCharIndex",
+          "offset": 5,
+          "size": 1,
+          "line": 639
+        },
+        {
+          "name": "FCharCU",
+          "offset": 6,
+          "size": 1,
+          "line": 640
+        },
+        {
+          "name": "FCharCD",
+          "offset": 7,
+          "size": 1,
+          "line": 641
+        },
+        {
+          "name": "FCharCL",
+          "offset": 8,
+          "size": 1,
+          "line": 642
+        },
+        {
+          "name": "FCharCR",
+          "offset": 9,
+          "size": 1,
+          "line": 643
+        },
+        {
+          "name": "FCharTable",
+          "offset": 10,
+          "size": 1,
+          "line": 644
+        }
+      ]
+    }
+  ],
+  "diagnostics": []
+}

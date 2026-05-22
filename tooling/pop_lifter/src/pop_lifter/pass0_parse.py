@@ -68,12 +68,24 @@ class ProgramAST:
     diagnostics: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:
+        # File paths are rewritten to be repo-relative so the JSON dump
+        # diffs cleanly across checkouts. The marker is the submodule
+        # mount point under `vendor/pop-apple2/`; anything outside that
+        # tree falls back to the basename, which is good enough for
+        # ad-hoc test fixtures created in tmp dirs.
+        def _portable(s: str) -> str:
+            marker = "vendor/pop-apple2/"
+            idx = s.find(marker)
+            if idx >= 0:
+                return s[idx + len(marker):]
+            return s.rsplit("/", 1)[-1]
+
         def _default(obj: object) -> object:
             if isinstance(obj, Path):
-                return str(obj)
+                return _portable(str(obj))
             if isinstance(obj, Line):
                 return {
-                    "file": str(obj.file),
+                    "file": _portable(str(obj.file)),
                     "lineno": obj.lineno,
                     "label": obj.label,
                     "mnemonic": obj.mnemonic,
@@ -81,11 +93,20 @@ class ProgramAST:
                 }
             raise TypeError(f"unhandled: {type(obj)}")
 
+        # `asdict` on the dum blocks materialises a dict, so the `file`
+        # field reaches `_default` as a plain string — rewrite those
+        # in-place before serialising.
+        dum_blocks_serialized: list[dict] = []
+        for b in self.dum_blocks:
+            d = asdict(b)
+            d["file"] = _portable(d["file"])
+            dum_blocks_serialized.append(d)
+
         return json.dumps(
             {
                 "equates": dict(sorted(self.equates.items())),
-                "dum_blocks": [asdict(b) for b in self.dum_blocks],
-                "diagnostics": self.diagnostics,
+                "dum_blocks": dum_blocks_serialized,
+                "diagnostics": [_portable(d) for d in self.diagnostics],
             },
             indent=2,
             default=_default,
