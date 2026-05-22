@@ -208,3 +208,24 @@ def test_no_diagnostics_on_eq_files(source_dir):
         [source_dir / "EQ.S", source_dir / "GAMEEQ.S"], search_paths=[source_dir]
     )
     assert ast.diagnostics == []
+
+
+def test_dum_with_no_operand_is_dropped(tmp_path):
+    # A `dum` line with no address operand cannot be honored: there is no
+    # base address for the `ds` fields that follow. The parser should
+    # warn and then *skip* the malformed block — neither appending it to
+    # the AST nor letting subsequent `ds` lines define equates at the
+    # implicit (and incorrect) address 0.
+    f = tmp_path / "bad_dum.S"
+    f.write_text(
+        " dum\n"
+        "ghost ds 1\n"
+        " dend\n"
+        "real = $1234\n"
+    )
+    from pop_lifter.pass0_parse import parse_files
+    ast = parse_files([f])
+    assert "ghost" not in ast.equates
+    assert ast.equates["real"] == 0x1234
+    assert ast.dum_blocks == []
+    assert any("dum with no operand" in d for d in ast.diagnostics)

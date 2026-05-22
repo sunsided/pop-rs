@@ -20,7 +20,17 @@ def _cmd_parse(args: argparse.Namespace) -> int:
 
     inputs: list[Path] = []
     if args.files:
-        inputs = [Path(f) for f in args.files]
+        missing: list[str] = []
+        for f in args.files:
+            p = Path(f)
+            if not p.is_file():
+                missing.append(f)
+            else:
+                inputs.append(p)
+        if missing:
+            for f in missing:
+                print(f"error: input file not found: {f}", file=sys.stderr)
+            return 2
     else:
         for name in ("EQ.S", "GAMEEQ.S"):
             p = src_dir / name

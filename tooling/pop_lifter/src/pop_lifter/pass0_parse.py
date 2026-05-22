@@ -161,7 +161,7 @@ def _tokenize_expr(s: str) -> list[str]:
 
 class _ExprParser:
     """Recursive-descent evaluator. Operator precedence kept simple:
-    `* / & |` bind tighter than `+ -`; left-associative."""
+    `* / & | ^` bind tighter than `+ -`; left-associative."""
 
     def __init__(self, tokens: list[str], symbols: dict[str, int]) -> None:
         self.t = tokens
@@ -329,19 +329,16 @@ class Parser:
 
         # An open `dum` at end of file is implicitly closed.
 
-    def _open_dum(self, line: Line, prev: _DumState | None) -> _DumState:
+    def _open_dum(self, line: Line, prev: _DumState | None) -> _DumState | None:
         del prev  # opening a new dum implicitly closes the previous one
         if not line.operand:
+            # No operand: skip this block entirely. Returning `None`
+            # leaves the parser in the "no open dum" state so any
+            # following `ds` lines are silently dropped rather than
+            # accumulating into a dangling block at address 0 (which
+            # would also leak bogus equates into the symbol table).
             self._warn(line, "dum with no operand")
-            return _DumState(
-                block=DumBlock(
-                    start_addr=0,
-                    start_expr="",
-                    file=str(line.file),
-                    line=line.lineno,
-                ),
-                lc=0,
-            )
+            return None
         try:
             addr = eval_expr(line.operand, self.ast.equates)
         except ValueError as exc:
