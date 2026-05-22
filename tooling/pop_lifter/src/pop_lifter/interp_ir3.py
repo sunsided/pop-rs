@@ -32,10 +32,13 @@ from .interp_ir1 import run as ir1_run
 from .ir1 import ModuleIR1, Routine as IR1Routine
 from .ir3 import (
     Block,
+    BreakStmt,
     CallStmt,
+    ContinueStmt,
     GotoStmt,
     IfStmt,
     LabelStmt,
+    LoopStmt,
     ModuleIR3,
     RawIfStmt,
     RawStmt,
@@ -57,6 +60,15 @@ class _TailCallSignal(Exception):
     def __init__(self, target: str):
         super().__init__(target)
         self.target = target
+
+
+class _BreakSignal(Exception):
+    """Raised by BreakStmt to exit the innermost enclosing LoopStmt."""
+
+
+class _ContinueSignal(Exception):
+    """Raised by ContinueStmt to jump to the top of the innermost
+    enclosing LoopStmt."""
 
 
 def run(
@@ -168,6 +180,28 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
         elif stmt.else_block is not None:
             _exec_block(stmt.else_block, modules, aliases, trace)
         return
+    if isinstance(stmt, LoopStmt):
+        # Bounded so a busted exit guard doesn't hang the interpreter.
+        # 6502 routines we're modelling don't iterate more than ~1024
+        # times in practice — a million is room to spare for tests.
+        for _ in range(1_000_000):
+            try:
+                _exec_block(stmt.body, modules, aliases, trace)
+            except _ContinueSignal:
+                continue
+            except _BreakSignal:
+                break
+            # Body fell off the bottom without break/continue —
+            # natural iteration, keep looping.
+        else:
+            raise InterpError(
+                "LoopStmt exceeded 1,000,000 iterations — exit guard bug?"
+            )
+        return
+    if isinstance(stmt, BreakStmt):
+        raise _BreakSignal()
+    if isinstance(stmt, ContinueStmt):
+        raise _ContinueSignal()
     if isinstance(stmt, (GotoStmt, LabelStmt)):
         # The relooper currently emits these only for routines it
         # couldn't structure. Anything reaching the interpreter is a

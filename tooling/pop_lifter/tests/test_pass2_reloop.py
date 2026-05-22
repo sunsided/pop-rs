@@ -122,27 +122,36 @@ def test_checkfloor_ir3_top_level_shape(source_dir):
     )
 
 
-def test_relooper_fallback_for_loops():
-    """A routine with a backward local jump must take the
-    unstructured fallback path — every IR1 item shows up as either a
-    RawStmt, a Label/Goto/Return/TailCall, or a wrapped IfStmt with a
-    Goto in its then-block. No infinite recursion, no exception."""
+def _two_back_edges_routine(extra=None):
+    """Build a routine with two back-edges to the same header — the
+    loop-relooper recognises only single-back-edge simple do-while
+    shapes, so this defeats it and forces the fallback path. Pre-
+    pends an `extra` IR1 item just inside the loop body if supplied
+    (used to inject Call / IR1If into the fallback shape)."""
     from pop_lifter.ir1 import Branch, CmpImm, Imm, Label, Reg
 
     src = SourceRef(file="syn", line=0, raw="")
-    # do { cmp; bne loop } end
-    r = Routine(
-        name="loopy",
-        body=[
-            Label(name=":loop", src=src),
-            CmpImm(reg=Reg.A, imm=Imm(value=0, text="#0"), src=src),
-            Branch(cond="ne", target=":loop", src=src),
-            Return(src=src),
-        ],
-    )
-    out = reloop_routine(r)
-    # The unstructured fallback wraps the Branch as a RawIfStmt whose
-    # then-block contains a GotoStmt (target is local).
+    body = [
+        Label(name=":loop", src=src),
+        CmpImm(reg=Reg.A, imm=Imm(value=0, text="#0"), src=src),
+        Branch(cond="eq", target=":loop", src=src),   # back-edge #1
+    ]
+    if extra is not None:
+        body.append(extra)
+    body.extend([
+        CmpImm(reg=Reg.A, imm=Imm(value=1, text="#1"), src=src),
+        Branch(cond="ne", target=":loop", src=src),   # back-edge #2
+        Return(src=src),
+    ])
+    return Routine(name="loopy", body=body)
+
+
+def test_relooper_fallback_for_unstructurable_loops():
+    """Two back-edges to the same header — outside the simple-
+    do-while shape the relooper recognises. The routine must take
+    the unstructured fallback path and emit `LabelStmt` +
+    `RawIfStmt`-with-`GotoStmt`."""
+    out = reloop_routine(_two_back_edges_routine())
     stmts = out.body.stmts
     assert any(isinstance(s, LabelStmt) for s in stmts), (
         "expected LabelStmt in the fallback shape"
@@ -159,73 +168,51 @@ def test_fallback_cross_module_branch_becomes_tail_call():
     local label is a conditional tail call into another routine —
     IR1 executes it by switching routines. Emitting `GotoStmt` here
     would silently change semantics; the fallback must produce a
-    `TailCallStmt` in the then-block instead."""
-    from pop_lifter.ir1 import (
-        Branch,
-        CmpImm,
-        Compare,
-        If as IR1If,
-        Imm,
-        Label,
-        Reg,
-    )
+    `TailCallStmt` in the then-block instead. Uses the two-back-edge
+    shape to force the fallback path."""
+    from pop_lifter.ir1 import Compare, If as IR1If, Imm, Reg
 
     src = SourceRef(file="syn", line=0, raw="")
-    # do { cmp; if a == 1 goto external_fn; bne :loop } — the
-    # backward `bne :loop` triggers the fallback path.
-    r = Routine(
-        name="loopy_with_tail_call",
-        body=[
-            Label(name=":loop", src=src),
-            CmpImm(reg=Reg.A, imm=Imm(value=0, text="#0"), src=src),
-            IR1If(
-                cond=Compare(
-                    reg=Reg.A,
-                    op="==",
-                    rhs=Imm(value=1, text="#1"),
-                ),
-                target="external_fn",
-                src=src,
-            ),
-            Branch(cond="ne", target=":loop", src=src),
-            Return(src=src),
-        ],
+    cross_module_if = IR1If(
+        cond=Compare(reg=Reg.A, op="==", rhs=Imm(value=2, text="#2")),
+        target="external_fn",
+        src=src,
     )
-    out = reloop_routine(r)
-    # The IR1If with a non-local target must produce a TailCallStmt,
-    # not a GotoStmt.
-    if_stmt = next(s for s in out.body.stmts if isinstance(s, IfStmt))
-    assert any(
-        isinstance(t, TailCallStmt) and t.target == "external_fn"
-        for t in if_stmt.then_block.stmts
-    ), "cross-module If target must lower to TailCallStmt in the fallback"
+    out = reloop_routine(_two_back_edges_routine(extra=cross_module_if))
+    # Among the IfStmts in the fallback, find the one whose then-block
+    # references external_fn — its then-block must hold a TailCallStmt.
+    matched = False
+    for s in out.body.stmts:
+        if isinstance(s, IfStmt):
+            for t in s.then_block.stmts:
+                if isinstance(t, TailCallStmt) and t.target == "external_fn":
+                    matched = True
+                    break
+                if isinstance(t, GotoStmt) and t.target == "external_fn":
+                    raise AssertionError(
+                        "cross-module If target lowered to GotoStmt instead "
+                        "of TailCallStmt — fallback semantics regression"
+                    )
+    assert matched, (
+        "cross-module If target must lower to TailCallStmt in the fallback"
+    )
 
 
 def test_fallback_ir1_call_becomes_callstmt():
     """In the fallback path, an IR1 `Call` must be emitted as a
-    structured `CallStmt`, not folded into a `RawStmt`. That keeps
-    the IR3 shape consistent for downstream consumers regardless of
-    whether the routine took the structured or unstructured path."""
-    from pop_lifter.ir1 import Branch, Call as IR1Call, Label, Reg, CmpImm, Imm
+    structured `CallStmt`, not folded into a `RawStmt`. Uses the
+    two-back-edge shape to force the fallback path."""
+    from pop_lifter.ir1 import Call as IR1Call
     from pop_lifter.ir3 import CallStmt
 
     src = SourceRef(file="syn", line=0, raw="")
-    r = Routine(
-        name="loopy_with_call",
-        body=[
-            Label(name=":loop", src=src),
-            IR1Call(target="helper", src=src),
-            CmpImm(reg=Reg.A, imm=Imm(value=0, text="#0"), src=src),
-            Branch(cond="ne", target=":loop", src=src),
-            Return(src=src),
-        ],
-    )
-    out = reloop_routine(r)
+    out = reloop_routine(_two_back_edges_routine(
+        extra=IR1Call(target="helper", src=src),
+    ))
     assert any(
         isinstance(s, CallStmt) and s.target == "helper"
         for s in out.body.stmts
     ), "IR1 Call must lower to IR3 CallStmt in the fallback"
-    # And the body must NOT contain a RawStmt wrapping the Call.
     from pop_lifter.ir3 import RawStmt as IR3RawStmt
     for s in out.body.stmts:
         if isinstance(s, IR3RawStmt):
@@ -282,6 +269,212 @@ def _stubs_module():
         name="STUBS",
         file="syn",
         routines=[stub("onground", 0x200), stub("falling", 0x201), stub("fallon", 0x202)],
+    )
+
+
+# --------------------------------------------------------------- loops
+
+
+def _structured_loop_count(routine):
+    """Count `LoopStmt` nodes anywhere in `routine`'s body."""
+    from pop_lifter.ir3 import LoopStmt
+
+    seen = 0
+    def walk(stmts):
+        nonlocal seen
+        for s in stmts:
+            if isinstance(s, LoopStmt):
+                seen += 1
+                walk(s.body.stmts)
+            inner_then = getattr(s, "then_block", None)
+            if inner_then is not None:
+                walk(inner_then.stmts)
+            inner_else = getattr(s, "else_block", None)
+            if inner_else is not None:
+                walk(inner_else.stmts)
+    walk(routine.body.stmts)
+    return seen
+
+
+def test_chgshadposn_loop_structures(source_dir):
+    """AUTO.S `chgshadposn` is the cleanest do-while in the codebase:
+    `:loop ... dey ; bpl :loop`. After the loop-relooper slice it
+    must contain exactly one `LoopStmt`, no GotoStmt/LabelStmt."""
+    from pop_lifter.ir3 import GotoStmt as G, LabelStmt as L
+    ast = parse_files(
+        [source_dir / "EQ.S", source_dir / "GAMEEQ.S", source_dir / "AUTO.S"],
+        search_paths=[source_dir],
+    )
+    auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
+    ir1 = lift_file(auto, ast.equates, ["chgshadposn"]).module
+    ir3 = reloop_module(structure_module(ir1))
+    r = ir3.find("chgshadposn")
+    assert _structured_loop_count(r) == 1, (
+        "chgshadposn should contain exactly one LoopStmt"
+    )
+    # No fallback markers.
+    def walk(stmts):
+        for s in stmts:
+            assert not isinstance(s, (G, L)), (
+                f"unexpected unstructured stmt {type(s).__name__}"
+            )
+            inner = getattr(s, "then_block", None)
+            if inner is not None:
+                walk(inner.stmts)
+            inner = getattr(s, "else_block", None)
+            if inner is not None:
+                walk(inner.stmts)
+            inner = getattr(s, "body", None)
+            if inner is not None and hasattr(inner, "stmts"):
+                walk(inner.stmts)
+    walk(r.body.stmts)
+
+
+def test_loop_exit_cond_is_inverted():
+    """A do-while shape `:hdr ... bpl :hdr` continues while N=0
+    (`pl`). The structured form has the exit guard at the bottom:
+    `if mi { break }`. Verify the inversion."""
+    from pop_lifter.ir1 import Branch, CmpImm, Imm, Label, Reg
+    from pop_lifter.ir3 import BreakStmt, LoopStmt, RawIfStmt
+
+    src = SourceRef(file="syn", line=0, raw="")
+    r = Routine(
+        name="dec_loop",
+        body=[
+            Label(name=":hdr", src=src),
+            CmpImm(reg=Reg.A, imm=Imm(value=0, text="#0"), src=src),
+            Branch(cond="pl", target=":hdr", src=src),
+            Return(src=src),
+        ],
+    )
+    out = reloop_routine(r)
+    loop = next(s for s in out.body.stmts if isinstance(s, LoopStmt))
+    guard = next(
+        s for s in loop.body.stmts if isinstance(s, RawIfStmt)
+    )
+    assert guard.cond == "mi", (
+        f"expected pl→mi inversion at loop bottom, got cond={guard.cond!r}"
+    )
+    assert any(isinstance(t, BreakStmt) for t in guard.then_block.stmts)
+
+
+def test_loop_with_fused_if_inverts_compare():
+    """Same as above, but the back-edge is a fused `If(Compare)`.
+    Verify the Compare's op is inverted (e.g. `!=` → `==`)."""
+    from pop_lifter.ir1 import (
+        Compare,
+        If as IR1If,
+        Imm,
+        Label,
+        Reg,
+    )
+
+    src = SourceRef(file="syn", line=0, raw="")
+    r = Routine(
+        name="cmp_loop",
+        body=[
+            Label(name=":hdr", src=src),
+            IR1If(
+                cond=Compare(reg=Reg.A, op="!=", rhs=Imm(value=5, text="#5")),
+                target=":hdr",
+                src=src,
+            ),
+            Return(src=src),
+        ],
+    )
+    out = reloop_routine(r)
+    from pop_lifter.ir3 import LoopStmt
+    loop = next(s for s in out.body.stmts if isinstance(s, LoopStmt))
+    guard = next(s for s in loop.body.stmts if isinstance(s, IfStmt))
+    assert guard.cond.op == "==", (
+        f"expected != → == inversion, got {guard.cond.op!r}"
+    )
+
+
+def test_synthetic_counter_loop_runs_correctly():
+    """Behavioural gate for the loop-relooper. Construct a do-while
+    counter loop using only lifted ops, structure it, and execute via
+    the IR3 interpreter. The loop:
+
+        a = 0
+        :loop:
+        store a → 0x100 + a   (so we can see iteration count via mem)
+        c = 0
+        a = a + 1
+        cmp a, #5
+        if a != 5 goto :loop
+        return
+
+    Post-state: mem[0x100..0x105] should hold 0..4 (the loop writes
+    a=0,1,2,3,4 before the cmp == 5 fires). mem[0x80] is the
+    accumulator's final value (5).
+    """
+    from pop_lifter.ir1 import (
+        AdcImm,
+        Abs,
+        Clc,
+        CmpImm,
+        Compare,
+        If as IR1If,
+        Imm,
+        Label,
+        LoadImm,
+        Reg,
+        Routine,
+        StoreAbs,
+        StoreIndexed,
+    )
+
+    src = SourceRef(file="syn", line=0, raw="")
+    OUT = Abs(name="out", addr=0x100)
+
+    body = [
+        # x = 0  (used as the indexed-store offset; same value as a)
+        LoadImm(reg=Reg.X, imm=Imm(value=0, text="#0"), src=src),
+        LoadImm(reg=Reg.A, imm=Imm(value=0, text="#0"), src=src),
+        Label(name=":loop", src=src),
+        StoreIndexed(reg=Reg.A, base=OUT, index=Reg.X, src=src),
+        # Bump x and a in lockstep.
+        Clc(src=src),
+        AdcImm(imm=Imm(value=1, text="#1"), src=src),
+        # Reload x from a via a memory hop: write a to 0x80, then
+        # read x from 0x80. (No `tax` in IR1 yet.)
+        StoreAbs(
+            reg=Reg.A,
+            target=Abs(name="ctr", addr=0x80),
+            src=src,
+        ),
+        # x = mem[0x80]
+        # We don't have LoadAbs to X with a literal address... we do.
+        # Use LoadAbs with reg=X.
+    ]
+    from pop_lifter.ir1 import LoadAbs
+    body.append(LoadAbs(reg=Reg.X, source=Abs(name="ctr", addr=0x80), src=src))
+    body.extend([
+        IR1If(
+            cond=Compare(reg=Reg.A, op="!=", rhs=Imm(value=5, text="#5")),
+            target=":loop",
+            src=src,
+        ),
+        Return(src=src),
+    ])
+    routine = Routine(name="counter", body=body)
+    mod = ModuleIR1(name="SYN", file="syn", routines=[routine])
+    ir3_mod = reloop_module(structure_module(mod))
+
+    from pop_lifter.ir3 import LoopStmt
+    counter = ir3_mod.find("counter")
+    assert any(isinstance(s, LoopStmt) for s in counter.body.stmts), (
+        "synthetic counter loop didn't structure as LoopStmt"
+    )
+
+    ram = bytearray(0x10000)
+    ir3_run([ir3_mod], "counter", ram=ram)
+    assert list(ram[0x100:0x105]) == [0, 1, 2, 3, 4], (
+        f"loop did not iterate 5 times; got {list(ram[0x100:0x105])}"
+    )
+    assert ram[0x80] == 5, (
+        f"final counter value should be 5, got {ram[0x80]}"
     )
 
 

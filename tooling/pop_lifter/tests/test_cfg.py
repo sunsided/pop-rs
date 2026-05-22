@@ -102,3 +102,86 @@ def test_empty_routine_gets_synthetic_return():
     cfg = build_cfg(Routine(name="empty", entry_aliases=[], body=[]))
     assert len(cfg.blocks) == 1
     assert isinstance(cfg.blocks[0].terminator, Return)
+
+
+# ---- dominator / loop analysis
+
+
+def test_checkfloor_entry_dominates_everything(source_dir):
+    """The CFG entry must dominate every reachable block."""
+    from pop_lifter.cfg import compute_idoms, dominates
+
+    cfg = build_cfg(_lift_and_structure(source_dir, "CHECKFLOOR"))
+    idom = compute_idoms(cfg)
+    for b in cfg.blocks:
+        if b.id in idom:
+            assert dominates(idom, cfg.entry_id, b.id)
+
+
+def test_checkfloor_has_no_back_edges(source_dir):
+    """CHECKFLOOR is loop-free — no back-edges at all."""
+    from pop_lifter.cfg import find_back_edges
+
+    cfg = build_cfg(_lift_and_structure(source_dir, "CHECKFLOOR"))
+    assert find_back_edges(cfg) == []
+
+
+def test_chgshadposn_has_one_back_edge(source_dir):
+    """AUTO.S `chgshadposn` has exactly one back-edge: from the
+    `bpl :loop` tail to the `:loop` header."""
+    from pop_lifter.cfg import find_back_edges
+    from pop_lifter.pass0_parse import parse_files
+    from pop_lifter.pass1_lift import lift_file
+    from pop_lifter.pass2_struct import structure_module
+
+    ast = parse_files(
+        [source_dir / "EQ.S", source_dir / "GAMEEQ.S", source_dir / "AUTO.S"],
+        search_paths=[source_dir],
+    )
+    auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
+    ir2 = structure_module(lift_file(auto, ast.equates, ["chgshadposn"]).module)
+    cfg = build_cfg(ir2.find("chgshadposn"))
+    back = find_back_edges(cfg)
+    assert len(back) == 1, f"expected 1 back-edge, got {back}"
+    src, dst = back[0]
+    assert cfg.blocks[dst].label == ":loop"
+
+
+def test_natural_loop_body_includes_header_and_tail():
+    """Natural-loop body for a 3-block do-while is exactly the 3
+    blocks: header, intermediate (optional), tail."""
+    from pop_lifter.cfg import natural_loop_body
+    from pop_lifter.ir1 import (
+        Branch,
+        CmpImm,
+        Imm,
+        Label,
+        LoadImm,
+        Reg,
+        Return,
+        Routine,
+        SourceRef,
+    )
+
+    src = SourceRef(file="syn", line=0, raw="")
+    r = Routine(
+        name="dw",
+        body=[
+            LoadImm(reg=Reg.A, imm=Imm(value=0, text="#0"), src=src),
+            Label(name=":hdr", src=src),
+            CmpImm(reg=Reg.A, imm=Imm(value=5, text="#5"), src=src),
+            Branch(cond="ne", target=":hdr", src=src),
+            Return(src=src),
+        ],
+    )
+    cfg = build_cfg(r)
+    # Block 0 is the entry (LoadImm + fall-through to :hdr).
+    # Block 1 (:hdr) is the loop header.
+    # Block 2 is the tail (Branch back to :hdr).
+    # Block 3 is the post-loop Return.
+    hdr = cfg.label_to_block[":hdr"]
+    tail = hdr + 1
+    body = natural_loop_body(cfg, source=tail, header=hdr)
+    assert hdr in body and tail in body
+    # The Return block must NOT be in the loop.
+    assert (tail + 1) not in body

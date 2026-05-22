@@ -84,6 +84,38 @@ class IfStmt:
 
 
 @dataclass(frozen=True)
+class LoopStmt:
+    """`loop { body }` — an infinite loop with explicit exits via
+    `BreakStmt`. The relooper produces this for the classic 6502
+    do-while-with-counter pattern (`:hdr ... dex ; bpl :hdr`):
+
+        loop {
+            ...body...
+            if !exit_cond { break; }
+        }
+
+    The exit guard sits at the bottom of `body` since 6502 do-while
+    loops always evaluate the continue condition after the body.
+    Pass 3 / pass 4 may rewrite into `for`/`while` shapes when an
+    induction variable is recognised."""
+
+    body: "Block"
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class BreakStmt:
+    """Exit the innermost enclosing `LoopStmt`."""
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class ContinueStmt:
+    """Jump to the top of the innermost enclosing `LoopStmt`."""
+    src: SourceRef
+
+
+@dataclass(frozen=True)
 class GotoStmt:
     """Escape hatch: the relooper couldn't structure this transfer
     (typically a loop back-edge or an irreducible CFG fragment). Pass
@@ -118,7 +150,8 @@ class RawIfStmt:
 
 Stmt = (
     RawStmt | CallStmt | TailCallStmt | ReturnStmt
-    | IfStmt | RawIfStmt | GotoStmt | LabelStmt
+    | IfStmt | RawIfStmt | LoopStmt | BreakStmt | ContinueStmt
+    | GotoStmt | LabelStmt
 )
 
 
@@ -199,6 +232,16 @@ def _fmt_stmt(stmt: Stmt, indent: int) -> list[str]:
                 lines.extend(_fmt_stmt(s, indent + 1))
         lines.append(f"{pad}}}")
         return lines
+    if isinstance(stmt, LoopStmt):
+        lines = [f"{pad}loop {{                          ; {stmt.src.short()}"]
+        for s in stmt.body.stmts:
+            lines.extend(_fmt_stmt(s, indent + 1))
+        lines.append(f"{pad}}}")
+        return lines
+    if isinstance(stmt, BreakStmt):
+        return [f"{pad}break                            ; {stmt.src.short()}"]
+    if isinstance(stmt, ContinueStmt):
+        return [f"{pad}continue                         ; {stmt.src.short()}"]
     if isinstance(stmt, GotoStmt):
         return [f"{pad}goto {stmt.target}              ; {stmt.src.short()}"]
     if isinstance(stmt, LabelStmt):
