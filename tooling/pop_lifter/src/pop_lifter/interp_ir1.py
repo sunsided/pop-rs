@@ -76,6 +76,11 @@ from .ir1 import (
     Transfer,
     Unsupported,
 )
+# Re-use the parser's canonical synthetic-address base so the two
+# modules can't drift. If the cutoff ever needs to move, it moves in
+# `pass0_parse._LABEL_SENTINEL_BASE` and the interpreter follows
+# automatically.
+from .pass0_parse import _LABEL_SENTINEL_BASE
 
 
 class InterpError(RuntimeError):
@@ -126,30 +131,29 @@ class Trace:
         return out
 
 
-_SYNTHETIC_ADDR_BASE = 0x10000
-"""Mirror of `pass0_parse._LABEL_SENTINEL_BASE`. Any `Abs.addr` ≥
-this value came from `ProgramAST.labels` — a synthesised symbol with
-no real assembled address. The interpreter refuses to dereference
-those rather than silently masking to a low RAM slot."""
-
-
 def _real_addr(addr: int, src) -> int:
     """Mask `addr` into a 16-bit RAM index, raising `InterpError` if
     the high bits flag it as a synthetic-label sentinel.
 
     Pass 0 puts every globally-scoped program label into
-    `ProgramAST.labels` at `0x10000 + i`, so the lifter can accept
-    `lda #SymbolicLabel` / `ldx symbol_table,x` operands. Those
-    addresses are fine to LIFT (the dump just shows the symbolic
-    name), but you can't actually READ or WRITE through them — we
-    haven't assembled the program, so the address is meaningless
-    in terms of real memory layout.
+    `ProgramAST.labels` at `_LABEL_SENTINEL_BASE + i` (0x10000+), so
+    the lifter can accept `lda #SymbolicLabel` / `ldx symbol_table,x`
+    operands. Those addresses are fine to LIFT (the dump just shows
+    the symbolic name), but you can't actually READ or WRITE through
+    them — we haven't assembled the program, so the address is
+    meaningless in terms of real memory layout.
 
-    Every `exec_atom` site that touches `ram[...]` routes through
-    here. Use the bare-int `addr` parameter (not the `Abs` wrapper)
-    so callers that compute an index (`base + Y`, etc.) check the
-    final effective address."""
-    if addr >= _SYNTHETIC_ADDR_BASE:
+    Calling convention for indexed accesses: validate the *base*
+    here (`_real_addr(item.base.addr, item.src)`) and then apply
+    the index + 16-bit wrap yourself:
+
+        base = _real_addr(item.base.addr, item.src)
+        addr = (base + (idx_val & 0xff)) & 0xffff
+
+    That way a real high-page base (e.g. `$fff0,x` with `x=$30`)
+    wraps to `$0020` instead of falsely tripping the synthetic gate
+    on the un-wrapped `$10020` sum. Synthetic bases still raise."""
+    if addr >= _LABEL_SENTINEL_BASE:
         where = src.short() if src is not None else "<unknown>"
         raw = repr(src.raw) if src is not None else ""
         raise InterpError(

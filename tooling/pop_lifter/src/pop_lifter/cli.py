@@ -152,6 +152,7 @@ def _cmd_lift(args: argparse.Namespace) -> int:
     # parse_files call.
     base = [src_dir / n for n in ("EQ.S", "GAMEEQ.S") if (src_dir / n).exists()]
     ast = parse_files([*base, *file_paths], search_paths=[src_dir])
+    symbols = ast.symbols()
 
     # For each file, lift only those `--entry` labels that this file
     # actually defines. This lets a single CLI invocation produce a
@@ -174,7 +175,7 @@ def _cmd_lift(args: argparse.Namespace) -> int:
         local_entries = [e for e in args.entry if e in defined and e not in handled]
         if not local_entries:
             continue
-        report = lift_file(file_ast, ast.symbols(), local_entries)
+        report = lift_file(file_ast, symbols, local_entries)
         if not report.module.routines:
             continue
         dumps.append((
@@ -232,6 +233,7 @@ def _cmd_struct(args: argparse.Namespace) -> int:
 
     base = [src_dir / n for n in ("EQ.S", "GAMEEQ.S") if (src_dir / n).exists()]
     ast = parse_files([*base, *file_paths], search_paths=[src_dir])
+    symbols = ast.symbols()
 
     dumps: list[str] = []
     total_fused = 0
@@ -255,7 +257,7 @@ def _cmd_struct(args: argparse.Namespace) -> int:
         local_entries = [e for e in args.entry if e in defined and e not in handled]
         if not local_entries:
             continue
-        ir1_module = lift_file(file_ast, ast.symbols(), local_entries).module
+        ir1_module = lift_file(file_ast, symbols, local_entries).module
         ir2_module = structure_module(ir1_module)
         f, u = fusion_stats(ir2_module)
         cmp_left, setc_left = elision_stats(ir2_module)
@@ -319,6 +321,7 @@ def _cmd_reloop(args: argparse.Namespace) -> int:
 
     base = [src_dir / n for n in ("EQ.S", "GAMEEQ.S") if (src_dir / n).exists()]
     ast = parse_files([*base, *file_paths], search_paths=[src_dir])
+    symbols = ast.symbols()
 
     dumps: list[str] = []
     total_routines = 0
@@ -339,7 +342,7 @@ def _cmd_reloop(args: argparse.Namespace) -> int:
         local_entries = [e for e in args.entry if e in defined and e not in handled]
         if not local_entries:
             continue
-        ir1_module = lift_file(file_ast, ast.symbols(), local_entries).module
+        ir1_module = lift_file(file_ast, symbols, local_entries).module
         ir2_module = structure_module(ir1_module)
         ir3_module = reloop_module(ir2_module)
         total_routines += len(ir3_module.routines)
@@ -396,6 +399,7 @@ def _cmd_lift_all(args: argparse.Namespace) -> int:
     base = [p for p in base_order if p.exists()]
     others = [p for p in files if p not in base]
     ast = parse_files([*base, *others], search_paths=[src_dir])
+    symbols = ast.symbols()
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -421,7 +425,7 @@ def _cmd_lift_all(args: argparse.Namespace) -> int:
             skipped.append(src_path.name)
             continue
 
-        report = lift_file(file_ast, ast.symbols(), entries)
+        report = lift_file(file_ast, symbols, entries)
         if not report.module.routines:
             skipped.append(src_path.name)
             continue

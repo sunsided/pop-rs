@@ -42,7 +42,7 @@ fn onground {
   }
   call getunderft                ; CTRL.S:318
   cmp a, #block              ; CTRL.S:319
-  if a != #0x14 {    ; CTRL.S:320
+  if a != #block {    ; CTRL.S:320
     goto :1              ; CTRL.S:320
   }
   call InsideBlock                ; CTRL.S:321
@@ -213,7 +213,7 @@ fn fallon {
     return                           ; CTRL.S:303
   }
   a = *CharYVel@0x0048        ; CTRL.S:253
-  if a >= #0x20 {    ; CTRL.S:255
+  if a >= #grabspeed {    ; CTRL.S:255
     return                           ; CTRL.S:303
   }
   a = *CharY@0x0042        ; CTRL.S:257
@@ -260,7 +260,7 @@ fn InsideBlock {
   if a >= #0x08 {    ; CTRL.S:468
     call getbehind                ; CTRL.S:485
     cmp a, #block              ; CTRL.S:486
-    if a != #0x14 {    ; CTRL.S:487
+    if a != #block {    ; CTRL.S:487
       call getdist                ; CTRL.S:498
       a = a ^ #0xff              ; CTRL.S:499
       c = 0                            ; CTRL.S:500
@@ -283,10 +283,10 @@ fn InsideBlock {
   }
   call getinfront                ; CTRL.S:471
   cmp a, #block              ; CTRL.S:472
-  if a == #0x14 {    ; CTRL.S:473
+  if a == #block {    ; CTRL.S:473
     call getbehind                ; CTRL.S:485
     cmp a, #block              ; CTRL.S:486
-    if a != #0x14 {    ; CTRL.S:487
+    if a != #block {    ; CTRL.S:487
       call getdist                ; CTRL.S:498
       a = a ^ #0xff              ; CTRL.S:499
       c = 0                            ; CTRL.S:500

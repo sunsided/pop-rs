@@ -23,6 +23,7 @@ lifted IR1 still round-trips line-for-line with the source.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -615,7 +616,7 @@ class ModuleIR1:
 # rather than canonical IR — pass 2 will define its own dump format.
 
 
-_NUMERIC_IMM_RE = __import__("re").compile(
+_NUMERIC_IMM_RE = re.compile(
     # `#$ff`, `#%01010101`, `#-1`, `#42` — anything that's just a
     # number after the `#` (with optional `<`/`>` byte operator).
     r"^#[<>]?[\s]*[-+]?(?:\$[0-9a-fA-F]+|%[01]+|\d+)\s*$"
@@ -634,11 +635,14 @@ def _fmt_imm(imm: Imm) -> str:
     object, but for visual scanning the symbol carries the engineering
     intent — what code in 1989 called the address by its name, not by
     its assembled offset.
+
+    `.strip()` covers belt-and-suspenders whitespace from synthetic
+    test fixtures; pass-0's lexer already removes `;` comments and
+    leading/trailing whitespace from operands, so the call is a
+    no-op in normal CLI usage.
     """
     if _NUMERIC_IMM_RE.match(imm.text or ""):
         return f"#{imm.value & 0xff:#04x}"
-    # Preserve the original Merlin operand text verbatim. Strip a
-    # trailing comment fragment if the lexer left one in.
     return imm.text.strip()
 
 
