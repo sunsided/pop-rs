@@ -211,6 +211,36 @@ def test_cmp_indexed_then_bne_fuses_to_indexed_compare():
     assert ifs[0].cond.rhs.index is Reg.X
 
 
+def test_cmp_indexed_never_elided_even_when_flags_dead():
+    """`CmpIndexed` reads through memory, and an indexed read can hit
+    I/O space (Apple II `$c0xx` soft switches and friends). Even
+    when Z/N/C are dead at exit, the elision sweep must keep the
+    cmp — same conservatism as `Bit(Abs)` from PR #12. Without this
+    pin a future "all cmps are pure" optimisation would silently
+    delete the read and change program behavior."""
+    from pop_lifter.pass2_struct import _eliminate_dead_flags
+
+    src = SourceRef(file="syn", line=0, raw="cmp soft_switch,x")
+    r = Routine(
+        name="f",
+        body=[
+            CmpIndexed(
+                reg=Reg.A,
+                base=Abs(name="soft", addr=0xc030),
+                index=Reg.X,
+                src=src,
+            ),
+            # No flag reader downstream — Z/N/C are dead at exit.
+            Return(src=src),
+        ],
+    )
+    out = _eliminate_dead_flags(structure_routine(r), flag_demand={})
+    assert any(isinstance(i, CmpIndexed) for i in out.body), (
+        "CmpIndexed must survive elision even with dead flags — "
+        "the indexed read itself may be side-effecting"
+    )
+
+
 def test_adc_indexed_then_branch_does_not_fuse():
     """Adc{Imm,Abs,Indexed} aren't on `_affected_register` — none of
     the adc variants participate in pass-2 fusion (adc reads AND

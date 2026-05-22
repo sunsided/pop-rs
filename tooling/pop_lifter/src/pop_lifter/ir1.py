@@ -384,8 +384,8 @@ class IndexedAbs:
     type so it can appear anywhere `Abs` does in instruction source/
     target unions. Mirrors how `LoadIndexed` / `StoreIndexed` already
     embed `(base, index)` for the load/store opcodes, but exposes it
-    as a value so non-load/store ops (`cmp X,y`, `and table,x`,
-    `adc base,y`) can also carry indexed operands.
+    as a value so non-load/store ops (`cmp tbl,x`, `and table,x`,
+    `adc base,y`, `ora list,y`) can also carry indexed operands.
 
     `index` is always `Reg.X` or `Reg.Y` on the 6502; the IR
     enforces that at construction by the lifter (`_parse_indexed`)."""
@@ -396,7 +396,7 @@ class IndexedAbs:
 
 @dataclass(frozen=True)
 class CmpIndexed:
-    """`cmp/cpx/cpy base,x` or `,y` — compare reg against the byte at
+    """`cmp base,x` or `cmp base,y` — compare A against the byte at
     `mem[base + idx_reg]`. Sets Z/N/C without storing. Same fusion
     rules as `CmpAbs` (`bcs`/`bcc` → `>=`/`<`, `beq`/`bne` →
     `==`/`!=`), so chains like
@@ -404,7 +404,14 @@ class CmpIndexed:
         cmp tbl,x
         bne :next
 
-    fuse cleanly into `if a != *tbl[x] goto :next`."""
+    fuse cleanly into `if a != *tbl[x] goto :next`.
+
+    Limited to `cmp` on stock 6502: `cpx`/`cpy` have no abs-indexed
+    addressing mode (zero-page-only). `reg` is therefore always
+    `Reg.A`; the lifter rejects `cpx tbl,y` / `cpy tbl,x` as
+    `Unsupported` rather than synthesising a CmpIndexed for them.
+    The field is kept for shape consistency with `CmpAbs` / `CmpImm`,
+    not to imply cpx/cpy coverage."""
 
     reg: Reg
     base: Abs

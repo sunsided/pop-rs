@@ -511,10 +511,12 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         _set_zn(trace, trace.a)
         return True
     if isinstance(item, CmpIndexed):
-        # `cmp/cpx/cpy base,idx` — same semantics as CmpAbs but on
-        # the indexed effective address. Note: `_indexed_addr`
-        # validates `base` against the synthetic gate and wraps the
-        # sum at 16 bits.
+        # `cmp base,idx` — same semantics as CmpAbs but on the
+        # indexed effective address. (cpx/cpy don't have an abs-
+        # indexed addressing mode on stock 6502, so `item.reg` is
+        # always Reg.A here; see the CmpIndexed dataclass docstring.)
+        # Note: `_indexed_addr` validates `base` against the synthetic
+        # gate and wraps the sum at 16 bits.
         reg_val = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
         rhs = ram[_indexed_addr(
             IndexedAbs(base=item.base, index=item.index), trace, item.src

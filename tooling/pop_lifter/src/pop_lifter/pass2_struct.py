@@ -210,10 +210,10 @@ def _fuse_pair(prev: Item, branch: Branch) -> If | None:
         )
     if isinstance(prev, CmpIndexed) and cond_op is not None:
         # `cmp tbl,x ; bne :next` → `if a != *(tbl)[x] goto :next`.
-        # Compare.rhs accepts Imm or Abs today; for indexed we pass
-        # the wrapping IndexedAbs through so dumps render
-        # `*(tbl + x)`. Pass 3 / pass 4 will care about the indexed
-        # shape when they emit Rust subscripts.
+        # `Compare.rhs` accepts `Imm | Abs | IndexedAbs | None`; for
+        # the indexed cmp we wrap the (base, index) pair so dumps
+        # render `*(tbl + x)` and pass 3 / pass 4 can recognise the
+        # indexed shape when they emit Rust subscripts.
         from .ir1 import IndexedAbs
         return If(
             cond=Compare(
@@ -545,12 +545,14 @@ def _backward_sweep(
             continue
 
         if isinstance(item, CmpIndexed):
-            # Same flag effect as CmpImm/CmpAbs: writes Z,N,C without
-            # touching A/X/Y. Elidable if its flags are dead — but
-            # unlike the pure imm/abs cmps we conservatively keep it
-            # because indexed reads can hit I/O space and the read
-            # itself may be side-effecting (same rationale as
-            # Bit(Abs)).
+            # Same flag effect as CmpImm/CmpAbs (writes Z,N,C without
+            # touching A/X/Y), but **never elided** even when those
+            # flags are dead — an indexed memory read can hit I/O
+            # space, and silently dropping the read would change
+            # program behavior. Same rationale as `Bit(Abs)` in
+            # PR #12. Concretely: we clear Z/N/C from the live set
+            # (the cmp DID write them) but don't add the index to
+            # `drop`, so the instruction stays in the body.
             live -= {"Z", "N", "C"}
             continue
 
