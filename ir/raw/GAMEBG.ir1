@@ -582,11 +582,11 @@ fn PMASK {
 :mask:
   a = *FCharY@0x0073        ; GAMEBG.S:874
   c = 0                            ; GAMEBG.S:875
-  ??? adc pmaskdy,x            ; GAMEBG.S:876
+  a = a + *(pmaskdy@0x0168 + x) + c   ; GAMEBG.S:876
   *YCO@0x0002 = a            ; GAMEBG.S:877
   a = *XCO@0x0001        ; GAMEBG.S:879
   c = 0                            ; GAMEBG.S:880
-  ??? adc pmaskdx,x            ; GAMEBG.S:881
+  a = a + *(pmaskdx@0x0167 + x) + c   ; GAMEBG.S:881
   *XCO@0x0001 = a            ; GAMEBG.S:882
   a = *(pmaski@0x0169 + x)   ; GAMEBG.S:884
   *IMAGE@0x0004 = a            ; GAMEBG.S:885
@@ -618,7 +618,7 @@ fn FLOW {
   call initlay                  ; GAMEBG.S:921
   a = #glassy                  ; GAMEBG.S:922
   c = 1                            ; GAMEBG.S:923
-  ??? sbc sandht,y            ; GAMEBG.S:924
+  a = a - *(sandht@0x0165 + y) - (1 - c)   ; GAMEBG.S:924
   *BOTCUT@0x0013 = a            ; GAMEBG.S:925
   a = *(flowimg@0x0166 + x)   ; GAMEBG.S:926
   *IMAGE@0x0004 = a            ; GAMEBG.S:927

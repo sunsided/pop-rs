@@ -39,6 +39,7 @@ from .ir1 import (
     Abs,
     AdcAbs,
     AdcImm,
+    AdcIndexed,
     Asl,
     Bit,
     Bitwise,
@@ -47,6 +48,7 @@ from .ir1 import (
     Clc,
     CmpAbs,
     CmpImm,
+    CmpIndexed,
     CmpIndirect,
     Compare,
     DecTarget,
@@ -54,6 +56,7 @@ from .ir1 import (
     If,
     Imm,
     IncTarget,
+    IndexedAbs,
     IndirectY,
     Label,
     LoadAbs,
@@ -69,6 +72,7 @@ from .ir1 import (
     Routine,
     SbcAbs,
     SbcImm,
+    SbcIndexed,
     Sec,
     StoreAbs,
     StoreIndexed,
@@ -189,6 +193,12 @@ def _eval_compare(cond: Compare, trace: Trace, ram: bytearray) -> bool:
         )
     if isinstance(cond.rhs, Imm):
         rhs = cond.rhs.value & 0xff
+    elif isinstance(cond.rhs, IndexedAbs):
+        # Indexed-absolute Compare RHS: validate base then add the
+        # 8-bit index. Same shape as the load/store/cmp dispatch in
+        # `exec_atom`. Source is None because Compare doesn't carry
+        # one; `_indexed_addr` degrades gracefully.
+        rhs = ram[_indexed_addr(cond.rhs, trace, None)]
     elif isinstance(cond.rhs, Abs):
         # `_real_addr` raises on synthetic-label dereferences; we
         # pass `None` for the SourceRef because Compare doesn't
@@ -283,6 +293,18 @@ def _resolve_indirect_y(ind: IndirectY, trace: Trace, ram: bytearray) -> int:
     lo = ram[base]
     hi = ram[(base + 1) & 0xffff]
     return (((hi << 8) | lo) + (trace.y & 0xff)) & 0xffff
+
+
+def _indexed_addr(ix: IndexedAbs, trace: Trace, src) -> int:
+    """Compute the effective address for an `base,x` / `base,y`
+    indexed operand. Mirrors the load/store path: validate the base
+    against the synthetic-label gate, then add the 8-bit index and
+    wrap the result at 16 bits. See `_real_addr` for why we don't
+    push the un-wrapped sum through the gate.
+    """
+    base = _real_addr(ix.base.addr, src)
+    idx_val = trace.x if ix.index is Reg.X else trace.y
+    return (base + (idx_val & 0xff)) & 0xffff
 
 
 def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
@@ -474,6 +496,8 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
             rhs = item.source.value & 0xff
         elif isinstance(item.source, IndirectY):
             rhs = ram[_resolve_indirect_y(item.source, trace, ram)]
+        elif isinstance(item.source, IndexedAbs):
+            rhs = ram[_indexed_addr(item.source, trace, item.src)]
         else:
             rhs = ram[_real_addr(item.source.addr, item.src)]
         if item.op == "and":
@@ -484,6 +508,40 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
             trace.a = trace.a ^ rhs
         else:
             raise InterpError(f"unknown Bitwise op {item.op!r}")
+        _set_zn(trace, trace.a)
+        return True
+    if isinstance(item, CmpIndexed):
+        # `cmp base,idx` — same semantics as CmpAbs but on the
+        # indexed effective address. (cpx/cpy don't have an abs-
+        # indexed addressing mode on stock 6502, so `item.reg` is
+        # always Reg.A here; see the CmpIndexed dataclass docstring.)
+        # Note: `_indexed_addr` validates `base` against the synthetic
+        # gate and wraps the sum at 16 bits.
+        reg_val = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
+        rhs = ram[_indexed_addr(
+            IndexedAbs(base=item.base, index=item.index), trace, item.src
+        )]
+        diff = (reg_val - rhs) & 0xff
+        trace.c = 1 if reg_val >= rhs else 0
+        _set_zn(trace, diff)
+        return True
+    if isinstance(item, AdcIndexed):
+        rhs = ram[_indexed_addr(
+            IndexedAbs(base=item.base, index=item.index), trace, item.src
+        )]
+        total = (trace.a & 0xff) + rhs + trace.c
+        trace.a = total & 0xff
+        trace.c = 1 if total > 0xff else 0
+        _set_zn(trace, trace.a)
+        return True
+    if isinstance(item, SbcIndexed):
+        # See SbcImm/SbcAbs for the `A + ~operand + C` borrow trick.
+        rhs = ram[_indexed_addr(
+            IndexedAbs(base=item.base, index=item.index), trace, item.src
+        )]
+        total = (trace.a & 0xff) + ((rhs ^ 0xff) & 0xff) + trace.c
+        trace.a = total & 0xff
+        trace.c = 1 if total > 0xff else 0
         _set_zn(trace, trace.a)
         return True
     if isinstance(item, LoadIndirect):

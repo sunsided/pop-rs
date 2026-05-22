@@ -4,7 +4,7 @@ fn falling {
   a = *CharY@0x0042        ; CTRL.S:77
   x = *CharBlockY@0x0045        ; CTRL.S:79
   x += 1                         ; CTRL.S:80
-  ??? cmp FloorY,x            ; CTRL.S:81
+  cmp a, *(FloorY@0x127e + x)   ; CTRL.S:81
   if cs goto :1       ; CTRL.S:82
   tail_call fallon                ; CTRL.S:84
 :1:
@@ -151,7 +151,7 @@ fn fallon {
   a = a + #grablead + c              ; CTRL.S:259
   x = *CharBlockY@0x0045        ; CTRL.S:260
   x += 1                         ; CTRL.S:261
-  ??? cmp FloorY,x            ; CTRL.S:262
+  cmp a, *(FloorY@0x127e + x)   ; CTRL.S:262
   if cc goto ]rts       ; CTRL.S:263
   a = *CharX@0x0041        ; CTRL.S:268
   *savekidx@0x00af = a            ; CTRL.S:269
@@ -1487,7 +1487,7 @@ fn DoRunjump {
   x = *CharFace@0x0043        ; CTRL.S:1771
   x += 1                         ; CTRL.S:1772
   c = 0                            ; CTRL.S:1773
-  ??? adc plus1,x            ; CTRL.S:1774
+  a = a + *(plus1@0x0000 + x) + c   ; CTRL.S:1774
   *blockx@0x008c = a            ; CTRL.S:1775
   x = a                            ; CTRL.S:1777
   y = *CharBlockY@0x0045        ; CTRL.S:1778
@@ -1507,9 +1507,9 @@ fn DoRunjump {
   call getdist1                  ; CTRL.S:1799
   x = *bufindex@0x00c1        ; CTRL.S:1801
   c = 0                            ; CTRL.S:1802
-  ??? adc Mult7,x            ; CTRL.S:1803
+  a = a + *(Mult7@0x1210 + x) + c   ; CTRL.S:1803
   c = 0                            ; CTRL.S:1804
-  ??? adc Mult7,x            ; CTRL.S:1805
+  a = a + *(Mult7@0x1210 + x) + c   ; CTRL.S:1805
   c = 1                            ; CTRL.S:1807
   a = a - #RJLeadDist - (1 - c)        ; CTRL.S:1808
   cmp a, #-RJMaxFujBak              ; CTRL.S:1811

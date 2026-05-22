@@ -150,8 +150,8 @@ fn fallon {
   a = a + #grablead + c              ; CTRL.S:259
   x = *CharBlockY@0x0045        ; CTRL.S:260
   x += 1                         ; CTRL.S:261
-  ??? cmp FloorY,x            ; CTRL.S:262
-  if cc goto ]rts       ; CTRL.S:263
+  cmp a, *(FloorY@0x127e + x)   ; CTRL.S:262
+  if a < *(FloorY@0x127e + x) goto ]rts  ; CTRL.S:263
   a = *CharX@0x0041        ; CTRL.S:268
   *savekidx@0x00af = a            ; CTRL.S:269
   a = #grabreach                  ; CTRL.S:270

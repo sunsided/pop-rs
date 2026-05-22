@@ -552,11 +552,11 @@ fn drawfrnt {
   *IMAGE@0x0004 = a            ; FRAMEADV.S:778
   a = *Ay@0x00ee        ; FRAMEADV.S:780
   c = 0                            ; FRAMEADV.S:781
-  ??? adc fronty,x            ; FRAMEADV.S:782
+  a = a + *(fronty@0x0058 + x) + c   ; FRAMEADV.S:782
   *YCO@0x0002 = a            ; FRAMEADV.S:783
   a = *blockxco@0x00f3        ; FRAMEADV.S:785
   c = 0                            ; FRAMEADV.S:786
-  ??? adc frontx,x            ; FRAMEADV.S:787
+  a = a + *(frontx@0x0059 + x) + c   ; FRAMEADV.S:787
   *XCO@0x0001 = a            ; FRAMEADV.S:788
   if x >= #archtop2 goto :sta  ; FRAMEADV.S:791
   a = #EditorDisk                  ; FRAMEADV.S:794
@@ -943,7 +943,7 @@ adda1:
   *XCO@0x0001 = a            ; FRAMEADV.S:1200
   a = *Ay@0x00ee        ; FRAMEADV.S:1201
   c = 0                            ; FRAMEADV.S:1202
-  ??? adc pieceay,x            ; FRAMEADV.S:1203
+  a = a + *(pieceay@0x0050 + x) + c   ; FRAMEADV.S:1203
   *YCO@0x0002 = a            ; FRAMEADV.S:1204
   a = #ora                  ; FRAMEADV.S:1205
   *OPACITY@0x0006 = a            ; FRAMEADV.S:1206
@@ -958,7 +958,7 @@ fn adda1 {
   *XCO@0x0001 = a            ; FRAMEADV.S:1200
   a = *Ay@0x00ee        ; FRAMEADV.S:1201
   c = 0                            ; FRAMEADV.S:1202
-  ??? adc pieceay,x            ; FRAMEADV.S:1203
+  a = a + *(pieceay@0x0050 + x) + c   ; FRAMEADV.S:1203
   *YCO@0x0002 = a            ; FRAMEADV.S:1204
   a = #ora                  ; FRAMEADV.S:1205
   *OPACITY@0x0006 = a            ; FRAMEADV.S:1206
@@ -1101,7 +1101,7 @@ fn drawlooseb {
   *IMAGE@0x0004 = a            ; FRAMEADV.S:1393
   a = *Ay@0x00ee        ; FRAMEADV.S:1395
   c = 0                            ; FRAMEADV.S:1396
-  ??? adc looseby,y            ; FRAMEADV.S:1397
+  a = a + *(looseby@0x0065 + y) + c   ; FRAMEADV.S:1397
   *YCO@0x0002 = a            ; FRAMEADV.S:1398
   a = #ora                  ; FRAMEADV.S:1400
   *OPACITY@0x0006 = a            ; FRAMEADV.S:1401
@@ -1212,7 +1212,7 @@ fn drawslicera {
   *IMAGE@0x0004 = a            ; FRAMEADV.S:1578
   a = *Ay@0x00ee        ; FRAMEADV.S:1579
   c = 1                            ; FRAMEADV.S:1580
-  ??? sbc slicergap,x            ; FRAMEADV.S:1581
+  a = a - *(slicergap@0x0062 + x) - (1 - c)   ; FRAMEADV.S:1581
   *YCO@0x0002 = a            ; FRAMEADV.S:1582
   a = #ora                  ; FRAMEADV.S:1583
   *OPACITY@0x0006 = a            ; FRAMEADV.S:1584
@@ -1671,11 +1671,10 @@ fn compare {
   x = *obj1@0x00f5        ; FRAMEADV.S:2188
   y = *obj2@0x00f6        ; FRAMEADV.S:2189
   a = *(objTYP@0xb4f7 + x)   ; FRAMEADV.S:2191
-  cmp a, #TypeShad              ; FRAMEADV.S:2192
   if a == #TypeShad goto :xinfront  ; FRAMEADV.S:2193
   a = *(objY@0xb4bb + x)   ; FRAMEADV.S:2195
-  ??? cmp objY,y            ; FRAMEADV.S:2196
-  if eq goto :same       ; FRAMEADV.S:2197
+  cmp a, *(objY@0xb4bb + y)   ; FRAMEADV.S:2196
+  if a == *(objY@0xb4bb + y) goto :same  ; FRAMEADV.S:2197
   if cc goto :xinfront       ; FRAMEADV.S:2198
   if cs goto :yinfront       ; FRAMEADV.S:2199
 :same:
@@ -1749,11 +1748,11 @@ metbufs2:
   call mbsub                  ; FRAMEADV.S:2254
   y += 1                         ; FRAMEADV.S:2255
 mbsub:
-  ??? ora redbuf,y            ; FRAMEADV.S:2256
-  ??? ora floorbuf,y            ; FRAMEADV.S:2257
-  ??? ora halfbuf,y            ; FRAMEADV.S:2258
-  ??? ora fredbuf,y            ; FRAMEADV.S:2259
-  ??? ora wipebuf,y            ; FRAMEADV.S:2260
+  a = a | *(redbuf@0x5e5a + y)              ; FRAMEADV.S:2256
+  a = a | *(floorbuf@0x5e96 + y)              ; FRAMEADV.S:2257
+  a = a | *(halfbuf@0x5e3c + y)              ; FRAMEADV.S:2258
+  a = a | *(fredbuf@0x5e78 + y)              ; FRAMEADV.S:2259
+  a = a | *(wipebuf@0x5eb4 + y)              ; FRAMEADV.S:2260
   return                           ; FRAMEADV.S:2261
   ??? usr $a9,3,$490,*-org            ; FRAMEADV.S:2266
 }
@@ -1762,21 +1761,21 @@ fn metbufs2 {
   call mbsub                  ; FRAMEADV.S:2254
   y += 1                         ; FRAMEADV.S:2255
 mbsub:
-  ??? ora redbuf,y            ; FRAMEADV.S:2256
-  ??? ora floorbuf,y            ; FRAMEADV.S:2257
-  ??? ora halfbuf,y            ; FRAMEADV.S:2258
-  ??? ora fredbuf,y            ; FRAMEADV.S:2259
-  ??? ora wipebuf,y            ; FRAMEADV.S:2260
+  a = a | *(redbuf@0x5e5a + y)              ; FRAMEADV.S:2256
+  a = a | *(floorbuf@0x5e96 + y)              ; FRAMEADV.S:2257
+  a = a | *(halfbuf@0x5e3c + y)              ; FRAMEADV.S:2258
+  a = a | *(fredbuf@0x5e78 + y)              ; FRAMEADV.S:2259
+  a = a | *(wipebuf@0x5eb4 + y)              ; FRAMEADV.S:2260
   return                           ; FRAMEADV.S:2261
   ??? usr $a9,3,$490,*-org            ; FRAMEADV.S:2266
 }
 
 fn mbsub {
-  ??? ora redbuf,y            ; FRAMEADV.S:2256
-  ??? ora floorbuf,y            ; FRAMEADV.S:2257
-  ??? ora halfbuf,y            ; FRAMEADV.S:2258
-  ??? ora fredbuf,y            ; FRAMEADV.S:2259
-  ??? ora wipebuf,y            ; FRAMEADV.S:2260
+  a = a | *(redbuf@0x5e5a + y)              ; FRAMEADV.S:2256
+  a = a | *(floorbuf@0x5e96 + y)              ; FRAMEADV.S:2257
+  a = a | *(halfbuf@0x5e3c + y)              ; FRAMEADV.S:2258
+  a = a | *(fredbuf@0x5e78 + y)              ; FRAMEADV.S:2259
+  a = a | *(wipebuf@0x5eb4 + y)              ; FRAMEADV.S:2260
   return                           ; FRAMEADV.S:2261
   ??? usr $a9,3,$490,*-org            ; FRAMEADV.S:2266
 }

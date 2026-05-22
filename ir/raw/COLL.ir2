@@ -49,8 +49,8 @@ fn CHECKBARR {
 :loop2:
   a = *(SNthisframe@0x0360 + x)   ; COLL.S:153
   if a <0 goto :no  ; COLL.S:154
-  ??? cmp SNlastframe,x            ; COLL.S:155
-  if ne goto :no       ; COLL.S:156
+  cmp a, *(SNlastframe@0x0370 + x)   ; COLL.S:155
+  if a != *(SNlastframe@0x0370 + x) goto :no  ; COLL.S:156
   a = *(CDlastframe@0x0330 + x)   ; COLL.S:158
   a = a & #0x0f              ; COLL.S:159
   if a != #0x00 goto :noL  ; COLL.S:160
@@ -192,7 +192,7 @@ fn getleftbar {
   y = a                            ; COLL.S:349
   a = *blockedge@0x00c2        ; COLL.S:351
   c = 0                            ; COLL.S:352
-  ??? adc BarL,y            ; COLL.S:353
+  a = a + *(BarL@0x007b + y) + c   ; COLL.S:353
   return                           ; COLL.S:355
 :clear:
   a = #0xff                  ; COLL.S:357
@@ -208,7 +208,7 @@ fn getrightbar {
   c = 0                            ; COLL.S:376
   a = a + #0x0d + c              ; COLL.S:377
   c = 1                            ; COLL.S:378
-  ??? sbc BarR,y            ; COLL.S:379
+  a = a - *(BarR@0x007c + y) - (1 - c)   ; COLL.S:379
   return                           ; COLL.S:381
 :clear:
   a = #0x00                  ; COLL.S:383
@@ -611,7 +611,7 @@ DBarr:
   y = a                            ; COLL.S:949
   a = *blockedge@0x00c2        ; COLL.S:951
   c = 0                            ; COLL.S:952
-  ??? adc BarL,y            ; COLL.S:953
+  a = a + *(BarL@0x007b + y) + c   ; COLL.S:953
   *ztemp@0x00e9 = a            ; COLL.S:954
   c = 1                            ; COLL.S:956
   a = a - *CDRightEj@0x00bf - (1 - c) ; COLL.S:957
@@ -628,7 +628,7 @@ DBarr:
   c = 0                            ; COLL.S:973
   a = a + #0x0d + c              ; COLL.S:974
   c = 1                            ; COLL.S:975
-  ??? sbc BarR,y            ; COLL.S:976
+  a = a - *(BarR@0x007c + y) - (1 - c)   ; COLL.S:976
   *ztemp@0x00e9 = a            ; COLL.S:977
   a = *CDLeftEj@0x00be        ; COLL.S:979
   c = 1                            ; COLL.S:980
@@ -658,7 +658,7 @@ fn DBarr {
   y = a                            ; COLL.S:949
   a = *blockedge@0x00c2        ; COLL.S:951
   c = 0                            ; COLL.S:952
-  ??? adc BarL,y            ; COLL.S:953
+  a = a + *(BarL@0x007b + y) + c   ; COLL.S:953
   *ztemp@0x00e9 = a            ; COLL.S:954
   c = 1                            ; COLL.S:956
   a = a - *CDRightEj@0x00bf - (1 - c) ; COLL.S:957
@@ -675,7 +675,7 @@ fn DBarr {
   c = 0                            ; COLL.S:973
   a = a + #0x0d + c              ; COLL.S:974
   c = 1                            ; COLL.S:975
-  ??? sbc BarR,y            ; COLL.S:976
+  a = a - *(BarR@0x007c + y) - (1 - c)   ; COLL.S:976
   *ztemp@0x00e9 = a            ; COLL.S:977
   a = *CDLeftEj@0x00be        ; COLL.S:979
   c = 1                            ; COLL.S:980
@@ -926,16 +926,14 @@ fn CHECKGATE {
   if a >= #0x6f goto ]rts  ; COLL.S:1329
 :1:
   call getunderft                  ; COLL.S:1331
-  cmp a, #gate              ; COLL.S:1332
   if a == #gate goto :check  ; COLL.S:1333
   *tempblockx@0x0091 -= 1                         ; COLL.S:1335
   call rdblock1                  ; COLL.S:1336
-  cmp a, #gate              ; COLL.S:1337
   if a != #gate goto ]rts  ; COLL.S:1338
 :check:
   x = *tempblockx@0x0091        ; COLL.S:1340
   a = *(CDthisframe@0x0320 + x)   ; COLL.S:1341
-  ??? and CDlastframe,x            ; COLL.S:1342
+  a = a & *(CDlastframe@0x0330 + x)              ; COLL.S:1342
   if a != #0xff goto ]rts  ; COLL.S:1344
   call gatebarr?                  ; COLL.S:1346
   if cs goto ]rts       ; COLL.S:1347
@@ -1038,7 +1036,7 @@ fn DBarr2 {
   y = a                            ; COLL.S:1475
   a = *blockedge@0x00c2        ; COLL.S:1477
   c = 0                            ; COLL.S:1478
-  ??? adc BarL,y            ; COLL.S:1479
+  a = a + *(BarL@0x007b + y) + c   ; COLL.S:1479
   *ztemp@0x00e9 = a            ; COLL.S:1480
   c = 1                            ; COLL.S:1482
   a = a - *CDRightEj@0x00bf - (1 - c) ; COLL.S:1483
@@ -1055,7 +1053,7 @@ fn DBarr2 {
   c = 0                            ; COLL.S:1499
   a = a + #0x0d + c              ; COLL.S:1500
   c = 1                            ; COLL.S:1501
-  ??? sbc BarR,y            ; COLL.S:1502
+  a = a - *(BarR@0x007c + y) - (1 - c)   ; COLL.S:1502
   *ztemp@0x00e9 = a            ; COLL.S:1503
   a = *CDLeftEj@0x00be        ; COLL.S:1505
   c = 1                            ; COLL.S:1506

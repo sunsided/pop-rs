@@ -375,6 +375,72 @@ class CmpIndirect:
     src: SourceRef
 
 
+# ---------------------------------------------------------------- indexed-absolute addressing
+
+
+@dataclass(frozen=True)
+class IndexedAbs:
+    """`base,x` or `base,y` — indexed-absolute addressing as a value
+    type so it can appear anywhere `Abs` does in instruction source/
+    target unions. Mirrors how `LoadIndexed` / `StoreIndexed` already
+    embed `(base, index)` for the load/store opcodes, but exposes it
+    as a value so non-load/store ops (`cmp tbl,x`, `and table,x`,
+    `adc base,y`, `ora list,y`) can also carry indexed operands.
+
+    `index` is always `Reg.X` or `Reg.Y` on the 6502; the IR
+    enforces that at construction by the lifter (`_parse_indexed`)."""
+
+    base: Abs
+    index: Reg
+
+
+@dataclass(frozen=True)
+class CmpIndexed:
+    """`cmp base,x` or `cmp base,y` — compare A against the byte at
+    `mem[base + idx_reg]`. Sets Z/N/C without storing. Same fusion
+    rules as `CmpAbs` (`bcs`/`bcc` → `>=`/`<`, `beq`/`bne` →
+    `==`/`!=`), so chains like
+
+        cmp tbl,x
+        bne :next
+
+    fuse cleanly into `if a != *tbl[x] goto :next`.
+
+    Limited to `cmp` on stock 6502: `cpx`/`cpy` have no abs-indexed
+    addressing mode (zero-page-only). `reg` is therefore always
+    `Reg.A`; the lifter rejects `cpx tbl,y` / `cpy tbl,x` as
+    `Unsupported` rather than synthesising a CmpIndexed for them.
+    The field is kept for shape consistency with `CmpAbs` / `CmpImm`,
+    not to imply cpx/cpy coverage."""
+
+    reg: Reg
+    base: Abs
+    index: Reg
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class AdcIndexed:
+    """`adc base,x` or `,y` — A += mem[base + idx_reg] + C. Mirror of
+    `AdcAbs` for the indexed addressing mode. Used by POP's
+    arithmetic helpers (`adc BarL,y` etc.)."""
+
+    base: Abs
+    index: Reg
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class SbcIndexed:
+    """`sbc base,x` or `,y` — same shape as `AdcIndexed` but
+    subtracts with borrow. Pairs with `SbcAbs` / `SbcImm` for the
+    other addressing modes already lifted."""
+
+    base: Abs
+    index: Reg
+    src: SourceRef
+
+
 # ---------------------------------------------------------------- pass-1 long-tail atoms
 
 
@@ -434,7 +500,10 @@ class Bitwise:
     embedded-expression form."""
 
     op: str
-    source: "Imm | Abs | IndirectY"
+    # `IndexedAbs` extends the union for `and table,x` / `ora list,y`
+    # / `eor mask,x` patterns POP uses for table-driven blits and
+    # parallel-array bit checks.
+    source: "Imm | Abs | IndirectY | IndexedAbs"
     src: SourceRef
 
 
@@ -524,7 +593,11 @@ class Compare:
 
     reg: Reg
     op: str
-    rhs: "Imm | Abs | None"
+    # `IndexedAbs` joined the union so `cmp tbl,x ; bne :L` fuses
+    # cleanly into `if a != *(tbl + x) goto :L`. Without it the
+    # indexed cmp would stay unfused even when the addressing mode
+    # is otherwise well-handled.
+    rhs: "Imm | Abs | IndexedAbs | None"
 
 
 @dataclass(frozen=True)
@@ -561,6 +634,7 @@ Instr = (
     | LoadIndirect | StoreIndirect | CmpIndirect
     | SbcImm | SbcAbs | Lsr | Bit
     | Pha | Pla
+    | CmpIndexed | AdcIndexed | SbcIndexed
     | Unsupported
 )
 Item = Label | Instr
@@ -656,6 +730,8 @@ def _fmt_compare(c: Compare) -> str:
         return f"{c.reg} {c.op}"
     if isinstance(c.rhs, Imm):
         return f"{c.reg} {c.op} {_fmt_imm(c.rhs)}"
+    if isinstance(c.rhs, IndexedAbs):
+        return f"{c.reg} {c.op} *({_fmt_abs(c.rhs.base)} + {c.rhs.index})"
     return f"{c.reg} {c.op} *{_fmt_abs(c.rhs)}"
 
 
@@ -730,9 +806,26 @@ def format_item(item: Item) -> str:
             rhs = _fmt_imm(item.source)
         elif isinstance(item.source, IndirectY):
             rhs = f"*({_fmt_abs(item.source.ptr)})[y]"
+        elif isinstance(item.source, IndexedAbs):
+            rhs = f"*({_fmt_abs(item.source.base)} + {item.source.index})"
         else:
             rhs = f"*{_fmt_abs(item.source)}"
         return f"  a = a {sym} {rhs}              ; {item.src.short()}"
+    if isinstance(item, CmpIndexed):
+        return (
+            f"  cmp {item.reg}, *({_fmt_abs(item.base)} + {item.index})"
+            f"   ; {item.src.short()}"
+        )
+    if isinstance(item, AdcIndexed):
+        return (
+            f"  a = a + *({_fmt_abs(item.base)} + {item.index}) + c"
+            f"   ; {item.src.short()}"
+        )
+    if isinstance(item, SbcIndexed):
+        return (
+            f"  a = a - *({_fmt_abs(item.base)} + {item.index}) - (1 - c)"
+            f"   ; {item.src.short()}"
+        )
     if isinstance(item, LoadIndirect):
         return (
             f"  {item.reg} = *({_fmt_abs(item.source.ptr)})[y]"

@@ -645,7 +645,7 @@ fn animexit {
 :2:
   a = *state@0x00f0        ; MOVER.S:815
   c = 1                            ; MOVER.S:816
-  ??? sbc gatevel,x            ; MOVER.S:817
+  a = a - *(gatevel@0x0272 + x) - (1 - c)   ; MOVER.S:817
   *state@0x00f0 = a            ; MOVER.S:818
   if eq goto :cont       ; MOVER.S:819
   if cs goto :cont       ; MOVER.S:820
@@ -666,7 +666,7 @@ fn animgate {
   cmp a, #0xff              ; MOVER.S:845
   if a == #0xff goto :stop  ; MOVER.S:846
   c = 0                            ; MOVER.S:847
-  ??? adc gateinc,x            ; MOVER.S:848
+  a = a + *(gateinc@0x0273 + x) + c   ; MOVER.S:848
   *state@0x00f0 = a            ; MOVER.S:849
   cmp x, #0x00              ; MOVER.S:851
   if x == #0x00 goto :goingdown  ; MOVER.S:852
@@ -710,7 +710,7 @@ fn animgate {
 :2:
   a = *state@0x00f0        ; MOVER.S:907
   c = 1                            ; MOVER.S:908
-  ??? sbc gatevel,x            ; MOVER.S:909
+  a = a - *(gatevel@0x0272 + x) - (1 - c)   ; MOVER.S:909
   *state@0x00f0 = a            ; MOVER.S:910
   if eq goto :cont       ; MOVER.S:911
   if cs goto :cont       ; MOVER.S:912
@@ -1239,11 +1239,10 @@ fn mobfloor {
   *moby@0xb670 = a            ; MOVER.S:1669
   x = *mobscrn@0xb680        ; MOVER.S:1673
   if x == #0x00 goto :null  ; MOVER.S:1674
-  cmp a, #0xe2              ; MOVER.S:1676
   if a >= #0xe2 goto :fallon  ; MOVER.S:1677
   x = *moblevel@0xb6b0        ; MOVER.S:1679
-  ??? cmp BlockAy+1,x            ; MOVER.S:1680
-  if cc goto :fallon       ; MOVER.S:1681
+  cmp a, *(BlockAy+1@0x1284 + x)   ; MOVER.S:1680
+  if a < *(BlockAy+1@0x1284 + x) goto :fallon  ; MOVER.S:1681
   x = *moblevel@0xb6b0        ; MOVER.S:1686
   *tempblocky@0x0092 = x            ; MOVER.S:1687
   a = *mobx@0xb660        ; MOVER.S:1689

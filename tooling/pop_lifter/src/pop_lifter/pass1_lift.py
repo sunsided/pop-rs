@@ -41,11 +41,15 @@ from .ir1 import (
     Abs,
     AdcAbs,
     AdcImm,
+    AdcIndexed,
     Asl,
     Bit,
     Bitwise,
+    CmpIndexed,
+    IndexedAbs,
     Pha,
     Pla,
+    SbcIndexed,
     Branch,
     Call,
     Clc,
@@ -332,6 +336,16 @@ def _lift_instr(
             ind = _parse_indirect_y(line.operand, equates)
             if ind is not None:
                 return CmpIndirect(reg=Reg.A, source=ind, src=src)
+        # `cmp tbl,x` / `cmp tbl,y` — indexed-absolute. Only `cmp`
+        # has the `,y` form on stock 6502; `cpx`/`cpy` don't have
+        # indexed addressing at all (zero-page only, no `,y`).
+        if mnemonic == "cmp":
+            idx = _parse_indexed(line.operand, equates)
+            if idx is not None:
+                base, idx_reg = idx
+                return CmpIndexed(
+                    reg=Reg.A, base=base, index=idx_reg, src=src,
+                )
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return CmpAbs(reg=reg, source=addr, src=src)
@@ -369,6 +383,10 @@ def _lift_instr(
         imm = _parse_immediate(line.operand, equates)
         if imm is not None:
             return AdcImm(imm=imm, src=src)
+        idx = _parse_indexed(line.operand, equates)
+        if idx is not None:
+            base, idx_reg = idx
+            return AdcIndexed(base=base, index=idx_reg, src=src)
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return AdcAbs(source=addr, src=src)
@@ -384,6 +402,10 @@ def _lift_instr(
         imm = _parse_immediate(line.operand, equates)
         if imm is not None:
             return SbcImm(imm=imm, src=src)
+        idx = _parse_indexed(line.operand, equates)
+        if idx is not None:
+            base, idx_reg = idx
+            return SbcIndexed(base=base, index=idx_reg, src=src)
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return SbcAbs(source=addr, src=src)
@@ -466,6 +488,15 @@ def _lift_instr(
         ind = _parse_indirect_y(line.operand, equates)
         if ind is not None:
             return Bitwise(op=op_key, source=ind, src=src)
+        # Indexed-absolute: `and table,x`, `ora mask,y`, etc.
+        idx = _parse_indexed(line.operand, equates)
+        if idx is not None:
+            base, idx_reg = idx
+            return Bitwise(
+                op=op_key,
+                source=IndexedAbs(base=base, index=idx_reg),
+                src=src,
+            )
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return Bitwise(op=op_key, source=addr, src=src)

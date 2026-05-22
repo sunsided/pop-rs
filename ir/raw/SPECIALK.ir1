@@ -313,14 +313,14 @@ fn checkcode {
 :smod:
   a = *($ffff@0xffff + y)   ; SPECIALK.S:654
   if eq goto ]rts       ; SPECIALK.S:655
-  ??? cmp keybuf,x            ; SPECIALK.S:656
+  cmp a, *(keybuf@0x03ac + x)   ; SPECIALK.S:656
   if eq goto :match       ; SPECIALK.S:657
   cmp a, #"A"              ; SPECIALK.S:658
   if cc goto :fail       ; SPECIALK.S:659
   cmp a, #"Z"+1              ; SPECIALK.S:660
   if cs goto :fail       ; SPECIALK.S:661
   a = a | #0x20              ; SPECIALK.S:662
-  ??? cmp keybuf,x            ; SPECIALK.S:663
+  cmp a, *(keybuf@0x03ac + x)   ; SPECIALK.S:663
   if ne goto :fail       ; SPECIALK.S:664
 :match:
   y += 1                         ; SPECIALK.S:666
@@ -1479,10 +1479,10 @@ fn KEEPTIME {
   ??? cpy #nummsg            ; SPECIALK.S:1283
   if cs goto ]rts       ; SPECIALK.S:1284
   a = *FrameCount+1@0x0307        ; SPECIALK.S:1285
-  ??? cmp timetable+1,y            ; SPECIALK.S:1286
+  cmp a, *(timetable+1@0x0333 + y)   ; SPECIALK.S:1286
   if cc goto ]rts       ; SPECIALK.S:1287
   a = *FrameCount@0x0306        ; SPECIALK.S:1288
-  ??? cmp timetable,y            ; SPECIALK.S:1289
+  cmp a, *(timetable@0x0332 + y)   ; SPECIALK.S:1289
   if cc goto ]rts       ; SPECIALK.S:1290
   a = *msgtimer@0x00db        ; SPECIALK.S:1294
   if ne goto ]rts       ; SPECIALK.S:1295
@@ -1736,14 +1736,14 @@ checkcode:
 :smod:
   a = *($ffff@0xffff + y)   ; SPECIALK.S:654
   if eq goto ]rts       ; SPECIALK.S:655
-  ??? cmp keybuf,x            ; SPECIALK.S:656
+  cmp a, *(keybuf@0x03ac + x)   ; SPECIALK.S:656
   if eq goto :match       ; SPECIALK.S:657
   cmp a, #"A"              ; SPECIALK.S:658
   if cc goto :fail       ; SPECIALK.S:659
   cmp a, #"Z"+1              ; SPECIALK.S:660
   if cs goto :fail       ; SPECIALK.S:661
   a = a | #0x20              ; SPECIALK.S:662
-  ??? cmp keybuf,x            ; SPECIALK.S:663
+  cmp a, *(keybuf@0x03ac + x)   ; SPECIALK.S:663
   if ne goto :fail       ; SPECIALK.S:664
 :match:
   y += 1                         ; SPECIALK.S:666

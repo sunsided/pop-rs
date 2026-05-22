@@ -194,11 +194,13 @@ def _fmt_compare(c: Compare) -> str:
     # format, which silently dropped the symbolic intent — a `cmp a,
     # #block` followed by `if a != #0x14 { ... }` would mis-render
     # because the imm was rebuilt with the value-only template.
-    from .ir1 import Abs, Imm, _fmt_imm
+    from .ir1 import Abs, Imm, IndexedAbs, _fmt_imm
     if c.rhs is None:
         return f"{c.reg} {c.op}"
     if isinstance(c.rhs, Imm):
         return f"{c.reg} {c.op} {_fmt_imm(c.rhs)}"
+    if isinstance(c.rhs, IndexedAbs):
+        return f"{c.reg} {c.op} *({c.rhs.base.name}@{c.rhs.base.addr:#06x} + {c.rhs.index})"
     if isinstance(c.rhs, Abs):
         return f"{c.reg} {c.op} *{c.rhs.name}@{c.rhs.addr:#06x}"
     return f"{c.reg} {c.op} {c.rhs!r}"
