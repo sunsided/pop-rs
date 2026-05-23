@@ -23,25 +23,36 @@ the load + carry set-up + add/subtract into a `BinExpr`:
 
 The explicit `clc`/`sec` pins the op to a pure 8-bit add / subtract.
 
+**Slice 3 — X/Y + interprocedural demand.** Copy folding generalises
+from the accumulator to all three registers (`ldx SRC ; stx DST` ⇒
+`DST = SRC`). And a register-demand call-graph fixed-point computes
+which registers each routine reads before writing, so a `sta DST ; jmp
+R` folds when `R` doesn't read the stored register — instead of
+conservatively assuming every call/tail-call reads everything. (In POP
+this mostly helps the accumulator: X/Y are pervasively live as index
+registers, so X/Y copies rarely become dead.)
+
 Deliberately conservative, behaviour-preserving:
 
-* **Accumulator only.** The X/Y copies (`ldx`/`stx`) are rarer; a
-  later slice generalises.
-* **Adjacent runs.** A foldable group is a `load A` immediately
+* **All three registers** for the copy form; arithmetic stays
+  accumulator-only (`adc`/`sbc` are A-only on the 6502).
+* **Adjacent runs.** A foldable group is a register load immediately
   followed by its store(s) (with the `clc`/`sec` + `adc`/`sbc` in
   between for the arithmetic form). Requiring adjacency sidesteps the
   source-clobbering question — nothing runs between the load and the
   stores, so a memory operand can't be overwritten before the copy.
-* **Dead-after check.** The load is only dropped when `A` is dead
-  after the store run: the next thing that touches A writes it
-  (reassignment), or — inside a loop body whose first A-touch is a
-  write — control wraps back to that write. For an arithmetic fold the
-  **carry** the add/sub set must *also* be dead (so a 16-bit add's
-  high-byte `adc` is never folded — its carry feeds the next op). A
-  single store only for the arithmetic form (the stored value isn't
-  the source, so a multi-store run isn't an idempotent write-back).
-  `Return` / `Call` / `TailCall` count as reads, so a value escaping
-  via a call or return is never folded away.
+* **Dead-after check.** The load is only dropped when the register is
+  dead after the store run: the next thing that touches it writes it
+  (reassignment), or — inside a loop body whose first touch is a
+  write — control wraps back to that write. X and Y are also read as
+  *index* registers (`tbl,x` / `(zp),y`), which counts. For an
+  arithmetic fold the **carry** the add/sub set must *also* be dead (so
+  a 16-bit add's high-byte `adc` is never folded — its carry feeds the
+  next op). A single store only for the arithmetic form (the stored
+  value isn't the source, so a multi-store run isn't an idempotent
+  write-back). A `Return` reads every register (a caller may read the
+  result); a `Call`/`TailCall` reads only the registers its target
+  demands.
 * Anything ambiguous is left exactly as pass 2 produced it.
 
 Out of scope (later slices): expression trees deeper than one op,
@@ -65,7 +76,10 @@ from .ir1 import (
     CmpImm,
     CmpIndexed,
     CmpIndirect,
+    DecTarget,
+    IncTarget,
     IndexedAbs,
+    IndirectY,
     LoadAbs,
     LoadImm,
     LoadIndexed,
@@ -96,7 +110,9 @@ from .ir3 import (
     BreakStmt,
     CallStmt,
     ContinueStmt,
+    GotoStmt,
     IfStmt,
+    LabelStmt,
     LoopStmt,
     ModuleIR3,
     RawIfStmt,
@@ -108,16 +124,29 @@ from .ir3 import (
 )
 
 
-# ---------------------------------------------------------------- A read/write classification
+# ---------------------------------------------------------------- resources
 
 
-def _writes_a(item) -> bool:
-    """True if the IR1 atom assigns a new value to the accumulator."""
+# A "resource" is something the fold must prove dead before it can drop
+# a load: one of the three registers, or the carry flag (carry only
+# matters for the arithmetic `clc ; adc` / `sec ; sbc` fold).
+_REGS = (Reg.A, Reg.X, Reg.Y)
+_CARRY = "carry"
+_RESOURCES = (*_REGS, _CARRY)
+
+
+# ---------------------------------------------------------------- register read/write classification
+
+
+def _writes_reg(item, reg) -> bool:
+    """True if the IR1 atom assigns a new value to register `reg`."""
     if isinstance(item, (LoadImm, LoadAbs, LoadIndexed, LoadIndirect)):
-        return item.reg is Reg.A
+        return item.reg is reg
     if isinstance(item, Transfer):
-        return item.dst_reg is Reg.A
-    if isinstance(item, (
+        return item.dst_reg is reg
+    if isinstance(item, (IncTarget, DecTarget)):
+        return item.target is reg  # also reads it — see _reads_reg
+    if reg is Reg.A and isinstance(item, (
         AdcImm, AdcAbs, AdcIndexed, SbcImm, SbcAbs, SbcIndexed, SbcIndirect,
         Bitwise, Asl, Lsr, Rol, Ror, Pla,
     )):
@@ -126,70 +155,91 @@ def _writes_a(item) -> bool:
     return False
 
 
-def _reads_a(item) -> bool:
-    """True if the IR1 atom consumes the accumulator's current value.
+def _reads_reg(item, reg) -> bool:
+    """True if the IR1 atom consumes register `reg`'s current value —
+    including its use as an *index* register (`tbl,x` / `tbl,y`) or, for
+    Y, the pointer index of `(zp),y`. Missing one of those would let the
+    fold drop a still-live load, so the index cases are spelled out.
 
     `Unsupported` opcodes count as a read: their semantics are unknown,
-    so they might read A (or its flags). Treating them as a read makes
-    them a hard barrier for liveness — the fold never steps past an
-    opcode the lifter hasn't modelled yet."""
+    so they're a hard barrier — the fold never steps past an opcode the
+    lifter hasn't modelled yet."""
     if isinstance(item, Unsupported):
         return True
-    if isinstance(item, (StoreAbs, StoreIndexed, StoreIndirect, StoreLocal)):
-        return item.reg is Reg.A
-    if isinstance(item, Transfer):
-        return item.src_reg is Reg.A
-    if isinstance(item, (CmpImm, CmpAbs, CmpIndexed, CmpIndirect)):
-        return item.reg is Reg.A
-    if isinstance(item, (
+    if isinstance(item, (StoreAbs, StoreIndexed, StoreIndirect, StoreLocal)) \
+            and item.reg is reg:
+        return True
+    if isinstance(item, Transfer) and item.src_reg is reg:
+        return True
+    if isinstance(item, (CmpImm, CmpAbs, CmpIndexed, CmpIndirect)) and item.reg is reg:
+        return True
+    if isinstance(item, (IncTarget, DecTarget)) and item.target is reg:
+        return True
+    if reg is Reg.A and isinstance(item, (
         AdcImm, AdcAbs, AdcIndexed, SbcImm, SbcAbs, SbcIndexed, SbcIndirect,
         Bitwise, Asl, Lsr, Rol, Ror, Bit, Pha,
     )):
         return True
+    if reg in (Reg.X, Reg.Y):
+        # X / Y feed indexed addressing (`tbl,x` / `tbl,y`).
+        if isinstance(item, (
+            LoadIndexed, StoreIndexed, CmpIndexed, AdcIndexed, SbcIndexed,
+        )) and item.index is reg:
+            return True
+        if isinstance(item, Bitwise) and isinstance(item.source, IndexedAbs) \
+                and item.source.index is reg:
+            return True
+    if reg is Reg.Y:
+        # `(zp),y` post-indexed indirect reads Y.
+        if isinstance(item, (LoadIndirect, StoreIndirect, CmpIndirect, SbcIndirect)):
+            return True
+        if isinstance(item, Bitwise) and isinstance(item.source, IndirectY):
+            return True
     return False
 
 
-def _is_a_load(item):
-    """If `item` loads the accumulator from a value pass-3 can fold
-    (immediate or a memory read), return that source value; else
-    None. Note: `Transfer`/arithmetic write A but their "source"
+def _is_reg_load(item):
+    """If `item` loads a register from a value pass-3 can fold (an
+    immediate or a memory read), return `(reg, source_value)`; else
+    None. `Transfer`/arithmetic write a register but their "source"
     isn't a standalone copyable value, so they don't qualify."""
-    if isinstance(item, LoadImm) and item.reg is Reg.A:
-        return item.imm
-    if isinstance(item, LoadAbs) and item.reg is Reg.A:
-        return item.source
-    if isinstance(item, LoadIndexed) and item.reg is Reg.A:
-        return IndexedAbs(base=item.base, index=item.index)
-    if isinstance(item, LoadIndirect) and item.reg is Reg.A:
-        return item.source
+    if isinstance(item, LoadImm):
+        return (item.reg, item.imm)
+    if isinstance(item, LoadAbs):
+        return (item.reg, item.source)
+    if isinstance(item, LoadIndexed):
+        return (item.reg, IndexedAbs(base=item.base, index=item.index))
+    if isinstance(item, LoadIndirect):
+        return (item.reg, item.source)  # reg is always A for (zp),y
     return None
 
 
-def _a_store_target(item):
-    """If `item` stores the accumulator to memory, return the store
-    target (Abs / IndexedAbs / IndirectY); else None. `StoreLocal`
+def _reg_store_target(item):
+    """If `item` stores a register to memory, return `(reg, target)`
+    (target an Abs / IndexedAbs / IndirectY); else None. `StoreLocal`
     (SMC operand patch) is excluded — its target is symbolic and an
     Assign can't represent it."""
-    if isinstance(item, StoreAbs) and item.reg is Reg.A:
-        return item.target
-    if isinstance(item, StoreIndexed) and item.reg is Reg.A:
-        return IndexedAbs(base=item.base, index=item.index)
-    if isinstance(item, StoreIndirect) and item.reg is Reg.A:
-        return item.target
+    if isinstance(item, StoreAbs):
+        return (item.reg, item.target)
+    if isinstance(item, StoreIndexed):
+        return (item.reg, IndexedAbs(base=item.base, index=item.index))
+    if isinstance(item, StoreIndirect):
+        return (item.reg, item.target)  # reg is always A for (zp),y
     return None
 
 
-def _store_run(stmts: list[Stmt], start: int):
-    """Maximal run of consecutive A-stores beginning at `stmts[start]`,
-    returned as `(list_of_(target, src), index_after_run)`."""
+def _store_run(stmts: list[Stmt], start: int, reg):
+    """Maximal run of consecutive stores of `reg` beginning at
+    `stmts[start]`, returned as `(list_of_(target, src),
+    index_after_run)`."""
     run: list[tuple[object, object]] = []
     k = start
     n = len(stmts)
     while k < n and isinstance(stmts[k], RawStmt):
-        tgt = _a_store_target(stmts[k].item)
-        if tgt is None:
+        st = _reg_store_target(stmts[k].item)
+        if st is None or st[0] is not reg:
             break
-        run.append((tgt, stmts[k].item.src))
+        run.append((st[1], stmts[k].item.src))
         k += 1
     return run, k
 
@@ -271,74 +321,244 @@ def _arith_after_load(stmts: list[Stmt], i: int):
     return None
 
 
-def _cond_reads_a(cond) -> bool:
-    return cond.reg is Reg.A
+# ---------------------------------------------------------------- resource dispatch
 
 
-def _cond_reads_c(cond) -> bool:
-    # An IR3 `Compare` re-derives `reg vs rhs` from registers — it never
-    # reads the carry flag. (Carry branches that weren't fused to a
-    # register compare stay as `RawIfStmt`, which the scan treats as a
-    # hard barrier.)
-    return False
+def _resource_reads(item, res) -> bool:
+    return _reads_c(item) if res is _CARRY else _reads_reg(item, res)
 
 
-# ---------------------------------------------------------------- A liveness over IR3
+def _resource_writes(item, res) -> bool:
+    return _writes_c(item) if res is _CARRY else _writes_reg(item, res)
 
 
-def _stmt_touches_a(stmt: Stmt) -> bool:
-    """Conservative: does this statement (including any nested block)
-    read or write A? Used by `_first_a_touch_is_write` to find the
-    first A-touch in a loop body. (The forward deadness scan in
-    `_a_dead_from` classifies each statement type directly rather than
-    relying on this coarse "touches A" summary.)"""
-    if isinstance(stmt, RawStmt):
-        return _reads_a(stmt.item) or _writes_a(stmt.item)
-    if isinstance(stmt, Assign):
-        # Folded assigns never touch A (that's the point).
+def _resource_cond_reads(cond, res) -> bool:
+    """Does an `IfStmt`'s `Compare` consume `res`? It re-derives `reg vs
+    rhs` from registers, so it never reads the carry flag; for X/Y the
+    rhs may be an indexed memory operand."""
+    if res is _CARRY:
         return False
+    if cond.reg is res:
+        return True
+    rhs = cond.rhs
+    return res in (Reg.X, Reg.Y) and isinstance(rhs, IndexedAbs) and rhs.index is res
+
+
+# ---------------------------------------------------------------- liveness over IR3
+
+
+def _stmt_touches_resource(stmt: Stmt, res) -> bool:
+    """Conservative: does this statement (including any nested block)
+    read or write `res`? Used by `_first_resource_touch_is_write`. (The
+    forward deadness scan in `_dead_from` classifies each statement type
+    directly rather than relying on this coarse summary.)"""
+    if isinstance(stmt, RawStmt):
+        return _resource_reads(stmt.item, res) or _resource_writes(stmt.item, res)
+    if isinstance(stmt, Assign):
+        return False  # a folded copy / expr touches no register or flag
+    if isinstance(stmt, (BreakStmt, ContinueStmt, GotoStmt, LabelStmt)):
+        return False  # pure control transfer
+    if isinstance(stmt, (CallStmt, TailCallStmt, ReturnStmt)):
+        return True  # may pass / return the resource
     if isinstance(stmt, IfStmt):
-        if stmt.cond.reg is Reg.A:
+        if _resource_cond_reads(stmt.cond, res):
             return True
-        return _block_touches_a(stmt.then_block) or (
-            stmt.else_block is not None and _block_touches_a(stmt.else_block)
+        return _block_touches_resource(stmt.then_block, res) or (
+            stmt.else_block is not None and _block_touches_resource(stmt.else_block, res)
         )
     if isinstance(stmt, RawIfStmt):
-        # Raw flag-suffix condition doesn't name a register, but its
-        # body might touch A.
-        return _block_touches_a(stmt.then_block) or (
-            stmt.else_block is not None and _block_touches_a(stmt.else_block)
-        )
+        return True  # reads a raw 6502 flag — conservatively touches
     if isinstance(stmt, LoopStmt):
-        return _block_touches_a(stmt.body)
-    # Call / TailCall / Return are handled as A-readers by the caller
-    # (they might pass/return A); Break/Continue/Goto/Label don't
-    # touch A.
+        return _block_touches_resource(stmt.body, res)
+    return True
+
+
+def _block_touches_resource(block: Block, res) -> bool:
+    return any(_stmt_touches_resource(s, res) for s in block.stmts)
+
+
+def _first_resource_touch_is_write(block: Block, res) -> bool:
+    """Scanning a block from the top, is the first statement that
+    touches `res` a *write*? If so, the block doesn't depend on the
+    incoming value of `res` — used to decide it's dead across a loop's
+    back-edge (the next iteration overwrites it before reading)."""
+    for s in block.stmts:
+        if not _stmt_touches_resource(s, res):
+            continue
+        if isinstance(s, RawStmt):
+            return _resource_writes(s.item, res) and not _resource_reads(s.item, res)
+        # A nested control-flow stmt touches `res` in a way we can't
+        # cheaply classify — be conservative.
+        return False
+    return False  # never touches `res` → incoming value not required,
+    # but nothing here proves a write either; safe default is "not a
+    # clean write-first", so callers stay conservative.
+
+
+# ---------------------------------------------------------------- interprocedural register demand
+
+
+_REG_SET = frozenset(_REGS)
+
+
+def _has_unstructured(block: Block) -> bool:
+    """Does `block` (recursively) contain a `Goto`/`Label` escape hatch?
+    Such routines defeat the structured demand scan, so we treat them as
+    demanding every register."""
+    for s in block.stmts:
+        if isinstance(s, (GotoStmt, LabelStmt)):
+            return True
+        for attr in ("then_block", "else_block", "body"):
+            inner = getattr(s, attr, None)
+            if inner is not None and hasattr(inner, "stmts") and _has_unstructured(inner):
+                return True
     return False
 
 
-def _block_touches_a(block: Block) -> bool:
-    return any(_stmt_touches_a(s) for s in block.stmts)
+def _stmt_demands(stmt: Stmt, reg, *, tail_dm, call_dm, ret):
+    """Tri-state for a single statement: True = some path reads `reg`
+    (or, when `ret` is True, lets it escape via a return) before writing
+    it; False = every path writes `reg` before reading it (a kill);
+    None = neither (the caller keeps scanning).
 
-
-def _first_a_touch_is_write(block: Block) -> bool:
-    """Scanning a block from the top, is the first statement that
-    touches A a *write*? If so, the block doesn't depend on the
-    incoming A — used to decide that A is dead across a loop's
-    back-edge (the next iteration overwrites it before reading)."""
-    for s in block.stmts:
-        if not _stmt_touches_a(s):
-            continue
-        if isinstance(s, RawStmt):
-            if _writes_a(s.item) and not _reads_a(s.item):
-                return True
+    `call_dm` is the *read*-demand map consulted for a non-tail `Call`
+    (the callee returns, so only an actual read of `reg` matters).
+    `tail_dm` is the map consulted for a `TailCall` (its eventual return
+    escapes to *our* caller, so `tail_dm` is the escape-aware map)."""
+    if isinstance(stmt, RawStmt):
+        if _reads_reg(stmt.item, reg):
+            return True
+        if _writes_reg(stmt.item, reg):
             return False
-        # A nested control-flow stmt touches A in a way we can't
-        # cheaply classify — be conservative.
+        return None
+    if isinstance(stmt, Assign):
+        return None
+    if isinstance(stmt, ReturnStmt):
+        # An unwritten reg escapes to the caller here. For the
+        # escape-aware (`live`) map that's a use; for the read-only map
+        # it isn't.
+        return True if ret else False
+    if isinstance(stmt, (BreakStmt, ContinueStmt)):
+        return False  # stays within the routine; no read / escape here
+    if isinstance(stmt, (GotoStmt, LabelStmt)):
+        return True   # unstructured — conservatively a use
+    if isinstance(stmt, CallStmt):
+        # The callee returns to us; only a genuine read matters. If it
+        # doesn't read reg the call is transparent (it may clobber reg,
+        # which we don't track — keep scanning).
+        return True if reg in call_dm.get(stmt.target, _REG_SET) else None
+    if isinstance(stmt, TailCallStmt):
+        # The path ends here; reg is used iff it's read *or escapes*
+        # through the target — that's the escape-aware map.
+        return reg in tail_dm.get(stmt.target, _REG_SET)
+    if isinstance(stmt, IfStmt):
+        if _resource_cond_reads(stmt.cond, reg):
+            return True
+        return _branches_demand(
+            stmt.then_block, stmt.else_block, reg,
+            tail_dm=tail_dm, call_dm=call_dm, ret=ret,
+        )
+    if isinstance(stmt, RawIfStmt):
+        # The cond reads a raw flag, not a register.
+        return _branches_demand(
+            stmt.then_block, stmt.else_block, reg,
+            tail_dm=tail_dm, call_dm=call_dm, ret=ret,
+        )
+    if isinstance(stmt, LoopStmt):
+        # The body runs at least once; its demand from the top decides.
+        return _seq_demands(stmt.body.stmts, 0, reg, tail_dm=tail_dm,
+                            call_dm=call_dm, ret=ret)
+    return None
+
+
+def _branches_demand(then_block: Block, else_block, reg, *, tail_dm, call_dm, ret):
+    kw = dict(tail_dm=tail_dm, call_dm=call_dm, ret=ret)
+    t = _seq_demands(then_block.stmts, 0, reg, **kw)
+    e = _seq_demands(else_block.stmts, 0, reg, **kw) if else_block is not None else None
+    if t is True or e is True:
+        return True
+    # A kill only if *both* branches kill reg. With no `else`, the false
+    # edge falls through past the `if`, so it isn't a kill.
+    if t is False and else_block is not None and e is False:
         return False
-    return False  # never touches A → incoming A not required, but
-    # nothing here proves a write either; safe default is "not a
-    # clean write-first", so callers stay conservative.
+    return None
+
+
+def _seq_demands(stmts: list[Stmt], idx: int, reg, *, tail_dm, call_dm, ret):
+    """Tri-state demand for `stmts[idx:]` — the first statement that
+    determines `reg` (used → True, killed → False); None if none do."""
+    for k in range(idx, len(stmts)):
+        r = _stmt_demands(stmts[k], reg, tail_dm=tail_dm, call_dm=call_dm, ret=ret)
+        if r is not None:
+            return r
+    return None
+
+
+def _demand_fixpoint(routines, *, ret, call_dm) -> dict:
+    """Fixed-point of each routine's register demand. `ret` says whether
+    a register escaping via a `Return` counts as a use (the escape-aware
+    `live` map) or not (the `read` map). `call_dm` is the read-demand map
+    used for non-tail calls; pass None to consult the map being computed
+    (only correct when `ret` is False, i.e. computing the read map).
+    Keyed by every name a routine answers to (canonical + aliases);
+    unknown / cross-module targets default to all registers."""
+    alias_groups = [
+        (r, (r.name, *getattr(r, "entry_aliases", []))) for r in routines
+    ]
+    unstructured = {r.name: _has_unstructured(r.body) for r in routines}
+    dm: dict = {}
+    for _, ns in alias_groups:
+        for n in ns:
+            dm[n] = frozenset()
+    changed = True
+    while changed:
+        changed = False
+        for r, ns in alias_groups:
+            if unstructured[r.name]:
+                new = _REG_SET
+            else:
+                cdm = dm if call_dm is None else call_dm
+                new = frozenset(
+                    reg for reg in _REGS
+                    if _seq_demands(r.body.stmts, 0, reg,
+                                    tail_dm=dm, call_dm=cdm, ret=ret) is True
+                )
+            for n in ns:
+                if dm[n] != new:
+                    dm[n] = new
+                    changed = True
+    return dm
+
+
+def _compute_register_demand(routines):
+    """Return `(read_demand, live_demand)`.
+
+    * `read_demand[R]` — registers R may *read* before writing them.
+      Used at a non-tail `Call`: the callee returns, so only a genuine
+      read can observe the caller's register.
+    * `live_demand[R]` — registers live at R's entry: read before
+      written, *or* still unwritten when R returns (escaping to R's
+      caller, who may read them). Used at a `TailCall`, whose return
+      unwinds to *our* caller — so a target that merely preserves the
+      register keeps it live, and the copy must not be folded.
+
+    `not (reg in live_demand[R])` is exactly "R must clobber reg before
+    returning", the soundness condition for dropping a `sta DST ; jmp R`.
+    """
+    read_demand = _demand_fixpoint(routines, ret=False, call_dm=None)
+    live_demand = _demand_fixpoint(routines, ret=True, call_dm=read_demand)
+    return read_demand, live_demand
+
+
+def _resource_demanded(target: str, res, demand) -> bool:
+    """Does the given demand map mark `res` as used by `target`? Carry
+    isn't demand-analysed (pass 2 owns flag liveness), so it's always
+    assumed used; an absent map or unknown target is conservative."""
+    if res is _CARRY:
+        return True
+    if demand is None:
+        return True
+    return res in demand.get(target, _REG_SET)
 
 
 # ---------------------------------------------------------------- the fold
@@ -351,18 +571,23 @@ def _dead_from(
     reads,
     writes,
     cond_reads,
+    call_reads,
+    tail_reads,
     dead_fallthrough: bool,
     dead_break: bool,
     dead_continue: bool,
 ) -> bool:
-    """Is the tracked resource (A, or the carry flag) dead from
+    """Is the tracked resource (A / X / Y, or the carry flag) dead from
     `stmts[idx:]` onward — i.e. overwritten before being read on
     *every* control-flow path?
 
     `reads` / `writes` classify a `RawStmt`'s atom; `cond_reads` says
-    whether an `IfStmt`'s `Compare` consumes the resource. The scan is
-    path-sensitive: each way out of the current statement list carries
-    its own deadness:
+    whether an `IfStmt`'s `Compare` consumes the resource;
+    `call_reads(target)` says whether a non-tail call to `target`
+    reads it, and `tail_reads(target)` whether the resource is still
+    live when tail-calling `target` (read by it *or* escaping through
+    its return). The scan is path-sensitive: each way out of the
+    current statement list carries its own deadness:
 
     * `dead_fallthrough` — control runs off the end of this list.
     * `dead_break` — a `break` exits the innermost enclosing loop.
@@ -372,8 +597,12 @@ def _dead_from(
 
     * `RawStmt` that `reads` the resource → live (False); that `writes`
       it (without reading) → dead (True); otherwise step past it.
-    * `Call`/`TailCall`/`Return` → live (the resource may be an
-      argument / return value).
+    * `Return` → live (a caller may read whatever the routine returns).
+    * `Call` whose target reads the resource → live; otherwise step
+      past it (the call doesn't observe the dropped value).
+    * `TailCall` → live unless the target *must clobber* the resource
+      before returning (`not tail_reads`); a target that merely
+      preserves it lets the value escape to our caller.
     * `RawIfStmt` → live: it reads raw 6502 flags, which the dropped
       op may have set (Z/N for a load, plus carry for `adc`/`sbc`).
     * `IfStmt` whose condition reads the resource → live; otherwise
@@ -400,8 +629,15 @@ def _dead_from(
         if isinstance(s, Assign):
             i += 1  # a folded copy / expr touches neither A nor flags
             continue
-        if isinstance(s, (CallStmt, TailCallStmt, ReturnStmt)):
+        if isinstance(s, ReturnStmt):
             return False
+        if isinstance(s, CallStmt):
+            if call_reads(s.target):
+                return False
+            i += 1  # call doesn't read the resource — keep scanning
+            continue
+        if isinstance(s, TailCallStmt):
+            return not tail_reads(s.target)
         if isinstance(s, BreakStmt):
             return dead_break
         if isinstance(s, ContinueStmt):
@@ -414,6 +650,7 @@ def _dead_from(
             # Deadness of everything after this `if` (the false edge,
             # and the then-block's own fall-through both land here).
             kw = dict(reads=reads, writes=writes, cond_reads=cond_reads,
+                      call_reads=call_reads, tail_reads=tail_reads,
                       dead_break=dead_break, dead_continue=dead_continue)
             rest = _dead_from(stmts, i + 1, dead_fallthrough=dead_fallthrough, **kw)
             then_dead = _dead_from(
@@ -432,37 +669,44 @@ def _dead_from(
     return dead_fallthrough
 
 
-def _a_dead_from(stmts, idx, *, dead_fallthrough, dead_break, dead_continue) -> bool:
-    """A-liveness wrapper over `_dead_from`."""
+# `Edges` is the per-resource deadness at the three ways out of the
+# block currently being folded: control falling off the end, a `break`,
+# and a `continue`. Each is a dict keyed by resource (A / X / Y / carry).
+_Edges = tuple  # (dead_fallthrough, dead_break, dead_continue) of dicts
+
+
+def _dead(stmts: list[Stmt], idx: int, res, edges, demand) -> bool:
+    """Is `res` dead from `stmts[idx:]` onward, given this block's edge
+    deadness `edges` and the module's `demand` = `(read, live)` maps?
+    Binds the resource's read/write/cond/demand predicates and looks up
+    its edge values. A non-tail `Call` consults the read map; a
+    `TailCall` consults the escape-aware `live` map."""
+    read_demand, live_demand = (None, None) if demand is None else demand
+    dead_fallthrough, dead_break, dead_continue = edges
     return _dead_from(
         stmts, idx,
-        reads=_reads_a, writes=_writes_a, cond_reads=_cond_reads_a,
-        dead_fallthrough=dead_fallthrough,
-        dead_break=dead_break, dead_continue=dead_continue,
+        reads=lambda it: _resource_reads(it, res),
+        writes=lambda it: _resource_writes(it, res),
+        cond_reads=lambda c: _resource_cond_reads(c, res),
+        call_reads=lambda tgt: _resource_demanded(tgt, res, read_demand),
+        tail_reads=lambda tgt: _resource_demanded(tgt, res, live_demand),
+        dead_fallthrough=dead_fallthrough[res],
+        dead_break=dead_break[res],
+        dead_continue=dead_continue[res],
     )
 
 
-def _c_dead_from(stmts, idx, *, dead_fallthrough, dead_break, dead_continue) -> bool:
-    """Carry-liveness wrapper over `_dead_from`."""
-    return _dead_from(
-        stmts, idx,
-        reads=_reads_c, writes=_writes_c, cond_reads=_cond_reads_c,
-        dead_fallthrough=dead_fallthrough,
-        dead_break=dead_break, dead_continue=dead_continue,
-    )
+def _all_dead(value: bool) -> dict:
+    return {res: value for res in _RESOURCES}
 
 
-def _fold_block(
-    block: Block,
-    *,
-    dead_fallthrough: bool,
-    dead_break: bool,
-    dead_continue: bool,
-) -> Block:
-    """Fold accumulator copy runs in `block`. The three flags give the
-    deadness of A at each edge out of this block — see `_a_dead_from`.
-    They're threaded down so a fold inside a loop body knows whether A
-    survives the break (post-loop) and back-edge (re-entry) paths."""
+def _fold_block(block: Block, *, edges, demand) -> Block:
+    """Fold register copy / arithmetic runs in `block`. `edges` is the
+    per-resource deadness at this block's exits (fall-through, break,
+    continue) — threaded down so a fold inside a loop body knows whether
+    the register / carry survives the back-edge and break paths.
+    `demand` is the interprocedural register-demand map."""
+    dead_break, dead_continue = edges[1], edges[2]
     stmts = list(block.stmts)
     out: list[Stmt] = []
     i = 0
@@ -472,87 +716,73 @@ def _fold_block(
 
         # Recurse into nested blocks first. Nested `if` bodies fall
         # through to *after* the `if`; rather than recompute that edge
-        # we pass `dead_fallthrough=False` (conservative — only costs
+        # we pass an all-live fall-through (conservative — only costs
         # missed folds). `break`/`continue` inside the body still target
-        # the same enclosing loop, so those flags pass through unchanged.
+        # the same enclosing loop, so those edges pass through unchanged.
         if isinstance(stmt, (IfStmt, RawIfStmt)):
+            inner = (_all_dead(False), dead_break, dead_continue)
             stmt = replace(
                 stmt,
-                then_block=_fold_block(
-                    stmt.then_block,
-                    dead_fallthrough=False,
-                    dead_break=dead_break,
-                    dead_continue=dead_continue,
-                ),
+                then_block=_fold_block(stmt.then_block, edges=inner, demand=demand),
                 else_block=(
-                    _fold_block(
-                        stmt.else_block,
-                        dead_fallthrough=False,
-                        dead_break=dead_break,
-                        dead_continue=dead_continue,
-                    )
+                    _fold_block(stmt.else_block, edges=inner, demand=demand)
                     if stmt.else_block is not None else None
                 ),
             )
         elif isinstance(stmt, LoopStmt):
             # Re-entry (fall-off-bottom and `continue`): the next
-            # iteration must overwrite A before reading it. Break: jump
-            # to whatever follows the loop in this block.
-            reentry_dead = _first_a_touch_is_write(stmt.body)
-            post_loop_dead = _a_dead_from(
-                stmts, i + 1,
-                dead_fallthrough=dead_fallthrough,
-                dead_break=dead_break,
-                dead_continue=dead_continue,
-            )
+            # iteration must overwrite the resource before reading it.
+            # Break: jump to whatever follows the loop in this block.
+            reentry = {
+                res: _first_resource_touch_is_write(stmt.body, res)
+                for res in _RESOURCES
+            }
+            post_loop = {
+                res: _dead(stmts, i + 1, res, edges, demand) for res in _RESOURCES
+            }
             stmt = replace(
                 stmt,
                 body=_fold_block(
-                    stmt.body,
-                    dead_fallthrough=reentry_dead,
-                    dead_break=post_loop_dead,
-                    dead_continue=reentry_dead,
+                    stmt.body, edges=(reentry, post_loop, reentry), demand=demand
                 ),
             )
 
-        # Try to start a fold run at a foldable A-load.
+        # Try to start a fold run at a foldable register load.
         if isinstance(stmt, RawStmt):
-            source = _is_a_load(stmt.item)
-            if source is not None:
-                edge = dict(
-                    dead_fallthrough=dead_fallthrough,
-                    dead_break=dead_break,
-                    dead_continue=dead_continue,
-                )
+            load = _is_reg_load(stmt.item)
+            if load is not None:
+                reg, source = load
 
-                # (1) Arithmetic fold: load ; clc/sec ; adc/sbc ; sta.
-                # Single store only — the stored value isn't the source
-                # value, so a multi-store run isn't an idempotent
+                # (1) Arithmetic fold (A only): load ; clc/sec ; adc/sbc
+                # ; sta. Single store only — the stored value isn't the
+                # source value, so a multi-store run isn't an idempotent
                 # write-back and could clobber the operand. A *and* the
                 # carry the add/sub set must be dead afterwards.
-                arith = _arith_after_load(stmts, i)
-                if arith is not None and arith[1] is not None:
-                    op, operand, store_start = arith
-                    targets, j = _store_run(stmts, store_start)
-                    if (
-                        len(targets) == 1
-                        and _a_dead_from(stmts, j, **edge)
-                        and _c_dead_from(stmts, j, **edge)
-                    ):
-                        tgt, ssrc = targets[0]
-                        out.append(Assign(
-                            target=tgt,
-                            source=BinExpr(op=op, lhs=source, rhs=operand),
-                            src=ssrc,
-                        ))
-                        i = j
-                        continue
+                if reg is Reg.A:
+                    arith = _arith_after_load(stmts, i)
+                    if arith is not None and arith[1] is not None:
+                        op, operand, store_start = arith
+                        targets, j = _store_run(stmts, store_start, Reg.A)
+                        if (
+                            len(targets) == 1
+                            and _dead(stmts, j, Reg.A, edges, demand)
+                            and _dead(stmts, j, _CARRY, edges, demand)
+                        ):
+                            tgt, ssrc = targets[0]
+                            out.append(Assign(
+                                target=tgt,
+                                source=BinExpr(op=op, lhs=source, rhs=operand),
+                                src=ssrc,
+                            ))
+                            i = j
+                            continue
 
-                # (2) Pure copy fold: load ; sta [; sta ...]. A run of
-                # stores fed by one load; sound for multiple stores
-                # because each writes the (unchanged) source value.
-                targets, j = _store_run(stmts, i + 1)
-                if targets and _a_dead_from(stmts, j, **edge):
+                # (2) Pure copy fold (A / X / Y): load ; sta [; sta ...].
+                # A run of stores of the same register fed by one load;
+                # sound for multiple stores because each writes the
+                # (unchanged) source value.
+                targets, j = _store_run(stmts, i + 1, reg)
+                if targets and _dead(stmts, j, reg, edges, demand):
                     for tgt, ssrc in targets:
                         out.append(Assign(target=tgt, source=source, src=ssrc))
                     i = j
@@ -563,27 +793,24 @@ def _fold_block(
     return Block.of(out)
 
 
-def fold_routine(routine: RoutineIR3) -> RoutineIR3:
+def fold_routine(routine: RoutineIR3, demand: dict | None = None) -> RoutineIR3:
     # The routine's top-level block falls through to `return` /
-    # tail-call, where A might be a return value — so A is NOT dead
-    # at the end. There's no enclosing loop, so break/continue are
-    # dead-false too (they shouldn't appear at this level anyway).
-    return replace(
-        routine,
-        body=_fold_block(
-            routine.body,
-            dead_fallthrough=False,
-            dead_break=False,
-            dead_continue=False,
-        ),
-    )
+    # tail-call, where a register might be a return value — so nothing
+    # is dead at the end. No enclosing loop, so break/continue edges are
+    # all-live too (they shouldn't appear at this level anyway).
+    edges = (_all_dead(False), _all_dead(False), _all_dead(False))
+    return replace(routine, body=_fold_block(routine.body, edges=edges, demand=demand))
 
 
 def fold_module(module: ModuleIR3) -> ModuleIR3:
+    # Interprocedural register demand lets a `sta DST ; jmp R` fold when
+    # R doesn't read the stored register — computed across this module's
+    # routines (cross-module targets stay conservative).
+    demand = _compute_register_demand(module.routines)
     return ModuleIR3(
         name=module.name,
         file=module.file,
-        routines=[fold_routine(r) for r in module.routines],
+        routines=[fold_routine(r, demand) for r in module.routines],
     )
 
 
