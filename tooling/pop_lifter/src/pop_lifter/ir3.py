@@ -75,6 +75,27 @@ class BinExpr:
 
 
 @dataclass(frozen=True)
+class RotateExpr:
+    """Accumulator rotate folded into a pass-3 expression.
+
+    Collapses `lda X ; (rol)*n ; sta DST` (or `ror`) into
+    `DST = rotl(X, n)` (or `rotr`). `op` is `"rotl"` (from
+    consecutive `rol`) or `"rotr"` (from consecutive `ror`).
+    `count` is the number of rotate instructions.
+
+    Unlike `BinExpr` shifts, the carry flag is an *input*: at
+    evaluation time the interpreter reads the current carry from
+    the trace and feeds it into the first rotation step; successive
+    steps use the carry produced by the previous step. The final
+    carry-out is not written back — by the fold's soundness
+    condition carry is dead after the store."""
+
+    op: str   # "rotl" | "rotr"
+    operand: "Imm | Abs | IndexedAbs | IndirectY"
+    count: int
+
+
+@dataclass(frozen=True)
 class Wide16Stmt:
     """16-bit arithmetic — a pass-3 structural rewrite of the 6502 idiom:
 
@@ -128,7 +149,7 @@ class Assign:
     differential tests)."""
 
     target: "Abs | IndexedAbs | IndirectY"
-    source: "Imm | Abs | IndexedAbs | IndirectY | BinExpr"
+    source: "Imm | Abs | IndexedAbs | IndirectY | BinExpr | RotateExpr"
     src: SourceRef
 
 
@@ -478,6 +499,8 @@ def _fmt_stmt(stmt: Stmt, indent: int) -> list[str]:
                 return f"*{_fmt_abs(v)}"
             if isinstance(v, BinExpr):
                 return f"{_loc(v.lhs)} {v.op} {_loc(v.rhs)}"
+            if isinstance(v, RotateExpr):
+                return f"{v.op}({_loc(v.operand)}, {v.count})"
             return repr(v)
 
         return [f"{pad}{_loc(stmt.target)} = {_loc(stmt.source)}    ; {stmt.src.short()}"]
