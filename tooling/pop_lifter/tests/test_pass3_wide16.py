@@ -23,6 +23,7 @@ from pop_lifter.ir1 import (
     Clc,
     Compare,
     Imm,
+    IndexedAbs,
     LoadAbs,
     LoadImm,
     LoadIndexed,
@@ -32,6 +33,7 @@ from pop_lifter.ir1 import (
     Sec,
     SourceRef,
     StoreAbs,
+    StoreIndexed,
 )
 from pop_lifter.ir3 import (
     Assign,
@@ -285,6 +287,31 @@ def test_wide16_not_matched_when_hi_adc_type_differs():
     ]
     out = _fold(stmts)
     assert not any(isinstance(s, Wide16Stmt) for s in out)
+
+
+def test_wide16_indexed_dst_keeps_index_reg_live():
+    """When lo_dst or hi_dst uses an indexed addressing mode, the index
+    register must be considered live by all three liveness helpers.
+    A subsequent `ldx #0 ; stx dst` copy must NOT be folded because X
+    is still live as the store-destination index inside the Wide16Stmt."""
+    # Wide16 with X-indexed store destinations: sta (Base + x)
+    # Then an 8-bit copy that uses X as a copy-source would be wrong to fold.
+    wide16 = [
+        _lda("src_lo", 0x10),
+        _clc(),
+        _adc_imm(1),
+        _raw(StoreIndexed(reg=Reg.A, base=_abs("Dst", 0x50), index=Reg.X, src=SRC)),
+        _lda("src_hi", 0x11),
+        _adc_imm(0),
+        _raw(StoreIndexed(reg=Reg.A, base=_abs("Dst_hi", 0x60), index=Reg.X, src=SRC)),
+    ]
+    # The Wide16Stmt should still be recognised (the store targets are valid).
+    out = _fold(wide16)
+    assert len(out) == 1
+    w = out[0]
+    assert isinstance(w, Wide16Stmt)
+    assert isinstance(w.lo_dst, IndexedAbs) and w.lo_dst.index is Reg.X
+    assert isinstance(w.hi_dst, IndexedAbs) and w.hi_dst.index is Reg.X
 
 
 def test_wide16_followed_by_other_folds():

@@ -440,12 +440,16 @@ def _stmt_touches_resource(stmt: Stmt, res) -> bool:
     if isinstance(stmt, RawStmt):
         return _resource_reads(stmt.item, res) or _resource_writes(stmt.item, res)
     if isinstance(stmt, Wide16Stmt):
-        # Clobbers A and carry; may also read X/Y as index registers.
+        # Clobbers A and carry; may also read X/Y as index registers in
+        # any of the six address slots (sources, operands, and destinations).
         if res is Reg.A or res is _CARRY:
             return True
         if res in (Reg.X, Reg.Y):
-            for v in (stmt.lo_src, stmt.lo_op, stmt.hi_src, stmt.hi_op):
+            for v in (stmt.lo_src, stmt.lo_op, stmt.lo_dst,
+                      stmt.hi_src, stmt.hi_op, stmt.hi_dst):
                 if isinstance(v, IndexedAbs) and v.index is res:
+                    return True
+                if isinstance(v, IndirectY) and res is Reg.Y:
                     return True
         return False
     if isinstance(stmt, Assign):
@@ -534,12 +538,15 @@ def _stmt_demands(stmt: Stmt, reg, *, tail_dm, call_dm, ret):
     if isinstance(stmt, Wide16Stmt):
         # `lda lo_src` kills A without reading the incoming A; `clc`/`sec`
         # kills carry without reading it.  X/Y are read only when used as
-        # index registers in one of the operands.
+        # index registers across all six address slots.
         if reg is Reg.A:
             return False  # killed
         if reg in (Reg.X, Reg.Y):
-            for v in (stmt.lo_src, stmt.lo_op, stmt.hi_src, stmt.hi_op):
+            for v in (stmt.lo_src, stmt.lo_op, stmt.lo_dst,
+                      stmt.hi_src, stmt.hi_op, stmt.hi_dst):
                 if isinstance(v, IndexedAbs) and v.index is reg:
+                    return True
+                if isinstance(v, IndirectY) and reg is Reg.Y:
                     return True
         return None  # doesn't affect this register — keep scanning
     if isinstance(stmt, Assign):
@@ -751,8 +758,9 @@ def _dead_from(
             # Step 2 (clc/sec) writes carry without reading it first.
             if writes(Clc(src=s.src)):
                 return True  # carry killed at step 2 — dead from here
-            # Resource must be X or Y — live iff any indexed operand reads it.
-            for v in (s.lo_src, s.lo_op, s.hi_src, s.hi_op):
+            # Resource must be X or Y — live iff any indexed/indirect slot reads it.
+            # Check all six address slots: sources, operands, and store destinations.
+            for v in (s.lo_src, s.lo_op, s.lo_dst, s.hi_src, s.hi_op, s.hi_dst):
                 if isinstance(v, IndexedAbs):
                     if reads(AdcIndexed(base=v.base, index=v.index, src=s.src)):
                         return False  # indexed read — X or Y is live
