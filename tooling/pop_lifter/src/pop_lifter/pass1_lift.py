@@ -70,6 +70,7 @@ from .ir1 import (
     LoadImm,
     LoadIndexed,
     LoadIndirect,
+    LocalRef,
     Lsr,
     ModuleIR1,
     Reg,
@@ -77,6 +78,7 @@ from .ir1 import (
     Routine,
     SbcAbs,
     SbcImm,
+    SbcIndirect,
     Sec,
     SourceRef,
     StoreAbs,
@@ -459,6 +461,9 @@ def _lift_instr(
         if idx is not None:
             base, idx_reg = idx
             return SbcIndexed(base=base, index=idx_reg, src=src)
+        ind = _parse_indirect_y(line.operand, equates)
+        if ind is not None:
+            return SbcIndirect(source=ind, src=src)
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return SbcAbs(source=addr, src=src)
@@ -500,11 +505,21 @@ def _lift_instr(
     if mnemonic in ("inc", "dec"):
         if line.operand is None:
             return Unsupported(mnemonic=mnemonic, operand=None, src=src)
-        addr = _parse_absolute(line.operand, equates)
-        if addr is None:
-            return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
         node_cls = IncTarget if mnemonic == "inc" else DecTarget
-        return node_cls(target=addr, src=src)
+        addr = _parse_absolute(line.operand, equates)
+        if addr is not None:
+            return node_cls(target=addr, src=src)
+        # `inc :smod+2` — self-modifying-code operand bump (advancing
+        # a patched pointer's high byte). Local-label target, address
+        # stays symbolic. Tried after the absolute parse so resolved
+        # symbols still take the memory path.
+        local = _parse_local_target(line.operand)
+        if local is not None:
+            label, offset = local
+            return node_cls(
+                target=LocalRef(label=label, offset=offset), src=src,
+            )
+        return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
 
     # Register transfers (`tax` / `tay` / `txa` / `tya`). `tsx`/`txs`
     # interact with the stack pointer — out of scope for now.

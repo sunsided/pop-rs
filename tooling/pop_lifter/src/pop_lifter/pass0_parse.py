@@ -191,11 +191,22 @@ def _tokenize_expr(s: str) -> list[str]:
         if c.isalpha() or c == "_" or c == "]":
             # `]name` is a Merlin macro-style variable; treat as an
             # identifier so it can appear on either side of an equate.
+            # Note: `.` is NOT part of an identifier — Merlin uses it
+            # as the bitwise-OR operator (handled below). No symbol in
+            # EQ.S/GAMEEQ.S contains a dot, so this is unambiguous.
             j = i + 1
-            while j < len(s) and (s[j].isalnum() or s[j] in "_."):
+            while j < len(s) and (s[j].isalnum() or s[j] == "_"):
                 j += 1
             out.append(s[i:j])
             i = j
+            continue
+        if c == ".":
+            # Merlin bitwise-OR operator (e.g. `sta.$40` = `sta | $40`).
+            # POP uses it to OR flag bits into addresses / build
+            # masks. Emitted as its own token; the parser maps it to
+            # `|`.
+            out.append(".")
+            i += 1
             continue
         if c in _BIN_OPS or c in "()":
             out.append(c)
@@ -239,7 +250,7 @@ class _ExprParser:
 
     def _term(self) -> int:
         v = self._factor()
-        while self._peek() in ("*", "/", "&", "|", "^"):
+        while self._peek() in ("*", "/", "&", "|", "^", "."):
             op = self._eat()
             r = self._factor()
             if op == "*":
@@ -248,7 +259,8 @@ class _ExprParser:
                 v = v // r
             elif op == "&":
                 v = v & r
-            elif op == "|":
+            elif op in ("|", "."):
+                # `.` is Merlin's bitwise-OR operator, same as `|`.
                 v = v | r
             elif op == "^":
                 v = v ^ r

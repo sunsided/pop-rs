@@ -112,6 +112,7 @@ from .ir1 import (
     SbcAbs,
     SbcImm,
     SbcIndexed,
+    SbcIndirect,
     Sec,
     ShiftMem,
     Transfer,
@@ -171,8 +172,8 @@ def _affected_register(item: Item):
     if isinstance(item, Bitwise):
         from .ir1 import Reg
         return Reg.A
-    if isinstance(item, (SbcImm, SbcAbs, SbcIndexed, Asl, Lsr, Rol, Ror)):
-        # All seven define A's new value as their flag-side-effect,
+    if isinstance(item, (SbcImm, SbcAbs, SbcIndexed, SbcIndirect, Asl, Lsr, Rol, Ror)):
+        # All eight define A's new value as their flag-side-effect,
         # so a subsequent `beq`/`bne`/`bpl`/`bmi` reads Z/N of A.
         # Asl belongs here too — `asl a ; beq L` fuses into
         # `if a == 0 goto L` exactly like Lsr/Rol/Ror do. Earlier
@@ -263,7 +264,7 @@ def _defines_flags(item: Item) -> bool:
             CmpImm, CmpAbs, CmpIndexed,
             LoadImm, LoadAbs, LoadIndexed, LoadIndirect,
             IncTarget, DecTarget, Transfer, Bitwise,
-            SbcImm, SbcAbs, SbcIndexed,
+            SbcImm, SbcAbs, SbcIndexed, SbcIndirect,
             Asl, Lsr, Rol, Ror, Bit, ShiftMem,
             Pla,
             # AdcIndexed: see `_affected_register` note — adc lacks
@@ -546,7 +547,7 @@ def _backward_sweep(
             live.add("C")
             continue
 
-        if isinstance(item, (SbcImm, SbcAbs, SbcIndexed)):
+        if isinstance(item, (SbcImm, SbcAbs, SbcIndexed, SbcIndirect)):
             # Sbc is symmetric with Adc: writes Z,N,C; reads C (the
             # borrow flag chains through subsequent sbc's).
             live -= {"Z", "N", "C"}

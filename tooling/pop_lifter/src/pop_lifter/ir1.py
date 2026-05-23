@@ -277,6 +277,17 @@ class SbcAbs:
 
 
 @dataclass(frozen=True)
+class SbcIndirect:
+    """`sbc (ptr),y` — subtract the post-indexed-indirect byte from A
+    with borrow. The indirect-indexed analog of `SbcAbs`; mirrors
+    `CmpIndirect`. POP's HIRES.S uses it for sprite-mask subtraction
+    (`sbc (IMAGE),y`)."""
+
+    source: IndirectY
+    src: SourceRef
+
+
+@dataclass(frozen=True)
 class Lsr:
     """`lsr a` / `lsr` — accumulator-only logical shift right.
     `C = old A bit 0`, `A = A >> 1`. N is always 0 (the shifted-in
@@ -522,22 +533,37 @@ class SbcIndexed:
 
 
 @dataclass(frozen=True)
-class IncTarget:
-    """`inx` / `iny` / `inc addr` — add 1 to a register or memory
-    location. Sets Z/N on the result; does NOT touch C. `target` is
-    either a `Reg` (X or Y — `ina` doesn't exist on stock 6502) or
-    an `Abs` for memory-resident counters."""
+class LocalRef:
+    """A `:label+N` / `]label+N` reference whose address stays
+    symbolic (local labels aren't in the resolved symbol table).
+    Used as an `IncTarget`/`DecTarget` target for self-modifying-code
+    operand bumps — `inc :smod+2` advances the high byte of the
+    instruction operand labelled `:smod`. The store analog is
+    `StoreLocal`; the interpreter routes both through the
+    `Trace.code_patches` side channel."""
 
-    target: "Reg | Abs"
+    label: str
+    offset: int
+
+
+@dataclass(frozen=True)
+class IncTarget:
+    """`inx` / `iny` / `inc addr` / `inc :label+N` — add 1 to a
+    register, memory location, or self-modifying-code operand byte.
+    Sets Z/N on the result; does NOT touch C. `target` is a `Reg`
+    (X or Y — `ina` doesn't exist on stock 6502), an `Abs` for
+    memory counters, or a `LocalRef` for SMC operand bumps."""
+
+    target: "Reg | Abs | LocalRef"
     src: SourceRef
 
 
 @dataclass(frozen=True)
 class DecTarget:
-    """`dex` / `dey` / `dec addr` — same as `IncTarget` but
-    decrement. Sets Z/N; does NOT touch C."""
+    """`dex` / `dey` / `dec addr` / `dec :label+N` — same as
+    `IncTarget` but decrement. Sets Z/N; does NOT touch C."""
 
-    target: "Reg | Abs"
+    target: "Reg | Abs | LocalRef"
     src: SourceRef
 
 
@@ -713,7 +739,7 @@ Instr = (
     | Pha | Pla
     | CmpIndexed | AdcIndexed | SbcIndexed
     | Rol | Ror | ShiftMem
-    | StoreLocal
+    | StoreLocal | SbcIndirect
     | Unsupported
 )
 Item = Label | Instr
@@ -840,6 +866,11 @@ def format_item(item: Item) -> str:
         return f"  a = a - {_fmt_imm(item.imm)} - (1 - c)        ; {item.src.short()}"
     if isinstance(item, SbcAbs):
         return f"  a = a - *{_fmt_abs(item.source)} - (1 - c) ; {item.src.short()}"
+    if isinstance(item, SbcIndirect):
+        return (
+            f"  a = a - *({_fmt_abs(item.source.ptr)})[y] - (1 - c)"
+            f"   ; {item.src.short()}"
+        )
     if isinstance(item, Lsr):
         return f"  a = a >> 1                       ; {item.src.short()}"
     if isinstance(item, Rol):
@@ -886,12 +917,18 @@ def format_item(item: Item) -> str:
         return f"  {kw} {item.target}                ; {item.src.short()}"
     if isinstance(item, Return):
         return f"  return                           ; {item.src.short()}"
-    if isinstance(item, IncTarget):
-        tgt = item.target if isinstance(item.target, Reg) else f"*{_fmt_abs(item.target)}"
-        return f"  {tgt} += 1                         ; {item.src.short()}"
-    if isinstance(item, DecTarget):
-        tgt = item.target if isinstance(item.target, Reg) else f"*{_fmt_abs(item.target)}"
-        return f"  {tgt} -= 1                         ; {item.src.short()}"
+    if isinstance(item, (IncTarget, DecTarget)):
+        if isinstance(item.target, Reg):
+            tgt = str(item.target)
+        elif isinstance(item.target, LocalRef):
+            loc = item.target.label
+            if item.target.offset != 0:
+                loc = f"{loc}+{item.target.offset}"
+            tgt = f"patch *{loc}"
+        else:
+            tgt = f"*{_fmt_abs(item.target)}"
+        sym = "+= 1" if isinstance(item, IncTarget) else "-= 1"
+        return f"  {tgt} {sym}                         ; {item.src.short()}"
     if isinstance(item, Transfer):
         return f"  {item.dst_reg} = {item.src_reg}                            ; {item.src.short()}"
     if isinstance(item, Bitwise):

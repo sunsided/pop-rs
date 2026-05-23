@@ -103,8 +103,8 @@ fn CLS {
   *($3000@0x3000 + y) = a   ; HIRES.S:220
   y += 1                         ; HIRES.S:221
   if y != #0x00 goto :loop  ; HIRES.S:222
-  ??? inc :loop+2            ; HIRES.S:224
-  ??? inc :smod+2            ; HIRES.S:225
+  patch *:loop+2 += 1                         ; HIRES.S:224
+  patch *:smod+2 += 1                         ; HIRES.S:225
   x -= 1                         ; HIRES.S:227
   if x != #0x00 goto :loop  ; HIRES.S:228
   return                           ; HIRES.S:230
@@ -1213,7 +1213,7 @@ fn FASTLAY {
   a = *YCO@0x0002        ; HIRES.S:1767
   x = a                            ; HIRES.S:1768
   y += 1                         ; HIRES.S:1769
-  ??? sbc (IMAGE),y            ; HIRES.S:1770
+  a = a - *(IMAGE@0x0004)[y] - (1 - c)   ; HIRES.S:1770
   if cs goto :ok       ; HIRES.S:1771
   a = #0xff                  ; HIRES.S:1772
 :ok:
@@ -1275,7 +1275,7 @@ fn fastlaySTA {
   a = *YCO@0x0002        ; HIRES.S:1840
   x = a                            ; HIRES.S:1841
   y += 1                         ; HIRES.S:1842
-  ??? sbc (IMAGE),y            ; HIRES.S:1843
+  a = a - *(IMAGE@0x0004)[y] - (1 - c)   ; HIRES.S:1843
   if cs goto :ok       ; HIRES.S:1844
   a = #0xff                  ; HIRES.S:1845
 :ok:
@@ -1337,7 +1337,7 @@ fn FASTMASK {
   a = *YCO@0x0002        ; HIRES.S:1912
   x = a                            ; HIRES.S:1913
   y += 1                         ; HIRES.S:1914
-  ??? sbc (IMAGE),y            ; HIRES.S:1915
+  a = a - *(IMAGE@0x0004)[y] - (1 - c)   ; HIRES.S:1915
   if cs goto :ok       ; HIRES.S:1916
   a = #0xff                  ; HIRES.S:1917
 :ok:
@@ -1507,10 +1507,10 @@ fn COPYSCRN {
   *($5000@0x5000 + y) = a   ; HIRES.S:2080
   y += 1                         ; HIRES.S:2082
   if y != #0x00 goto :loop  ; HIRES.S:2083
-  ??? inc :org1+2            ; HIRES.S:2085
-  ??? inc :org2+2            ; HIRES.S:2086
-  ??? inc :dst1+2            ; HIRES.S:2087
-  ??? inc :dst2+2            ; HIRES.S:2088
+  patch *:org1+2 += 1                         ; HIRES.S:2085
+  patch *:org2+2 += 1                         ; HIRES.S:2086
+  patch *:dst1+2 += 1                         ; HIRES.S:2087
+  patch *:dst2+2 += 1                         ; HIRES.S:2088
   x -= 1                         ; HIRES.S:2090
   if x != #0x00 goto :loop  ; HIRES.S:2091
   return                           ; HIRES.S:2093
