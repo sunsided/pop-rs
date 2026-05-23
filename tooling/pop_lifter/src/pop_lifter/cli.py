@@ -27,6 +27,7 @@ from .pass2_reloop import is_unstructured, reloop_module
 from .pass2_struct import elision_stats, fusion_stats, structure_module
 from .pass3_expr import fold_module, fold_stats
 from .pass3_match import match_stats, recognize_module
+from .pass3_smc import recognize_smc, smc_stats
 
 DEFAULT_SOURCE_REL = Path("01 POP Source/Source")
 
@@ -529,6 +530,80 @@ def _cmd_match(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------- smc (pass 3)
+
+
+def _cmd_smc(args: argparse.Namespace) -> int:
+    """Run pass 1, then recognise self-modifying-code immediate patches
+    as operand variables. Writes the IR1 dump to `--out` (or stdout);
+    the summary reports how many patch stores became `StoreOpVar`s."""
+    src_dir = _resolve_source_dir(args)
+    if src_dir is None:
+        return 2
+
+    file_paths: list[Path] = []
+    for raw in args.file:
+        p = Path(raw)
+        if not p.is_absolute():
+            candidate = src_dir / p
+            if candidate.is_file():
+                p = candidate
+        if not p.is_file():
+            print(f"error: input file not found: {raw}", file=sys.stderr)
+            return 2
+        file_paths.append(p)
+
+    base = [src_dir / n for n in ("EQ.S", "GAMEEQ.S") if (src_dir / n).exists()]
+    ast = parse_files([*base, *file_paths], search_paths=[src_dir])
+    symbols = ast.symbols()
+
+    dumps: list[str] = []
+    total_routines = 0
+    total_opvars = 0
+    handled: set[str] = set()
+    for file_path in file_paths:
+        file_ast = next(
+            (f for f in ast.files if Path(f.path).resolve() == file_path.resolve()),
+            None,
+        )
+        if file_ast is None:
+            print(
+                f"error: file {file_path} was not loaded by the parser",
+                file=sys.stderr,
+            )
+            return 1
+        defined = set(discover_entries(file_ast))
+        local_entries = [e for e in args.entry if e in defined and e not in handled]
+        if not local_entries:
+            continue
+        module = recognize_smc(lift_file(file_ast, symbols, local_entries).module)
+        total_routines += len(module.routines)
+        total_opvars += smc_stats(module)
+        dumps.append(ir1_mod.format_module(module))
+        handled.update(local_entries)
+
+    missing = [e for e in args.entry if e not in handled]
+    if missing:
+        print(
+            f"error: entries not found in any input file: {missing}",
+            file=sys.stderr,
+        )
+        return 1
+
+    text = "\n".join(dumps)
+    if args.out:
+        out_path = Path(args.out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(text, encoding="utf-8")
+        print(
+            f"wrote {out_path} ({total_routines} routines, "
+            f"{total_opvars} SMC operand variables)"
+        )
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
 # ---------------------------------------------------------------- lift-all
 
 def _cmd_lift_all(args: argparse.Namespace) -> int:
@@ -818,6 +893,25 @@ def main(argv: list[str] | None = None) -> int:
         help="If given, write the IR3 dump here instead of stdout.",
     )
     p_match.set_defaults(func=_cmd_match)
+
+    p_smc = sub.add_parser(
+        "smc",
+        help="Pass 3: run pass 1, then recognise self-modifying-code "
+             "immediate patches as named operand variables.",
+    )
+    p_smc.add_argument(
+        "file", nargs="+",
+        help=".S file (absolute path or relative to the source dir).",
+    )
+    p_smc.add_argument(
+        "--entry", action="append", required=True,
+        help="Routine entry-point label. May be passed multiple times.",
+    )
+    p_smc.add_argument(
+        "--out", default=None,
+        help="If given, write the IR1 dump here instead of stdout.",
+    )
+    p_smc.set_defaults(func=_cmd_smc)
 
     p_lift_all = sub.add_parser(
         "lift-all",
