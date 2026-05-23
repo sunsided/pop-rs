@@ -539,6 +539,7 @@ def _first_resource_touch_is_write(block: Block, res) -> bool:
 
 
 _REG_SET = frozenset(_REGS)
+_RESOURCE_SET = frozenset(_RESOURCES)  # includes _CARRY — used as conservative default
 
 
 def _has_unstructured(block: Block) -> bool:
@@ -555,27 +556,39 @@ def _has_unstructured(block: Block) -> bool:
     return False
 
 
-def _stmt_demands(stmt: Stmt, reg, *, tail_dm, call_dm, ret):
+def _stmt_demands(stmt: Stmt, reg, *, tail_dm, call_dm, ret, kill_dm=None,
+                  kill_mode=False):
     """Tri-state for a single statement: True = some path reads `reg`
     (or, when `ret` is True, lets it escape via a return) before writing
     it; False = every path writes `reg` before reading it (a kill);
     None = neither (the caller keeps scanning).
+
+    `kill_dm`, when provided, maps routine names to the set of resources
+    they definitely clobber on all paths before returning — used by the
+    kill-demand fixpoint to propagate kills across calls.
+
+    `kill_mode`, when True, changes the semantics of path-terminating
+    statements that do not write the resource: `ReturnStmt`,
+    `BreakStmt`, and `ContinueStmt` return `None` instead of `False`.
+    This is necessary for `_compute_kill_demand`: a bare return/break
+    does not *write* the resource, so it must not contribute a `False`
+    (kill) result — only an explicit write should produce `False`.
 
     `call_dm` is the *read*-demand map consulted for a non-tail `Call`
     (the callee returns, so only an actual read of `reg` matters).
     `tail_dm` is the map consulted for a `TailCall` (its eventual return
     escapes to *our* caller, so `tail_dm` is the escape-aware map)."""
     if isinstance(stmt, RawStmt):
-        if _reads_reg(stmt.item, reg):
+        if _resource_reads(stmt.item, reg):
             return True
-        if _writes_reg(stmt.item, reg):
+        if _resource_writes(stmt.item, reg):
             return False
         return None
     if isinstance(stmt, Wide16Stmt):
         # `lda lo_src` kills A without reading the incoming A; `clc`/`sec`
         # kills carry without reading it.  X/Y are read only when used as
         # index registers across all six address slots.
-        if reg is Reg.A:
+        if reg is Reg.A or reg is _CARRY:
             return False  # killed
         if reg in (Reg.X, Reg.Y):
             for v in (stmt.lo_src, stmt.lo_op, stmt.lo_dst,
@@ -590,9 +603,17 @@ def _stmt_demands(stmt: Stmt, reg, *, tail_dm, call_dm, ret):
     if isinstance(stmt, ReturnStmt):
         # An unwritten reg escapes to the caller here. For the
         # escape-aware (`live`) map that's a use; for the read-only map
-        # it isn't.
+        # it isn't. In kill_mode a bare return is not a write, so yield
+        # None (transparent) to avoid false kills in kill_demand.
+        if kill_mode:
+            return None
         return True if ret else False
     if isinstance(stmt, (BreakStmt, ContinueStmt)):
+        # Stays within the routine; neither reads nor writes the resource.
+        # In kill_mode yield None so a break/continue path never falsely
+        # reports a kill.
+        if kill_mode:
+            return None
         return False  # stays within the routine; no read / escape here
     if isinstance(stmt, (GotoStmt, LabelStmt)):
         return True   # unstructured — conservatively a use
@@ -600,28 +621,35 @@ def _stmt_demands(stmt: Stmt, reg, *, tail_dm, call_dm, ret):
         # The callee returns to us; only a genuine read matters. If it
         # doesn't read reg the call is transparent (it may clobber reg,
         # which we don't track — keep scanning).
-        return True if reg in call_dm.get(stmt.target, _REG_SET) else None
+        if reg in call_dm.get(stmt.target, _RESOURCE_SET):
+            return True   # callee reads reg
+        if kill_dm is not None and reg in kill_dm.get(stmt.target, frozenset()):
+            return False  # callee clobbers reg on all paths
+        return None
     if isinstance(stmt, TailCallStmt):
         # The path ends here; reg is used iff it's read *or escapes*
         # through the target — that's the escape-aware map.
-        return reg in tail_dm.get(stmt.target, _REG_SET)
+        return reg in tail_dm.get(stmt.target, _RESOURCE_SET)
     if isinstance(stmt, IfStmt):
         if _resource_cond_reads(stmt.cond, reg):
             return True
         return _branches_demand(
             stmt.then_block, stmt.else_block, reg,
-            tail_dm=tail_dm, call_dm=call_dm, ret=ret,
+            tail_dm=tail_dm, call_dm=call_dm, ret=ret, kill_dm=kill_dm,
+            kill_mode=kill_mode,
         )
     if isinstance(stmt, RawIfStmt):
         # The cond reads a raw flag, not a register.
         return _branches_demand(
             stmt.then_block, stmt.else_block, reg,
-            tail_dm=tail_dm, call_dm=call_dm, ret=ret,
+            tail_dm=tail_dm, call_dm=call_dm, ret=ret, kill_dm=kill_dm,
+            kill_mode=kill_mode,
         )
     if isinstance(stmt, LoopStmt):
         # The body runs at least once; its demand from the top decides.
         return _seq_demands(stmt.body.stmts, 0, reg, tail_dm=tail_dm,
-                            call_dm=call_dm, ret=ret)
+                            call_dm=call_dm, ret=ret, kill_dm=kill_dm,
+                            kill_mode=kill_mode)
     # Any other node type — notably the late readability passes' nodes
     # (`MatchStmt`, `DoWhileStmt`) — isn't modelled here. The fold runs
     # on reloop output, before those passes, so this is never hit in the
@@ -631,8 +659,10 @@ def _stmt_demands(stmt: Stmt, reg, *, tail_dm, call_dm, ret):
     return True
 
 
-def _branches_demand(then_block: Block, else_block, reg, *, tail_dm, call_dm, ret):
-    kw = dict(tail_dm=tail_dm, call_dm=call_dm, ret=ret)
+def _branches_demand(then_block: Block, else_block, reg, *, tail_dm, call_dm, ret,
+                     kill_dm=None, kill_mode=False):
+    kw = dict(tail_dm=tail_dm, call_dm=call_dm, ret=ret, kill_dm=kill_dm,
+              kill_mode=kill_mode)
     t = _seq_demands(then_block.stmts, 0, reg, **kw)
     e = _seq_demands(else_block.stmts, 0, reg, **kw) if else_block is not None else None
     if t is True or e is True:
@@ -644,11 +674,13 @@ def _branches_demand(then_block: Block, else_block, reg, *, tail_dm, call_dm, re
     return None
 
 
-def _seq_demands(stmts: list[Stmt], idx: int, reg, *, tail_dm, call_dm, ret):
+def _seq_demands(stmts: list[Stmt], idx: int, reg, *, tail_dm, call_dm, ret,
+                 kill_dm=None, kill_mode=False):
     """Tri-state demand for `stmts[idx:]` — the first statement that
     determines `reg` (used → True, killed → False); None if none do."""
     for k in range(idx, len(stmts)):
-        r = _stmt_demands(stmts[k], reg, tail_dm=tail_dm, call_dm=call_dm, ret=ret)
+        r = _stmt_demands(stmts[k], reg, tail_dm=tail_dm, call_dm=call_dm, ret=ret,
+                          kill_dm=kill_dm, kill_mode=kill_mode)
         if r is not None:
             return r
     return None
@@ -675,12 +707,12 @@ def _demand_fixpoint(routines, *, ret, call_dm) -> dict:
         changed = False
         for r, ns in alias_groups:
             if unstructured[r.name]:
-                new = _REG_SET
+                new = _RESOURCE_SET
             else:
                 cdm = dm if call_dm is None else call_dm
                 new = frozenset(
-                    reg for reg in _REGS
-                    if _seq_demands(r.body.stmts, 0, reg,
+                    res for res in _RESOURCES
+                    if _seq_demands(r.body.stmts, 0, res,
                                     tail_dm=dm, call_dm=cdm, ret=ret) is True
                 )
             for n in ns:
@@ -691,34 +723,82 @@ def _demand_fixpoint(routines, *, ret, call_dm) -> dict:
 
 
 def _compute_register_demand(routines):
-    """Return `(read_demand, live_demand)`.
+    """Return `(read_demand, live_demand, kill_demand)`.
 
-    * `read_demand[R]` — registers R may *read* before writing them.
+    * `read_demand[R]` — resources R may *read* before writing them.
       Used at a non-tail `Call`: the callee returns, so only a genuine
-      read can observe the caller's register.
-    * `live_demand[R]` — registers live at R's entry: read before
+      read can observe the caller's resource.
+    * `live_demand[R]` — resources live at R's entry: read before
       written, *or* still unwritten when R returns (escaping to R's
       caller, who may read them). Used at a `TailCall`, whose return
       unwinds to *our* caller — so a target that merely preserves the
-      register keeps it live, and the copy must not be folded.
+      resource keeps it live, and the copy must not be folded.
+    * `kill_demand[R]` — resources R definitely clobbers on every path
+      before returning. Used at a non-tail `Call`: if the callee kills
+      the resource, the incoming value is provably dead even when the
+      post-call continuation is conservatively live (e.g. at routine
+      exit). Enables arithmetic folds across `jsr` call sites.
 
     `not (reg in live_demand[R])` is exactly "R must clobber reg before
     returning", the soundness condition for dropping a `sta DST ; jmp R`.
     """
     read_demand = _demand_fixpoint(routines, ret=False, call_dm=None)
     live_demand = _demand_fixpoint(routines, ret=True, call_dm=read_demand)
-    return read_demand, live_demand
+    kill_demand = _compute_kill_demand(routines, read_demand, live_demand)
+    return read_demand, live_demand, kill_demand
+
+
+def _compute_kill_demand(routines, read_demand, live_demand) -> dict:
+    """Fixed-point of each routine's kill set: resources the routine
+    definitely clobbers on *every* path before returning. Starts empty
+    (pessimistic) and grows monotonically until stable.
+
+    Uses `ret=False` so a plain return without touching the resource
+    counts as a non-read (not as an escape), and `kill_dm` (the map
+    being computed) to propagate kills across non-tail calls."""
+    alias_groups = [
+        (r, (r.name, *getattr(r, "entry_aliases", []))) for r in routines
+    ]
+    unstructured = {r.name: _has_unstructured(r.body) for r in routines}
+    dm: dict = {}
+    for _, ns in alias_groups:
+        for n in ns:
+            dm[n] = frozenset()  # start pessimistic: nothing killed
+    changed = True
+    while changed:
+        changed = False
+        for r, ns in alias_groups:
+            if unstructured[r.name]:
+                new = frozenset()  # unstructured: conservatively kills nothing
+            else:
+                new = frozenset(
+                    res for res in _RESOURCES
+                    if _seq_demands(r.body.stmts, 0, res,
+                                    tail_dm=live_demand, call_dm=read_demand,
+                                    ret=False, kill_dm=dm,
+                                    kill_mode=True) is False
+                )
+            for n in ns:
+                if dm[n] != new:
+                    dm[n] = new
+                    changed = True
+    return dm
 
 
 def _resource_demanded(target: str, res, demand) -> bool:
-    """Does the given demand map mark `res` as used by `target`? Carry
-    isn't demand-analysed (pass 2 owns flag liveness), so it's always
-    assumed used; an absent map or unknown target is conservative."""
-    if res is _CARRY:
-        return True
+    """Does the given demand map mark `res` as used by `target`?
+    Unknown targets and an absent map are conservative (all demanded)."""
     if demand is None:
         return True
-    return res in demand.get(target, _REG_SET)
+    return res in demand.get(target, _RESOURCE_SET)
+
+
+def _resource_killed(target: str, res, kill_demand) -> bool:
+    """Does the kill map prove `target` clobbers `res` on all paths?
+    Unknown targets or an absent map default to conservative (not killed)."""
+    if kill_demand is None:
+        return False
+    return res in kill_demand.get(target, frozenset())
 
 
 # ---------------------------------------------------------------- the fold
@@ -732,6 +812,7 @@ def _dead_from(
     writes,
     cond_reads,
     call_reads,
+    call_kills,
     tail_reads,
     dead_fallthrough: bool,
     dead_break: bool,
@@ -743,8 +824,10 @@ def _dead_from(
 
     `reads` / `writes` classify a `RawStmt`'s atom; `cond_reads` says
     whether an `IfStmt`'s `Compare` consumes the resource;
-    `call_reads(target)` says whether a non-tail call to `target`
-    reads it, and `tail_reads(target)` whether the resource is still
+    `call_reads(target)` says whether a non-tail call to `target` reads
+    it; `call_kills(target)` says whether the callee clobbers it on all
+    paths before returning (so the incoming value is dead regardless of
+    what follows the call); `tail_reads(target)` whether the resource is
     live when tail-calling `target` (read by it *or* escaping through
     its return). The scan is path-sensitive: each way out of the
     current statement list carries its own deadness:
@@ -813,7 +896,9 @@ def _dead_from(
         if isinstance(s, CallStmt):
             if call_reads(s.target):
                 return False
-            i += 1  # call doesn't read the resource — keep scanning
+            if call_kills(s.target):
+                return True   # callee clobbers resource — original value dead
+            i += 1  # call neither reads nor kills — step past
             continue
         if isinstance(s, TailCallStmt):
             return not tail_reads(s.target)
@@ -829,7 +914,8 @@ def _dead_from(
             # Deadness of everything after this `if` (the false edge,
             # and the then-block's own fall-through both land here).
             kw = dict(reads=reads, writes=writes, cond_reads=cond_reads,
-                      call_reads=call_reads, tail_reads=tail_reads,
+                      call_reads=call_reads, call_kills=call_kills,
+                      tail_reads=tail_reads,
                       dead_break=dead_break, dead_continue=dead_continue)
             rest = _dead_from(stmts, i + 1, dead_fallthrough=dead_fallthrough, **kw)
             then_dead = _dead_from(
@@ -856,11 +942,14 @@ _Edges = tuple  # (dead_fallthrough, dead_break, dead_continue) of dicts
 
 def _dead(stmts: list[Stmt], idx: int, res, edges, demand) -> bool:
     """Is `res` dead from `stmts[idx:]` onward, given this block's edge
-    deadness `edges` and the module's `demand` = `(read, live)` maps?
+    deadness `edges` and the module's `demand` = `(read, live, kill)` maps?
     Binds the resource's read/write/cond/demand predicates and looks up
-    its edge values. A non-tail `Call` consults the read map; a
+    its edge values. A non-tail `Call` consults the read and kill maps; a
     `TailCall` consults the escape-aware `live` map."""
-    read_demand, live_demand = (None, None) if demand is None else demand
+    if demand is None:
+        read_demand, live_demand, kill_demand = None, None, None
+    else:
+        read_demand, live_demand, kill_demand = demand
     dead_fallthrough, dead_break, dead_continue = edges
     return _dead_from(
         stmts, idx,
@@ -868,6 +957,7 @@ def _dead(stmts: list[Stmt], idx: int, res, edges, demand) -> bool:
         writes=lambda it: _resource_writes(it, res),
         cond_reads=lambda c: _resource_cond_reads(c, res),
         call_reads=lambda tgt: _resource_demanded(tgt, res, read_demand),
+        call_kills=lambda tgt: _resource_killed(tgt, res, kill_demand),
         tail_reads=lambda tgt: _resource_demanded(tgt, res, live_demand),
         dead_fallthrough=dead_fallthrough[res],
         dead_break=dead_break[res],
