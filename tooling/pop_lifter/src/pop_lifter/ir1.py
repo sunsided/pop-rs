@@ -921,8 +921,9 @@ def format_item(item: Item) -> str:
         if isinstance(item.target, Reg):
             tgt = str(item.target)
         elif isinstance(item.target, LocalRef):
-            loc = item.target.label if item.target.offset == 0 \
-                else f"{item.target.label}+{item.target.offset}"
+            loc = item.target.label
+            if item.target.offset != 0:
+                loc = f"{loc}+{item.target.offset}"
             tgt = f"patch *{loc}"
         else:
             tgt = f"*{_fmt_abs(item.target)}"

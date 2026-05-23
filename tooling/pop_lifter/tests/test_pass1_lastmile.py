@@ -11,7 +11,6 @@ from pop_lifter.ir1 import (
     IncTarget,
     IndirectY,
     LocalRef,
-    Reg,
     SbcIndirect,
     SourceRef,
 )
