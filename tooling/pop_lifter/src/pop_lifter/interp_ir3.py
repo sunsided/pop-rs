@@ -288,7 +288,7 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
         if not trace.value_stack:
             raise InterpError(
                 f"RestoreTemp (tmp{stmt.slot}) on empty value stack at "
-                f"{stmt.src.short()} — unbalanced save/restore?"
+                f"{stmt.src.short()} ({stmt.src.raw!r}) — unbalanced save/restore?"
             )
         trace.a = trace.value_stack.pop()
         _set_zn(trace, trace.a)
