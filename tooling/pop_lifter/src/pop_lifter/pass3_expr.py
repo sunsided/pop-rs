@@ -415,10 +415,16 @@ def _has_unstructured(block: Block) -> bool:
     return False
 
 
-def _stmt_demands(stmt: Stmt, reg, dm: dict):
+def _stmt_demands(stmt: Stmt, reg, *, tail_dm, call_dm, ret):
     """Tri-state for a single statement: True = some path reads `reg`
-    before writing it; False = every path writes `reg` before reading
-    it (a kill); None = neither (the caller keeps scanning)."""
+    (or, when `ret` is True, lets it escape via a return) before writing
+    it; False = every path writes `reg` before reading it (a kill);
+    None = neither (the caller keeps scanning).
+
+    `call_dm` is the *read*-demand map consulted for a non-tail `Call`
+    (the callee returns, so only an actual read of `reg` matters).
+    `tail_dm` is the map consulted for a `TailCall` (its eventual return
+    escapes to *our* caller, so `tail_dm` is the escape-aware map)."""
     if isinstance(stmt, RawStmt):
         if _reads_reg(stmt.item, reg):
             return True
@@ -428,35 +434,47 @@ def _stmt_demands(stmt: Stmt, reg, dm: dict):
     if isinstance(stmt, Assign):
         return None
     if isinstance(stmt, ReturnStmt):
-        return False  # path ends without reading reg from the entry state
+        # An unwritten reg escapes to the caller here. For the
+        # escape-aware (`live`) map that's a use; for the read-only map
+        # it isn't.
+        return True if ret else False
     if isinstance(stmt, (BreakStmt, ContinueStmt)):
-        return False  # exits / restarts the loop; no read here
+        return False  # stays within the routine; no read / escape here
     if isinstance(stmt, (GotoStmt, LabelStmt)):
-        return True   # unstructured — conservatively a read
+        return True   # unstructured — conservatively a use
     if isinstance(stmt, CallStmt):
-        # If the callee reads reg before writing it, reg is demanded.
-        # Otherwise the call is transparent for demand (it may clobber
-        # reg, but we don't track that — keep scanning).
-        return True if reg in dm.get(stmt.target, _REG_SET) else None
+        # The callee returns to us; only a genuine read matters. If it
+        # doesn't read reg the call is transparent (it may clobber reg,
+        # which we don't track — keep scanning).
+        return True if reg in call_dm.get(stmt.target, _REG_SET) else None
     if isinstance(stmt, TailCallStmt):
-        # Tail call ends the path: demanded iff the target reads reg.
-        return reg in dm.get(stmt.target, _REG_SET)
+        # The path ends here; reg is used iff it's read *or escapes*
+        # through the target — that's the escape-aware map.
+        return reg in tail_dm.get(stmt.target, _REG_SET)
     if isinstance(stmt, IfStmt):
         if _resource_cond_reads(stmt.cond, reg):
             return True
-        return _branches_demand(stmt.then_block, stmt.else_block, reg, dm)
+        return _branches_demand(
+            stmt.then_block, stmt.else_block, reg,
+            tail_dm=tail_dm, call_dm=call_dm, ret=ret,
+        )
     if isinstance(stmt, RawIfStmt):
         # The cond reads a raw flag, not a register.
-        return _branches_demand(stmt.then_block, stmt.else_block, reg, dm)
+        return _branches_demand(
+            stmt.then_block, stmt.else_block, reg,
+            tail_dm=tail_dm, call_dm=call_dm, ret=ret,
+        )
     if isinstance(stmt, LoopStmt):
         # The body runs at least once; its demand from the top decides.
-        return _seq_demands(stmt.body.stmts, 0, reg, dm)
+        return _seq_demands(stmt.body.stmts, 0, reg, tail_dm=tail_dm,
+                            call_dm=call_dm, ret=ret)
     return None
 
 
-def _branches_demand(then_block: Block, else_block, reg, dm):
-    t = _seq_demands(then_block.stmts, 0, reg, dm)
-    e = _seq_demands(else_block.stmts, 0, reg, dm) if else_block is not None else None
+def _branches_demand(then_block: Block, else_block, reg, *, tail_dm, call_dm, ret):
+    kw = dict(tail_dm=tail_dm, call_dm=call_dm, ret=ret)
+    t = _seq_demands(then_block.stmts, 0, reg, **kw)
+    e = _seq_demands(else_block.stmts, 0, reg, **kw) if else_block is not None else None
     if t is True or e is True:
         return True
     # A kill only if *both* branches kill reg. With no `else`, the false
@@ -466,22 +484,24 @@ def _branches_demand(then_block: Block, else_block, reg, dm):
     return None
 
 
-def _seq_demands(stmts: list[Stmt], idx: int, reg, dm: dict):
+def _seq_demands(stmts: list[Stmt], idx: int, reg, *, tail_dm, call_dm, ret):
     """Tri-state demand for `stmts[idx:]` — the first statement that
-    determines `reg` (reads → True, writes → False); None if none do."""
+    determines `reg` (used → True, killed → False); None if none do."""
     for k in range(idx, len(stmts)):
-        r = _stmt_demands(stmts[k], reg, dm)
+        r = _stmt_demands(stmts[k], reg, tail_dm=tail_dm, call_dm=call_dm, ret=ret)
         if r is not None:
             return r
     return None
 
 
-def _compute_register_demand(routines) -> dict:
-    """Least fixed-point of each routine's register demand — the set of
-    registers it may read before writing, so a caller must treat them as
-    live. Keyed by every name a routine answers to (canonical name +
-    entry aliases). Targets not in this set (cross-module / unknown)
-    default to all registers when looked up, which is conservative."""
+def _demand_fixpoint(routines, *, ret, call_dm) -> dict:
+    """Fixed-point of each routine's register demand. `ret` says whether
+    a register escaping via a `Return` counts as a use (the escape-aware
+    `live` map) or not (the `read` map). `call_dm` is the read-demand map
+    used for non-tail calls; pass None to consult the map being computed
+    (only correct when `ret` is False, i.e. computing the read map).
+    Keyed by every name a routine answers to (canonical + aliases);
+    unknown / cross-module targets default to all registers."""
     alias_groups = [
         (r, (r.name, *getattr(r, "entry_aliases", []))) for r in routines
     ]
@@ -497,9 +517,11 @@ def _compute_register_demand(routines) -> dict:
             if unstructured[r.name]:
                 new = _REG_SET
             else:
+                cdm = dm if call_dm is None else call_dm
                 new = frozenset(
                     reg for reg in _REGS
-                    if _seq_demands(r.body.stmts, 0, reg, dm) is True
+                    if _seq_demands(r.body.stmts, 0, reg,
+                                    tail_dm=dm, call_dm=cdm, ret=ret) is True
                 )
             for n in ns:
                 if dm[n] != new:
@@ -508,10 +530,30 @@ def _compute_register_demand(routines) -> dict:
     return dm
 
 
+def _compute_register_demand(routines):
+    """Return `(read_demand, live_demand)`.
+
+    * `read_demand[R]` — registers R may *read* before writing them.
+      Used at a non-tail `Call`: the callee returns, so only a genuine
+      read can observe the caller's register.
+    * `live_demand[R]` — registers live at R's entry: read before
+      written, *or* still unwritten when R returns (escaping to R's
+      caller, who may read them). Used at a `TailCall`, whose return
+      unwinds to *our* caller — so a target that merely preserves the
+      register keeps it live, and the copy must not be folded.
+
+    `not (reg in live_demand[R])` is exactly "R must clobber reg before
+    returning", the soundness condition for dropping a `sta DST ; jmp R`.
+    """
+    read_demand = _demand_fixpoint(routines, ret=False, call_dm=None)
+    live_demand = _demand_fixpoint(routines, ret=True, call_dm=read_demand)
+    return read_demand, live_demand
+
+
 def _resource_demanded(target: str, res, demand) -> bool:
-    """Does calling / tail-calling `target` read `res`? Carry isn't
-    demand-analysed (pass 2 owns flag liveness), so it's always assumed
-    read; an absent `demand` map or unknown target is conservative."""
+    """Does the given demand map mark `res` as used by `target`? Carry
+    isn't demand-analysed (pass 2 owns flag liveness), so it's always
+    assumed used; an absent map or unknown target is conservative."""
     if res is _CARRY:
         return True
     if demand is None:
@@ -529,7 +571,8 @@ def _dead_from(
     reads,
     writes,
     cond_reads,
-    demand_reads,
+    call_reads,
+    tail_reads,
     dead_fallthrough: bool,
     dead_break: bool,
     dead_continue: bool,
@@ -540,10 +583,11 @@ def _dead_from(
 
     `reads` / `writes` classify a `RawStmt`'s atom; `cond_reads` says
     whether an `IfStmt`'s `Compare` consumes the resource;
-    `demand_reads(target)` says whether calling / tail-calling `target`
-    reads it (from the interprocedural demand analysis). The scan is
-    path-sensitive: each way out of the current statement list carries
-    its own deadness:
+    `call_reads(target)` says whether a non-tail call to `target`
+    reads it, and `tail_reads(target)` whether the resource is still
+    live when tail-calling `target` (read by it *or* escaping through
+    its return). The scan is path-sensitive: each way out of the
+    current statement list carries its own deadness:
 
     * `dead_fallthrough` — control runs off the end of this list.
     * `dead_break` — a `break` exits the innermost enclosing loop.
@@ -556,8 +600,9 @@ def _dead_from(
     * `Return` → live (a caller may read whatever the routine returns).
     * `Call` whose target reads the resource → live; otherwise step
       past it (the call doesn't observe the dropped value).
-    * `TailCall` whose target reads the resource → live; otherwise the
-      path ends without a read → dead.
+    * `TailCall` → live unless the target *must clobber* the resource
+      before returning (`not tail_reads`); a target that merely
+      preserves it lets the value escape to our caller.
     * `RawIfStmt` → live: it reads raw 6502 flags, which the dropped
       op may have set (Z/N for a load, plus carry for `adc`/`sbc`).
     * `IfStmt` whose condition reads the resource → live; otherwise
@@ -587,12 +632,12 @@ def _dead_from(
         if isinstance(s, ReturnStmt):
             return False
         if isinstance(s, CallStmt):
-            if demand_reads(s.target):
+            if call_reads(s.target):
                 return False
             i += 1  # call doesn't read the resource — keep scanning
             continue
         if isinstance(s, TailCallStmt):
-            return not demand_reads(s.target)
+            return not tail_reads(s.target)
         if isinstance(s, BreakStmt):
             return dead_break
         if isinstance(s, ContinueStmt):
@@ -605,7 +650,7 @@ def _dead_from(
             # Deadness of everything after this `if` (the false edge,
             # and the then-block's own fall-through both land here).
             kw = dict(reads=reads, writes=writes, cond_reads=cond_reads,
-                      demand_reads=demand_reads,
+                      call_reads=call_reads, tail_reads=tail_reads,
                       dead_break=dead_break, dead_continue=dead_continue)
             rest = _dead_from(stmts, i + 1, dead_fallthrough=dead_fallthrough, **kw)
             then_dead = _dead_from(
@@ -632,16 +677,19 @@ _Edges = tuple  # (dead_fallthrough, dead_break, dead_continue) of dicts
 
 def _dead(stmts: list[Stmt], idx: int, res, edges, demand) -> bool:
     """Is `res` dead from `stmts[idx:]` onward, given this block's edge
-    deadness `edges` and the module's register `demand` map? Binds the
-    resource's read/write/cond/demand predicates and looks up its edge
-    values."""
+    deadness `edges` and the module's `demand` = `(read, live)` maps?
+    Binds the resource's read/write/cond/demand predicates and looks up
+    its edge values. A non-tail `Call` consults the read map; a
+    `TailCall` consults the escape-aware `live` map."""
+    read_demand, live_demand = (None, None) if demand is None else demand
     dead_fallthrough, dead_break, dead_continue = edges
     return _dead_from(
         stmts, idx,
         reads=lambda it: _resource_reads(it, res),
         writes=lambda it: _resource_writes(it, res),
         cond_reads=lambda c: _resource_cond_reads(c, res),
-        demand_reads=lambda tgt: _resource_demanded(tgt, res, demand),
+        call_reads=lambda tgt: _resource_demanded(tgt, res, read_demand),
+        tail_reads=lambda tgt: _resource_demanded(tgt, res, live_demand),
         dead_fallthrough=dead_fallthrough[res],
         dead_break=dead_break[res],
         dead_continue=dead_continue[res],

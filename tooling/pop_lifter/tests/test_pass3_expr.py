@@ -588,6 +588,44 @@ def test_demand_tailcall_to_a_reader_blocks_fold():
     assert not any(isinstance(s, Assign) for s in folded.find("caller").body.stmts)
 
 
+def test_demand_tailcall_to_preserving_routine_blocks_fold():
+    """A target that *preserves* A (never touches it) and returns lets
+    the value escape to the original caller — so `a = #0x42 ; *DST = a ;
+    jmp target` must NOT fold even though `target` doesn't *read* A.
+    "Doesn't read before write" is not "must clobber before return", so
+    the escape-aware `live` demand keeps A live here. (Reviewer #22.)"""
+    caller = _routine("caller", [
+        _ldimm(Reg.A, 0x42), _sta(Reg.A, "DST", 0x300),
+        TailCallStmt(target="target", src=SRC),
+    ])
+    target = _routine("target", [
+        _ldimm(Reg.X, 0x01), ReturnStmt(src=SRC),  # preserves A entirely
+    ])
+    mod = ModuleIR3(name="M", file="syn", routines=[caller, target])
+    folded = fold_module(mod)
+    # The `lda #0x42` survives — A escapes through target's return.
+    assert not any(isinstance(s, Assign) for s in folded.find("caller").body.stmts)
+
+
+def test_demand_tailcall_to_clobbering_routine_folds():
+    """The dual: a target whose first act on A is a *write* (here it
+    loads A) must-clobbers A before any return, so the value is provably
+    dead — `a = #0x42 ; *DST = a ; jmp target` folds. This is the
+    SkelProg/GuardProg shape, with the soundness condition made precise."""
+    caller = _routine("caller", [
+        _ldimm(Reg.A, 0x42), _sta(Reg.A, "DST", 0x300),
+        TailCallStmt(target="target", src=SRC),
+    ])
+    target = _routine("target", [
+        _R(LoadAbs(reg=Reg.A, source=Abs(name="OTHER", addr=0x301), src=SRC)),
+        _sta(Reg.A, "MARK", 0x302), ReturnStmt(src=SRC),
+    ])
+    mod = ModuleIR3(name="M", file="syn", routines=[caller, target])
+    folded = fold_module(mod)
+    cbody = folded.find("caller").body.stmts
+    assert isinstance(cbody[0], Assign) and cbody[0].source.value == 0x42
+
+
 def test_demand_unknown_target_is_conservative():
     """A tail call to a target not in the module (cross-module / unknown)
     defaults to demanding every register — no fold."""
