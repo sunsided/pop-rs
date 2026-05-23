@@ -1,0 +1,42 @@
+; module HIRES from 01 POP Source/Source/HIRES.S
+
+fn FASTBLACK {
+  a = *color@0x0006        ; HIRES.S:2006
+  opvar smCOLOR = a            ; HIRES.S:2007
+  a = *PAGE@0x0000        ; HIRES.S:2009
+  opvar smPAGE = a            ; HIRES.S:2010
+  a = *XCO@0x0001        ; HIRES.S:2012
+  opvar smXCO = a            ; HIRES.S:2013
+  a = *width@0x0005        ; HIRES.S:2015
+  c = 1                            ; HIRES.S:2016
+  a = a - #0x01 - (1 - c)        ; HIRES.S:2017
+  opvar smSTART = a            ; HIRES.S:2018
+  a = *YCO@0x0002        ; HIRES.S:2020
+  x = a                            ; HIRES.S:2021
+  a = a - *height@0x0004 - (1 - c) ; HIRES.S:2022
+  opvar smTOP = a            ; HIRES.S:2023
+:outloop:
+  a = *(YLO@0xe000 + x)   ; HIRES.S:2026
+  c = 0                            ; HIRES.S:2027
+:smXCO:
+  a = a + #{smXCO} + c              ; HIRES.S:2028
+  patch *:smod+1 = a            ; HIRES.S:2029
+  a = *(YHI@0xe0c0 + x)   ; HIRES.S:2031
+:smPAGE:
+  a = a + #{smPAGE} + c              ; HIRES.S:2032
+  patch *:smod+2 = a            ; HIRES.S:2033
+:smCOLOR:
+  a = #{smCOLOR}                  ; HIRES.S:2035
+:smSTART:
+  y = #{smSTART}                  ; HIRES.S:2037
+:inloop:
+:smod:
+  *($2000@0x2000 + y) = a   ; HIRES.S:2040
+  y -= 1                         ; HIRES.S:2041
+  if pl goto :inloop       ; HIRES.S:2042
+  x -= 1                         ; HIRES.S:2044
+:smTOP:
+  cmp x, #{smTOP}              ; HIRES.S:2045
+  if ne goto :outloop       ; HIRES.S:2046
+  return                           ; HIRES.S:2048
+}

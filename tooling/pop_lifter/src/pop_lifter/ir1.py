@@ -70,10 +70,18 @@ class SourceRef:
 class Imm:
     """`#expr` — an immediate byte. Stored as a signed Python int so the
     Merlin `#-1` form survives without an extra masking step; the
-    interpreter masks to 8 bits at the point of use."""
+    interpreter masks to 8 bits at the point of use.
+
+    `opvar` names a self-modifying-code *operand variable*: when set,
+    this immediate is the patchable operand of an instruction whose byte
+    gets rewritten at runtime (`sta :smXCO+1`). The interpreter then
+    reads the variable's current value (`Trace.operand_vars[opvar]`),
+    falling back to `value` before any patch. Pass 3's SMC recognition
+    fills this in; it's `None` for ordinary immediates."""
 
     value: int
     text: str  # original operand text, e.g. "#-1" or "#$ff"
+    opvar: str | None = None
 
 
 @dataclass(frozen=True)
@@ -159,6 +167,23 @@ class StoreLocal:
     reg: Reg
     target_label: str
     offset: int
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class StoreOpVar:
+    """`opvar NAME = reg` — a recognised self-modifying-code immediate
+    patch. Pass 3's SMC recognition rewrites a `StoreLocal` whose
+    `:label+1` patches the immediate byte of the instruction at
+    `:label` into this form, naming the operand variable after the
+    label. The matching immediate read carries `Imm.opvar = NAME`.
+
+    The interpreter writes `Trace.operand_vars[name]`, which the patched
+    immediate then reads — so unlike the opaque `StoreLocal` /
+    `code_patches` model, the patch actually takes effect."""
+
+    reg: Reg
+    name: str
     src: SourceRef
 
 
@@ -765,7 +790,7 @@ Instr = (
     | Pha | Pla
     | CmpIndexed | AdcIndexed | SbcIndexed
     | Rol | Ror | ShiftMem
-    | StoreLocal | SbcIndirect
+    | StoreLocal | StoreOpVar | SbcIndirect
     | Nop | FlagOp
     | Unsupported
 )
@@ -847,6 +872,10 @@ def _fmt_imm(imm: Imm) -> str:
     leading/trailing whitespace from operands, so the call is a
     no-op in normal CLI usage.
     """
+    if imm.opvar is not None:
+        # Self-modifying-code operand variable — render the mutable name
+        # rather than the placeholder byte the source happened to assemble.
+        return f"#{{{imm.opvar}}}"
     if _NUMERIC_IMM_RE.match(imm.text or ""):
         return f"#{imm.value & 0xff:#04x}"
     return imm.text.strip()
@@ -879,6 +908,8 @@ def format_item(item: Item) -> str:
     if isinstance(item, StoreLocal):
         loc = item.target_label if item.offset == 0 else f"{item.target_label}+{item.offset}"
         return f"  patch *{loc} = {item.reg}            ; {item.src.short()}"
+    if isinstance(item, StoreOpVar):
+        return f"  opvar {item.name} = {item.reg}            ; {item.src.short()}"
     if isinstance(item, Asl):
         return f"  a = a << 1                       ; {item.src.short()}"
     if isinstance(item, Clc):

@@ -85,6 +85,7 @@ from .ir1 import (
     StoreIndexed,
     StoreIndirect,
     StoreLocal,
+    StoreOpVar,
     Transfer,
     Unsupported,
 )
@@ -142,6 +143,13 @@ class Trace:
     # operand is future work — but the writes are observable so
     # tests can assert the patch happened. See `ir1.StoreLocal`.
     code_patches: dict[tuple[str, int], int] = field(default_factory=dict)
+    # Self-modifying-code *operand variables* (the faithful model). A
+    # recognised immediate patch (`StoreOpVar`) writes here keyed by
+    # name, and an `Imm` carrying that `opvar` reads it back via
+    # `_imm_value` — so the patched instruction actually sees the
+    # rewritten operand. Distinct from `code_patches`, which stays the
+    # opaque sink for unrecognised `StoreLocal` patches.
+    operand_vars: dict[str, int] = field(default_factory=dict)
 
     def diff_against(self, initial: bytes) -> dict[int, int]:
         """Return only the addresses whose byte differs from `initial`.
@@ -195,6 +203,16 @@ def _set_zn(trace: Trace, value: int) -> None:
     trace.n = (v >> 7) & 1
 
 
+def _imm_value(imm, trace: Trace) -> int:
+    """The 8-bit value of an immediate operand. For a self-modifying-code
+    operand variable (`imm.opvar` set) read the patched value from
+    `trace.operand_vars`, falling back to the assembled `imm.value`
+    before any patch; otherwise just the literal."""
+    if imm.opvar is not None:
+        return trace.operand_vars.get(imm.opvar, imm.value) & 0xff
+    return imm.value & 0xff
+
+
 def _eval_compare(cond: Compare, trace: Trace, ram: bytearray) -> bool:
     """Evaluate a structured Compare against the current register/RAM
     state. The IR2 form is self-contained — no flag inspection needed."""
@@ -210,7 +228,7 @@ def _eval_compare(cond: Compare, trace: Trace, ram: bytearray) -> bool:
             f"Compare op {cond.op!r} requires a rhs but none was supplied"
         )
     if isinstance(cond.rhs, Imm):
-        rhs = cond.rhs.value & 0xff
+        rhs = _imm_value(cond.rhs, trace)
     elif isinstance(cond.rhs, IndexedAbs):
         # Indexed-absolute Compare RHS: validate base then add the
         # 8-bit index. Same shape as the load/store/cmp dispatch in
@@ -338,7 +356,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
     if isinstance(item, Label):
         return True
     if isinstance(item, LoadImm):
-        value = item.imm.value & 0xff
+        value = _imm_value(item.imm, trace)
         if item.reg is Reg.A:
             trace.a = value
         elif item.reg is Reg.X:
@@ -382,6 +400,12 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
         trace.code_patches[(item.target_label, item.offset)] = value
         return True
+    if isinstance(item, StoreOpVar):
+        # Recognised SMC immediate patch — the faithful model: write the
+        # operand variable, which the patched `Imm` reads via `_imm_value`.
+        value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
+        trace.operand_vars[item.name] = value
+        return True
     if isinstance(item, StoreIndexed):
         value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
         idx_val = trace.x if item.index is Reg.X else trace.y
@@ -415,7 +439,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
             raise InterpError(f"unknown FlagOp flag {item.flag!r}")
         return True
     if isinstance(item, AdcImm):
-        total = (trace.a & 0xff) + (item.imm.value & 0xff) + trace.c
+        total = (trace.a & 0xff) + _imm_value(item.imm, trace) + trace.c
         trace.a = total & 0xff
         trace.c = 1 if total > 0xff else 0
         _set_zn(trace, trace.a)
@@ -432,7 +456,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         # previous SBC. Going out, C=1 means "no borrow occurred"
         # (i.e. A >= operand + (1-C_in)).
         operand = (
-            item.imm.value & 0xff if isinstance(item, SbcImm)
+            _imm_value(item.imm, trace) if isinstance(item, SbcImm)
             else ram[_real_addr(item.source.addr, item.src)]
         )
         total = (trace.a & 0xff) + ((operand ^ 0xff) & 0xff) + trace.c
@@ -504,7 +528,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         return True
     if isinstance(item, Bit):
         operand = (
-            item.source.value & 0xff if isinstance(item.source, Imm)
+            _imm_value(item.source, trace) if isinstance(item.source, Imm)
             else ram[_real_addr(item.source.addr, item.src)]
         )
         # Z reflects (A AND operand). N and V come from bits 7 and 6
@@ -532,7 +556,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         return True
     if isinstance(item, (CmpImm, CmpAbs)):
         reg_val = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
-        rhs = item.imm.value & 0xff if isinstance(item, CmpImm) \
+        rhs = _imm_value(item.imm, trace) if isinstance(item, CmpImm) \
             else ram[_real_addr(item.source.addr, item.src)]
         diff = (reg_val - rhs) & 0xff
         trace.c = 1 if reg_val >= rhs else 0
@@ -590,7 +614,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         return True
     if isinstance(item, Bitwise):
         if isinstance(item.source, Imm):
-            rhs = item.source.value & 0xff
+            rhs = _imm_value(item.source, trace)
         elif isinstance(item.source, IndirectY):
             rhs = ram[_resolve_indirect_y(item.source, trace, ram)]
         elif isinstance(item.source, IndexedAbs):
@@ -730,7 +754,7 @@ def run(
             continue
 
         if isinstance(item, LoadImm):
-            value = item.imm.value & 0xff
+            value = _imm_value(item.imm, trace)
             if item.reg is Reg.A:
                 trace.a = value
             elif item.reg is Reg.X:
@@ -812,7 +836,7 @@ def run(
             continue
 
         if isinstance(item, AdcImm):
-            total = (trace.a & 0xff) + (item.imm.value & 0xff) + trace.c
+            total = (trace.a & 0xff) + _imm_value(item.imm, trace) + trace.c
             trace.a = total & 0xff
             trace.c = 1 if total > 0xff else 0
             _set_zn(trace, trace.a)
@@ -830,7 +854,7 @@ def run(
         if isinstance(item, (CmpImm, CmpAbs)):
             reg_val = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
             if isinstance(item, CmpImm):
-                rhs = item.imm.value & 0xff
+                rhs = _imm_value(item.imm, trace)
             else:
                 rhs = ram[_real_addr(item.source.addr, item.src)]
             # 6502 CMP: compute reg - rhs without storing. C = no-borrow

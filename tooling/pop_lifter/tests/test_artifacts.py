@@ -26,6 +26,7 @@ IR_PILOT_CHGSHADPOSN_IR3 = REPO_ROOT / "ir" / "pilot" / "chgshadposn.ir3"
 IR_PILOT_CHGSHADPOSN_PASS3 = REPO_ROOT / "ir" / "pilot" / "chgshadposn.pass3.ir3"
 IR_PILOT_CUP_PASS3 = REPO_ROOT / "ir" / "pilot" / "cup.pass3.ir3"
 IR_PILOT_CMPSPACE_MATCH = REPO_ROOT / "ir" / "pilot" / "cmpspace.match.ir3"
+IR_PILOT_FASTBLACK_SMC = REPO_ROOT / "ir" / "pilot" / "fastblack.smc.ir1"
 IR_RAW = REPO_ROOT / "ir" / "raw"
 
 PILOT_ENTRIES = [
@@ -383,6 +384,42 @@ def test_pass3_cmpspace_match_artifact_matches(source_dir):
         f"regenerate with:\n"
         f"  pop-lifter match CTRLSUBS.S --entry CMPSPACE "
         f"--out {IR_PILOT_CMPSPACE_MATCH.relative_to(REPO_ROOT)}"
+    )
+
+
+def _regen_fastblack_smc(source_dir: Path) -> str:
+    from pop_lifter.pass3_smc import recognize_smc
+    ast = parse_files(
+        [
+            source_dir / "EQ.S",
+            source_dir / "GAMEEQ.S",
+            source_dir / "HIRES.S",
+        ],
+        search_paths=[source_dir],
+    )
+    hires = next(f for f in ast.files if Path(f.path).name == "HIRES.S")
+    module = recognize_smc(lift_file(hires, ast.symbols(), ["FASTBLACK"]).module)
+    return ir1_mod.format_module(module)
+
+
+def test_pass3_fastblack_smc_artifact_matches(source_dir):
+    """The FASTBLACK pass-3 pilot pins SMC operand-variable recognition:
+    five immediate patches (`opvar smCOLOR/smPAGE/smXCO/smSTART/smTOP`)
+    are connected to their `#{...}` immediate reads, while the 16-bit
+    `:smod` address patch stays an opaque `patch *:smod+1/+2`."""
+    if not IR_PILOT_FASTBLACK_SMC.exists():
+        raise AssertionError(
+            f"missing artifact {IR_PILOT_FASTBLACK_SMC}. regenerate with:\n"
+            f"  pop-lifter smc HIRES.S --entry FASTBLACK "
+            f"--out {IR_PILOT_FASTBLACK_SMC.relative_to(REPO_ROOT)}"
+        )
+    expected = IR_PILOT_FASTBLACK_SMC.read_text(encoding="utf-8")
+    actual = _regen_fastblack_smc(source_dir)
+    assert actual == expected, (
+        f"{IR_PILOT_FASTBLACK_SMC.relative_to(REPO_ROOT)} is stale. "
+        f"regenerate with:\n"
+        f"  pop-lifter smc HIRES.S --entry FASTBLACK "
+        f"--out {IR_PILOT_FASTBLACK_SMC.relative_to(REPO_ROOT)}"
     )
 
 
