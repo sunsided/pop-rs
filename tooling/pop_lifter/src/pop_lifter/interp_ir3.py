@@ -29,10 +29,20 @@ from .interp_ir1 import (
     _real_addr,
     _resolve,
     _resolve_indirect_y,
+    _set_zn,
     exec_atom,
 )
 from .interp_ir1 import run as ir1_run
-from .ir1 import Abs, Imm, IndexedAbs, IndirectY, ModuleIR1, Reg, Routine as IR1Routine
+from .ir1 import (
+    Abs,
+    DecTarget,
+    Imm,
+    IndexedAbs,
+    IndirectY,
+    ModuleIR1,
+    Reg,
+    Routine as IR1Routine,
+)
 from .ir3 import (
     Assign,
     BinExpr,
@@ -40,10 +50,11 @@ from .ir3 import (
     BreakStmt,
     CallStmt,
     ContinueStmt,
+    DoWhileStmt,
+    ForStmt,
     GotoStmt,
     IfStmt,
     LabelStmt,
-    DoWhileStmt,
     LoopStmt,
     MatchStmt,
     ModuleIR3,
@@ -283,6 +294,35 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
         else:
             raise InterpError(
                 "DoWhileStmt exceeded 1,000,000 iterations — exit guard bug?"
+            )
+        return
+    if isinstance(stmt, ForStmt):
+        # Down-counter `for var in (0..=init).rev()`. Replay the init
+        # LoadImm and the `dey`/`dex` step (subsumed into the node) so
+        # register + flag state matches the original do-while exactly.
+        init = stmt.init.value & 0xff
+        if stmt.var is Reg.A:
+            trace.a = init
+        elif stmt.var is Reg.X:
+            trace.x = init
+        else:
+            trace.y = init
+        _set_zn(trace, init)
+        for _ in range(1_000_000):
+            try:
+                _exec_block(stmt.body, modules, aliases, trace)
+            except _ContinueSignal:
+                # Matches the do-while back-edge: restart body, no step.
+                continue
+            except _BreakSignal:
+                break
+            exec_atom(DecTarget(target=stmt.var, src=stmt.src), trace, trace.ram)
+            cur = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[stmt.var]
+            if cur & 0x80:  # var >= 0 is now false — stop
+                break
+        else:
+            raise InterpError(
+                "ForStmt exceeded 1,000,000 iterations — counter bug?"
             )
         return
     if isinstance(stmt, BreakStmt):

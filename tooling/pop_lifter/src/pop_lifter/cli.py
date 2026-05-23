@@ -26,7 +26,7 @@ from .pass1_lift import discover_entries, lift_file
 from .pass2_reloop import is_unstructured, reloop_module
 from .pass2_struct import elision_stats, fusion_stats, structure_module
 from .pass3_expr import fold_module, fold_stats
-from .pass3_loops import dowhile_stats, recover_loops
+from .pass3_loops import dowhile_stats, for_stats, recover_loops
 from .pass3_match import match_stats, recognize_module
 from .pass3_smc import recognize_smc, smc_store_count, smc_var_count
 
@@ -535,10 +535,12 @@ def _cmd_match(args: argparse.Namespace) -> int:
 
 
 def _cmd_loops(args: argparse.Namespace) -> int:
-    """Run pass 1 + 2 + reloop + fold, then recover bottom-tested loops:
+    """Run pass 1 + 2 + reloop + fold, then recover loops: a bottom-test
     `loop { body ; if exit { break } }` becomes `do { body } while
-    !exit`. Writes the IR3 dump to `--out` (or stdout); the summary
-    reports how many do-while loops were recovered."""
+    !exit`, and a down-counter (`y = #N ; do { … ; y -= 1 } while y >=
+    0`) is promoted to `for y in (0..=N).rev() { … }`. Writes the IR3
+    dump to `--out` (or stdout); the summary reports how many `for` and
+    `do-while` loops were recovered."""
     src_dir = _resolve_source_dir(args)
     if src_dir is None:
         return 2
@@ -561,7 +563,8 @@ def _cmd_loops(args: argparse.Namespace) -> int:
 
     dumps: list[str] = []
     total_routines = 0
-    total_loops = 0
+    total_dowhile = 0
+    total_for = 0
     handled: set[str] = set()
     for file_path in file_paths:
         file_ast = next(
@@ -581,7 +584,8 @@ def _cmd_loops(args: argparse.Namespace) -> int:
         ir3_module = reloop_module(structure_module(lift_file(file_ast, symbols, local_entries).module))
         recovered = recover_loops(fold_module(ir3_module))
         total_routines += len(recovered.routines)
-        total_loops += dowhile_stats(recovered)
+        total_dowhile += dowhile_stats(recovered)
+        total_for += for_stats(recovered)
         dumps.append(ir3_mod.format_module(recovered))
         handled.update(local_entries)
 
@@ -600,7 +604,7 @@ def _cmd_loops(args: argparse.Namespace) -> int:
         out_path.write_text(text, encoding="utf-8")
         print(
             f"wrote {out_path} ({total_routines} routines, "
-            f"{total_loops} do-while loops recovered)"
+            f"{total_for} for loops + {total_dowhile} do-while loops recovered)"
         )
     else:
         sys.stdout.write(text)
@@ -996,7 +1000,8 @@ def main(argv: list[str] | None = None) -> int:
     p_loops = sub.add_parser(
         "loops",
         help="Pass 3: run pass 1 + 2 + reloop + fold, then recover "
-             "bottom-tested loops as `do { … } while` shapes.",
+             "bottom-tested loops as `do { … } while` shapes and "
+             "down-counters as `for` loops.",
     )
     p_loops.add_argument(
         "file", nargs="+",

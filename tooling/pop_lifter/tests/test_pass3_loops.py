@@ -22,12 +22,15 @@ from pop_lifter.ir1 import (
     Reg,
     SourceRef,
     StoreIndexed,
+    Unsupported,
 )
 from pop_lifter.ir3 import (
     Block,
     BreakStmt,
+    CallStmt,
     ContinueStmt,
     DoWhileStmt,
+    ForStmt,
     IfStmt,
     LoopStmt,
     ModuleIR3,
@@ -36,7 +39,12 @@ from pop_lifter.ir3 import (
     ReturnStmt,
     RoutineIR3,
 )
-from pop_lifter.pass3_loops import dowhile_stats, recover_loops, recover_routine
+from pop_lifter.pass3_loops import (
+    dowhile_stats,
+    for_stats,
+    recover_loops,
+    recover_routine,
+)
 
 SRC = SourceRef(file="syn", line=0, raw="")
 
@@ -53,6 +61,23 @@ def _guard(cond: Compare) -> IfStmt:
 
 def _loop(body: list) -> LoopStmt:
     return LoopStmt(body=Block.of(body), src=SRC)
+
+
+def _ldimm(reg: Reg, v: int) -> RawStmt:
+    return RawStmt(LoadImm(reg=reg, imm=Imm(value=v, text=f"#{v}"), src=SRC))
+
+
+def _dec(reg: Reg) -> RawStmt:
+    return RawStmt(DecTarget(target=reg, src=SRC))
+
+
+def _down_counter(init: int, body: list, reg: Reg = Reg.Y) -> list:
+    """`reg = #init ; loop { *body* ; reg -= 1 ; if reg < 0 break }` —
+    the dey/bpl down-counter shape recovery should promote to a for."""
+    return [
+        _ldimm(reg, init),
+        _loop([*body, _dec(reg), _guard(_cmp(reg, "<0"))]),
+    ]
 
 
 def _recover_one(stmts: list):
@@ -128,27 +153,139 @@ def test_nested_loop_recovered():
     assert any(isinstance(s, DoWhileStmt) for s in out[0].body.stmts)
 
 
+# --------------------------------------------------------------- for recovery
+
+
+def test_down_counter_becomes_for():
+    body = [RawStmt(StoreIndexed(
+        reg=Reg.Y, base=Abs(name="OUT", addr=0x300), index=Reg.Y, src=SRC))]
+    out = _recover_one(_down_counter(6, body))
+    assert len(out) == 1 and isinstance(out[0], ForStmt)
+    f = out[0]
+    assert f.var is Reg.Y and (f.init.value & 0xff) == 6
+    # The init LoadImm and the trailing dey are subsumed.
+    assert len(f.body.stmts) == 1 and isinstance(f.body.stmts[0], RawStmt)
+    assert not any(isinstance(s, BreakStmt) for s in f.body.stmts)
+
+
+def _not_a_for(out) -> bool:
+    """A non-promoted counter keeps its init `LoadImm` and recovers a
+    `DoWhileStmt` — never a `ForStmt`."""
+    return (not any(isinstance(s, ForStmt) for s in out)
+            and any(isinstance(s, DoWhileStmt) for s in out))
+
+
+def test_negative_init_not_promoted_to_for():
+    """init >= 0x80 (negative as a sign test) means the do-while body
+    might run a different number of times than a top-tested for — left
+    as a do-while."""
+    assert _not_a_for(_recover_one(_down_counter(0x80, [_ldimm(Reg.A, 0)])))
+
+
+def test_counter_rewritten_in_body_not_promoted():
+    """If the counter is also written inside the body it isn't a clean
+    induction variable — left as a do-while."""
+    body = [_ldimm(Reg.Y, 9)]  # clobbers Y mid-body
+    assert _not_a_for(_recover_one(_down_counter(6, body)))
+
+
+def test_continue_in_body_not_promoted():
+    out = _recover_one([
+        _ldimm(Reg.Y, 6),
+        _loop([ContinueStmt(src=SRC), _dec(Reg.Y), _guard(_cmp(Reg.Y, "<0"))]),
+    ])
+    assert _not_a_for(out)
+
+
+def test_up_counter_not_promoted():
+    """An up-counter (`!=` bound) is out of scope — stays a do-while."""
+    out = _recover_one([
+        _ldimm(Reg.X, 0),
+        _loop([RawStmt(IncTarget(target=Reg.X, src=SRC)),
+               _guard(_cmp(Reg.X, "==", 5))]),
+    ])
+    assert _not_a_for(out)
+
+
+def test_call_in_body_not_promoted():
+    """A `call` in the body may clobber X/Y (no proof the callee
+    preserves it), so the counter isn't provably clean — not a for."""
+    out = _recover_one(_down_counter(6, [CallStmt(target="foo", src=SRC)]))
+    assert _not_a_for(out)
+
+
+def test_unsupported_op_in_body_not_promoted():
+    """An unmodelled opcode has unknown register effects — conservatively
+    blocks promotion."""
+    body = [RawStmt(Unsupported(mnemonic="wat", operand=None, src=SRC))]
+    out = _recover_one(_down_counter(6, body))
+    assert _not_a_for(out)
+
+
+def test_symbolic_init_bound_preserved_in_dump():
+    """A symbolic counter bound (`#numslots`) renders as the name, not
+    its assembled byte, via `_fmt_imm`."""
+    from pop_lifter import ir3 as ir3_mod
+    init = Imm(value=0x06, text="#numslots")
+    body = [RawStmt(StoreIndexed(
+        reg=Reg.Y, base=Abs(name="OUT", addr=0x300), index=Reg.Y, src=SRC))]
+    out = _recover_one([
+        RawStmt(LoadImm(reg=Reg.Y, imm=init, src=SRC)),
+        _loop([*body, _dec(Reg.Y), _guard(_cmp(Reg.Y, "<0"))]),
+    ])
+    assert isinstance(out[0], ForStmt)
+    dump = "\n".join(ir3_mod._fmt_stmt(out[0], 0))
+    assert "(0..=#numslots).rev()" in dump
+
+
+def test_for_recovery_is_behaviour_preserving():
+    """The recovered `for y in (0..=3).rev()` writing `y` to `OUT[y]`
+    must produce identical RAM (and final register/flag state) to the
+    original `loop`/do-while."""
+    def routine() -> RoutineIR3:
+        body = [RawStmt(StoreIndexed(
+            reg=Reg.Y, base=Abs(name="OUT", addr=0x300), index=Reg.Y, src=SRC))]
+        return RoutineIR3(name="counter", body=Block.of([
+            *_down_counter(3, body),
+            ReturnStmt(src=SRC),
+        ]))
+
+    pre = ModuleIR3("M", "syn", [routine()])
+    post = recover_loops(pre)
+    assert for_stats(post) == 1 and dowhile_stats(post) == 0
+
+    r1 = bytearray(0x10000)
+    t1 = ir3_run([pre], "counter", ram=r1)
+    r2 = bytearray(0x10000)
+    t2 = ir3_run([post], "counter", ram=r2)
+    assert r1 == r2
+    assert list(r2[0x300:0x304]) == [0, 1, 2, 3]
+    # Final counter value (0xff after the last dey) must match too.
+    assert t1.y == t2.y == 0xff
+
+
 # --------------------------------------------------------------- behavioural
 
 
 def test_dowhile_recovery_is_behaviour_preserving():
-    """A counted loop writing `y` to `OUT[y]` for y = 3..0. Recovery to
-    `do { … } while y >= 0` must produce identical RAM."""
+    """An up-counter `x = 0 ; loop { OUT[x]=x ; x += 1 ; if x == 4 break }`
+    recovers to a `do { … } while x != 4` (not a for — up-counters are
+    out of scope) and must produce identical RAM."""
     def routine() -> RoutineIR3:
         return RoutineIR3(name="counter", body=Block.of([
-            RawStmt(LoadImm(reg=Reg.Y, imm=Imm(value=3, text="#3"), src=SRC)),
+            RawStmt(LoadImm(reg=Reg.X, imm=Imm(value=0, text="#0"), src=SRC)),
             _loop([
                 RawStmt(StoreIndexed(
-                    reg=Reg.Y, base=Abs(name="OUT", addr=0x300), index=Reg.Y, src=SRC)),
-                RawStmt(DecTarget(target=Reg.Y, src=SRC)),
-                _guard(_cmp(Reg.Y, "<0")),
+                    reg=Reg.X, base=Abs(name="OUT", addr=0x300), index=Reg.X, src=SRC)),
+                RawStmt(IncTarget(target=Reg.X, src=SRC)),
+                _guard(_cmp(Reg.X, "==", 4)),
             ]),
             ReturnStmt(src=SRC),
         ]))
 
     pre = ModuleIR3("M", "syn", [routine()])
     post = recover_loops(pre)
-    assert dowhile_stats(post) == 1
+    assert dowhile_stats(post) == 1 and for_stats(post) == 0
 
     r1 = bytearray(0x10000)
     ir3_run([pre], "counter", ram=r1)

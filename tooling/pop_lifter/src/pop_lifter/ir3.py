@@ -180,6 +180,34 @@ class DoWhileStmt:
 
 
 @dataclass(frozen=True)
+class ForStmt:
+    """`for var in (0..=init).rev() { body }` — pass-3 induction-variable
+    recovery for the 6502 down-counter idiom (`ldy #N : … : dey : bpl`).
+    Recognised from a `DoWhileStmt` of the shape
+
+        var = #init        (init, immediately before the loop)
+        do {
+            body
+            var -= 1       (the step, last in the do-while body)
+        } while var >= 0
+
+    where `init` is non-negative (bit 7 clear, so the loop runs at least
+    once and a top test matches the bottom test) and `var` is the loop
+    counter only (never otherwise written in `body`, no `continue`). The
+    counter runs `init, init-1, …, 0`; after the last iteration the step
+    leaves `var = 0xff`, exactly as the original loop did.
+
+    The init `LoadImm` and the trailing `dey`/`dex` step are subsumed
+    into this node; the interpreter replays both so register and flag
+    state are identical to the do-while it replaced."""
+
+    var: Reg
+    init: Imm
+    body: "Block"
+    src: SourceRef
+
+
+@dataclass(frozen=True)
 class BreakStmt:
     """Exit the innermost enclosing loop statement (`LoopStmt` or, after
     loop recovery, `DoWhileStmt`)."""
@@ -259,7 +287,7 @@ class MatchStmt:
 
 Stmt = (
     RawStmt | Assign | CallStmt | TailCallStmt | ReturnStmt
-    | IfStmt | RawIfStmt | LoopStmt | DoWhileStmt | MatchStmt
+    | IfStmt | RawIfStmt | LoopStmt | DoWhileStmt | ForStmt | MatchStmt
     | BreakStmt | ContinueStmt | GotoStmt | LabelStmt
 )
 
@@ -377,6 +405,15 @@ def _fmt_stmt(stmt: Stmt, indent: int) -> list[str]:
         for s in stmt.body.stmts:
             lines.extend(_fmt_stmt(s, indent + 1))
         lines.append(f"{pad}}} while {_fmt_compare(stmt.cond)}")
+        return lines
+    if isinstance(stmt, ForStmt):
+        from .ir1 import _fmt_imm
+        # Delegate to ir1's immediate formatter so a symbolic bound
+        # (`#numslots`, etc.) survives instead of its assembled byte.
+        lines = [f"{pad}for {stmt.var} in (0..={_fmt_imm(stmt.init)}).rev() {{    ; {stmt.src.short()}"]
+        for s in stmt.body.stmts:
+            lines.extend(_fmt_stmt(s, indent + 1))
+        lines.append(f"{pad}}}")
         return lines
     if isinstance(stmt, MatchStmt):
         from .ir1 import _fmt_imm
