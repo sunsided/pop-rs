@@ -63,6 +63,7 @@ from .ir1 import (
     LoadImm,
     LoadIndexed,
     LoadIndirect,
+    LocalRef,
     Lsr,
     ModuleIR1,
     Pha,
@@ -75,6 +76,7 @@ from .ir1 import (
     SbcAbs,
     SbcImm,
     SbcIndexed,
+    SbcIndirect,
     Sec,
     ShiftMem,
     StoreAbs,
@@ -422,6 +424,15 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         trace.c = 1 if total > 0xff else 0
         _set_zn(trace, trace.a)
         return True
+    if isinstance(item, SbcIndirect):
+        # `sbc (ptr),y` — same borrow arithmetic as SbcAbs/SbcImm,
+        # operand read from the post-indexed-indirect address.
+        operand = ram[_resolve_indirect_y(item.source, trace, ram)]
+        total = (trace.a & 0xff) + ((operand ^ 0xff) & 0xff) + trace.c
+        trace.a = total & 0xff
+        trace.c = 1 if total > 0xff else 0
+        _set_zn(trace, trace.a)
+        return True
     if isinstance(item, Lsr):
         old = trace.a & 0xff
         new = old >> 1
@@ -533,6 +544,16 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
                 trace.x = new
             else:
                 trace.y = new
+            _set_zn(trace, new)
+        elif isinstance(item.target, LocalRef):
+            # SMC operand bump (`inc :smod+2`). Route through the
+            # code_patches side channel like StoreLocal; the patched
+            # operand has no real address. We seed missing slots at 0
+            # so a bump-before-store reads as 0 (best-effort — a
+            # faithful SMC model is future work).
+            key = (item.target.label, item.target.offset)
+            new = (trace.code_patches.get(key, 0) + delta) & 0xff
+            trace.code_patches[key] = new
             _set_zn(trace, new)
         else:
             addr = _real_addr(item.target.addr, item.src)

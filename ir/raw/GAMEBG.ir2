@@ -147,13 +147,13 @@ fn FLIPDISKMSG {
 fn superimage {
   call setupimage                  ; GAMEBG.S:357
 superim1:
-  ??? lda #sta.$40            ; GAMEBG.S:359
+  a = #sta.$40                  ; GAMEBG.S:359
   *OPACITY@0x0006 = a            ; GAMEBG.S:360
   tail_call addmsg                ; GAMEBG.S:361
 }
 
 fn superim1 {
-  ??? lda #sta.$40            ; GAMEBG.S:359
+  a = #sta.$40                  ; GAMEBG.S:359
   *OPACITY@0x0006 = a            ; GAMEBG.S:360
   tail_call addmsg                ; GAMEBG.S:361
 }
@@ -206,7 +206,7 @@ fn DRAWSHAD {
 fn DrawNormal {
   a = #mask                  ; GAMEBG.S:433
   *OPACITY@0x0006 = a            ; GAMEBG.S:434
-  ??? lda #UseLayrsave.$80            ; GAMEBG.S:436
+  a = #UseLayrsave.$80                  ; GAMEBG.S:436
   tail_call addmid                ; GAMEBG.S:437
 ]rts:
   return                           ; GAMEBG.S:439
@@ -217,21 +217,20 @@ fn DrawShifted {
   call chgoffset                  ; GAMEBG.S:444
   a = #mask                  ; GAMEBG.S:446
   *OPACITY@0x0006 = a            ; GAMEBG.S:447
-  ??? lda #UseLayrsave.$80            ; GAMEBG.S:449
+  a = #UseLayrsave.$80                  ; GAMEBG.S:449
   tail_call addmid                ; GAMEBG.S:450
 }
 
 fn DrawEored {
   a = #eor                  ; GAMEBG.S:454
   *OPACITY@0x0006 = a            ; GAMEBG.S:455
-  ??? lda #UseLayrsave.$80            ; GAMEBG.S:457
+  a = #UseLayrsave.$80                  ; GAMEBG.S:457
   tail_call addmid                ; GAMEBG.S:458
 }
 
 fn chgoffset {
   c = 0                            ; GAMEBG.S:462
   a = a + *OFFSET@0x0003 + c    ; GAMEBG.S:463
-  cmp a, #0x07              ; GAMEBG.S:464
   if a < #0x07 goto :1  ; GAMEBG.S:465
   *XCO@0x0001 += 1                         ; GAMEBG.S:467
   c = 1                            ; GAMEBG.S:468
@@ -345,7 +344,7 @@ fn DRAWOPPMETER {
 :1:
   a = #0xbf                  ; GAMEBG.S:597
   *YCO@0x0002 = a            ; GAMEBG.S:598
-  ??? lda #sta.$80            ; GAMEBG.S:599
+  a = #sta.$80                  ; GAMEBG.S:599
   *OPACITY@0x0006 = a            ; GAMEBG.S:600
   x = #0x00                  ; GAMEBG.S:602
   *xsave@0x00e8 = x            ; GAMEBG.S:603
@@ -397,7 +396,7 @@ fn DRAWOPPMETER {
   *OFFSET@0x0003 = a            ; GAMEBG.S:650
   tail_call addmsg                ; GAMEBG.S:651
 :darkpart:
-  ??? lda #and.$80            ; GAMEBG.S:654
+  a = #and.$80                  ; GAMEBG.S:654
   *OPACITY@0x0006 = a            ; GAMEBG.S:655
   a = #blank                  ; GAMEBG.S:656
   *IMAGE@0x0004 = a            ; GAMEBG.S:657
@@ -581,7 +580,7 @@ fn PMASK {
   *TABLE@0x0007 = a            ; GAMEBG.S:888
   a = #and                  ; GAMEBG.S:890
   *OPACITY@0x0006 = a            ; GAMEBG.S:891
-  ??? lda #UseLayrsave.$80            ; GAMEBG.S:892
+  a = #UseLayrsave.$80                  ; GAMEBG.S:892
   tail_call addmid                ; GAMEBG.S:893
 }
 
@@ -826,7 +825,7 @@ fn :draw {
   *OFFSET@0x0003 = a            ; GAMEBG.S:650
   tail_call addmsg                ; GAMEBG.S:651
 :darkpart:
-  ??? lda #and.$80            ; GAMEBG.S:654
+  a = #and.$80                  ; GAMEBG.S:654
   *OPACITY@0x0006 = a            ; GAMEBG.S:655
   a = #blank                  ; GAMEBG.S:656
   *IMAGE@0x0004 = a            ; GAMEBG.S:657
@@ -841,7 +840,7 @@ fn :drawimg {
   *OFFSET@0x0003 = a            ; GAMEBG.S:650
   tail_call addmsg                ; GAMEBG.S:651
 :darkpart:
-  ??? lda #and.$80            ; GAMEBG.S:654
+  a = #and.$80                  ; GAMEBG.S:654
   *OPACITY@0x0006 = a            ; GAMEBG.S:655
   a = #blank                  ; GAMEBG.S:656
   *IMAGE@0x0004 = a            ; GAMEBG.S:657
