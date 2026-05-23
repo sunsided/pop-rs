@@ -107,8 +107,21 @@ def recognize_smc(module: ModuleIR1) -> ModuleIR1:
     )
 
 
-def smc_stats(module: ModuleIR1) -> int:
-    """Total `StoreOpVar` patch stores produced across the module."""
+def smc_var_count(module: ModuleIR1) -> int:
+    """Number of distinct operand variables recognised — counted per
+    routine (a local label is routine-scoped, so the same name in two
+    routines is two variables) and summed. This is the count of patched
+    instructions now modelled faithfully, which may be fewer than the
+    number of patch *stores* (`smc_store_count`) when several stores
+    rewrite the same operand."""
+    return sum(
+        len({it.name for it in r.body if isinstance(it, StoreOpVar)})
+        for r in module.routines
+    )
+
+
+def smc_store_count(module: ModuleIR1) -> int:
+    """Total `StoreOpVar` patch *stores* produced across the module."""
     return sum(
         1
         for r in module.routines

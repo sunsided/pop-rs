@@ -31,7 +31,12 @@ from pop_lifter.ir1 import (
     StoreLocal,
     StoreOpVar,
 )
-from pop_lifter.pass3_smc import recognize_routine, recognize_smc, smc_stats
+from pop_lifter.pass3_smc import (
+    recognize_routine,
+    recognize_smc,
+    smc_store_count,
+    smc_var_count,
+)
 
 SRC = SourceRef(file="syn", line=0, raw="")
 
@@ -102,7 +107,7 @@ def test_offset_two_patch_stays_opaque():
     ])
     rec = recognize_routine(routine)
     assert any(isinstance(it, StoreLocal) for it in rec.body)
-    assert smc_stats(ModuleIR1("M", "syn", [rec])) == 0
+    assert smc_store_count(ModuleIR1("M", "syn", [rec])) == 0
 
 
 def test_patch_of_non_immediate_instruction_stays_opaque():
@@ -144,3 +149,7 @@ def test_multiple_patch_sites_share_one_operand_var():
     assert len(opvars) == 2 and all(it.name == "smL" for it in opvars)
     lda = next(it for it in rec.body if isinstance(it, LoadImm))
     assert lda.imm.opvar == "smL"
+    # Two patch stores, but one operand variable.
+    mod = ModuleIR1("M", "syn", [rec])
+    assert smc_store_count(mod) == 2
+    assert smc_var_count(mod) == 1

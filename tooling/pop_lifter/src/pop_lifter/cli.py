@@ -27,7 +27,7 @@ from .pass2_reloop import is_unstructured, reloop_module
 from .pass2_struct import elision_stats, fusion_stats, structure_module
 from .pass3_expr import fold_module, fold_stats
 from .pass3_match import match_stats, recognize_module
-from .pass3_smc import recognize_smc, smc_stats
+from .pass3_smc import recognize_smc, smc_store_count, smc_var_count
 
 DEFAULT_SOURCE_REL = Path("01 POP Source/Source")
 
@@ -559,7 +559,8 @@ def _cmd_smc(args: argparse.Namespace) -> int:
 
     dumps: list[str] = []
     total_routines = 0
-    total_opvars = 0
+    total_vars = 0
+    total_stores = 0
     handled: set[str] = set()
     for file_path in file_paths:
         file_ast = next(
@@ -578,7 +579,8 @@ def _cmd_smc(args: argparse.Namespace) -> int:
             continue
         module = recognize_smc(lift_file(file_ast, symbols, local_entries).module)
         total_routines += len(module.routines)
-        total_opvars += smc_stats(module)
+        total_vars += smc_var_count(module)
+        total_stores += smc_store_count(module)
         dumps.append(ir1_mod.format_module(module))
         handled.update(local_entries)
 
@@ -597,7 +599,8 @@ def _cmd_smc(args: argparse.Namespace) -> int:
         out_path.write_text(text, encoding="utf-8")
         print(
             f"wrote {out_path} ({total_routines} routines, "
-            f"{total_opvars} SMC operand variables)"
+            f"{total_vars} SMC operand variables across "
+            f"{total_stores} patch stores)"
         )
     else:
         sys.stdout.write(text)
