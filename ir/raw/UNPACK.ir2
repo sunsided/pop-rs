@@ -590,4 +590,5 @@ fn loadscrn {
   if a < #0x9e goto :loop  ; UNPACK.S:876
 ]rts:
   return                           ; UNPACK.S:877
+  ??? usr $a9,2,$a00,*-org            ; UNPACK.S:882
 }

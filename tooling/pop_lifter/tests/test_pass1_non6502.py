@@ -32,9 +32,16 @@ def test_rev_lifts_to_none():
     assert _lift_instr(_line("rev", '"SKIP"'), {}, set()) is None
 
 
-def test_usr_and_da_lift_to_none():
-    assert _lift_instr(_line("usr", "something"), {}, set()) is None
+def test_usr_and_da_lift_correctly():
+    """`da` is inert data → None. `usr` is a code/data *generator*
+    (`usr $a9,N,addr,*-org`), not literal data — it stays visible as
+    `Unsupported` so the IR flags that an unexpanded generated block
+    lives here, rather than silently dropping it like `rev`/`da`."""
+    from pop_lifter.ir1 import Unsupported
     assert _lift_instr(_line("da", "label"), {}, set()) is None
+    usr = _lift_instr(_line("usr", "$a9,16,$b00,*-org"), {}, set())
+    assert isinstance(usr, Unsupported)
+    assert usr.mnemonic == "usr"
 
 
 def test_cheatcode_data_labels_not_discovered_as_entries(tmp_path):

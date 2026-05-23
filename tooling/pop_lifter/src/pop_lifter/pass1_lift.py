@@ -109,17 +109,26 @@ _NON_CODE_DIRECTIVES = frozenset(
         "asc", "dfb", "dci", "str", "lst", "tr", "xc", "mx", "ent", "ext",
         "use", "rel", "obj", "sav", "lup", "--^", "if", "do", "else",
         "fin", "mac", "eom", "<<<", ">>>",
-        # Merlin data pseudo-ops that emit bytes, not code:
+        # Merlin data pseudo-ops that emit inert literal bytes:
         #   `rev "STR"` — the ASCII of STR, reversed (POP's cheat-code
         #     table: `C_skip rev "SKIP"`, `C_devel rev "POP"`, ...).
         #   `da expr`   — "define address", a 2-byte little-endian
         #     word (same as `dw`).
-        #   `usr ...`   — a user-defined assembler function; emits
-        #     whatever bytes its definition produces.
         # Treating them as non-code stops `discover_entries` from
         # mistaking a data label (e.g. `C_skip`) for a routine entry,
         # and keeps inline data from surfacing as `??? rev`.
-        "rev", "da", "usr",
+        #
+        # NOTE: `usr` is deliberately NOT here. It's a Merlin user-
+        # function *generator* (`usr $a9,N,addr,*-org` — emits an
+        # unrolled fast-fill / address table, bracketed by `lst off`
+        # so its output stays out of the listing), not inert data.
+        # The lift can't expand it, but silently skipping it would
+        # hide that a generated block exists. Leaving it to fall
+        # through to `Unsupported` keeps a visible `??? usr ...`
+        # marker for a future codegen/data-extraction pass. All `usr`
+        # calls in POP are unlabeled and sit after `rts`, so this
+        # doesn't reintroduce the data-label-as-entry discovery bug.
+        "rev", "da",
     }
 )
 

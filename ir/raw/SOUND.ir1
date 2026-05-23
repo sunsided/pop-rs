@@ -209,4 +209,5 @@ fn tone {
   a = a - #0x01 - (1 - c)        ; SOUND.S:349
   if ne goto :outloop       ; SOUND.S:350
   return                           ; SOUND.S:352
+  ??? usr $a9,20,$e00,*-org            ; SOUND.S:359
 }
