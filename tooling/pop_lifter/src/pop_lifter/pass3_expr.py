@@ -72,6 +72,7 @@ from .ir1 import (
     Bit,
     Bitwise,
     Clc,
+    Imm,
     CmpAbs,
     CmpImm,
     CmpIndexed,
@@ -320,6 +321,41 @@ def _arith_after_load(stmts: list[Stmt], i: int):
     ):
         return ("-", _arith_operand(arith), i + 3)
     return None
+
+
+def _shift_after_load(stmts: list[Stmt], i: int):
+    """If `stmts[i+1:]` begins with a maximal run of one or more `asl a`
+    or `lsr a` (all the same direction), return `(op, count, store_start)`
+    where `op` is `"<<"` or `">>"` and `count` is the number of shifts.
+    Returns None if there is no shift immediately after the load.
+
+    The caller is responsible for the dead-after-A and dead-after-carry
+    checks: `asl`/`lsr` both write A and write carry (fresh, not a
+    carry-through), so both must be dead past the following store for the
+    fold to be sound."""
+    n = len(stmts)
+    if i + 1 >= n or not isinstance(stmts[i + 1], RawStmt):
+        return None
+    item1 = stmts[i + 1].item
+    if isinstance(item1, Asl):
+        shift_op = "<<"
+    elif isinstance(item1, Lsr):
+        shift_op = ">>"
+    else:
+        return None
+    j = i + 1
+    count = 0
+    while j < n and isinstance(stmts[j], RawStmt):
+        item = stmts[j].item
+        if shift_op == "<<" and isinstance(item, Asl):
+            count += 1
+            j += 1
+        elif shift_op == ">>" and isinstance(item, Lsr):
+            count += 1
+            j += 1
+        else:
+            break
+    return (shift_op, count, j)
 
 
 def _wide16_at(stmts: list[Stmt], i: int, lo_src):
@@ -929,7 +965,32 @@ def _fold_block(block: Block, *, edges, demand) -> Block:
                             i = j
                             continue
 
-                # (2) Pure copy fold (A / X / Y): load ; sta [; sta ...].
+                    # (2) Shift fold: lda X ; (asl)*n / (lsr)*n ; sta Y.
+                    # A single left/right shift run. Both A and carry must
+                    # be dead after the store (asl/lsr produce fresh carry).
+                    shift = _shift_after_load(stmts, i)
+                    if shift is not None:
+                        shift_op, count, store_start = shift
+                        targets, j = _store_run(stmts, store_start, Reg.A)
+                        if (
+                            len(targets) == 1
+                            and _dead(stmts, j, Reg.A, edges, demand)
+                            and _dead(stmts, j, _CARRY, edges, demand)
+                        ):
+                            tgt, ssrc = targets[0]
+                            out.append(Assign(
+                                target=tgt,
+                                source=BinExpr(
+                                    op=shift_op,
+                                    lhs=source,
+                                    rhs=Imm(value=count, text=f"#{count}"),
+                                ),
+                                src=ssrc,
+                            ))
+                            i = j
+                            continue
+
+                # (3) Pure copy fold (A / X / Y): load ; sta [; sta ...].
                 # A run of stores of the same register fed by one load;
                 # sound for multiple stores because each writes the
                 # (unchanged) source value.

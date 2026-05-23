@@ -56,23 +56,20 @@ class RawStmt:
 
 @dataclass(frozen=True)
 class BinExpr:
-    """`lhs op rhs` — a pass-3 folded 8-bit arithmetic expression.
-    Collapses the accumulator compute-and-store idiom
-    `a = LHS ; clc ; adc RHS ; sta DST` (and the `sec ; sbc` subtract
-    form) into a single `DST = LHS + RHS` assignment, dropping the
-    load, the carry set-up, and the add/sub.
+    """`lhs op rhs` — a pass-3 folded 8-bit expression.
 
-    `op` is `"+"` (clc + adc) or `"-"` (sec + sbc) — the carry set-up
-    pins the operation to pure 8-bit add / subtract, with the result
-    wrapping mod 256. `lhs` is the dropped load's value; `rhs` is the
-    add/sub operand. Both are drawn from the same value forms as
-    `Assign.source` (`Imm` / `Abs` / `IndexedAbs` / `IndirectY`).
+    Arithmetic form: collapses `a = LHS ; clc ; adc RHS ; sta DST`
+    (and the `sec ; sbc` subtract form) into `DST = LHS + RHS`.
+    `op` is `"+"` (clc + adc) or `"-"` (sec + sbc).
 
-    Produced only when A *and* the carry are dead after the store, so
-    the dropped flag side-effects can't be observed (the IR3
-    interpreter checks this via the differential tests)."""
+    Shift form: collapses `a = LHS ; (asl)*n ; sta DST` (or `lsr`)
+    into `DST = LHS << n` (or `>>`). `op` is `"<<"` or `">>"`;
+    `rhs` is an `Imm` holding the shift count.
 
-    op: str  # "+" | "-"
+    All forms: produced only when A *and* carry are dead after the
+    store, so the dropped flag side-effects can't be observed."""
+
+    op: str  # "+" | "-" | "<<" | ">>"
     lhs: "Imm | Abs | IndexedAbs | IndirectY"
     rhs: "Imm | Abs | IndexedAbs | IndirectY"
 

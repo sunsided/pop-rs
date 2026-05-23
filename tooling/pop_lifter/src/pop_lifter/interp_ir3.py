@@ -187,14 +187,17 @@ def _assign_read(value, trace: Trace, src) -> int:
     if isinstance(value, Abs):
         return trace.ram[_real_addr(value.addr, src)]
     if isinstance(value, BinExpr):
-        # Folded `clc ; adc` / `sec ; sbc`: pure 8-bit add / subtract,
-        # result wraps mod 256 (the carry set-up pinned the operation).
+        # Folded arithmetic / shift: result wraps to 8 bits.
         lhs = _assign_read(value.lhs, trace, src)
         rhs = _assign_read(value.rhs, trace, src)
         if value.op == "+":
             return (lhs + rhs) & 0xff
         if value.op == "-":
             return (lhs - rhs) & 0xff
+        if value.op == "<<":
+            return (lhs << rhs) & 0xff
+        if value.op == ">>":
+            return (lhs >> rhs) & 0xff
         raise InterpError(f"unknown BinExpr op: {value.op!r}")
     raise InterpError(f"unknown Assign source type: {type(value).__name__}")
 
