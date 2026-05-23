@@ -25,6 +25,7 @@ IR_PILOT_CHECKFLOOR_IR3 = REPO_ROOT / "ir" / "pilot" / "checkfloor.ir3"
 IR_PILOT_CHGSHADPOSN_IR3 = REPO_ROOT / "ir" / "pilot" / "chgshadposn.ir3"
 IR_PILOT_CHGSHADPOSN_PASS3 = REPO_ROOT / "ir" / "pilot" / "chgshadposn.pass3.ir3"
 IR_PILOT_CUP_PASS3 = REPO_ROOT / "ir" / "pilot" / "cup.pass3.ir3"
+IR_PILOT_CUP_RS = REPO_ROOT / "ir" / "pilot" / "cup.rs"
 IR_PILOT_CMPSPACE_MATCH = REPO_ROOT / "ir" / "pilot" / "cmpspace.match.ir3"
 IR_PILOT_FASTBLACK_SMC = REPO_ROOT / "ir" / "pilot" / "fastblack.smc.ir1"
 IR_PILOT_CHGSHADPOSN_LOOPS = REPO_ROOT / "ir" / "pilot" / "chgshadposn.loops.ir3"
@@ -345,6 +346,49 @@ def test_pass3_cup_fold_artifact_matches(source_dir):
         f"regenerate with:\n"
         f"  pop-lifter fold AUTO.S --entry Cup "
         f"--out {IR_PILOT_CUP_PASS3.relative_to(REPO_ROOT)}"
+    )
+
+
+def _regen_cup_rs(source_dir: Path) -> str:
+    from pop_lifter.pass2_reloop import reloop_module
+    from pop_lifter.pass2_struct import structure_module
+    from pop_lifter.pass3_expr import fold_module
+    from pop_lifter.pass3_loops import recover_loops
+    from pop_lifter.pass3_temps import recover_temps
+    from pop_lifter.pass4_emit_rust import emit_module
+    ast = parse_files(
+        [
+            source_dir / "EQ.S",
+            source_dir / "GAMEEQ.S",
+            source_dir / "AUTO.S",
+        ],
+        search_paths=[source_dir],
+    )
+    auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
+    ir1_module = lift_file(auto, ast.symbols(), ["Cup"]).module
+    ir3_module = reloop_module(structure_module(ir1_module))
+    recovered = recover_temps(recover_loops(fold_module(ir3_module)))
+    return emit_module(recovered)
+
+
+def test_pass4_cup_rs_artifact_matches(source_dir):
+    """The Cup pass-4 pilot pins the Rust skeleton emitter: the folded
+    `CharBlockY += #3` lowers to a `wrapping_add` assignment and the
+    `CharID = #1` immediate lowers to a direct store, while the calls
+    and unfolded loads/stores surface as `// TODO`/`// raw` comments."""
+    if not IR_PILOT_CUP_RS.exists():
+        raise AssertionError(
+            f"missing artifact {IR_PILOT_CUP_RS}. regenerate with:\n"
+            f"  pop-lifter emit AUTO.S --entry Cup "
+            f"--out {IR_PILOT_CUP_RS.relative_to(REPO_ROOT)}"
+        )
+    expected = IR_PILOT_CUP_RS.read_text(encoding="utf-8")
+    actual = _regen_cup_rs(source_dir)
+    assert actual == expected, (
+        f"{IR_PILOT_CUP_RS.relative_to(REPO_ROOT)} is stale. "
+        f"regenerate with:\n"
+        f"  pop-lifter emit AUTO.S --entry Cup "
+        f"--out {IR_PILOT_CUP_RS.relative_to(REPO_ROOT)}"
     )
 
 
