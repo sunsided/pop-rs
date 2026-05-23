@@ -445,9 +445,9 @@ def _regen_chgshadposn_loops(source_dir: Path) -> str:
 
 
 def test_pass3_chgshadposn_loops_artifact_matches(source_dir):
-    """The chgshadposn pass-3 loops pilot pins do-while recovery: the
-    `loop { ... ; if y < 0 { break } }` collapses to `do { ... } while
-    y >= 0`, with the bottom exit guard hoisted into the header."""
+    """The chgshadposn pass-3 loops pilot pins loop recovery: the
+    `loop { ... ; y -= 1 ; if y < 0 { break } }` down-counter is
+    promoted all the way to `for y in (0..=0x06).rev() { ... }`."""
     if not IR_PILOT_CHGSHADPOSN_LOOPS.exists():
         raise AssertionError(
             f"missing artifact {IR_PILOT_CHGSHADPOSN_LOOPS}. regenerate with:\n"
