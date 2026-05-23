@@ -47,6 +47,29 @@ class RawStmt:
 
 
 @dataclass(frozen=True)
+class Assign:
+    """`target = source` — a pass-3 folded copy. Collapses the
+    accumulator round-trip `a = SRC ; sta DST` (and the multi-store
+    `a = #k ; sta X ; sta Y`) into a direct memory assignment,
+    dropping the intermediate load.
+
+    `target` is a store destination drawn from the IR1 value types
+    (`Abs` for `sta addr`, `IndexedAbs` for `sta tbl,x`, `IndirectY`
+    for `sta (ptr),y`). `source` is the value the dropped load
+    produced — an `Imm` (`lda #k`) or one of the same memory-read
+    forms (`Abs` / `IndexedAbs` / `IndirectY`).
+
+    Produced only when the load's value flows *exclusively* into the
+    store(s) and `A` is dead afterwards, so the fold is
+    behaviour-preserving (the IR3 interpreter checks this via the
+    differential tests)."""
+
+    target: "Abs | IndexedAbs | IndirectY"
+    source: "Imm | Abs | IndexedAbs | IndirectY"
+    src: SourceRef
+
+
+@dataclass(frozen=True)
 class CallStmt:
     """`jsr target` — non-tail call. Translates to a regular function
     call at the Rust level."""
@@ -149,7 +172,7 @@ class RawIfStmt:
 
 
 Stmt = (
-    RawStmt | CallStmt | TailCallStmt | ReturnStmt
+    RawStmt | Assign | CallStmt | TailCallStmt | ReturnStmt
     | IfStmt | RawIfStmt | LoopStmt | BreakStmt | ContinueStmt
     | GotoStmt | LabelStmt
 )
@@ -214,6 +237,21 @@ def _fmt_stmt(stmt: Stmt, indent: int) -> list[str]:
         from .ir1 import format_item
         line = format_item(stmt.item).lstrip()
         return [f"{pad}{line}"]
+    if isinstance(stmt, Assign):
+        from .ir1 import Abs, Imm, IndexedAbs, IndirectY, _fmt_abs, _fmt_imm
+
+        def _loc(v) -> str:
+            if isinstance(v, Imm):
+                return _fmt_imm(v)
+            if isinstance(v, IndexedAbs):
+                return f"*({_fmt_abs(v.base)} + {v.index})"
+            if isinstance(v, IndirectY):
+                return f"*({_fmt_abs(v.ptr)})[y]"
+            if isinstance(v, Abs):
+                return f"*{_fmt_abs(v)}"
+            return repr(v)
+
+        return [f"{pad}{_loc(stmt.target)} = {_loc(stmt.source)}    ; {stmt.src.short()}"]
     if isinstance(stmt, CallStmt):
         return [f"{pad}call {stmt.target}                ; {stmt.src.short()}"]
     if isinstance(stmt, TailCallStmt):
