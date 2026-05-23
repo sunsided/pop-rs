@@ -25,6 +25,7 @@ IR_PILOT_CHECKFLOOR_IR3 = REPO_ROOT / "ir" / "pilot" / "checkfloor.ir3"
 IR_PILOT_CHGSHADPOSN_IR3 = REPO_ROOT / "ir" / "pilot" / "chgshadposn.ir3"
 IR_PILOT_CHGSHADPOSN_PASS3 = REPO_ROOT / "ir" / "pilot" / "chgshadposn.pass3.ir3"
 IR_PILOT_CUP_PASS3 = REPO_ROOT / "ir" / "pilot" / "cup.pass3.ir3"
+IR_PILOT_CMPSPACE_MATCH = REPO_ROOT / "ir" / "pilot" / "cmpspace.match.ir3"
 IR_RAW = REPO_ROOT / "ir" / "raw"
 
 PILOT_ENTRIES = [
@@ -341,6 +342,47 @@ def test_pass3_cup_fold_artifact_matches(source_dir):
         f"regenerate with:\n"
         f"  pop-lifter fold AUTO.S --entry Cup "
         f"--out {IR_PILOT_CUP_PASS3.relative_to(REPO_ROOT)}"
+    )
+
+
+def _regen_cmpspace_match(source_dir: Path) -> str:
+    from pop_lifter.pass2_reloop import reloop_module
+    from pop_lifter.pass2_struct import structure_module
+    from pop_lifter.pass3_expr import fold_module
+    from pop_lifter.pass3_match import recognize_module
+    from pop_lifter import ir3 as ir3_mod
+    ast = parse_files(
+        [
+            source_dir / "EQ.S",
+            source_dir / "GAMEEQ.S",
+            source_dir / "CTRLSUBS.S",
+        ],
+        search_paths=[source_dir],
+    )
+    sub = next(f for f in ast.files if Path(f.path).name == "CTRLSUBS.S")
+    ir1_module = lift_file(sub, ast.symbols(), ["CMPSPACE"]).module
+    matched = recognize_module(fold_module(reloop_module(structure_module(ir1_module))))
+    return ir3_mod.format_module(matched)
+
+
+def test_pass3_cmpspace_match_artifact_matches(source_dir):
+    """The CMPSPACE pass-3 pilot pins `match` recognition: four
+    `if a == K { a = 0 ; return }` arms with identical bodies collapse
+    into one `match` arm with four keys, while the trailing non-`==`
+    guard and the default `a = 1 ; return` stay put."""
+    if not IR_PILOT_CMPSPACE_MATCH.exists():
+        raise AssertionError(
+            f"missing artifact {IR_PILOT_CMPSPACE_MATCH}. regenerate with:\n"
+            f"  pop-lifter match CTRLSUBS.S --entry CMPSPACE "
+            f"--out {IR_PILOT_CMPSPACE_MATCH.relative_to(REPO_ROOT)}"
+        )
+    expected = IR_PILOT_CMPSPACE_MATCH.read_text(encoding="utf-8")
+    actual = _regen_cmpspace_match(source_dir)
+    assert actual == expected, (
+        f"{IR_PILOT_CMPSPACE_MATCH.relative_to(REPO_ROOT)} is stale. "
+        f"regenerate with:\n"
+        f"  pop-lifter match CTRLSUBS.S --entry CMPSPACE "
+        f"--out {IR_PILOT_CMPSPACE_MATCH.relative_to(REPO_ROOT)}"
     )
 
 

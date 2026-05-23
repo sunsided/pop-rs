@@ -39,9 +39,10 @@ from .ir1 import Compare, Item, SourceRef
 
 if TYPE_CHECKING:
     # Referenced only in the string annotations on `Assign` / `BinExpr`
-    # (the concrete value types live in ir1; ir3 imports them lazily
-    # inside the formatter to avoid a heavier import at module load).
-    from .ir1 import Abs, Imm, IndexedAbs, IndirectY
+    # / `MatchStmt` (the concrete value types live in ir1; ir3 imports
+    # them lazily inside the formatter to avoid a heavier import at
+    # module load).
+    from .ir1 import Abs, Imm, IndexedAbs, IndirectY, Reg
 
 
 # A `RawStmt` wraps a non-control-flow IR1/IR2 item. The relooper
@@ -202,9 +203,39 @@ class RawIfStmt:
     src: SourceRef
 
 
+@dataclass(frozen=True)
+class MatchArm:
+    """One arm of a `MatchStmt`: `values => body`. Multiple constants
+    map to one arm (`K1 | K2 => ...`) when the dispatch branched several
+    keys to the same handler (the 6502 idiom shares one target via tail
+    duplication, so the bodies come out identical)."""
+
+    values: "tuple[Imm, ...]"
+    body: "Block"
+
+
+@dataclass(frozen=True)
+class MatchStmt:
+    """`match reg { K => body, ... }` — pass-3 recognition of the 6502
+    jump-table dispatch idiom. Collapses a run of consecutive
+    `if reg == K { terminating_body }` (distinct constant keys, each
+    body ending in a return / tail-call / break / continue) into a
+    single multi-way branch.
+
+    Behaviour-preserving: the keys are distinct so at most one arm
+    matches, and every arm terminates so there's no fall-through between
+    cases. If no arm matches, control falls through to the statement
+    after the `MatchStmt` — exactly the `if`-chain's behaviour, so the
+    chain's fall-through tail stays where it was (an implicit default)."""
+
+    reg: Reg
+    arms: "tuple[MatchArm, ...]"
+    src: SourceRef
+
+
 Stmt = (
     RawStmt | Assign | CallStmt | TailCallStmt | ReturnStmt
-    | IfStmt | RawIfStmt | LoopStmt | BreakStmt | ContinueStmt
+    | IfStmt | RawIfStmt | LoopStmt | MatchStmt | BreakStmt | ContinueStmt
     | GotoStmt | LabelStmt
 )
 
@@ -315,6 +346,17 @@ def _fmt_stmt(stmt: Stmt, indent: int) -> list[str]:
         lines = [f"{pad}loop {{                          ; {stmt.src.short()}"]
         for s in stmt.body.stmts:
             lines.extend(_fmt_stmt(s, indent + 1))
+        lines.append(f"{pad}}}")
+        return lines
+    if isinstance(stmt, MatchStmt):
+        from .ir1 import _fmt_imm
+        lines = [f"{pad}match {stmt.reg} {{    ; {stmt.src.short()}"]
+        for arm in stmt.arms:
+            keys = " | ".join(_fmt_imm(v) for v in arm.values)
+            lines.append(f"{pad}  {keys} => {{")
+            for s in arm.body.stmts:
+                lines.extend(_fmt_stmt(s, indent + 2))
+            lines.append(f"{pad}  }}")
         lines.append(f"{pad}}}")
         return lines
     if isinstance(stmt, BreakStmt):

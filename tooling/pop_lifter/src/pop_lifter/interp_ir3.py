@@ -32,7 +32,7 @@ from .interp_ir1 import (
     exec_atom,
 )
 from .interp_ir1 import run as ir1_run
-from .ir1 import Abs, Imm, IndexedAbs, IndirectY, ModuleIR1, Routine as IR1Routine
+from .ir1 import Abs, Imm, IndexedAbs, IndirectY, ModuleIR1, Reg, Routine as IR1Routine
 from .ir3 import (
     Assign,
     BinExpr,
@@ -44,6 +44,7 @@ from .ir3 import (
     IfStmt,
     LabelStmt,
     LoopStmt,
+    MatchStmt,
     ModuleIR3,
     RawIfStmt,
     RawStmt,
@@ -230,6 +231,16 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
         elif stmt.else_block is not None:
             _exec_block(stmt.else_block, modules, aliases, trace)
         return
+    if isinstance(stmt, MatchStmt):
+        reg_val = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[stmt.reg]
+        for arm in stmt.arms:
+            if any((v.value & 0xff) == reg_val for v in arm.values):
+                # The arm terminates (return / tail-call / break / ...),
+                # so this raises the matching signal; if it somehow falls
+                # off, returning here matches the no-match fall-through.
+                _exec_block(arm.body, modules, aliases, trace)
+                return
+        return  # no arm matched — fall through to the next statement
     if isinstance(stmt, RawIfStmt):
         if _branch_taken(stmt.cond, trace):
             _exec_block(stmt.then_block, modules, aliases, trace)

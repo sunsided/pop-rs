@@ -1,0 +1,16 @@
+; module CTRLSUBS from 01 POP Source/Source/CTRLSUBS.S
+
+fn CMPSPACE {
+  match a {    ; CTRLSUBS.S:1508
+    #space | #pillartop | #panelwof | #block => {
+      a = #0x00                  ; CTRLSUBS.S:1521
+      return                           ; CTRLSUBS.S:1522
+    }
+  }
+  if a >= #archtop1 {    ; CTRLSUBS.S:1516
+    a = #0x00                  ; CTRLSUBS.S:1521
+    return                           ; CTRLSUBS.S:1522
+  }
+  a = #0x01                  ; CTRLSUBS.S:1518
+  return                           ; CTRLSUBS.S:1519
+}
