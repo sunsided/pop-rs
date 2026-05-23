@@ -119,6 +119,7 @@ from .ir3 import (
     RawIfStmt,
     RawStmt,
     ReturnStmt,
+    RotateExpr,
     RoutineIR3,
     Stmt,
     TailCallStmt,
@@ -356,6 +357,35 @@ def _shift_after_load(stmts: list[Stmt], i: int):
         else:
             break
     return (shift_op, count, j)
+
+
+def _rotate_after_load(stmts: list[Stmt], i: int):
+    """If `stmts[i+1:]` begins with a maximal run of one or more `rol a`
+    or `ror a` (all the same direction), return `(op, count, store_start)`
+    where `op` is `"rotl"` or `"rotr"`. Returns None otherwise.
+
+    The caller is responsible for dead-after-A and dead-after-carry
+    checks. Unlike `asl`/`lsr`, `rol`/`ror` read the carry flag as an
+    input; the `RotateExpr` the fold emits reads carry from the trace
+    at evaluation time, so no constraint on the carry-in is required."""
+    n = len(stmts)
+    if i + 1 >= n or not isinstance(stmts[i + 1], RawStmt):
+        return None
+    item1 = stmts[i + 1].item
+    if isinstance(item1, Rol):
+        rot_op = "rotl"
+        target_cls = Rol
+    elif isinstance(item1, Ror):
+        rot_op = "rotr"
+        target_cls = Ror
+    else:
+        return None
+    j = i + 1
+    count = 0
+    while j < n and isinstance(stmts[j], RawStmt) and isinstance(stmts[j].item, target_cls):
+        count += 1
+        j += 1
+    return (rot_op, count, j)
 
 
 def _wide16_at(stmts: list[Stmt], i: int, lo_src):
@@ -1083,7 +1113,35 @@ def _fold_block(block: Block, *, edges, demand) -> Block:
                             i = j
                             continue
 
-                # (3) Pure copy fold (A / X / Y): load ; sta [; sta ...].
+                    # (3) Rotate fold: lda X ; (rol)*n / (ror)*n ; sta Y.
+                    # Single store only. A and carry must be dead after
+                    # the store. Carry is an INPUT to each rotation step
+                    # (rol/ror read carry, unlike asl/lsr which write
+                    # fresh carry). RotateExpr reads carry from the trace
+                    # at evaluation time — no constraint on carry-in here.
+                    rotate = _rotate_after_load(stmts, i)
+                    if rotate is not None:
+                        rot_op, count, store_start = rotate
+                        targets, j = _store_run(stmts, store_start, Reg.A)
+                        if (
+                            len(targets) == 1
+                            and _dead(stmts, j, Reg.A, edges, demand)
+                            and _dead(stmts, j, _CARRY, edges, demand)
+                        ):
+                            tgt, ssrc = targets[0]
+                            out.append(Assign(
+                                target=tgt,
+                                source=RotateExpr(
+                                    op=rot_op,
+                                    operand=source,
+                                    count=count,
+                                ),
+                                src=ssrc,
+                            ))
+                            i = j
+                            continue
+
+                # (4) Pure copy fold (A / X / Y): load ; sta [; sta ...].
                 # A run of stores of the same register fed by one load;
                 # sound for multiple stores because each writes the
                 # (unchanged) source value.

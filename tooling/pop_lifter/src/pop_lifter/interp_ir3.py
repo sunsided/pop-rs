@@ -64,6 +64,7 @@ from .ir3 import (
     RepeatStmt,
     RestoreTemp,
     ReturnStmt,
+    RotateExpr,
     RoutineIR3,
     SaveTemp,
     Stmt,
@@ -201,6 +202,19 @@ def _assign_read(value, trace: Trace, src) -> int:
         if value.op == ">>":
             return (lhs >> rhs) & 0xff
         raise InterpError(f"unknown BinExpr op: {value.op!r}")
+    if isinstance(value, RotateExpr):
+        val = _assign_read(value.operand, trace, src)
+        c = trace.c & 1
+        for _ in range(value.count):
+            if value.op == "rotl":
+                new_c = (val >> 7) & 1
+                val = ((val << 1) | c) & 0xff
+            else:  # "rotr"
+                new_c = val & 1
+                val = ((val >> 1) | (c << 7)) & 0xff
+            c = new_c
+        # Carry-out not written back — dead by the fold's soundness condition.
+        return val
     raise InterpError(f"unknown Assign source type: {type(value).__name__}")
 
 
