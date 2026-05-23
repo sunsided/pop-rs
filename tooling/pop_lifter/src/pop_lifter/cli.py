@@ -25,7 +25,7 @@ from .pass0_parse import ProgramAST, parse_files
 from .pass1_lift import discover_entries, lift_file
 from .pass2_reloop import is_unstructured, reloop_module
 from .pass2_struct import elision_stats, fusion_stats, structure_module
-from .pass3_expr import fold_module, fold_stats
+from .pass3_expr import fold_module, fold_stats, wide16_stats
 from .pass3_loops import dowhile_stats, for_stats, recover_loops, repeat_stats
 from .pass3_match import match_stats, recognize_module
 from .pass3_smc import recognize_smc, smc_store_count, smc_var_count
@@ -407,6 +407,7 @@ def _cmd_fold(args: argparse.Namespace) -> int:
     dumps: list[str] = []
     total_routines = 0
     total_assigns = 0
+    total_wide16 = 0
     handled: set[str] = set()
     for file_path in file_paths:
         file_ast = next(
@@ -429,6 +430,7 @@ def _cmd_fold(args: argparse.Namespace) -> int:
         folded = fold_module(ir3_module)
         total_routines += len(folded.routines)
         total_assigns += fold_stats(folded)
+        total_wide16 += wide16_stats(folded)
         dumps.append(ir3_mod.format_module(folded))
         handled.update(local_entries)
 
@@ -447,7 +449,7 @@ def _cmd_fold(args: argparse.Namespace) -> int:
         out_path.write_text(text, encoding="utf-8")
         print(
             f"wrote {out_path} ({total_routines} routines, "
-            f"{total_assigns} folded assigns)"
+            f"{total_assigns} folded assigns, {total_wide16} wide16)"
         )
     else:
         sys.stdout.write(text)

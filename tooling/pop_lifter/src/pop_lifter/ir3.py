@@ -78,6 +78,40 @@ class BinExpr:
 
 
 @dataclass(frozen=True)
+class Wide16Stmt:
+    """16-bit arithmetic — a pass-3 structural rewrite of the 6502 idiom:
+
+        lda lo_src ; clc/sec ; adc/sbc lo_op ; sta lo_dst
+        lda hi_src ; adc/sbc hi_op          ; sta hi_dst
+
+    where the second `adc`/`sbc` has no preceding carry set-up — it
+    consumes the carry produced by the low-byte operation.  `op` is
+    `"+"` (clc + adc pair) or `"-"` (sec + sbc pair).
+
+    Unlike the 8-bit `Assign`/`BinExpr` fold, no dead-after check is
+    required: this is a *structural* replacement that preserves every
+    side-effect of all seven instructions (both memory writes, the
+    final A value = hi-byte result, and the final carry = carry out of
+    the hi-byte operation).
+
+    Combined semantics:
+        lo_dst = lo_src ± lo_op            (lo byte, no carry-in)
+        hi_dst = hi_src ± hi_op ± carry    (hi byte, carry from lo)
+    i.e. `{hi_dst:lo_dst} = {hi_src:lo_src} ± {hi_op:lo_op}` — an
+    exact 16-bit add (or subtract-with-borrow), result wrapping mod
+    65536."""
+
+    op: str  # "+" | "-"
+    lo_src: "Imm | Abs | IndexedAbs | IndirectY"
+    lo_op:  "Imm | Abs | IndexedAbs | IndirectY"
+    lo_dst: "Abs | IndexedAbs | IndirectY"
+    hi_src: "Imm | Abs | IndexedAbs | IndirectY"
+    hi_op:  "Imm | Abs | IndexedAbs | IndirectY"
+    hi_dst: "Abs | IndexedAbs | IndirectY"
+    src: SourceRef
+
+
+@dataclass(frozen=True)
 class Assign:
     """`target = source` — a pass-3 folded copy. Collapses the
     accumulator round-trip `a = SRC ; sta DST` (and the multi-store
@@ -320,7 +354,7 @@ class MatchStmt:
 
 
 Stmt = (
-    RawStmt | Assign | CallStmt | TailCallStmt | ReturnStmt
+    RawStmt | Wide16Stmt | Assign | CallStmt | TailCallStmt | ReturnStmt
     | IfStmt | RawIfStmt | LoopStmt | DoWhileStmt | ForStmt | RepeatStmt
     | MatchStmt | BreakStmt | ContinueStmt | GotoStmt | LabelStmt
 )
@@ -385,6 +419,25 @@ def _fmt_stmt(stmt: Stmt, indent: int) -> list[str]:
         from .ir1 import format_item
         line = format_item(stmt.item).lstrip()
         return [f"{pad}{line}"]
+    if isinstance(stmt, Wide16Stmt):
+        from .ir1 import Abs, Imm, IndexedAbs, IndirectY, _fmt_abs, _fmt_imm
+
+        def _loc16(v) -> str:
+            if isinstance(v, Imm):
+                return _fmt_imm(v)
+            if isinstance(v, IndexedAbs):
+                return f"*({_fmt_abs(v.base)} + {v.index})"
+            if isinstance(v, IndirectY):
+                return f"*({_fmt_abs(v.ptr)})[y]"
+            if isinstance(v, Abs):
+                return f"*{_fmt_abs(v)}"
+            return repr(v)
+
+        op_c = f"{stmt.op}c"  # "+c" or "-c" — carry-in from the lo byte
+        return [
+            f"{pad}{_loc16(stmt.lo_dst)} = {_loc16(stmt.lo_src)} {stmt.op} {_loc16(stmt.lo_op)}    ; {stmt.src.short()}",
+            f"{pad}{_loc16(stmt.hi_dst)} = {_loc16(stmt.hi_src)} {op_c} {_loc16(stmt.hi_op)}    ; [wide16]",
+        ]
     if isinstance(stmt, Assign):
         from .ir1 import Abs, Imm, IndexedAbs, IndirectY, _fmt_abs, _fmt_imm
 
