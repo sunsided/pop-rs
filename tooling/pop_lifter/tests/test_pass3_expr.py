@@ -335,9 +335,12 @@ def test_no_arith_fold_when_carry_live_at_return():
 
 def test_no_arith_fold_without_carry_setup():
     """A bare `adc` with no preceding `clc` depends on the incoming
-    carry, so it can't be a pure `+` — left alone."""
+    carry, so it can't be a pure `+` — left alone. A and carry are
+    both dead afterwards (`*_kill_ac()`), so the missing `clc` is the
+    *only* reason the fold is refused — a regression that dropped the
+    carry-set-up requirement would make this fold and fail the test."""
     out = _fold([
-        _load_a_abs("X", 0x10), _adc_imm(8), _store_a_abs("Y", 0x20), _kill_a(),
+        _load_a_abs("X", 0x10), _adc_imm(8), _store_a_abs("Y", 0x20), *_kill_ac(),
     ])
     assert not any(isinstance(s, Assign) for s in out)
 
@@ -357,10 +360,12 @@ def test_no_arith_fold_when_carry_live():
 def test_no_arith_fold_multi_store():
     """`a = X ; clc ; adc #8 ; *Y = a ; *Z = a` — multi-store arithmetic
     isn't an idempotent write-back (a target could alias the operand),
-    so the fold is refused."""
+    so the fold is refused. A and carry are both dead afterwards
+    (`*_kill_ac()`), so the multi-store restriction is the *only*
+    blocker — re-enabling multi-store arithmetic would fail this test."""
     out = _fold([
         _load_a_abs("X", 0x10), _clc(), _adc_imm(8),
-        _store_a_abs("Y", 0x20), _store_a_abs("Z", 0x21), _kill_a(),
+        _store_a_abs("Y", 0x20), _store_a_abs("Z", 0x21), *_kill_ac(),
     ])
     assert not any(isinstance(s, Assign) for s in out)
 
