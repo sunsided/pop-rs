@@ -492,8 +492,8 @@ fn SETDHIRES {
   ??? da ]2            ; UNPACK.S:669
 FADEIN:
   *RAMRDmain@0xc002 = a            ; UNPACK.S:682
-  ??? sta :sm1+2            ; UNPACK.S:683
-  ??? sta :sm2+2            ; UNPACK.S:684
+  patch *:sm1+2 = a            ; UNPACK.S:683
+  patch *:sm2+2 = a            ; UNPACK.S:684
   c = 0                            ; UNPACK.S:686
   ??? xce             ; UNPACK.S:687
   ??? sep $30            ; UNPACK.S:689
@@ -532,8 +532,8 @@ FADEIN:
 
 fn FADEIN {
   *RAMRDmain@0xc002 = a            ; UNPACK.S:682
-  ??? sta :sm1+2            ; UNPACK.S:683
-  ??? sta :sm2+2            ; UNPACK.S:684
+  patch *:sm1+2 = a            ; UNPACK.S:683
+  patch *:sm2+2 = a            ; UNPACK.S:684
   c = 0                            ; UNPACK.S:686
   ??? xce             ; UNPACK.S:687
   ??? sep $30            ; UNPACK.S:689
@@ -583,7 +583,7 @@ fn LOADSUPER {
 fn loadscrn {
   a = #0x20                  ; UNPACK.S:867
 :loop:
-  ??? sta :sm            ; UNPACK.S:868
+  patch *:sm = a            ; UNPACK.S:868
   call rw18                  ; UNPACK.S:869
   ??? lda :sm            ; UNPACK.S:872
   c = 0                            ; UNPACK.S:873

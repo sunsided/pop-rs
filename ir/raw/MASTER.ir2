@@ -57,24 +57,24 @@ fn setmain {
 fn driveon {
   a = #0x00                  ; MASTER.S:301
 driveon1:
-  ??? sta :delay            ; MASTER.S:302
+  patch *:delay = a            ; MASTER.S:302
   call setaux                  ; MASTER.S:304
   bit *RWBANK1@0xc08b                ; MASTER.S:308
   bit *RWBANK1@0xc08b                ; MASTER.S:309
   a = *BBundID@0x03f5        ; MASTER.S:313
-  ??? sta :IDbyte            ; MASTER.S:314
+  patch *:IDbyte = a            ; MASTER.S:314
   call rw18                  ; MASTER.S:316
   call rw18                  ; MASTER.S:322
   return                           ; MASTER.S:326
 }
 
 fn driveon1 {
-  ??? sta :delay            ; MASTER.S:302
+  patch *:delay = a            ; MASTER.S:302
   call setaux                  ; MASTER.S:304
   bit *RWBANK1@0xc08b                ; MASTER.S:308
   bit *RWBANK1@0xc08b                ; MASTER.S:309
   a = *BBundID@0x03f5        ; MASTER.S:313
-  ??? sta :IDbyte            ; MASTER.S:314
+  patch *:IDbyte = a            ; MASTER.S:314
   call rw18                  ; MASTER.S:316
   call rw18                  ; MASTER.S:322
   return                           ; MASTER.S:326
@@ -206,7 +206,7 @@ fn vidstuff {
   ??? lda :sm            ; MASTER.S:509
   c = 0                            ; MASTER.S:510
   a = a + #0x12 + c              ; MASTER.S:511
-  ??? sta :sm            ; MASTER.S:512
+  patch *:sm = a            ; MASTER.S:512
   cmp a, #0x6c              ; MASTER.S:513
   if a < #0x6c goto :loop  ; MASTER.S:514
   call driveoff                  ; MASTER.S:515

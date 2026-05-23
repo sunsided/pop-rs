@@ -474,7 +474,7 @@ ANIMTRANS:
   x = *numtrans@0x0095        ; MOVER.S:633
   if eq goto ]rts       ; MOVER.S:634
   a = #0x00                  ; MOVER.S:636
-  ??? sta ]cleanflag            ; MOVER.S:637
+  patch *]cleanflag = a            ; MOVER.S:637
 :loop:
   *tempnt@0x0096 = x            ; MOVER.S:639
   call animobj                  ; MOVER.S:641
@@ -482,7 +482,7 @@ ANIMTRANS:
   a = *trdirec@0xb640        ; MOVER.S:645
   if pl goto :1       ; MOVER.S:646
   a = #0xff                  ; MOVER.S:648
-  ??? sta ]cleanflag            ; MOVER.S:649
+  patch *]cleanflag = a            ; MOVER.S:649
 :1:
   *(trdirec@0xb640 + x) = a   ; MOVER.S:651
   x -= 1                         ; MOVER.S:653
@@ -516,7 +516,7 @@ fn ANIMTRANS {
   x = *numtrans@0x0095        ; MOVER.S:633
   if eq goto ]rts       ; MOVER.S:634
   a = #0x00                  ; MOVER.S:636
-  ??? sta ]cleanflag            ; MOVER.S:637
+  patch *]cleanflag = a            ; MOVER.S:637
 :loop:
   *tempnt@0x0096 = x            ; MOVER.S:639
   call animobj                  ; MOVER.S:641
@@ -524,7 +524,7 @@ fn ANIMTRANS {
   a = *trdirec@0xb640        ; MOVER.S:645
   if pl goto :1       ; MOVER.S:646
   a = #0xff                  ; MOVER.S:648
-  ??? sta ]cleanflag            ; MOVER.S:649
+  patch *]cleanflag = a            ; MOVER.S:649
 :1:
   *(trdirec@0xb640 + x) = a   ; MOVER.S:651
   x -= 1                         ; MOVER.S:653

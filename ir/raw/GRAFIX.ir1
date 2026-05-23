@@ -216,7 +216,7 @@ fn ADDPEEL {
   a = *(dummy@0x019d + x)   ; GRAFIX.S:444
   a = #maxpeel                  ; GRAFIX.S:447
 :1:
-  ??? sta :sm+1            ; GRAFIX.S:450
+  patch *:sm+1 = a            ; GRAFIX.S:450
   x = a                            ; GRAFIX.S:452
   a = *(peelX@0xb115 + x)   ; GRAFIX.S:453
   c = 0                            ; GRAFIX.S:454
@@ -357,7 +357,7 @@ fn SNGPEEL {
   if eq goto :1       ; GRAFIX.S:643
   x = #maxpeel                  ; GRAFIX.S:644
 :1:
-  ??? stx :sm+1            ; GRAFIX.S:645
+  patch *:sm+1 = x            ; GRAFIX.S:645
   a = *(peelX@0xb115 + x)   ; GRAFIX.S:646
   if eq goto ]rts       ; GRAFIX.S:647
 :loop:
@@ -935,8 +935,8 @@ fn WHOOP {
 }
 
 fn tone {
-  ??? sty :pitch            ; GRAFIX.S:1344
-  ??? stx :pitch+1            ; GRAFIX.S:1345
+  patch *:pitch = y            ; GRAFIX.S:1344
+  patch *:pitch+1 = x            ; GRAFIX.S:1345
 :outloop:
   bit *$c030@0xc030                ; GRAFIX.S:1346
   x = #0x00                  ; GRAFIX.S:1347

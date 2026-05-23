@@ -130,7 +130,7 @@ fn ADDSLICERS {
   y = a                            ; SUBS.S:262
   c = 0                            ; SUBS.S:263
   a = a + #0x0a + c              ; SUBS.S:264
-  ??? sta :sm+1            ; SUBS.S:265
+  patch *:sm+1 = a            ; SUBS.S:265
 :loop:
   a = *(BlueType@0x0024)[y]   ; SUBS.S:267
   a = a & #idmask              ; SUBS.S:268
@@ -274,9 +274,9 @@ fn PLAYCUT {
   x = a                            ; SUBS.S:438
   tail_call PlayCut4                ; SUBS.S:441
   a = *(AddrL@0x034c + x)   ; SUBS.S:444
-  ??? sta :sm+1            ; SUBS.S:445
+  patch *:sm+1 = a            ; SUBS.S:445
   a = *(AddrH@0x034d + x)   ; SUBS.S:446
-  ??? sta :sm+2            ; SUBS.S:447
+  patch *:sm+2 = a            ; SUBS.S:447
 :sm:
   call $FFFF                  ; SUBS.S:448
   a = #0x01                  ; SUBS.S:450

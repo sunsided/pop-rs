@@ -917,17 +917,17 @@ fn add  (aka ]add) {
 
 fn setback {
   a = #addback                  ; FRAMEADV.S:1164
-  ??? sta ]add+1            ; FRAMEADV.S:1165
+  patch *]add+1 = a            ; FRAMEADV.S:1165
   a = #>addback                  ; FRAMEADV.S:1166
-  ??? sta ]add+2            ; FRAMEADV.S:1167
+  patch *]add+2 = a            ; FRAMEADV.S:1167
   return                           ; FRAMEADV.S:1168
 }
 
 fn setmid {
   a = #addmidezfast                  ; FRAMEADV.S:1170
-  ??? sta ]add+1            ; FRAMEADV.S:1171
+  patch *]add+1 = a            ; FRAMEADV.S:1171
   a = #>addmidezfast                  ; FRAMEADV.S:1172
-  ??? sta ]add+2            ; FRAMEADV.S:1173
+  patch *]add+2 = a            ; FRAMEADV.S:1173
 ]rts:
   return                           ; FRAMEADV.S:1174
 }

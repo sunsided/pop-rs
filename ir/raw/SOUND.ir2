@@ -40,9 +40,9 @@ fn makesound {
   if cs goto :rts       ; SOUND.S:130
   x = a                            ; SOUND.S:132
   a = *(lookup@0x02f2 + x)   ; SOUND.S:133
-  ??? sta :sm+1            ; SOUND.S:134
+  patch *:sm+1 = a            ; SOUND.S:134
   a = *(lookup+1@0x02f3 + x)   ; SOUND.S:135
-  ??? sta :sm+2            ; SOUND.S:136
+  patch *:sm+2 = a            ; SOUND.S:136
 :sm:
   tail_call $ffff                ; SOUND.S:138
 :rts:
@@ -190,8 +190,8 @@ fn DoGateSlam {
 }
 
 fn tone {
-  ??? sty :pitch            ; SOUND.S:332
-  ??? stx :pitch+1            ; SOUND.S:333
+  patch *:pitch = y            ; SOUND.S:332
+  patch *:pitch+1 = x            ; SOUND.S:333
 :outloop:
   bit *spkr@0xc030                ; SOUND.S:335
   x = #0x00                  ; SOUND.S:337

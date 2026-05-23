@@ -77,8 +77,8 @@ fn CHECKBARR {
 }
 
 fn getCData {
-  ??? sta :smodSN+1            ; COLL.S:195
-  ??? stx :smodCD+1            ; COLL.S:196
+  patch *:smodSN+1 = a            ; COLL.S:195
+  patch *:smodCD+1 = x            ; COLL.S:196
   a = *begrange@0x00c8        ; COLL.S:198
   call getblockej                  ; COLL.S:199
   c = 0                            ; COLL.S:200
@@ -165,8 +165,8 @@ fn initCDbufs {
   a = #SNthisframe                  ; COLL.S:303
   x = #CDthisframe                  ; COLL.S:304
 :cont:
-  ??? sta :smodSN+1            ; COLL.S:306
-  ??? stx :smodCD+1            ; COLL.S:307
+  patch *:smodSN+1 = a            ; COLL.S:306
+  patch *:smodCD+1 = x            ; COLL.S:307
   x = #0x09                  ; COLL.S:313
 :zloop:
 :smodSN:

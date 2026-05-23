@@ -34,6 +34,7 @@ pass 2.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -81,6 +82,7 @@ from .ir1 import (
     StoreAbs,
     StoreIndexed,
     StoreIndirect,
+    StoreLocal,
     Transfer,
     Unsupported,
 )
@@ -198,6 +200,30 @@ def _parse_indexed(
     except ValueError:
         return None
     return Abs(name=base_str, addr=addr & 0xffff), idx_reg
+
+
+_LOCAL_TARGET_RE = re.compile(
+    # `:label`, `]label`, optionally `+N` (N a decimal byte offset).
+    # `:` = Merlin local label, `]` = Merlin macro-local label.
+    r"^([:\]][A-Za-z0-9_]+)\s*(?:\+\s*(\d+))?$"
+)
+
+
+def _parse_local_target(operand: str) -> tuple[str, int] | None:
+    """Parse `:label+N` / `]label+N` / `:label` — a store target
+    addressed relative to a *local* label. Returns `(label, offset)`
+    or `None` if the operand isn't a local-label form.
+
+    Used only by the store opcodes (sta/stx/sty) for self-modifying-
+    code patches and local data stores; the address itself stays
+    symbolic because local labels aren't in the resolved symbol
+    table. See `ir1.StoreLocal`."""
+    m = _LOCAL_TARGET_RE.match(operand.strip())
+    if m is None:
+        return None
+    label = m.group(1)
+    offset = int(m.group(2)) if m.group(2) is not None else 0
+    return label, offset
 
 
 def _parse_indirect_y(
@@ -325,6 +351,21 @@ def _lift_instr(
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return StoreAbs(reg=_reg_of_store(mnemonic), target=addr, src=src)
+        # `sta :smXCO+1` / `sta :buffer` — store to a local-label-
+        # relative address. Covers self-modifying-code operand
+        # patches (the `+N` form, common in HIRES.S) and plain
+        # stores to local data labels (`+0`). Tried last so a label
+        # that *also* resolves as an equate/abs takes the normal
+        # StoreAbs path.
+        local = _parse_local_target(line.operand)
+        if local is not None:
+            label, offset = local
+            return StoreLocal(
+                reg=_reg_of_store(mnemonic),
+                target_label=label,
+                offset=offset,
+                src=src,
+            )
         return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
 
     if mnemonic in ("cmp", "cpx", "cpy"):
