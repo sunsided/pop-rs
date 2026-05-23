@@ -43,6 +43,7 @@ from .ir3 import (
     GotoStmt,
     IfStmt,
     LabelStmt,
+    DoWhileStmt,
     LoopStmt,
     MatchStmt,
     ModuleIR3,
@@ -263,6 +264,25 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
         else:
             raise InterpError(
                 "LoopStmt exceeded 1,000,000 iterations — exit guard bug?"
+            )
+        return
+    if isinstance(stmt, DoWhileStmt):
+        for _ in range(1_000_000):
+            try:
+                _exec_block(stmt.body, modules, aliases, trace)
+            except _ContinueSignal:
+                # A 6502 back-edge `continue` restarts the body without
+                # re-testing the bottom guard.
+                continue
+            except _BreakSignal:
+                break
+            # Body fell through — test the continue condition at the
+            # bottom, exactly where the original guard sat.
+            if not _eval_compare(stmt.cond, trace, trace.ram):
+                break
+        else:
+            raise InterpError(
+                "DoWhileStmt exceeded 1,000,000 iterations — exit guard bug?"
             )
         return
     if isinstance(stmt, BreakStmt):

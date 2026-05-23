@@ -159,6 +159,27 @@ class LoopStmt:
 
 
 @dataclass(frozen=True)
+class DoWhileStmt:
+    """`do { body } while cond` — pass-3 loop-condition recovery. The
+    relooper emits 6502 do-while loops as `loop { body ; if exit {
+    break } }` (the exit test is always at the bottom). This hoists that
+    trailing guard into the loop header, dropping the `if … { break }`
+    boilerplate and naming the loop's continue condition (the negation
+    of the exit test).
+
+    Semantics match the original `loop` exactly: run `body`; on a
+    `break` exit; on a `continue` restart `body` from the top *without*
+    testing `cond` (the 6502 back-edge skips the bottom guard); on
+    normal completion, repeat while `cond` holds. So `cond` is the
+    *continue* condition — e.g. an exit test of `y < 0` becomes
+    `while y >= 0`."""
+
+    body: "Block"
+    cond: Compare
+    src: SourceRef
+
+
+@dataclass(frozen=True)
 class BreakStmt:
     """Exit the innermost enclosing `LoopStmt`."""
     src: SourceRef
@@ -235,8 +256,8 @@ class MatchStmt:
 
 Stmt = (
     RawStmt | Assign | CallStmt | TailCallStmt | ReturnStmt
-    | IfStmt | RawIfStmt | LoopStmt | MatchStmt | BreakStmt | ContinueStmt
-    | GotoStmt | LabelStmt
+    | IfStmt | RawIfStmt | LoopStmt | DoWhileStmt | MatchStmt
+    | BreakStmt | ContinueStmt | GotoStmt | LabelStmt
 )
 
 
@@ -347,6 +368,12 @@ def _fmt_stmt(stmt: Stmt, indent: int) -> list[str]:
         for s in stmt.body.stmts:
             lines.extend(_fmt_stmt(s, indent + 1))
         lines.append(f"{pad}}}")
+        return lines
+    if isinstance(stmt, DoWhileStmt):
+        lines = [f"{pad}do {{                            ; {stmt.src.short()}"]
+        for s in stmt.body.stmts:
+            lines.extend(_fmt_stmt(s, indent + 1))
+        lines.append(f"{pad}}} while {_fmt_compare(stmt.cond)}")
         return lines
     if isinstance(stmt, MatchStmt):
         from .ir1 import _fmt_imm

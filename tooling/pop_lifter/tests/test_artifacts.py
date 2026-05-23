@@ -27,6 +27,7 @@ IR_PILOT_CHGSHADPOSN_PASS3 = REPO_ROOT / "ir" / "pilot" / "chgshadposn.pass3.ir3
 IR_PILOT_CUP_PASS3 = REPO_ROOT / "ir" / "pilot" / "cup.pass3.ir3"
 IR_PILOT_CMPSPACE_MATCH = REPO_ROOT / "ir" / "pilot" / "cmpspace.match.ir3"
 IR_PILOT_FASTBLACK_SMC = REPO_ROOT / "ir" / "pilot" / "fastblack.smc.ir1"
+IR_PILOT_CHGSHADPOSN_LOOPS = REPO_ROOT / "ir" / "pilot" / "chgshadposn.loops.ir3"
 IR_RAW = REPO_ROOT / "ir" / "raw"
 
 PILOT_ENTRIES = [
@@ -420,6 +421,46 @@ def test_pass3_fastblack_smc_artifact_matches(source_dir):
         f"regenerate with:\n"
         f"  pop-lifter smc HIRES.S --entry FASTBLACK "
         f"--out {IR_PILOT_FASTBLACK_SMC.relative_to(REPO_ROOT)}"
+    )
+
+
+def _regen_chgshadposn_loops(source_dir: Path) -> str:
+    from pop_lifter.pass2_reloop import reloop_module
+    from pop_lifter.pass2_struct import structure_module
+    from pop_lifter.pass3_expr import fold_module
+    from pop_lifter.pass3_loops import recover_loops
+    from pop_lifter import ir3 as ir3_mod
+    ast = parse_files(
+        [
+            source_dir / "EQ.S",
+            source_dir / "GAMEEQ.S",
+            source_dir / "AUTO.S",
+        ],
+        search_paths=[source_dir],
+    )
+    auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
+    ir1_module = lift_file(auto, ast.symbols(), ["chgshadposn"]).module
+    rec = recover_loops(fold_module(reloop_module(structure_module(ir1_module))))
+    return ir3_mod.format_module(rec)
+
+
+def test_pass3_chgshadposn_loops_artifact_matches(source_dir):
+    """The chgshadposn pass-3 loops pilot pins do-while recovery: the
+    `loop { ... ; if y < 0 { break } }` collapses to `do { ... } while
+    y >= 0`, with the bottom exit guard hoisted into the header."""
+    if not IR_PILOT_CHGSHADPOSN_LOOPS.exists():
+        raise AssertionError(
+            f"missing artifact {IR_PILOT_CHGSHADPOSN_LOOPS}. regenerate with:\n"
+            f"  pop-lifter loops AUTO.S --entry chgshadposn "
+            f"--out {IR_PILOT_CHGSHADPOSN_LOOPS.relative_to(REPO_ROOT)}"
+        )
+    expected = IR_PILOT_CHGSHADPOSN_LOOPS.read_text(encoding="utf-8")
+    actual = _regen_chgshadposn_loops(source_dir)
+    assert actual == expected, (
+        f"{IR_PILOT_CHGSHADPOSN_LOOPS.relative_to(REPO_ROOT)} is stale. "
+        f"regenerate with:\n"
+        f"  pop-lifter loops AUTO.S --entry chgshadposn "
+        f"--out {IR_PILOT_CHGSHADPOSN_LOOPS.relative_to(REPO_ROOT)}"
     )
 
 
