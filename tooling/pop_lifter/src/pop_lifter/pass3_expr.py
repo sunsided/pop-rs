@@ -468,7 +468,13 @@ def _stmt_demands(stmt: Stmt, reg, *, tail_dm, call_dm, ret):
         # The body runs at least once; its demand from the top decides.
         return _seq_demands(stmt.body.stmts, 0, reg, tail_dm=tail_dm,
                             call_dm=call_dm, ret=ret)
-    return None
+    # Any other node type — notably the late readability passes' nodes
+    # (`MatchStmt`, `DoWhileStmt`) — isn't modelled here. The fold runs
+    # on reloop output, before those passes, so this is never hit in the
+    # pipeline; but if it were, conservatively treat the register as used
+    # (True), never transparent (None), so demand can't be under-reported
+    # into an unsound fold.
+    return True
 
 
 def _branches_demand(then_block: Block, else_block, reg, *, tail_dm, call_dm, ret):

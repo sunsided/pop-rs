@@ -181,13 +181,16 @@ class DoWhileStmt:
 
 @dataclass(frozen=True)
 class BreakStmt:
-    """Exit the innermost enclosing `LoopStmt`."""
+    """Exit the innermost enclosing loop statement (`LoopStmt` or, after
+    loop recovery, `DoWhileStmt`)."""
     src: SourceRef
 
 
 @dataclass(frozen=True)
 class ContinueStmt:
-    """Jump to the top of the innermost enclosing `LoopStmt`."""
+    """Jump to the top of the innermost enclosing loop statement
+    (`LoopStmt` or, after recovery, `DoWhileStmt` — restarting its body
+    without re-testing the bottom condition)."""
     src: SourceRef
 
 

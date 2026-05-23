@@ -25,6 +25,14 @@ differential interpreter.
 This is the foundation for later induction-variable / `for` recovery,
 which wants the exit condition exposed in the header rather than buried
 at the bottom of the body.
+
+**Ordering.** `DoWhileStmt` is a *late* readability node: the fold
+(`pass3_expr`) and `match` recognition (`pass3_match`) walkers don't
+model it, so loop recovery must run after them (the `loops` CLI command
+runs `reloop → fold → recover_loops`). Re-running fold/match on the
+output is unsupported; to keep that from being a silent footgun, the
+fold's demand analysis treats any node it doesn't model conservatively
+(as a register use) rather than transparently.
 """
 
 from __future__ import annotations

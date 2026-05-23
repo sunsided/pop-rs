@@ -17,6 +17,7 @@ from pop_lifter.ir1 import (
     Compare,
     DecTarget,
     Imm,
+    IncTarget,
     LoadImm,
     Reg,
     SourceRef,
@@ -25,6 +26,7 @@ from pop_lifter.ir1 import (
 from pop_lifter.ir3 import (
     Block,
     BreakStmt,
+    ContinueStmt,
     DoWhileStmt,
     IfStmt,
     LoopStmt,
@@ -154,3 +156,26 @@ def test_dowhile_recovery_is_behaviour_preserving():
     ir3_run([post], "counter", ram=r2)
     assert r1 == r2
     assert list(r2[0x300:0x304]) == [0, 1, 2, 3]
+
+
+def test_continue_restarts_body_without_testing_condition():
+    """The subtle `DoWhileStmt` semantic: a `continue` restarts the body
+    *without* re-testing the bottom condition (unlike a C/Rust `do { }
+    while`). Here the body always `continue`s and the continue condition
+    `y == 0` is false once `y` advances — a C-style do-while would test
+    it and exit after one iteration, ours loops to the break guard."""
+    body = [
+        RawStmt(IncTarget(target=Reg.Y, src=SRC)),
+        RawStmt(StoreIndexed(
+            reg=Reg.Y, base=Abs(name="OUT", addr=0x300), index=Reg.Y, src=SRC)),
+        _guard(_cmp(Reg.Y, ">=", 3)),       # bound: break once y >= 3
+        ContinueStmt(src=SRC),              # always restart the body
+    ]
+    dw = DoWhileStmt(body=Block.of(body), cond=_cmp(Reg.Y, "==", 0), src=SRC)
+    mod = ModuleIR3("M", "syn", [RoutineIR3(name="c", body=Block.of([dw, ReturnStmt(src=SRC)]))])
+
+    ram = bytearray(0x10000)
+    ir3_run([mod], "c", ram=ram)
+    # Looped to the break guard (y reached 3), writing 1,2,3 — not just 1
+    # (which is what testing the false condition after `continue` would give).
+    assert list(ram[0x300:0x304]) == [0, 1, 2, 3]
