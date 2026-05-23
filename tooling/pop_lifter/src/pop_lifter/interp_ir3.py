@@ -331,6 +331,10 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
     if isinstance(stmt, RepeatStmt):
         # Fixed-count busy-wait. Replay the init, body, and step `count`
         # times — the full byte wrap leaves `var` back at its start.
+        if not (0 < stmt.count <= 1_000_000):
+            raise InterpError(
+                f"RepeatStmt count {stmt.count} out of range (0, 1,000,000]"
+            )
         start = stmt.start.value & 0xff
         if stmt.var is Reg.A:
             trace.a = start

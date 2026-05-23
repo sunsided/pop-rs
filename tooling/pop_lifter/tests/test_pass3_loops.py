@@ -21,6 +21,7 @@ from pop_lifter.ir1 import (
     LoadImm,
     Reg,
     SourceRef,
+    StoreAbs,
     StoreIndexed,
     Unsupported,
 )
@@ -334,6 +335,51 @@ def test_delay_body_reading_counter_not_repeat():
         _loop([*body, _dec(Reg.X), _guard(_cmp(Reg.X, "==", 0))]),
     ])
     assert not any(isinstance(s, RepeatStmt) for s in out)
+
+
+def test_delay_body_with_if_inspecting_counter_not_repeat():
+    """A body `if x == 3 { … }` inspects the counter — `repeat` would
+    drop that dependency, so it's left as a do-while. (Reviewer #28.)"""
+    inner_if = IfStmt(
+        cond=_cmp(Reg.X, "==", 3),
+        then_block=Block.of([RawStmt(StoreAbs(
+            reg=Reg.X, target=Abs(name="HIT", addr=0x310), src=SRC))]),
+        else_block=None, src=SRC,
+    )
+    out = _recover_one([
+        _ldimm(Reg.X, 0),
+        _loop([inner_if, _dec(Reg.X), _guard(_cmp(Reg.X, "==", 0))]),
+    ])
+    assert not any(isinstance(s, RepeatStmt) for s in out)
+
+
+def test_delay_body_with_match_on_counter_not_repeat():
+    """A `match x { … }` in the body inspects the counter — not a clean
+    delay. (Reviewer #28.)"""
+    from pop_lifter.ir3 import MatchArm, MatchStmt
+    arm = MatchArm(values=(Imm(value=1, text="#1"),),
+                   body=Block.of([ReturnStmt(src=SRC)]))
+    mat = MatchStmt(reg=Reg.X, arms=(arm,), src=SRC)
+    out = _recover_one([
+        _ldimm(Reg.X, 0),
+        _loop([mat, _dec(Reg.X), _guard(_cmp(Reg.X, "==", 0))]),
+    ])
+    assert not any(isinstance(s, RepeatStmt) for s in out)
+
+
+def test_repeat_count_out_of_range_raises():
+    """`RepeatStmt` is a public node; the interpreter guards a bad count
+    rather than spinning unbounded. (Reviewer #28.)"""
+    import pytest
+    from pop_lifter.interp_ir1 import InterpError
+    for bad in (0, -1, 2_000_000):
+        rep = RepeatStmt(count=bad, var=Reg.X,
+                         start=Imm(value=0, text="#0"), step=-1,
+                         body=Block.of([]), src=SRC)
+        mod = ModuleIR3("M", "syn", [RoutineIR3(
+            name="r", body=Block.of([rep, ReturnStmt(src=SRC)]))])
+        with pytest.raises(InterpError):
+            ir3_run([mod], "r", ram=bytearray(0x10000))
 
 
 def test_delay_recovery_is_behaviour_preserving():

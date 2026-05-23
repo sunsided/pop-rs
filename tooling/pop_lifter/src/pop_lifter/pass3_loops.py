@@ -60,7 +60,9 @@ from .ir3 import (
     ContinueStmt,
     DoWhileStmt,
     ForStmt,
+    GotoStmt,
     IfStmt,
+    LabelStmt,
     LoopStmt,
     MatchStmt,
     ModuleIR3,
@@ -216,19 +218,22 @@ def _counter_for(prev: Stmt, dw: DoWhileStmt):
                    cond=dw.cond, body=for_body, src=dw.src)
 
 
-def _block_reads_reg(block: Block, reg) -> bool:
+def _delay_body_reads_reg(block: Block, reg) -> bool:
+    """Could anything in `block` read `reg`? A `repeat` exposes no loop
+    variable, so a delay body must not depend on the counter at all.
+    Beyond explicit `RawStmt` reads this is conservative: any structured
+    statement (an `IfStmt`/`MatchStmt` whose condition might inspect the
+    counter, an `Assign` that might index by it, a nested loop, a call,
+    …) is treated as a read. Only `RawStmt`s that don't read `reg` and
+    pure control transfers are accepted."""
     for s in block.stmts:
-        if isinstance(s, RawStmt) and _reads_reg(s.item, reg):
-            return True
-        for attr in ("then_block", "else_block", "body"):
-            inner = getattr(s, attr, None)
-            if inner is not None and hasattr(inner, "stmts") \
-                    and _block_reads_reg(inner, reg):
+        if isinstance(s, RawStmt):
+            if _reads_reg(s.item, reg):
                 return True
-        if isinstance(s, MatchStmt):
-            for arm in s.arms:
-                if _block_reads_reg(arm.body, reg):
-                    return True
+            continue
+        if isinstance(s, (BreakStmt, ContinueStmt, GotoStmt, LabelStmt)):
+            continue  # control transfer — reads no register
+        return True  # any other node may read the counter
     return False
 
 
@@ -272,7 +277,7 @@ def _delay_loop(prev: Stmt, dw: DoWhileStmt):
     if direction is None or step.item.target is not reg:
         return None
     rest = Block.of(list(body[:-1]))
-    if (_body_clobbers_counter(rest, reg) or _block_reads_reg(rest, reg)
+    if (_body_clobbers_counter(rest, reg) or _delay_body_reads_reg(rest, reg)
             or _has_continue(rest) or _has_break(rest)):
         return None
     return RepeatStmt(count=0x100, var=reg, start=prev.item.imm,
