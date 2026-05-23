@@ -1,17 +1,17 @@
-"""Pass 3 slice 1 — accumulator copy folding.
+"""Pass 3 — accumulator/register expression folding.
 
-Two flavours of test:
+Three flavours of test:
 
 * **Synthetic unit tests** drive the folder (`_fold_block` /
-  `fold_routine`) over hand-built IR3 to pin the fold rules: a dead
-  accumulator copy collapses to an `Assign`, a multi-store run folds to
-  one `Assign` per store, and anything where `A` stays live (a trailing
-  store/cmp/return, a non-copyable `Transfer` source) is left exactly as
-  pass 2 produced it.
-* **Behavioural equivalence** lifts the real `chgshadposn` through pass
-  1 + 2 + reloop, then folds it, and asserts the IR3 interpreter
-  produces byte-identical RAM before and after folding — the fold must
-  not change observable behaviour.
+  `fold_routine`) over hand-built IR3 to pin the fold rules: copy folds
+  (A/X/Y), arithmetic folds (`clc;adc` / `sec;sbc`), the carry- and
+  register-liveness gates, and the interprocedural register demand that
+  lets a copy fold across a `jmp`/`jsr` when the target doesn't read the
+  register.
+* **Behavioural equivalence** interprets hand-built and real routines
+  (`chgshadposn`, `Cup`, plus synthetic caller/target pairs) before and
+  after folding and asserts byte-identical RAM — the fold must not
+  change observable behaviour.
 """
 
 from __future__ import annotations
@@ -47,10 +47,12 @@ from pop_lifter.ir3 import (
     CallStmt,
     IfStmt,
     LoopStmt,
+    ModuleIR3,
     RawIfStmt,
     RawStmt,
     ReturnStmt,
     RoutineIR3,
+    TailCallStmt,
 )
 from pop_lifter import ir3 as ir3_mod
 from pop_lifter.pass0_parse import parse_files
@@ -518,6 +520,142 @@ def test_cup_fold_structure(source_dir):
     assert assign.target.name == "CharBlockY"
     assert assign.source.lhs.name == "CharBlockY"
     assert isinstance(assign.source.rhs, Imm) and assign.source.rhs.value == 3
+
+
+# --------------------------------------------------------------- interprocedural demand
+
+
+def _R(it) -> RawStmt:
+    return RawStmt(item=it)
+
+
+def _routine(name, stmts) -> RoutineIR3:
+    return RoutineIR3(name=name, body=Block.of(stmts))
+
+
+def _ldimm(reg, v):
+    return _R(LoadImm(reg=reg, imm=Imm(value=v, text=f"#{v}"), src=SRC))
+
+
+def _sta(reg, name, addr):
+    return _R(StoreAbs(reg=reg, target=Abs(name=name, addr=addr), src=SRC))
+
+
+def _diff_ram(unfolded: ModuleIR3, folded: ModuleIR3, entry: str):
+    """Run `entry` in both modules from a zeroed RAM; return the two
+    RAM images for an equality assertion."""
+    from pop_lifter.interp_ir3 import run as ir3_run
+    r1 = bytearray(0x10000)
+    ir3_run([unfolded], entry, ram=r1)
+    r2 = bytearray(0x10000)
+    ir3_run([folded], entry, ram=r2)
+    return r1, r2
+
+
+def test_demand_tailcall_to_non_a_reader_folds():
+    """`a = #0x42 ; *DST = a ; jmp target` folds to `*DST = #0x42` when
+    `target` overwrites A before reading it (doesn't demand A). The
+    SkelProg→GuardProg shape. Differential: identical RAM."""
+    caller = _routine("caller", [
+        _ldimm(Reg.A, 0x42), _sta(Reg.A, "DST", 0x300),
+        TailCallStmt(target="target", src=SRC),
+    ])
+    target = _routine("target", [
+        _ldimm(Reg.A, 0x99), _sta(Reg.A, "MARK", 0x301), ReturnStmt(src=SRC),
+    ])
+    mod = ModuleIR3(name="M", file="syn", routines=[caller, target])
+    folded = fold_module(mod)
+    cbody = folded.find("caller").body.stmts
+    assert isinstance(cbody[0], Assign) and cbody[0].target.addr == 0x300
+    assert isinstance(cbody[0].source, Imm) and cbody[0].source.value == 0x42
+    r1, r2 = _diff_ram(mod, folded, "caller")
+    assert r1 == r2 and r2[0x300] == 0x42 and r2[0x301] == 0x99
+
+
+def test_demand_tailcall_to_a_reader_blocks_fold():
+    """If `target` reads A before writing it (here `sta MARK` first), it
+    demands A — so `a = #0x42 ; *DST = a ; jmp target` must NOT fold; the
+    accumulator carries the value into the tail call."""
+    caller = _routine("caller", [
+        _ldimm(Reg.A, 0x42), _sta(Reg.A, "DST", 0x300),
+        TailCallStmt(target="target", src=SRC),
+    ])
+    target = _routine("target", [
+        _sta(Reg.A, "MARK", 0x301), ReturnStmt(src=SRC),  # reads A first
+    ])
+    mod = ModuleIR3(name="M", file="syn", routines=[caller, target])
+    folded = fold_module(mod)
+    assert not any(isinstance(s, Assign) for s in folded.find("caller").body.stmts)
+
+
+def test_demand_unknown_target_is_conservative():
+    """A tail call to a target not in the module (cross-module / unknown)
+    defaults to demanding every register — no fold."""
+    caller = _routine("caller", [
+        _ldimm(Reg.A, 0x42), _sta(Reg.A, "DST", 0x300),
+        TailCallStmt(target="elsewhere", src=SRC),
+    ])
+    mod = ModuleIR3(name="M", file="syn", routines=[caller])
+    folded = fold_module(mod)
+    assert not any(isinstance(s, Assign) for s in folded.find("caller").body.stmts)
+
+
+def test_demand_x_copy_across_tailcall_folds():
+    """`x = #0x07 ; *DST = x ; jmp target` folds when `target` overwrites
+    X before reading it. The X/Y generalisation, unblocked by demand."""
+    caller = _routine("caller", [
+        _ldimm(Reg.X, 0x07), _sta(Reg.X, "DST", 0x300),
+        TailCallStmt(target="target", src=SRC),
+    ])
+    target = _routine("target", [
+        _ldimm(Reg.X, 0x01), _sta(Reg.X, "OUT", 0x302), ReturnStmt(src=SRC),
+    ])
+    mod = ModuleIR3(name="M", file="syn", routines=[caller, target])
+    folded = fold_module(mod)
+    cbody = folded.find("caller").body.stmts
+    assert isinstance(cbody[0], Assign) and cbody[0].source.value == 0x07
+    r1, r2 = _diff_ram(mod, folded, "caller")
+    assert r1 == r2 and r2[0x300] == 0x07
+
+
+def test_demand_call_then_reassign_folds():
+    """Non-tail `call` to a non-A-reader, then A reassigned: `a = #1 ;
+    *DST = a ; jsr target ; a = #0 ; *DST2 = a` folds the first copy
+    (A dead — target doesn't read it, then `a = #0` overwrites)."""
+    caller = _routine("caller", [
+        _ldimm(Reg.A, 1), _sta(Reg.A, "DST", 0x300),
+        CallStmt(target="target", src=SRC),
+        _ldimm(Reg.A, 0), _sta(Reg.A, "DST2", 0x302),
+        ReturnStmt(src=SRC),
+    ])
+    target = _routine("target", [
+        _ldimm(Reg.A, 5), _sta(Reg.A, "MARK", 0x301), ReturnStmt(src=SRC),
+    ])
+    mod = ModuleIR3(name="M", file="syn", routines=[caller, target])
+    folded = fold_module(mod)
+    assigns = [s for s in folded.find("caller").body.stmts if isinstance(s, Assign)]
+    assert any(a.target.addr == 0x300 and a.source.value == 1 for a in assigns)
+    r1, r2 = _diff_ram(mod, folded, "caller")
+    assert r1 == r2 and r2[0x300] == 1 and r2[0x301] == 5 and r2[0x302] == 0
+
+
+def test_demand_skelprog_folds_across_tailcall(source_dir):
+    """Real-world: AUTO.S `SkelProg` is `a = #2 ; *CharSword = a ; jmp
+    GuardProg`. GuardProg loads CharSword (overwrites A) before reading
+    it, so it doesn't demand A — the constant store folds across the
+    tail call to `*CharSword = #2`."""
+    ast = parse_files(
+        [source_dir / "EQ.S", source_dir / "GAMEEQ.S", source_dir / "AUTO.S"],
+        search_paths=[source_dir],
+    )
+    auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
+    ir1 = lift_file(auto, ast.symbols(), ["SkelProg", "GuardProg"]).module
+    folded = fold_module(reloop_module(structure_module(ir1)))
+    body = folded.find("SkelProg").body.stmts
+    assert isinstance(body[0], Assign)
+    assert body[0].target.name == "CharSword"
+    assert isinstance(body[0].source, Imm) and body[0].source.value == 2
+    assert isinstance(body[1], TailCallStmt) and body[1].target == "GuardProg"
 
 
 # --------------------------------------------------------------- whole tree
