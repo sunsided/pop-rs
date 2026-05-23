@@ -526,8 +526,8 @@ fn SETUPCHAR {
   c = 1                            ; CTRLSUBS.S:809
   a = a - #ScrnLeft - (1 - c)        ; CTRLSUBS.S:810
   *FCharX@0x0071 = a            ; CTRLSUBS.S:811
-  ??? asl FCharX            ; CTRLSUBS.S:813
-  ??? rol FCharX+1            ; CTRLSUBS.S:814
+  *FCharX@0x0071 <<= 1                 ; CTRLSUBS.S:813
+  *FCharX+1@0x0072 <rol= 1                 ; CTRLSUBS.S:814
   if eq goto :pos       ; CTRLSUBS.S:815
   a = *FCharX@0x0071        ; CTRLSUBS.S:817
   if a < #0xf0 goto :pos  ; CTRLSUBS.S:819
@@ -636,10 +636,10 @@ fn getfindex {
   a = #0x00                  ; CTRLSUBS.S:947
   *ztemp+1@0x00ea = a            ; CTRLSUBS.S:948
   *framepoint+1@0x0081 = a            ; CTRLSUBS.S:949
-  ??? asl framepoint            ; CTRLSUBS.S:951
-  ??? rol framepoint+1            ; CTRLSUBS.S:952
-  ??? asl framepoint            ; CTRLSUBS.S:953
-  ??? rol framepoint+1            ; CTRLSUBS.S:954
+  *framepoint@0x0080 <<= 1                 ; CTRLSUBS.S:951
+  *framepoint+1@0x0081 <rol= 1                 ; CTRLSUBS.S:952
+  *framepoint@0x0080 <<= 1                 ; CTRLSUBS.S:953
+  *framepoint+1@0x0081 <rol= 1                 ; CTRLSUBS.S:954
   a = *framepoint@0x0080        ; CTRLSUBS.S:956
   c = 0                            ; CTRLSUBS.S:957
   a = a + *ztemp@0x00e9 + c    ; CTRLSUBS.S:958
@@ -658,8 +658,8 @@ fn getswordframe {
   a = #0x00                  ; CTRLSUBS.S:980
   *ztemp+1@0x00ea = a            ; CTRLSUBS.S:981
   *framepoint+1@0x0081 = a            ; CTRLSUBS.S:982
-  ??? asl framepoint            ; CTRLSUBS.S:984
-  ??? rol framepoint+1            ; CTRLSUBS.S:985
+  *framepoint@0x0080 <<= 1                 ; CTRLSUBS.S:984
+  *framepoint+1@0x0081 <rol= 1                 ; CTRLSUBS.S:985
   a = *framepoint@0x0080        ; CTRLSUBS.S:987
   c = 0                            ; CTRLSUBS.S:988
   a = a + *ztemp@0x00e9 + c    ; CTRLSUBS.S:989
@@ -719,7 +719,7 @@ fn GETEDGES {
   a = *FCharX+1@0x0072        ; CTRLSUBS.S:1084
   a = a >> 1                       ; CTRLSUBS.S:1085
   a = *FCharX@0x0071        ; CTRLSUBS.S:1086
-  ??? ror             ; CTRLSUBS.S:1087
+  a = (a >> 1) | (c << 7)          ; CTRLSUBS.S:1087
   c = 0                            ; CTRLSUBS.S:1088
   a = a + #ScrnLeft + c              ; CTRLSUBS.S:1089
   x = *CharFace@0x0043        ; CTRLSUBS.S:1094

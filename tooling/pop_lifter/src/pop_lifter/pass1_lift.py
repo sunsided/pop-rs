@@ -49,7 +49,10 @@ from .ir1 import (
     IndexedAbs,
     Pha,
     Pla,
+    Rol,
+    Ror,
     SbcIndexed,
+    ShiftMem,
     Branch,
     Call,
     Clc,
@@ -362,13 +365,22 @@ def _lift_instr(
             return Unsupported(mnemonic=mnemonic, operand=None, src=src)
         return Call(target=line.operand.strip(), src=src)
 
-    if mnemonic == "asl":
-        # `asl` with no operand or `asl a` both mean accumulator shift.
-        # `asl abs` (memory) would need a separate IR node; rndp/RND
-        # never use that form, so leave it Unsupported for now.
+    if mnemonic in ("asl", "lsr", "rol", "ror"):
+        # Accumulator form: `<op>` (no operand) or `<op> a` → Asl /
+        # Lsr / Rol / Ror. Memory form: `<op> addr` → ShiftMem with
+        # the same op. POP uses both extensively (the 16-bit-shift
+        # idiom `asl lo ; rol hi` is a memory pair).
         op = (line.operand or "").strip().lower()
         if op in ("", "a"):
-            return Asl(src=src)
+            return {
+                "asl": Asl,
+                "lsr": Lsr,
+                "rol": Rol,
+                "ror": Ror,
+            }[mnemonic](src=src)
+        addr = _parse_absolute(line.operand, equates)
+        if addr is not None:
+            return ShiftMem(op=mnemonic, target=addr, src=src)
         return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
 
     if mnemonic == "clc":
@@ -409,14 +421,6 @@ def _lift_instr(
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return SbcAbs(source=addr, src=src)
-        return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
-
-    if mnemonic == "lsr":
-        # Accumulator-only form. `lsr <addr>` (memory shift) lands in
-        # a later slice once a routine actually needs it.
-        op = (line.operand or "").strip().lower()
-        if op in ("", "a"):
-            return Lsr(src=src)
         return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
 
     if mnemonic == "bit":

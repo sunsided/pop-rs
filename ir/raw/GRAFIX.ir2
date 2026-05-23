@@ -1455,11 +1455,11 @@ fn VBLANKIIc {
 :loop1:
   bit *vblflag@0x01fb                ; GRAFIX.S:1958
   if pl goto :loop1       ; GRAFIX.S:1959
-  ??? lsr vblflag            ; GRAFIX.S:1960
+  *vblflag@0x01fb >>= 1                 ; GRAFIX.S:1960
 :loop2:
   bit *vblflag@0x01fb                ; GRAFIX.S:1962
   if pl goto :loop2       ; GRAFIX.S:1963
-  ??? lsr vblflag            ; GRAFIX.S:1964
+  *vblflag@0x01fb >>= 1                 ; GRAFIX.S:1964
   ??? sei             ; GRAFIX.S:1966
   return                           ; GRAFIX.S:1967
 }
@@ -1470,7 +1470,7 @@ fn VBLI {
   *$c05b@0xc05b = a            ; GRAFIX.S:1974
   *$c078@0xc078 = a            ; GRAFIX.S:1975
   c = 1                            ; GRAFIX.S:1976
-  ??? ror vblflag            ; GRAFIX.S:1977
+  *vblflag@0x01fb ror>= 1                 ; GRAFIX.S:1977
 :notvbl:
   ??? rti             ; GRAFIX.S:1978
 }

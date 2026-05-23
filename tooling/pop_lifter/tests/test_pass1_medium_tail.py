@@ -61,12 +61,17 @@ def test_lsr_accumulator_lifts_to_lsr():
     assert isinstance(_lift_instr(_line("lsr"), {}, set()), Lsr)
 
 
-def test_lsr_memory_form_stays_unsupported():
-    """`lsr addr` (memory shift) needs a separate node — pinned as
-    Unsupported so a future overgeneralisation can't silently lift
-    it into the accumulator form."""
+def test_lsr_memory_form_lifts_to_shiftmem():
+    """`lsr addr` lifts to `ShiftMem(op="lsr", target=addr)` — added
+    as part of the memory-shifts slice. Previously this stayed
+    `Unsupported`; the test has been flipped to pin the new
+    behaviour (and to distinguish the memory variant from the
+    accumulator-only `Lsr` node)."""
+    from pop_lifter.ir1 import ShiftMem
     instr = _lift_instr(_line("lsr", "$80"), {}, set())
-    assert isinstance(instr, Unsupported)
+    assert isinstance(instr, ShiftMem)
+    assert instr.op == "lsr"
+    assert instr.target.addr == 0x80
 
 
 def test_bit_imm_lifts_to_bit_with_imm_source():
