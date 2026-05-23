@@ -22,10 +22,12 @@ from pop_lifter.ir1 import (
     Reg,
     SourceRef,
     StoreIndexed,
+    Unsupported,
 )
 from pop_lifter.ir3 import (
     Block,
     BreakStmt,
+    CallStmt,
     ContinueStmt,
     DoWhileStmt,
     ForStmt,
@@ -203,6 +205,37 @@ def test_up_counter_not_promoted():
                _guard(_cmp(Reg.X, "==", 5))]),
     ])
     assert _not_a_for(out)
+
+
+def test_call_in_body_not_promoted():
+    """A `call` in the body may clobber X/Y (no proof the callee
+    preserves it), so the counter isn't provably clean — not a for."""
+    out = _recover_one(_down_counter(6, [CallStmt(target="foo", src=SRC)]))
+    assert _not_a_for(out)
+
+
+def test_unsupported_op_in_body_not_promoted():
+    """An unmodelled opcode has unknown register effects — conservatively
+    blocks promotion."""
+    body = [RawStmt(Unsupported(mnemonic="wat", operand=None, src=SRC))]
+    out = _recover_one(_down_counter(6, body))
+    assert _not_a_for(out)
+
+
+def test_symbolic_init_bound_preserved_in_dump():
+    """A symbolic counter bound (`#numslots`) renders as the name, not
+    its assembled byte, via `_fmt_imm`."""
+    from pop_lifter import ir3 as ir3_mod
+    init = Imm(value=0x06, text="#numslots")
+    body = [RawStmt(StoreIndexed(
+        reg=Reg.Y, base=Abs(name="OUT", addr=0x300), index=Reg.Y, src=SRC))]
+    out = _recover_one([
+        RawStmt(LoadImm(reg=Reg.Y, imm=init, src=SRC)),
+        _loop([*body, _dec(Reg.Y), _guard(_cmp(Reg.Y, "<0"))]),
+    ])
+    assert isinstance(out[0], ForStmt)
+    dump = "\n".join(ir3_mod._fmt_stmt(out[0], 0))
+    assert "(0..=#numslots).rev()" in dump
 
 
 def test_for_recovery_is_behaviour_preserving():

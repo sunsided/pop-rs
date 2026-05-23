@@ -45,10 +45,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from .ir1 import DecTarget, LoadImm
+from .ir1 import DecTarget, LoadImm, Unsupported
 from .ir3 import (
     Block,
     BreakStmt,
+    CallStmt,
     ContinueStmt,
     DoWhileStmt,
     ForStmt,
@@ -60,6 +61,7 @@ from .ir3 import (
     RawStmt,
     RoutineIR3,
     Stmt,
+    TailCallStmt,
 )
 from .pass3_expr import _writes_reg
 
@@ -117,19 +119,27 @@ def _recurse(stmt: Stmt) -> Stmt:
     return stmt
 
 
-def _block_writes_reg(block: Block, reg) -> bool:
-    """Does any `RawStmt` in `block` (recursively) write `reg`? A clean
-    induction counter is written only by its step."""
+def _body_clobbers_counter(block: Block, reg) -> bool:
+    """Could anything in `block` (recursively) change `reg` other than
+    the loop's own step? A clean induction counter is written only by
+    its `dey`/`dex`. Beyond explicit `RawStmt` writes this conservatively
+    flags calls and unmodelled opcodes, which may clobber X/Y without our
+    being able to prove otherwise — promoting such a loop to a `for`
+    would misrepresent the iteration sequence."""
     for s in block.stmts:
-        if isinstance(s, RawStmt) and _writes_reg(s.item, reg):
-            return True
+        if isinstance(s, (CallStmt, TailCallStmt)):
+            return True  # callee may use X/Y as scratch
+        if isinstance(s, RawStmt):
+            if isinstance(s.item, Unsupported) or _writes_reg(s.item, reg):
+                return True
         for attr in ("then_block", "else_block", "body"):
             inner = getattr(s, attr, None)
-            if inner is not None and hasattr(inner, "stmts") and _block_writes_reg(inner, reg):
+            if inner is not None and hasattr(inner, "stmts") \
+                    and _body_clobbers_counter(inner, reg):
                 return True
         if isinstance(s, MatchStmt):
             for arm in s.arms:
-                if _block_writes_reg(arm.body, reg):
+                if _body_clobbers_counter(arm.body, reg):
                     return True
     return False
 
@@ -168,7 +178,7 @@ def _counter_for(prev: Stmt, dw: DoWhileStmt):
             and step.item.target is reg):
         return None
     for_body = Block.of(list(body[:-1]))
-    if _block_writes_reg(for_body, reg) or _has_continue(for_body):
+    if _body_clobbers_counter(for_body, reg) or _has_continue(for_body):
         return None
     return ForStmt(var=reg, init=prev.item.imm, body=for_body, src=dw.src)
 

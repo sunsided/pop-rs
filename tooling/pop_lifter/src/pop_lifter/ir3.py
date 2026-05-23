@@ -407,8 +407,10 @@ def _fmt_stmt(stmt: Stmt, indent: int) -> list[str]:
         lines.append(f"{pad}}} while {_fmt_compare(stmt.cond)}")
         return lines
     if isinstance(stmt, ForStmt):
-        init = stmt.init.value & 0xff
-        lines = [f"{pad}for {stmt.var} in (0..={init:#04x}).rev() {{    ; {stmt.src.short()}"]
+        from .ir1 import _fmt_imm
+        # Delegate to ir1's immediate formatter so a symbolic bound
+        # (`#numslots`, etc.) survives instead of its assembled byte.
+        lines = [f"{pad}for {stmt.var} in (0..={_fmt_imm(stmt.init)}).rev() {{    ; {stmt.src.short()}"]
         for s in stmt.body.stmts:
             lines.extend(_fmt_stmt(s, indent + 1))
         lines.append(f"{pad}}}")

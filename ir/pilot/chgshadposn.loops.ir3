@@ -3,7 +3,7 @@
 fn chgshadposn {
   *ztemp@0x00f0 = a            ; AUTO.S:1048
   *ztemp+1@0x00f1 = x            ; AUTO.S:1049
-  for y in (0..=0x06).rev() {    ; AUTO.S:1054
+  for y in (0..=#0x06).rev() {    ; AUTO.S:1054
     *(Char@0x0040 + y) = *(ztemp@0x00f0)[y]    ; AUTO.S:1052
   }
   y = #0x07                  ; AUTO.S:1056
