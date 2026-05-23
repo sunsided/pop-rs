@@ -76,13 +76,18 @@ from .ir1 import (
 from .ir3 import (
     Assign,
     Block,
+    BreakStmt,
+    CallStmt,
+    ContinueStmt,
     IfStmt,
     LoopStmt,
     ModuleIR3,
     RawIfStmt,
     RawStmt,
+    ReturnStmt,
     RoutineIR3,
     Stmt,
+    TailCallStmt,
 )
 
 
@@ -157,8 +162,10 @@ def _a_store_target(item):
 
 def _stmt_touches_a(stmt: Stmt) -> bool:
     """Conservative: does this statement (including any nested block)
-    read or write A? Used to decide whether a forward scan can safely
-    step past a statement when proving A dead."""
+    read or write A? Used by `_first_a_touch_is_write` to find the
+    first A-touch in a loop body. (The forward deadness scan in
+    `_a_dead_from` classifies each statement type directly rather than
+    relying on this coarse "touches A" summary.)"""
     if isinstance(stmt, RawStmt):
         return _reads_a(stmt.item) or _writes_a(stmt.item)
     if isinstance(stmt, Assign):
@@ -211,51 +218,107 @@ def _first_a_touch_is_write(block: Block) -> bool:
 # ---------------------------------------------------------------- the fold
 
 
-def _a_dead_after(stmts: list[Stmt], idx: int, *, dead_at_end: bool) -> bool:
-    """Starting just after the store run (index `idx`), is A dead —
-    i.e. overwritten before being read?
+def _a_dead_from(
+    stmts: list[Stmt],
+    idx: int,
+    *,
+    dead_fallthrough: bool,
+    dead_break: bool,
+    dead_continue: bool,
+) -> bool:
+    """Is A dead from `stmts[idx:]` onward — i.e. overwritten before
+    being read on *every* control-flow path? Path-sensitive: each way
+    out of the current statement list carries its own deadness:
 
-    * First statement that *writes* A (without reading) → dead.
-    * First statement that *reads* A (store, arithmetic, condition,
-      Call/TailCall/Return) → live.
-    * A `RawIfStmt` → live. The dropped load sets Z/N, which the
-      store run leaves untouched, so a raw flag-branch here could be
-      reading the load's flags. (`IfStmt` uses a self-contained
-      `Compare` and re-derives from registers, so it's exempt.)
-    * A nested block that touches A → conservatively live.
-    * Reached the end of the list → `dead_at_end` (True only for a
-      loop body whose first A-touch is a write).
+    * `dead_fallthrough` — control runs off the end of this list.
+    * `dead_break` — a `break` exits the innermost enclosing loop.
+    * `dead_continue` — a `continue` re-enters the innermost loop.
+
+    Per-statement rules:
+
+    * `RawStmt` that writes A without reading → dead (True); that reads
+      A → live (False); otherwise step past it.
+    * `Call`/`TailCall`/`Return` → live (A may be an argument / return
+      value).
+    * `RawIfStmt` → live: the dropped load set Z/N, which the store run
+      leaves intact, so a raw flag-branch may observe them. (An
+      `IfStmt` uses a self-contained `Compare`, so its *condition*
+      reads no flags — but each of its branches is still scanned.)
+    * `IfStmt` whose condition reads A → live; otherwise A is dead past
+      it only if dead on *both* the taken branch and the fall-through.
+    * A nested `LoopStmt`, `Goto`/`Label`, or any unrecognised stmt →
+      live (out of scope for slice 1; never step past it).
+
+    Unlike the earlier `_stmt_touches_a`-based scan, this never steps
+    past a compound statement on the strength of "its body doesn't
+    touch A" alone — a nested flag-branch or early exit is honoured.
     """
-    from .ir3 import CallStmt, ReturnStmt, TailCallStmt
-
-    for s in stmts[idx:]:
+    n = len(stmts)
+    i = idx
+    while i < n:
+        s = stmts[i]
         if isinstance(s, RawStmt):
             if _reads_a(s.item):
                 return False
             if _writes_a(s.item):
                 return True
+            i += 1
+            continue
+        if isinstance(s, Assign):
+            i += 1  # folded copy touches neither A nor flags
             continue
         if isinstance(s, (CallStmt, TailCallStmt, ReturnStmt)):
-            # A may be an argument / return value — treat as a read.
             return False
+        if isinstance(s, BreakStmt):
+            return dead_break
+        if isinstance(s, ContinueStmt):
+            return dead_continue
         if isinstance(s, RawIfStmt):
-            # Raw flag-suffix branch (eq/ne/pl/mi/...) may observe the
-            # Z/N the dropped load set — conservatively live.
             return False
-        if isinstance(s, Assign):
-            continue  # touches neither A nor flags
-        # IfStmt / RawIfStmt / LoopStmt / Break / Continue / etc.
-        if _stmt_touches_a(s):
-            return False
-        # Doesn't touch A — keep scanning (e.g. `if y < 0 { break }`).
-        continue
-    return dead_at_end
+        if isinstance(s, IfStmt):
+            if s.cond.reg is Reg.A:
+                return False
+            # Deadness of everything after this `if` (the false edge,
+            # and the then-block's own fall-through both land here).
+            rest = _a_dead_from(
+                stmts, i + 1,
+                dead_fallthrough=dead_fallthrough,
+                dead_break=dead_break,
+                dead_continue=dead_continue,
+            )
+            then_dead = _a_dead_from(
+                list(s.then_block.stmts), 0,
+                dead_fallthrough=rest,
+                dead_break=dead_break,
+                dead_continue=dead_continue,
+            )
+            if s.else_block is not None:
+                else_dead = _a_dead_from(
+                    list(s.else_block.stmts), 0,
+                    dead_fallthrough=rest,
+                    dead_break=dead_break,
+                    dead_continue=dead_continue,
+                )
+            else:
+                else_dead = rest
+            return then_dead and else_dead
+        # LoopStmt / GotoStmt / LabelStmt / anything else: don't step
+        # past it.
+        return False
+    return dead_fallthrough
 
 
-def _fold_block(block: Block, *, dead_at_end: bool) -> Block:
-    """Fold accumulator copy runs in `block`. `dead_at_end` says
-    whether A is dead when control falls off the end of this block
-    (True for a loop body that overwrites A before reading it)."""
+def _fold_block(
+    block: Block,
+    *,
+    dead_fallthrough: bool,
+    dead_break: bool,
+    dead_continue: bool,
+) -> Block:
+    """Fold accumulator copy runs in `block`. The three flags give the
+    deadness of A at each edge out of this block — see `_a_dead_from`.
+    They're threaded down so a fold inside a loop body knows whether A
+    survives the break (post-loop) and back-edge (re-entry) paths."""
     stmts = list(block.stmts)
     out: list[Stmt] = []
     i = 0
@@ -263,30 +326,49 @@ def _fold_block(block: Block, *, dead_at_end: bool) -> Block:
     while i < n:
         stmt = stmts[i]
 
-        # Recurse into nested blocks first.
-        if isinstance(stmt, IfStmt):
+        # Recurse into nested blocks first. Nested `if` bodies fall
+        # through to *after* the `if`; rather than recompute that edge
+        # we pass `dead_fallthrough=False` (conservative — only costs
+        # missed folds). `break`/`continue` inside the body still target
+        # the same enclosing loop, so those flags pass through unchanged.
+        if isinstance(stmt, (IfStmt, RawIfStmt)):
             stmt = replace(
                 stmt,
-                then_block=_fold_block(stmt.then_block, dead_at_end=False),
-                else_block=(
-                    _fold_block(stmt.else_block, dead_at_end=False)
-                    if stmt.else_block is not None else None
+                then_block=_fold_block(
+                    stmt.then_block,
+                    dead_fallthrough=False,
+                    dead_break=dead_break,
+                    dead_continue=dead_continue,
                 ),
-            )
-        elif isinstance(stmt, RawIfStmt):
-            stmt = replace(
-                stmt,
-                then_block=_fold_block(stmt.then_block, dead_at_end=False),
                 else_block=(
-                    _fold_block(stmt.else_block, dead_at_end=False)
+                    _fold_block(
+                        stmt.else_block,
+                        dead_fallthrough=False,
+                        dead_break=dead_break,
+                        dead_continue=dead_continue,
+                    )
                     if stmt.else_block is not None else None
                 ),
             )
         elif isinstance(stmt, LoopStmt):
-            body_dead_at_end = _first_a_touch_is_write(stmt.body)
+            # Re-entry (fall-off-bottom and `continue`): the next
+            # iteration must overwrite A before reading it. Break: jump
+            # to whatever follows the loop in this block.
+            reentry_dead = _first_a_touch_is_write(stmt.body)
+            post_loop_dead = _a_dead_from(
+                stmts, i + 1,
+                dead_fallthrough=dead_fallthrough,
+                dead_break=dead_break,
+                dead_continue=dead_continue,
+            )
             stmt = replace(
                 stmt,
-                body=_fold_block(stmt.body, dead_at_end=body_dead_at_end),
+                body=_fold_block(
+                    stmt.body,
+                    dead_fallthrough=reentry_dead,
+                    dead_break=post_loop_dead,
+                    dead_continue=reentry_dead,
+                ),
             )
 
         # Try to start a copy run at a foldable A-load.
@@ -303,7 +385,12 @@ def _fold_block(block: Block, *, dead_at_end: bool) -> Block:
                         break
                     targets.append((tgt, stmts[j].item.src))
                     j += 1
-                if targets and _a_dead_after(stmts, j, dead_at_end=dead_at_end):
+                if targets and _a_dead_from(
+                    stmts, j,
+                    dead_fallthrough=dead_fallthrough,
+                    dead_break=dead_break,
+                    dead_continue=dead_continue,
+                ):
                     # Fold: drop the load, replace each store with an
                     # Assign carrying the load's source.
                     for tgt, ssrc in targets:
@@ -319,9 +406,17 @@ def _fold_block(block: Block, *, dead_at_end: bool) -> Block:
 def fold_routine(routine: RoutineIR3) -> RoutineIR3:
     # The routine's top-level block falls through to `return` /
     # tail-call, where A might be a return value — so A is NOT dead
-    # at the end. (Folds there happen only via an explicit
-    # reassignment, never the fall-off-the-end rule.)
-    return replace(routine, body=_fold_block(routine.body, dead_at_end=False))
+    # at the end. There's no enclosing loop, so break/continue are
+    # dead-false too (they shouldn't appear at this level anyway).
+    return replace(
+        routine,
+        body=_fold_block(
+            routine.body,
+            dead_fallthrough=False,
+            dead_break=False,
+            dead_continue=False,
+        ),
+    )
 
 
 def fold_module(module: ModuleIR3) -> ModuleIR3:

@@ -21,6 +21,7 @@ from pathlib import Path
 from pop_lifter.interp_ir3 import run as ir3_run
 from pop_lifter.ir1 import (
     Abs,
+    Compare,
     Imm,
     IndexedAbs,
     LoadAbs,
@@ -36,7 +37,11 @@ from pop_lifter.ir1 import (
 from pop_lifter.ir3 import (
     Assign,
     Block,
+    BreakStmt,
     CallStmt,
+    IfStmt,
+    LoopStmt,
+    RawIfStmt,
     RawStmt,
     ReturnStmt,
     RoutineIR3,
@@ -144,6 +149,88 @@ def test_load_with_no_following_store_is_left_alone():
     out = _fold([_load_a_abs("SRC", 0x10), _kill_a()])
     assert not any(isinstance(s, Assign) for s in out)
     assert len(out) == 2
+
+
+def _if_y(then_stmts: list, cond_reg: Reg = Reg.Y) -> IfStmt:
+    return IfStmt(
+        cond=Compare(reg=cond_reg, op="==", rhs=Imm(value=0, text="#0")),
+        then_block=Block.of(then_stmts),
+        else_block=None,
+        src=SRC,
+    )
+
+
+def test_no_fold_when_nested_if_can_return():
+    """`a = SRC ; *DST = a ; if y == 0 { return } ; a = #0` must NOT
+    fold: on the `y == 0` path control returns with A still holding the
+    loaded value. The earlier `_stmt_touches_a` scan stepped past this
+    `if` because its body 'doesn't touch A'. (Reviewer #20.)"""
+    out = _fold([
+        _load_a_abs("SRC", 0x10),
+        _store_a_abs("DST", 0x20),
+        _if_y([ReturnStmt(src=SRC)]),
+        _kill_a(),
+    ])
+    assert not any(isinstance(s, Assign) for s in out)
+
+
+def test_no_fold_when_nested_if_holds_raw_flag_branch():
+    """A `RawIfStmt` nested inside an `if` body reads the Z/N flags the
+    dropped load set — folding would change behaviour. The scan must
+    not step past the outer `if` just because its body doesn't touch A.
+    (Reviewer #20.)"""
+    inner = RawIfStmt(
+        cond="eq",
+        then_block=Block.of([
+            # stx — touches X/memory, not A — so the body 'doesn't touch A'.
+            _raw(StoreAbs(reg=Reg.X, target=Abs(name="T", addr=0x40), src=SRC)),
+        ]),
+        else_block=None,
+        src=SRC,
+    )
+    out = _fold([
+        _load_a_abs("SRC", 0x10),
+        _store_a_abs("DST", 0x20),
+        _if_y([inner]),
+        _kill_a(),
+    ])
+    assert not any(isinstance(s, Assign) for s in out)
+
+
+def _loop_copy_routine(post_loop: list) -> RoutineIR3:
+    """A chgshadposn-shaped loop: the copy run sits at the top of the
+    body, the exit guard (`if ... { break }`) at the bottom. `post_loop`
+    is spliced in after the loop — it decides whether the break path
+    leaves A dead."""
+    loop = LoopStmt(
+        body=Block.of([
+            _load_a_abs("SRC", 0x10),
+            _store_a_abs("DST", 0x20),
+            _if_y([BreakStmt(src=SRC)]),
+        ]),
+        src=SRC,
+    )
+    return RoutineIR3(name="syn", body=Block.of([loop, *post_loop]))
+
+
+def test_loop_copy_folds_when_break_target_kills_a():
+    """Break exits to code that overwrites A before reading it (`a =
+    #0`), so the loop-body copy is dead on every path and folds."""
+    routine = _loop_copy_routine(post_loop=[_kill_a(), ReturnStmt(src=SRC)])
+    loop = fold_routine(routine).body.stmts[0]
+    assert isinstance(loop, LoopStmt)
+    assert any(isinstance(s, Assign) for s in loop.body.stmts)
+
+
+def test_loop_copy_not_folded_when_break_target_reads_a():
+    """If the post-loop code reads A before overwriting it (here a store
+    of A), the loaded value escapes via the break path — no fold."""
+    routine = _loop_copy_routine(
+        post_loop=[_store_a_abs("OUT", 0x50), ReturnStmt(src=SRC)]
+    )
+    loop = fold_routine(routine).body.stmts[0]
+    assert isinstance(loop, LoopStmt)
+    assert not any(isinstance(s, Assign) for s in loop.body.stmts)
 
 
 # --------------------------------------------------------------- chgshadposn
