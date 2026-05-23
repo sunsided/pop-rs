@@ -1,8 +1,13 @@
 """Pass 3 — bit-shift expression recovery.
 
 `lda X ; (asl)*n ; sta Y` and `lda X ; (lsr)*n ; sta Y` are folded into
-a single `Assign` with a `BinExpr` when A and carry are both dead after
-the store.  The shift count `n` becomes the `rhs` of the `BinExpr`.
+a single `Assign` with a `BinExpr` when (a) there is exactly one store
+target and (b) A and carry are both dead after the store.  The shift
+count `n` becomes the `rhs` of the `BinExpr`.
+
+The single-store requirement mirrors the arithmetic fold: the stored
+value (`X << n`) is not the source value `X`, so a multi-store run
+isn't an idempotent write-back and is left unfolded.
 """
 
 from __future__ import annotations

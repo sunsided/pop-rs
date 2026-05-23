@@ -966,8 +966,11 @@ def _fold_block(block: Block, *, edges, demand) -> Block:
                             continue
 
                     # (2) Shift fold: lda X ; (asl)*n / (lsr)*n ; sta Y.
-                    # A single left/right shift run. Both A and carry must
-                    # be dead after the store (asl/lsr produce fresh carry).
+                    # A single left/right shift run. Single store only
+                    # (the shifted value isn't the source, so a multi-store
+                    # run isn't an idempotent write-back). Both A and carry
+                    # must be dead after the store (asl/lsr produce fresh
+                    # carry).
                     shift = _shift_after_load(stmts, i)
                     if shift is not None:
                         shift_op, count, store_start = shift
