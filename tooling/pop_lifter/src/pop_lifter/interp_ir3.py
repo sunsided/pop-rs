@@ -62,8 +62,10 @@ from .ir3 import (
     RawIfStmt,
     RawStmt,
     RepeatStmt,
+    RestoreTemp,
     ReturnStmt,
     RoutineIR3,
+    SaveTemp,
     Stmt,
     TailCallStmt,
     Wide16Stmt,
@@ -270,6 +272,26 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
         addr = _assign_addr(stmt.target, trace, stmt.src)
         trace.ram[addr] = value
         trace.writes[addr] = value
+        return
+    if isinstance(stmt, SaveTemp):
+        # Recovered `pha`. The slot is naming metadata; the value rides
+        # the same shared value stack as `pha`/`pla`, so this is exactly
+        # the push it replaced (and stays correct across call frames,
+        # where slot ids would otherwise collide).
+        trace.value_stack.append(trace.a & 0xff)
+        if len(trace.value_stack) > trace.max_value_stack_depth:
+            trace.max_value_stack_depth = len(trace.value_stack)
+        return
+    if isinstance(stmt, RestoreTemp):
+        # Recovered `pla`: pop the shared value stack into A and set Z/N,
+        # mirroring `pla` exactly.
+        if not trace.value_stack:
+            raise InterpError(
+                f"RestoreTemp (tmp{stmt.slot}) on empty value stack at "
+                f"{stmt.src.short()} — unbalanced save/restore?"
+            )
+        trace.a = trace.value_stack.pop()
+        _set_zn(trace, trace.a)
         return
     if isinstance(stmt, CallStmt):
         callee = _resolve(modules, aliases, stmt.target)

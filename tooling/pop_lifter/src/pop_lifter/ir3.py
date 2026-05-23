@@ -133,6 +133,34 @@ class Assign:
 
 
 @dataclass(frozen=True)
+class SaveTemp:
+    """`pha` recovered as a scoped-temporary save: stash A into temp
+    `slot`. Pairs with a `RestoreTemp` of the same `slot` further down
+    the same routine (pass-3 `pass3_temps` matches the pair under the
+    stack's LIFO discipline).
+
+    `slot` is a per-routine id used only to name the temporary in the
+    dump / future Rust emission (`let tmp{slot} = a;`). The runtime
+    value still rides the one shared value stack, so the interpreter
+    treats this exactly like the `pha` it replaced — the rewrite is
+    behaviour-preserving regardless of how slots were numbered."""
+
+    slot: int
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class RestoreTemp:
+    """`pla` recovered as a scoped-temporary restore: `a = temp{slot}`,
+    also setting Z/N from the restored value (matching `pla`). Pairs
+    with the `SaveTemp` of the same `slot`. See `SaveTemp` for the
+    slot-vs-stack rationale."""
+
+    slot: int
+    src: SourceRef
+
+
+@dataclass(frozen=True)
 class CallStmt:
     """`jsr target` — non-tail call. Translates to a regular function
     call at the Rust level."""
@@ -351,9 +379,10 @@ class MatchStmt:
 
 
 Stmt = (
-    RawStmt | Wide16Stmt | Assign | CallStmt | TailCallStmt | ReturnStmt
-    | IfStmt | RawIfStmt | LoopStmt | DoWhileStmt | ForStmt | RepeatStmt
-    | MatchStmt | BreakStmt | ContinueStmt | GotoStmt | LabelStmt
+    RawStmt | Wide16Stmt | Assign | SaveTemp | RestoreTemp | CallStmt
+    | TailCallStmt | ReturnStmt | IfStmt | RawIfStmt | LoopStmt | DoWhileStmt
+    | ForStmt | RepeatStmt | MatchStmt | BreakStmt | ContinueStmt | GotoStmt
+    | LabelStmt
 )
 
 
@@ -452,6 +481,10 @@ def _fmt_stmt(stmt: Stmt, indent: int) -> list[str]:
             return repr(v)
 
         return [f"{pad}{_loc(stmt.target)} = {_loc(stmt.source)}    ; {stmt.src.short()}"]
+    if isinstance(stmt, SaveTemp):
+        return [f"{pad}tmp{stmt.slot} = a    ; {stmt.src.short()} [save]"]
+    if isinstance(stmt, RestoreTemp):
+        return [f"{pad}a = tmp{stmt.slot}    ; {stmt.src.short()} [restore]"]
     if isinstance(stmt, CallStmt):
         return [f"{pad}call {stmt.target}                ; {stmt.src.short()}"]
     if isinstance(stmt, TailCallStmt):
