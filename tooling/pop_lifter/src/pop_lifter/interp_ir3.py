@@ -66,6 +66,7 @@ from .ir3 import (
     RoutineIR3,
     Stmt,
     TailCallStmt,
+    Wide16Stmt,
 )
 
 
@@ -218,6 +219,44 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
             raise InterpError(
                 f"IR3 RawStmt wraps a non-atom item: {type(stmt.item).__name__}"
             )
+        return
+    if isinstance(stmt, Wide16Stmt):
+        # Replay the seven-instruction 16-bit add/sub faithfully:
+        #   lda lo_src ; clc/sec ; adc/sbc lo_op ; sta lo_dst
+        #   lda hi_src ; adc/sbc hi_op           ; sta hi_dst
+        # Each step's side-effects (A, carry, Z/N, memory writes) must
+        # match the original to pass differential tests.
+        lo_src_val = _assign_read(stmt.lo_src, trace, stmt.src)
+        lo_op_val = _assign_read(stmt.lo_op, trace, stmt.src)
+        if stmt.op == "+":
+            lo_sum = lo_src_val + lo_op_val          # clc → no carry-in
+            lo_result = lo_sum & 0xFF
+            lo_carry = (lo_sum >> 8) & 1
+        else:
+            lo_diff = lo_src_val - lo_op_val         # sec → borrow-in = 0
+            lo_result = lo_diff & 0xFF
+            lo_carry = 1 if lo_diff >= 0 else 0      # C=1 means no borrow
+        lo_dst_addr = _assign_addr(stmt.lo_dst, trace, stmt.src)
+        trace.ram[lo_dst_addr] = lo_result
+        trace.writes[lo_dst_addr] = lo_result
+        trace.a = lo_result                         # A after sta lo_dst
+        # lda hi_src (reads AFTER lo_dst was written — matches 6502 order)
+        hi_src_val = _assign_read(stmt.hi_src, trace, stmt.src)
+        hi_op_val = _assign_read(stmt.hi_op, trace, stmt.src)
+        if stmt.op == "+":
+            hi_sum = hi_src_val + hi_op_val + lo_carry
+            hi_result = hi_sum & 0xFF
+            hi_carry = (hi_sum >> 8) & 1
+        else:
+            hi_diff = hi_src_val - hi_op_val - (1 - lo_carry)
+            hi_result = hi_diff & 0xFF
+            hi_carry = 1 if hi_diff >= 0 else 0
+        hi_dst_addr = _assign_addr(stmt.hi_dst, trace, stmt.src)
+        trace.ram[hi_dst_addr] = hi_result
+        trace.writes[hi_dst_addr] = hi_result
+        trace.a = hi_result                         # A after sta hi_dst
+        trace.c = hi_carry
+        _set_zn(trace, hi_result)
         return
     if isinstance(stmt, Assign):
         # `target = source`, the dropped `lda`/`sta` round-trip. Read the

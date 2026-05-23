@@ -121,6 +121,7 @@ from .ir3 import (
     RoutineIR3,
     Stmt,
     TailCallStmt,
+    Wide16Stmt,
 )
 
 
@@ -321,6 +322,90 @@ def _arith_after_load(stmts: list[Stmt], i: int):
     return None
 
 
+def _wide16_at(stmts: list[Stmt], i: int, lo_src):
+    """If `stmts[i:i+7]` is exactly the 16-bit add/sub idiom, return a
+    `Wide16Stmt`; otherwise None.
+
+    Pattern (stmts[i] is already confirmed as a `LoadA` with source
+    `lo_src` by the caller):
+
+        stmts[i]   : lda LO_SRC           (caller's RawStmt load)
+        stmts[i+1] : clc / sec
+        stmts[i+2] : adc / sbc LO_OP
+        stmts[i+3] : sta LO_DST
+        stmts[i+4] : lda HI_SRC
+        stmts[i+5] : adc / sbc HI_OP      (bare — no preceding carry set)
+        stmts[i+6] : sta HI_DST
+
+    All seven must be `RawStmt`.  The `adc`/`sbc` types at [i+2] and
+    [i+5] must agree: add-pair (`clc` + two `adc`) or sub-pair (`sec` +
+    two `sbc`).  `StoreLocal` (SMC patch) at [i+3] or [i+6] is rejected
+    — `_reg_store_target` already excludes it.
+
+    No dead-after check: this is a structural replacement that preserves
+    all observable side-effects of the seven instructions."""
+    if i + 6 >= len(stmts):
+        return None
+    for k in range(1, 7):
+        if not isinstance(stmts[i + k], RawStmt):
+            return None
+    items = [stmts[i + k].item for k in range(1, 7)]
+    # items[0..5] map to stmts[i+1..i+6]
+
+    # [i+1] clc / sec
+    if isinstance(items[0], Clc):
+        op = "+"
+        adc_types = (AdcImm, AdcAbs, AdcIndexed)
+    elif isinstance(items[0], Sec):
+        op = "-"
+        adc_types = (SbcImm, SbcAbs, SbcIndexed, SbcIndirect)
+    else:
+        return None
+
+    # [i+2] adc/sbc LO_OP
+    if not isinstance(items[1], adc_types):
+        return None
+    lo_op = _arith_operand(items[1])
+    if lo_op is None:
+        return None
+
+    # [i+3] sta LO_DST  (regular store — StoreLocal excluded by _reg_store_target)
+    st3 = _reg_store_target(items[2])
+    if st3 is None or st3[0] is not Reg.A:
+        return None
+    lo_dst = st3[1]
+
+    # [i+4] lda HI_SRC
+    ld4 = _is_reg_load(items[3])
+    if ld4 is None or ld4[0] is not Reg.A:
+        return None
+    hi_src = ld4[1]
+
+    # [i+5] bare adc/sbc HI_OP (same op type as [i+2], no carry set before)
+    if not isinstance(items[4], adc_types):
+        return None
+    hi_op = _arith_operand(items[4])
+    if hi_op is None:
+        return None
+
+    # [i+6] sta HI_DST
+    st6 = _reg_store_target(items[5])
+    if st6 is None or st6[0] is not Reg.A:
+        return None
+    hi_dst = st6[1]
+
+    return Wide16Stmt(
+        op=op,
+        lo_src=lo_src,
+        lo_op=lo_op,
+        lo_dst=lo_dst,
+        hi_src=hi_src,
+        hi_op=hi_op,
+        hi_dst=hi_dst,
+        src=stmts[i].item.src,
+    )
+
+
 # ---------------------------------------------------------------- resource dispatch
 
 
@@ -354,6 +439,19 @@ def _stmt_touches_resource(stmt: Stmt, res) -> bool:
     directly rather than relying on this coarse summary.)"""
     if isinstance(stmt, RawStmt):
         return _resource_reads(stmt.item, res) or _resource_writes(stmt.item, res)
+    if isinstance(stmt, Wide16Stmt):
+        # Clobbers A and carry; may also read X/Y as index registers in
+        # any of the six address slots (sources, operands, and destinations).
+        if res is Reg.A or res is _CARRY:
+            return True
+        if res in (Reg.X, Reg.Y):
+            for v in (stmt.lo_src, stmt.lo_op, stmt.lo_dst,
+                      stmt.hi_src, stmt.hi_op, stmt.hi_dst):
+                if isinstance(v, IndexedAbs) and v.index is res:
+                    return True
+                if isinstance(v, IndirectY) and res is Reg.Y:
+                    return True
+        return False
     if isinstance(stmt, Assign):
         return False  # a folded copy / expr touches no register or flag
     if isinstance(stmt, (BreakStmt, ContinueStmt, GotoStmt, LabelStmt)):
@@ -387,6 +485,12 @@ def _first_resource_touch_is_write(block: Block, res) -> bool:
             continue
         if isinstance(s, RawStmt):
             return _resource_writes(s.item, res) and not _resource_reads(s.item, res)
+        if isinstance(s, Wide16Stmt):
+            # First step: `lda lo_src` kills A; `clc`/`sec` kills carry.
+            # Neither reads the incoming value of A or carry.
+            if res is Reg.A or res is _CARRY:
+                return True
+            return False  # X/Y may be read as indexes; be conservative
         # A nested control-flow stmt touches `res` in a way we can't
         # cheaply classify — be conservative.
         return False
@@ -431,6 +535,20 @@ def _stmt_demands(stmt: Stmt, reg, *, tail_dm, call_dm, ret):
         if _writes_reg(stmt.item, reg):
             return False
         return None
+    if isinstance(stmt, Wide16Stmt):
+        # `lda lo_src` kills A without reading the incoming A; `clc`/`sec`
+        # kills carry without reading it.  X/Y are read only when used as
+        # index registers across all six address slots.
+        if reg is Reg.A:
+            return False  # killed
+        if reg in (Reg.X, Reg.Y):
+            for v in (stmt.lo_src, stmt.lo_op, stmt.lo_dst,
+                      stmt.hi_src, stmt.hi_op, stmt.hi_dst):
+                if isinstance(v, IndexedAbs) and v.index is reg:
+                    return True
+                if isinstance(v, IndirectY) and reg is Reg.Y:
+                    return True
+        return None  # doesn't affect this register — keep scanning
     if isinstance(stmt, Assign):
         return None
     if isinstance(stmt, ReturnStmt):
@@ -632,6 +750,25 @@ def _dead_from(
                 return True
             i += 1
             continue
+        if isinstance(s, Wide16Stmt):
+            # Step 1 (lda lo_src) writes A without reading it; probe with
+            # Pla — also writes A, reads nothing else.
+            if writes(Pla(src=s.src)):
+                return True  # A killed at step 1 — dead from here
+            # Step 2 (clc/sec) writes carry without reading it first.
+            if writes(Clc(src=s.src)):
+                return True  # carry killed at step 2 — dead from here
+            # Resource must be X or Y — live iff any indexed/indirect slot reads it.
+            # Check all six address slots: sources, operands, and store destinations.
+            for v in (s.lo_src, s.lo_op, s.lo_dst, s.hi_src, s.hi_op, s.hi_dst):
+                if isinstance(v, IndexedAbs):
+                    if reads(AdcIndexed(base=v.base, index=v.index, src=s.src)):
+                        return False  # indexed read — X or Y is live
+                elif isinstance(v, IndirectY):
+                    if reads(StoreIndirect(reg=Reg.A, target=v, src=s.src)):
+                        return False  # (zp),y read — Y is live
+            i += 1  # doesn't touch this X/Y register — step past
+            continue
         if isinstance(s, Assign):
             i += 1  # a folded copy / expr touches neither A nor flags
             continue
@@ -765,6 +902,15 @@ def _fold_block(block: Block, *, edges, demand) -> Block:
                 # write-back and could clobber the operand. A *and* the
                 # carry the add/sub set must be dead afterwards.
                 if reg is Reg.A:
+                    # (0) 16-bit arithmetic: seven-instruction sequence.
+                    # No dead-after check needed — structural replacement
+                    # preserves all side-effects of the original seven ops.
+                    wide = _wide16_at(stmts, i, source)
+                    if wide is not None:
+                        out.append(wide)
+                        i += 7
+                        continue
+
                     arith = _arith_after_load(stmts, i)
                     if arith is not None and arith[1] is not None:
                         op, operand, store_start = arith
@@ -827,6 +973,26 @@ def fold_stats(module: ModuleIR3) -> int:
         total = 0
         for s in block.stmts:
             if isinstance(s, Assign):
+                total += 1
+            inner = getattr(s, "then_block", None)
+            if inner is not None:
+                total += count(inner)
+            inner = getattr(s, "else_block", None)
+            if inner is not None:
+                total += count(inner)
+            inner = getattr(s, "body", None)
+            if inner is not None and hasattr(inner, "stmts"):
+                total += count(inner)
+        return total
+    return sum(count(r.body) for r in module.routines)
+
+
+def wide16_stats(module: ModuleIR3) -> int:
+    """Total `Wide16Stmt` nodes produced across the module."""
+    def count(block: Block) -> int:
+        total = 0
+        for s in block.stmts:
+            if isinstance(s, Wide16Stmt):
                 total += 1
             inner = getattr(s, "then_block", None)
             if inner is not None:
