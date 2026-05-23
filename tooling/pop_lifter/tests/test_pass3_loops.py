@@ -162,7 +162,7 @@ def test_down_counter_becomes_for():
     out = _recover_one(_down_counter(6, body))
     assert len(out) == 1 and isinstance(out[0], ForStmt)
     f = out[0]
-    assert f.var is Reg.Y and (f.init.value & 0xff) == 6
+    assert f.var is Reg.Y and (f.start.value & 0xff) == 6 and f.step == -1
     # The init LoadImm and the trailing dey are subsumed.
     assert len(f.body.stmts) == 1 and isinstance(f.body.stmts[0], RawStmt)
     assert not any(isinstance(s, BreakStmt) for s in f.body.stmts)
@@ -197,12 +197,42 @@ def test_continue_in_body_not_promoted():
     assert _not_a_for(out)
 
 
-def test_up_counter_not_promoted():
-    """An up-counter (`!=` bound) is out of scope — stays a do-while."""
+def test_up_counter_becomes_for():
+    """`x = #0 ; do { body ; x += 1 } while x != 5` ⇒ `for x in #0..#5`."""
+    out = _recover_one([
+        _ldimm(Reg.X, 0),
+        _loop([RawStmt(StoreIndexed(
+            reg=Reg.X, base=Abs(name="OUT", addr=0x300), index=Reg.X, src=SRC)),
+            RawStmt(IncTarget(target=Reg.X, src=SRC)),
+            _guard(_cmp(Reg.X, "==", 5))]),
+    ])
+    assert len(out) == 1 and isinstance(out[0], ForStmt)
+    f = out[0]
+    assert f.var is Reg.X and (f.start.value & 0xff) == 0 and f.step == 1
+    assert f.cond.op == "!=" and (f.cond.rhs.value & 0xff) == 5
+
+
+def test_up_counter_with_start_ge_bound_not_promoted():
+    """`start >= N` would wrap (the do-while runs many more iterations
+    than `start..N`) — left as a do-while."""
+    out = _recover_one([
+        _ldimm(Reg.X, 5),
+        _loop([RawStmt(IncTarget(target=Reg.X, src=SRC)),
+               _guard(_cmp(Reg.X, "==", 5))]),  # start == N
+    ])
+    assert _not_a_for(out)
+
+
+def test_up_counter_with_memory_bound_not_promoted():
+    """A non-constant bound (`cpx mem`) can't be a fixed `start..N`
+    range — left as a do-while."""
     out = _recover_one([
         _ldimm(Reg.X, 0),
         _loop([RawStmt(IncTarget(target=Reg.X, src=SRC)),
-               _guard(_cmp(Reg.X, "==", 5))]),
+               IfStmt(cond=Compare(reg=Reg.X, op="==",
+                                   rhs=Abs(name="bound", addr=0x90)),
+                      then_block=Block.of([BreakStmt(src=SRC)]),
+                      else_block=None, src=SRC)]),
     ])
     assert _not_a_for(out)
 
@@ -268,9 +298,38 @@ def test_for_recovery_is_behaviour_preserving():
 
 
 def test_dowhile_recovery_is_behaviour_preserving():
-    """An up-counter `x = 0 ; loop { OUT[x]=x ; x += 1 ; if x == 4 break }`
-    recovers to a `do { … } while x != 4` (not a for — up-counters are
-    out of scope) and must produce identical RAM."""
+    """A `>=`-bounded down-loop `x = 3 ; loop { OUT[x]=x ; x -= 1 ;
+    if x < 1 break }` recovers to a `do { … } while x >= 1` (not a for —
+    only `>= 0` / `!=` bounds are promoted) and must produce identical
+    RAM."""
+    def routine() -> RoutineIR3:
+        return RoutineIR3(name="counter", body=Block.of([
+            RawStmt(LoadImm(reg=Reg.X, imm=Imm(value=3, text="#3"), src=SRC)),
+            _loop([
+                RawStmt(StoreIndexed(
+                    reg=Reg.X, base=Abs(name="OUT", addr=0x300), index=Reg.X, src=SRC)),
+                RawStmt(DecTarget(target=Reg.X, src=SRC)),
+                _guard(_cmp(Reg.X, "<", 1)),
+            ]),
+            ReturnStmt(src=SRC),
+        ]))
+
+    pre = ModuleIR3("M", "syn", [routine()])
+    post = recover_loops(pre)
+    assert dowhile_stats(post) == 1 and for_stats(post) == 0
+
+    r1 = bytearray(0x10000)
+    ir3_run([pre], "counter", ram=r1)
+    r2 = bytearray(0x10000)
+    ir3_run([post], "counter", ram=r2)
+    assert r1 == r2
+    assert list(r2[0x301:0x304]) == [1, 2, 3]
+
+
+def test_up_counter_for_is_behaviour_preserving():
+    """The recovered `for x in #0..#4` writing `x` to `OUT[x]` must
+    produce identical RAM (and final register state x = 4) to the
+    original up-counting loop."""
     def routine() -> RoutineIR3:
         return RoutineIR3(name="counter", body=Block.of([
             RawStmt(LoadImm(reg=Reg.X, imm=Imm(value=0, text="#0"), src=SRC)),
@@ -285,14 +344,15 @@ def test_dowhile_recovery_is_behaviour_preserving():
 
     pre = ModuleIR3("M", "syn", [routine()])
     post = recover_loops(pre)
-    assert dowhile_stats(post) == 1 and for_stats(post) == 0
+    assert for_stats(post) == 1 and dowhile_stats(post) == 0
 
     r1 = bytearray(0x10000)
-    ir3_run([pre], "counter", ram=r1)
+    t1 = ir3_run([pre], "counter", ram=r1)
     r2 = bytearray(0x10000)
-    ir3_run([post], "counter", ram=r2)
+    t2 = ir3_run([post], "counter", ram=r2)
     assert r1 == r2
     assert list(r2[0x300:0x304]) == [0, 1, 2, 3]
+    assert t1.x == t2.x == 4
 
 
 def test_continue_restarts_body_without_testing_condition():

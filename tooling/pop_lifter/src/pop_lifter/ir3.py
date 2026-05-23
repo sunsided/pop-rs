@@ -181,28 +181,36 @@ class DoWhileStmt:
 
 @dataclass(frozen=True)
 class ForStmt:
-    """`for var in (0..=init).rev() { body }` — pass-3 induction-variable
-    recovery for the 6502 down-counter idiom (`ldy #N : … : dey : bpl`).
-    Recognised from a `DoWhileStmt` of the shape
+    """A pass-3 recovered counted loop. Two 6502 idioms map here:
 
-        var = #init        (init, immediately before the loop)
+    * **down-counter** (`ldy #N : … : dey : bpl`) → `for var in
+      (0..=start).rev()` — `step = -1`, continue condition `var >= 0`,
+      `start` non-negative.
+    * **up-counter** (`ldx #i : … : inx : cpx #N : bne`) → `for var in
+      start..N` — `step = +1`, continue condition `var != N`, with
+      `start < N` so the range doesn't wrap.
+
+    Recognised from a `DoWhileStmt`
+
+        var = #start       (immediately before the loop)
         do {
             body
-            var -= 1       (the step, last in the do-while body)
-        } while var >= 0
+            var ±= 1       (the step, last in the do-while body)
+        } while <cond>
 
-    where `init` is non-negative (bit 7 clear, so the loop runs at least
-    once and a top test matches the bottom test) and `var` is the loop
-    counter only (never otherwise written in `body`, no `continue`). The
-    counter runs `init, init-1, …, 0`; after the last iteration the step
-    leaves `var = 0xff`, exactly as the original loop did.
+    where `var` is the loop counter only (never otherwise written in
+    `body`, no `continue`, no calls) and the start value makes the loop
+    run at least once (so the top-tested `for` matches the bottom test).
 
-    The init `LoadImm` and the trailing `dey`/`dex` step are subsumed
-    into this node; the interpreter replays both so register and flag
-    state are identical to the do-while it replaced."""
+    The init `LoadImm` and the trailing `inx`/`dey` step are subsumed
+    into this node; the interpreter replays the init, the step, and
+    `cond` so register and flag state are identical to the do-while it
+    replaced (e.g. a down-counter leaves `var = 0xff`)."""
 
     var: Reg
-    init: Imm
+    start: Imm
+    step: int          # +1 (up) or -1 (down)
+    cond: Compare      # continue condition (the do-while's): `var >= 0` or `var != N`
     body: "Block"
     src: SourceRef
 
@@ -408,9 +416,13 @@ def _fmt_stmt(stmt: Stmt, indent: int) -> list[str]:
         return lines
     if isinstance(stmt, ForStmt):
         from .ir1 import _fmt_imm
-        # Delegate to ir1's immediate formatter so a symbolic bound
-        # (`#numslots`, etc.) survives instead of its assembled byte.
-        lines = [f"{pad}for {stmt.var} in (0..={_fmt_imm(stmt.init)}).rev() {{    ; {stmt.src.short()}"]
+        # Delegate bounds to ir1's immediate formatter so a symbolic
+        # bound (`#numslots`, etc.) survives instead of its assembled byte.
+        if stmt.step < 0:
+            rng = f"(0..={_fmt_imm(stmt.start)}).rev()"
+        else:
+            rng = f"{_fmt_imm(stmt.start)}..{_fmt_imm(stmt.cond.rhs)}"
+        lines = [f"{pad}for {stmt.var} in {rng} {{    ; {stmt.src.short()}"]
         for s in stmt.body.stmts:
             lines.extend(_fmt_stmt(s, indent + 1))
         lines.append(f"{pad}}}")

@@ -22,15 +22,18 @@ behaviour-preserving (`DoWhileStmt` keeps the original `loop`'s
 continue/break semantics; see its docstring) and validated by the
 differential interpreter.
 
-Then, building on that, the 6502 down-counter idiom is promoted to a
-`for`: an init `var = #N` (N non-negative) immediately before a
-`do { body ; var -= 1 } while var >= 0`, where `var` is the loop
-counter only, becomes
+Then, building on that, a counted loop with a clean induction variable
+(written only by its step, no `continue`/calls) is promoted to a `for`:
 
-    for var in (0..=N).rev() { body }
+* down-counter — `var = #N (0 <= N < 0x80) ; do { body ; var -= 1 }
+  while var >= 0`  ⇒  `for var in (0..=N).rev() { body }`
+  (the `ldy #N : … : dey : bpl` shape).
+* up-counter — `var = #i ; do { body ; var += 1 } while var != #N`,
+  with `i < N`  ⇒  `for var in i..N { body }`
+  (the `ldx #i : … : inx : cpx #N : bne` shape).
 
-(the `ldy #N : … : dey : bpl` shape). Up-counters and other bound
-conditions are left as `do`/`loop` for now.
+Other bound conditions (memory bounds, `>=`/`<` floors, wrap-around
+delay loops) are left as `do`/`loop`.
 
 **Ordering.** `DoWhileStmt` is a *late* readability node: the fold
 (`pass3_expr`) and `match` recognition (`pass3_match`) walkers don't
@@ -45,7 +48,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from .ir1 import DecTarget, LoadImm, Unsupported
+from .ir1 import DecTarget, Imm, IncTarget, LoadImm, Unsupported
 from .ir3 import (
     Block,
     BreakStmt,
@@ -161,26 +164,51 @@ def _has_continue(block: Block) -> bool:
 
 def _counter_for(prev: Stmt, dw: DoWhileStmt):
     """If `prev` initialises the counter of do-while `dw` as a clean
-    down-counter (`var = #init>=0 ; do { body ; var -= 1 } while var >=
-    0`), return the `ForStmt`; else None."""
+    counted loop, return the `ForStmt`; else None. Two shapes:
+
+    * down-counter: `var = #start (0 <= start < 0x80) ;
+      do { body ; var -= 1 } while var >= 0`  →  step -1.
+    * up-counter:   `var = #start ; do { body ; var += 1 }
+      while var != #N`, with `start < N`      →  step +1.
+
+    Both require `start` to satisfy the continue condition (so the loop
+    runs at least once and the top-tested `for` matches), `var` written
+    only by its step, and no `continue` / call / unmodelled op."""
     if not (isinstance(prev, RawStmt) and isinstance(prev.item, LoadImm)):
         return None
     reg = prev.item.reg
-    if dw.cond.op != ">=0" or dw.cond.reg is not reg:
+    if dw.cond.reg is not reg:
         return None
-    if (prev.item.imm.value & 0xff) >= 0x80:
-        return None  # init must be non-negative so the loop runs >= once
     body = dw.body.stmts
     if not body:
         return None
     step = body[-1]
-    if not (isinstance(step, RawStmt) and isinstance(step.item, DecTarget)
-            and step.item.target is reg):
+    if not isinstance(step, RawStmt):
         return None
+    start = prev.item.imm.value & 0xff
+
+    if dw.cond.op == ">=0":
+        # Down-counter to 0 via dey/dex.
+        if not (isinstance(step.item, DecTarget) and step.item.target is reg):
+            return None
+        if start >= 0x80:
+            return None  # start must be non-negative so the loop runs >= once
+        direction = -1
+    elif dw.cond.op == "!=" and isinstance(dw.cond.rhs, Imm):
+        # Up-counter to a constant bound via inx/iny.
+        if not (isinstance(step.item, IncTarget) and step.item.target is reg):
+            return None
+        if not (start < (dw.cond.rhs.value & 0xff)):
+            return None  # start < N so `start..N` is the exact (non-wrapping) range
+        direction = +1
+    else:
+        return None
+
     for_body = Block.of(list(body[:-1]))
     if _body_clobbers_counter(for_body, reg) or _has_continue(for_body):
         return None
-    return ForStmt(var=reg, init=prev.item.imm, body=for_body, src=dw.src)
+    return ForStmt(var=reg, start=prev.item.imm, step=direction,
+                   cond=dw.cond, body=for_body, src=dw.src)
 
 
 def recover_block(block: Block) -> Block:

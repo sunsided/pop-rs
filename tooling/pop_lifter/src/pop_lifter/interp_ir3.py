@@ -36,6 +36,7 @@ from .interp_ir1 import run as ir1_run
 from .ir1 import (
     Abs,
     DecTarget,
+    IncTarget,
     Imm,
     IndexedAbs,
     IndirectY,
@@ -297,17 +298,19 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
             )
         return
     if isinstance(stmt, ForStmt):
-        # Down-counter `for var in (0..=init).rev()`. Replay the init
-        # LoadImm and the `dey`/`dex` step (subsumed into the node) so
-        # register + flag state matches the original do-while exactly.
-        init = stmt.init.value & 0xff
+        # Recovered counted loop. Replay the init `LoadImm`, the
+        # `inx`/`dey` step, and the continue condition so register +
+        # flag state matches the original do-while exactly.
+        start = stmt.start.value & 0xff
         if stmt.var is Reg.A:
-            trace.a = init
+            trace.a = start
         elif stmt.var is Reg.X:
-            trace.x = init
+            trace.x = start
         else:
-            trace.y = init
-        _set_zn(trace, init)
+            trace.y = start
+        _set_zn(trace, start)
+        step_op = (DecTarget if stmt.step < 0 else IncTarget)(
+            target=stmt.var, src=stmt.src)
         for _ in range(1_000_000):
             try:
                 _exec_block(stmt.body, modules, aliases, trace)
@@ -316,9 +319,8 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
                 continue
             except _BreakSignal:
                 break
-            exec_atom(DecTarget(target=stmt.var, src=stmt.src), trace, trace.ram)
-            cur = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[stmt.var]
-            if cur & 0x80:  # var >= 0 is now false — stop
+            exec_atom(step_op, trace, trace.ram)
+            if not _eval_compare(stmt.cond, trace, trace.ram):
                 break
         else:
             raise InterpError(
