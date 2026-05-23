@@ -10,8 +10,8 @@ op) is a barrier that forgoes the pair.
   nesting, call-spanning, and the non-firing cases (barrier between,
   unmatched push / pop, recursion into nested blocks).
 * **Behavioural equivalence** interprets before and after recovery,
-  asserting byte-identical RAM — relabelling pha/pla must not change
-  behaviour.
+  asserting identical write sets (``Trace.writes``) — relabelling
+  pha/pla must not change observable behaviour.
 """
 
 from __future__ import annotations
@@ -249,6 +249,7 @@ def test_behaviour_save_restore():
         _sta("Y", 0x20),    # Y = 0x11
     ]
     tb, ta = _run_both(_module(stmts), {})
+    assert tb.writes == ta.writes
     assert tb.ram[0x20] == ta.ram[0x20] == 0x11
     assert tb.ram[0x30] == ta.ram[0x30] == 0x99
 
@@ -267,6 +268,7 @@ def test_behaviour_save_restore_across_call():
         _sta("Y", 0x20),                     # Y = 0x42
     ]
     tb, ta = _run_both(_module(stmts, extra_routines=(clobber,)), {})
+    assert tb.writes == ta.writes
     assert tb.ram[0x20] == ta.ram[0x20] == 0x42
 
 
@@ -280,5 +282,6 @@ def test_behaviour_nested():
         _pla(), _sta("O", 0x22),    # outer restore → 0xAA
     ]
     tb, ta = _run_both(_module(stmts), {})
+    assert tb.writes == ta.writes
     assert tb.ram[0x21] == ta.ram[0x21] == 0xBB
     assert tb.ram[0x22] == ta.ram[0x22] == 0xAA

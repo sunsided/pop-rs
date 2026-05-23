@@ -556,7 +556,8 @@ def _has_unstructured(block: Block) -> bool:
     return False
 
 
-def _stmt_demands(stmt: Stmt, reg, *, tail_dm, call_dm, ret, kill_dm=None):
+def _stmt_demands(stmt: Stmt, reg, *, tail_dm, call_dm, ret, kill_dm=None,
+                  kill_mode=False):
     """Tri-state for a single statement: True = some path reads `reg`
     (or, when `ret` is True, lets it escape via a return) before writing
     it; False = every path writes `reg` before reading it (a kill);
@@ -565,6 +566,13 @@ def _stmt_demands(stmt: Stmt, reg, *, tail_dm, call_dm, ret, kill_dm=None):
     `kill_dm`, when provided, maps routine names to the set of resources
     they definitely clobber on all paths before returning — used by the
     kill-demand fixpoint to propagate kills across calls.
+
+    `kill_mode`, when True, changes the semantics of path-terminating
+    statements that do not write the resource: `ReturnStmt`,
+    `BreakStmt`, and `ContinueStmt` return `None` instead of `False`.
+    This is necessary for `_compute_kill_demand`: a bare return/break
+    does not *write* the resource, so it must not contribute a `False`
+    (kill) result — only an explicit write should produce `False`.
 
     `call_dm` is the *read*-demand map consulted for a non-tail `Call`
     (the callee returns, so only an actual read of `reg` matters).
@@ -595,9 +603,17 @@ def _stmt_demands(stmt: Stmt, reg, *, tail_dm, call_dm, ret, kill_dm=None):
     if isinstance(stmt, ReturnStmt):
         # An unwritten reg escapes to the caller here. For the
         # escape-aware (`live`) map that's a use; for the read-only map
-        # it isn't.
+        # it isn't. In kill_mode a bare return is not a write, so yield
+        # None (transparent) to avoid false kills in kill_demand.
+        if kill_mode:
+            return None
         return True if ret else False
     if isinstance(stmt, (BreakStmt, ContinueStmt)):
+        # Stays within the routine; neither reads nor writes the resource.
+        # In kill_mode yield None so a break/continue path never falsely
+        # reports a kill.
+        if kill_mode:
+            return None
         return False  # stays within the routine; no read / escape here
     if isinstance(stmt, (GotoStmt, LabelStmt)):
         return True   # unstructured — conservatively a use
@@ -620,17 +636,20 @@ def _stmt_demands(stmt: Stmt, reg, *, tail_dm, call_dm, ret, kill_dm=None):
         return _branches_demand(
             stmt.then_block, stmt.else_block, reg,
             tail_dm=tail_dm, call_dm=call_dm, ret=ret, kill_dm=kill_dm,
+            kill_mode=kill_mode,
         )
     if isinstance(stmt, RawIfStmt):
         # The cond reads a raw flag, not a register.
         return _branches_demand(
             stmt.then_block, stmt.else_block, reg,
             tail_dm=tail_dm, call_dm=call_dm, ret=ret, kill_dm=kill_dm,
+            kill_mode=kill_mode,
         )
     if isinstance(stmt, LoopStmt):
         # The body runs at least once; its demand from the top decides.
         return _seq_demands(stmt.body.stmts, 0, reg, tail_dm=tail_dm,
-                            call_dm=call_dm, ret=ret, kill_dm=kill_dm)
+                            call_dm=call_dm, ret=ret, kill_dm=kill_dm,
+                            kill_mode=kill_mode)
     # Any other node type — notably the late readability passes' nodes
     # (`MatchStmt`, `DoWhileStmt`) — isn't modelled here. The fold runs
     # on reloop output, before those passes, so this is never hit in the
@@ -640,8 +659,10 @@ def _stmt_demands(stmt: Stmt, reg, *, tail_dm, call_dm, ret, kill_dm=None):
     return True
 
 
-def _branches_demand(then_block: Block, else_block, reg, *, tail_dm, call_dm, ret, kill_dm=None):
-    kw = dict(tail_dm=tail_dm, call_dm=call_dm, ret=ret, kill_dm=kill_dm)
+def _branches_demand(then_block: Block, else_block, reg, *, tail_dm, call_dm, ret,
+                     kill_dm=None, kill_mode=False):
+    kw = dict(tail_dm=tail_dm, call_dm=call_dm, ret=ret, kill_dm=kill_dm,
+              kill_mode=kill_mode)
     t = _seq_demands(then_block.stmts, 0, reg, **kw)
     e = _seq_demands(else_block.stmts, 0, reg, **kw) if else_block is not None else None
     if t is True or e is True:
@@ -653,12 +674,13 @@ def _branches_demand(then_block: Block, else_block, reg, *, tail_dm, call_dm, re
     return None
 
 
-def _seq_demands(stmts: list[Stmt], idx: int, reg, *, tail_dm, call_dm, ret, kill_dm=None):
+def _seq_demands(stmts: list[Stmt], idx: int, reg, *, tail_dm, call_dm, ret,
+                 kill_dm=None, kill_mode=False):
     """Tri-state demand for `stmts[idx:]` — the first statement that
     determines `reg` (used → True, killed → False); None if none do."""
     for k in range(idx, len(stmts)):
         r = _stmt_demands(stmts[k], reg, tail_dm=tail_dm, call_dm=call_dm, ret=ret,
-                          kill_dm=kill_dm)
+                          kill_dm=kill_dm, kill_mode=kill_mode)
         if r is not None:
             return r
     return None
@@ -753,7 +775,8 @@ def _compute_kill_demand(routines, read_demand, live_demand) -> dict:
                     res for res in _RESOURCES
                     if _seq_demands(r.body.stmts, 0, res,
                                     tail_dm=live_demand, call_dm=read_demand,
-                                    ret=False, kill_dm=dm) is False
+                                    ret=False, kill_dm=dm,
+                                    kill_mode=True) is False
                 )
             for n in ns:
                 if dm[n] != new:

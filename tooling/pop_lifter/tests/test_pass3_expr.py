@@ -785,6 +785,29 @@ def test_demand_carry_unknown_target_blocks_fold():
     assert not any(isinstance(s, Assign) for s in folded.find("caller").body.stmts)
 
 
+def test_demand_carry_preserved_by_call_blocks_fold():
+    """Regression: a jsr to a carry-*preserving* callee (one that never
+    touches carry at all) must NOT enable the arithmetic fold.  The
+    incoming carry escapes through the callee's return; the `adc`'s carry
+    output is still live after the call returns, so the fold is unsound.
+
+    Before the kill_mode fix, ReturnStmt with ret=False incorrectly
+    returned False, making every routine appear to kill carry, which
+    could enable an unsound fold here."""
+    # Target touches only A and X; carry is completely preserved.
+    target = _routine("target", [
+        _ldimm(Reg.A, 0), _ldimm(Reg.X, 1), ReturnStmt(src=SRC),
+    ])
+    caller = _routine("caller", [
+        _load_a_abs("X", 0x10), _clc(), _adc_imm(8),
+        _store_a_abs("Y", 0x20),
+        CallStmt(target="target", src=SRC),
+    ])
+    mod = ModuleIR3(name="M", file="syn", routines=[caller, target])
+    folded = fold_module(mod)
+    assert not any(isinstance(s, Assign) for s in folded.find("caller").body.stmts)
+
+
 # --------------------------------------------------------------- whole tree
 
 
