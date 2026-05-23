@@ -1,41 +1,63 @@
 """Pass 4: emit Rust source from IR3.
 
-This is the first, deliberately thin slice. It lays down the module /
-routine scaffolding and lowers *leaf expressions* — the pass-3 folded
-`Assign`s (over immediates, absolute / indexed reads, `BinExpr`,
-`RotateExpr`) and bare `return`s. Everything else is left for later
-slices and surfaces honestly in the output rather than being silently
-dropped:
+First slice (skeleton) lowered module / routine scaffolding and leaf
+expressions (folded `Assign`s, `return`). This second slice lowers
+*all structured control flow*:
 
-* `RawStmt` (an unfolded IR1 atom) renders as a `// raw: …` comment
-  carrying the IR1 dump line — the lowering of general 6502 atoms is a
-  later slice.
-* Control flow (`if` / loops / `match`), calls, tail-calls, and pha/pla
-  temporaries render as `// TODO(pass4): lower <Kind>` placeholders.
+* `IfStmt` → `if <cond> { … } [else { … }]`
+* `LoopStmt` → `loop { … }`
+* `DoWhileStmt` → `loop { body; if !(<cond>) { break; } }`
+* `ForStmt` → init + `loop { body; step; if !(<cond>) { break; } }`
+* `RepeatStmt` → init + `for _ in 0..<count>usize { body; step; }`
+* `BreakStmt` / `ContinueStmt` → `break;` / `continue;`
+* `MatchStmt` → `match self.<reg> { val => { body }, … _ => {} }`
+* `CallStmt` / `TailCallStmt` → `self.<target>();` / `self.<target>(); return;`
+* `SaveTemp` / `RestoreTemp` → `let tmp{n} = self.a;` / `self.a = tmp{n};`
 
-Memory is modelled as a flat 64 KiB array on a provisional `Cpu`
-receiver (`self.ram`, with `self.a/x/y` registers) — the same shape the
-IR3 interpreter uses. The final `struct Game` + `Renderer/Audio/Input`
-trait design (and the `cargo fmt` / `clippy` finishing pass, and the
-`@generated <git-sha>` source manifest) are separate later slices; the
-receiver name here is provisional and documented as such in the emitted
-header.
+Still deferred (appear as `// TODO(pass4): lower <Kind>` comments):
+`RawStmt` (unfolded IR1 atoms — a later slice), `Wide16Stmt` (16-bit
+carry chain), `RawIfStmt` (raw flag condition — needs atom context),
+`GotoStmt` / `LabelStmt` (structural escape hatches).
+
+Memory model and receiver (`Cpu` / `self.ram`) remain provisional
+pending the Game/Renderer/Audio/Input design slice.
 """
 
 from __future__ import annotations
 
-from .ir1 import Abs, Imm, IndexedAbs, IndirectY
+from .ir1 import Abs, Compare, Imm, IndexedAbs, IndirectY
 from .ir3 import (
     Assign,
     BinExpr,
+    BreakStmt,
+    CallStmt,
+    ContinueStmt,
+    DoWhileStmt,
+    ForStmt,
+    IfStmt,
+    LoopStmt,
+    MatchStmt,
     ModuleIR3,
     RawStmt,
+    RepeatStmt,
+    RestoreTemp,
     ReturnStmt,
     RotateExpr,
     RoutineIR3,
+    SaveTemp,
+    TailCallStmt,
 )
 
 INDENT = "    "
+
+# Statement types that produce real Rust code (not a comment placeholder).
+_LOWERED_TYPES = (
+    Assign, ReturnStmt,
+    IfStmt, LoopStmt, DoWhileStmt, ForStmt, RepeatStmt,
+    BreakStmt, ContinueStmt, MatchStmt,
+    CallStmt, TailCallStmt,
+    SaveTemp, RestoreTemp,
+)
 
 
 # ---------------------------------------------------------------- values
@@ -53,7 +75,7 @@ def _emit_imm(imm: Imm) -> str:
 
 
 def _emit_value(v) -> str:
-    """Render an `Assign` source as a Rust r-value expression."""
+    """Render an `Assign` source or compare RHS as a Rust r-value."""
     if isinstance(v, Imm):
         return _emit_imm(v)
     if isinstance(v, Abs):
@@ -87,8 +109,7 @@ def _emit_binexpr(v: BinExpr) -> str:
 
 def _emit_target(target) -> str | None:
     """Render an `Assign` target as a Rust assignable place, or `None`
-    when the destination form isn't lowered yet (so the caller emits a
-    `// TODO` comment instead of an unassignable expression)."""
+    when the destination form isn't lowered yet."""
     if isinstance(target, Abs):
         return f"self.ram[{_addr(target.addr)}]"
     if isinstance(target, IndexedAbs):
@@ -96,21 +117,147 @@ def _emit_target(target) -> str | None:
     return None  # IndirectY and anything else: deferred
 
 
+def _emit_compare(c: Compare) -> str:
+    """Render a pass-3 `Compare` as a Rust boolean expression.
+
+    * `rhs=None` is a sign test (N-flag): `op` is `">=0"` or `"<0"`.
+      Cast the register to `i8` so the signed comparison is natural.
+    * `rhs=Imm` with `==`/`!=` is a zero / equality test (unsigned ok).
+    * `rhs=Imm` with `<`/`>=` comes from `cmp; bcc/bcs` — unsigned,
+      so plain u8 comparison is correct.
+    * `rhs=Abs` / `rhs=IndexedAbs`: compare against a memory byte."""
+    reg = f"self.{c.reg}"
+    if c.rhs is None:
+        # Sign test (N-flag): op is ">=0" (bpl) or "<0" (bmi). Validate
+        # explicitly so an unexpected op surfaces rather than silently
+        # emitting the wrong predicate.
+        if c.op == ">=0":
+            op_str = ">= 0"
+        elif c.op == "<0":
+            op_str = "< 0"
+        else:
+            raise ValueError(f"unexpected sign-test Compare op: {c.op!r}")
+        return f"({reg} as i8) {op_str}"
+    rhs = _emit_value(c.rhs)
+    return f"{reg} {c.op} {rhs}"
+
+
 # ---------------------------------------------------------------- statements
 
 
 def _emit_stmt(stmt, indent: int) -> list[str]:
     pad = INDENT * indent
+
     if isinstance(stmt, Assign):
         place = _emit_target(stmt.target)
         if place is None:
             return [f"{pad}// TODO(pass4): store via {type(stmt.target).__name__}"]
         return [f"{pad}{place} = {_emit_value(stmt.source)};"]
+
     if isinstance(stmt, ReturnStmt):
         return [f"{pad}return;"]
+
+    if isinstance(stmt, BreakStmt):
+        return [f"{pad}break;"]
+
+    if isinstance(stmt, ContinueStmt):
+        return [f"{pad}continue;"]
+
+    if isinstance(stmt, CallStmt):
+        return [f"{pad}self.{stmt.target}();"]
+
+    if isinstance(stmt, TailCallStmt):
+        return [f"{pad}self.{stmt.target}();", f"{pad}return;"]
+
+    if isinstance(stmt, SaveTemp):
+        return [f"{pad}let tmp{stmt.slot} = self.a;"]
+
+    if isinstance(stmt, RestoreTemp):
+        return [f"{pad}self.a = tmp{stmt.slot};"]
+
+    if isinstance(stmt, IfStmt):
+        lines = [f"{pad}if {_emit_compare(stmt.cond)} {{"]
+        for s in stmt.then_block.stmts:
+            lines.extend(_emit_stmt(s, indent + 1))
+        if stmt.else_block is not None:
+            lines.append(f"{pad}}} else {{")
+            for s in stmt.else_block.stmts:
+                lines.extend(_emit_stmt(s, indent + 1))
+        lines.append(f"{pad}}}")
+        return lines
+
+    if isinstance(stmt, LoopStmt):
+        lines = [f"{pad}loop {{"]
+        for s in stmt.body.stmts:
+            lines.extend(_emit_stmt(s, indent + 1))
+        lines.append(f"{pad}}}")
+        return lines
+
+    if isinstance(stmt, DoWhileStmt):
+        cond = _emit_compare(stmt.cond)
+        inner = INDENT * (indent + 1)
+        lines = [f"{pad}loop {{"]
+        for s in stmt.body.stmts:
+            lines.extend(_emit_stmt(s, indent + 1))
+        lines += [
+            f"{inner}if !({cond}) {{",
+            f"{inner}    break;",
+            f"{inner}}}",
+            f"{pad}}}",
+        ]
+        return lines
+
+    if isinstance(stmt, ForStmt):
+        step_method = "wrapping_sub" if stmt.step < 0 else "wrapping_add"
+        step_lit = f"0x{abs(stmt.step) & 0xff:02x}"
+        cond = _emit_compare(stmt.cond)
+        inner = INDENT * (indent + 1)
+        lines = [
+            f"{pad}self.{stmt.var} = {_emit_imm(stmt.start)};",
+            f"{pad}loop {{",
+        ]
+        for s in stmt.body.stmts:
+            lines.extend(_emit_stmt(s, indent + 1))
+        lines += [
+            f"{inner}self.{stmt.var} = self.{stmt.var}.{step_method}({step_lit});",
+            f"{inner}if !({cond}) {{",
+            f"{inner}    break;",
+            f"{inner}}}",
+            f"{pad}}}",
+        ]
+        return lines
+
+    if isinstance(stmt, RepeatStmt):
+        step_method = "wrapping_sub" if stmt.step < 0 else "wrapping_add"
+        step_lit = f"0x{abs(stmt.step) & 0xff:02x}"
+        inner = INDENT * (indent + 1)
+        lines = [
+            f"{pad}self.{stmt.var} = {_emit_imm(stmt.start)};",
+            f"{pad}for _ in 0..{stmt.count}usize {{",
+        ]
+        for s in stmt.body.stmts:
+            lines.extend(_emit_stmt(s, indent + 1))
+        lines += [
+            f"{inner}self.{stmt.var} = self.{stmt.var}.{step_method}({step_lit});",
+            f"{pad}}}",
+        ]
+        return lines
+
+    if isinstance(stmt, MatchStmt):
+        lines = [f"{pad}match self.{stmt.reg} {{"]
+        for arm in stmt.arms:
+            vals = " | ".join(f"0x{v.value & 0xff:02x}" for v in arm.values)
+            lines.append(f"{pad}    {vals} => {{")
+            for s in arm.body.stmts:
+                lines.extend(_emit_stmt(s, indent + 2))
+            lines.append(f"{pad}    }}")
+        lines += [f"{pad}    _ => {{}}", f"{pad}}}"]
+        return lines
+
     if isinstance(stmt, RawStmt):
         from .ir1 import format_item
         return [f"{pad}// raw: {format_item(stmt.item).strip()}"]
+
     return [f"{pad}// TODO(pass4): lower {type(stmt).__name__}"]
 
 
@@ -135,9 +282,9 @@ def emit_module(module: ModuleIR3) -> str:
         "// @generated by pop_lifter — DO NOT EDIT.",
         "//",
         "// Pass 4 skeleton slice: module + routine scaffolding with leaf-",
-        "// expression lowering. Control flow, calls, pha/pla temps, and the",
-        "// final Game/Renderer/Audio/Input design land in later slices;",
-        "// statements not yet lowered appear as `// TODO(pass4): …` lines.",
+        "// expression and control-flow lowering. `RawStmt` atoms, `Wide16Stmt`,",
+        "// `RawIfStmt`, and `GotoStmt`/`LabelStmt` are deferred to later slices;",
+        "// they appear as `// TODO(pass4): …` or `// raw: …` comments.",
         "// The `Cpu` receiver and flat `self.ram` model are provisional,",
         "// pending the state/trait design slice.",
         "//",
@@ -154,15 +301,13 @@ def emit_module(module: ModuleIR3) -> str:
 
 
 def lower_stats(module: ModuleIR3) -> tuple[int, int]:
-    """Count top-level statements lowered to real Rust (`Assign`,
-    `return`) vs. deferred (`RawStmt` comments, control flow, calls).
-    Nested blocks under deferred control flow aren't emitted yet, so
-    only the top level of each routine is counted — matching what the
-    emitter actually produces."""
+    """Count top-level statements that produce real Rust code vs. those
+    that produce a comment placeholder. Nested blocks under control-flow
+    are not counted — only the top-level flat list of each routine."""
     lowered = deferred = 0
     for routine in module.routines:
         for s in routine.body.stmts:
-            if isinstance(s, (Assign, ReturnStmt)):
+            if isinstance(s, _LOWERED_TYPES):
                 lowered += 1
             else:
                 deferred += 1

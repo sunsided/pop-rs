@@ -26,6 +26,7 @@ IR_PILOT_CHGSHADPOSN_IR3 = REPO_ROOT / "ir" / "pilot" / "chgshadposn.ir3"
 IR_PILOT_CHGSHADPOSN_PASS3 = REPO_ROOT / "ir" / "pilot" / "chgshadposn.pass3.ir3"
 IR_PILOT_CUP_PASS3 = REPO_ROOT / "ir" / "pilot" / "cup.pass3.ir3"
 IR_PILOT_CUP_RS = REPO_ROOT / "ir" / "pilot" / "cup.rs"
+IR_PILOT_CHGSHADPOSN_RS = REPO_ROOT / "ir" / "pilot" / "chgshadposn.rs"
 IR_PILOT_CMPSPACE_MATCH = REPO_ROOT / "ir" / "pilot" / "cmpspace.match.ir3"
 IR_PILOT_FASTBLACK_SMC = REPO_ROOT / "ir" / "pilot" / "fastblack.smc.ir1"
 IR_PILOT_CHGSHADPOSN_LOOPS = REPO_ROOT / "ir" / "pilot" / "chgshadposn.loops.ir3"
@@ -389,6 +390,50 @@ def test_pass4_cup_rs_artifact_matches(source_dir):
         f"regenerate with:\n"
         f"  pop-lifter emit AUTO.S --entry Cup "
         f"--out {IR_PILOT_CUP_RS.relative_to(REPO_ROOT)}"
+    )
+
+
+def _regen_chgshadposn_rs(source_dir: Path) -> str:
+    from pop_lifter.pass2_reloop import reloop_module
+    from pop_lifter.pass2_struct import structure_module
+    from pop_lifter.pass3_expr import fold_module
+    from pop_lifter.pass3_loops import recover_loops
+    from pop_lifter.pass3_temps import recover_temps
+    from pop_lifter.pass4_emit_rust import emit_module
+    ast = parse_files(
+        [
+            source_dir / "EQ.S",
+            source_dir / "GAMEEQ.S",
+            source_dir / "AUTO.S",
+        ],
+        search_paths=[source_dir],
+    )
+    auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
+    ir1_module = lift_file(auto, ast.symbols(), ["chgshadposn"]).module
+    ir3_module = reloop_module(structure_module(ir1_module))
+    recovered = recover_temps(recover_loops(fold_module(ir3_module)))
+    return emit_module(recovered)
+
+
+def test_pass4_chgshadposn_rs_artifact_matches(source_dir):
+    """The chgshadposn pass-4 pilot pins control-flow lowering: the
+    down-counter `for y in (0..=6).rev()` becomes an inlined
+    `self.y = 0x06; loop { … step … if !(signed cond) { break; } }`,
+    and the `jumpseq` call lowers to `self.jumpseq();` (a regular call
+    here — more statements follow it, so it is not a tail call)."""
+    if not IR_PILOT_CHGSHADPOSN_RS.exists():
+        raise AssertionError(
+            f"missing artifact {IR_PILOT_CHGSHADPOSN_RS}. regenerate with:\n"
+            f"  pop-lifter emit AUTO.S --entry chgshadposn "
+            f"--out {IR_PILOT_CHGSHADPOSN_RS.relative_to(REPO_ROOT)}"
+        )
+    expected = IR_PILOT_CHGSHADPOSN_RS.read_text(encoding="utf-8")
+    actual = _regen_chgshadposn_rs(source_dir)
+    assert actual == expected, (
+        f"{IR_PILOT_CHGSHADPOSN_RS.relative_to(REPO_ROOT)} is stale. "
+        f"regenerate with:\n"
+        f"  pop-lifter emit AUTO.S --entry chgshadposn "
+        f"--out {IR_PILOT_CHGSHADPOSN_RS.relative_to(REPO_ROOT)}"
     )
 
 
