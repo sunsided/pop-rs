@@ -25,7 +25,7 @@ fn entry {
   a = a >> 1                       ; BOOT.S:46
   a = a >> 1                       ; BOOT.S:47
   a = a | #0xc0              ; BOOT.S:48
-  ??? sta :rdsect+2            ; BOOT.S:49
+  patch *:rdsect+2 = a            ; BOOT.S:49
   a = #0x0f                  ; BOOT.S:50
   *sector@0x0050 = a            ; BOOT.S:51
 :0:

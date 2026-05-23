@@ -80,6 +80,7 @@ from .ir1 import (
     StoreAbs,
     StoreIndexed,
     StoreIndirect,
+    StoreLocal,
     Transfer,
     Unsupported,
 )
@@ -127,6 +128,14 @@ class Trace:
     # `max_stack_depth` for observability.
     value_stack: list[int] = field(default_factory=list)
     max_value_stack_depth: int = 0
+    # Self-modifying-code / local-label store sink. `StoreLocal`
+    # writes land here keyed by `(target_label, offset)` rather than
+    # into `ram`, because local labels have no resolved address (we
+    # don't assemble the program). Nothing reads it back yet — a
+    # faithful SMC model that re-routes the patched instruction's
+    # operand is future work — but the writes are observable so
+    # tests can assert the patch happened. See `ir1.StoreLocal`.
+    code_patches: dict[tuple[str, int], int] = field(default_factory=dict)
 
     def diff_against(self, initial: bytes) -> dict[int, int]:
         """Return only the addresses whose byte differs from `initial`.
@@ -359,6 +368,13 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         addr = _real_addr(item.target.addr, item.src)
         ram[addr] = value
         trace.writes[addr] = value
+        return True
+    if isinstance(item, StoreLocal):
+        # SMC / local-label store. We don't have a real address for
+        # the local label, so the write goes into the side-channel
+        # `code_patches` dict rather than `ram`. No flag effects.
+        value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
+        trace.code_patches[(item.target_label, item.offset)] = value
         return True
     if isinstance(item, StoreIndexed):
         value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]

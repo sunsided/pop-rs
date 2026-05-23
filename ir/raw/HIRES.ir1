@@ -91,9 +91,9 @@ fn CLS {
   a = *PAGE@0x0000        ; HIRES.S:206
   c = 0                            ; HIRES.S:207
   a = a + #0x20 + c              ; HIRES.S:208
-  ??? sta :loop+2            ; HIRES.S:209
+  patch *:loop+2 = a            ; HIRES.S:209
   a = a + #0x10 + c              ; HIRES.S:210
-  ??? sta :smod+2            ; HIRES.S:211
+  patch *:smod+2 = a            ; HIRES.S:211
   a = #0x80                  ; HIRES.S:213
   x = #0x10                  ; HIRES.S:215
   y = #0x00                  ; HIRES.S:217
@@ -143,7 +143,7 @@ fn setimage {
 
 fn GETWIDTH {
   a = *BANK@0x0012        ; HIRES.S:288
-  ??? sta :RAMRD+1            ; HIRES.S:289
+  patch *:RAMRD+1 = a            ; HIRES.S:289
 :RAMRD:
   *$c003@0xc003 = a            ; HIRES.S:291
   call setimage                  ; HIRES.S:293
@@ -163,7 +163,7 @@ fn PREPREP {
   a = *YCO@0x0002        ; HIRES.S:319
   *YSAVE@0x00f5 = a            ; HIRES.S:320
   a = *BANK@0x0012        ; HIRES.S:324
-  ??? sta :RAMRD+1            ; HIRES.S:325
+  patch *:RAMRD+1 = a            ; HIRES.S:325
 :RAMRD:
   *$c003@0xc003 = a            ; HIRES.S:327
   call setimage                  ; HIRES.S:329
@@ -315,19 +315,19 @@ fn LAYRSAVE {
   *PEELIMG+1@0x000c = a            ; HIRES.S:562
   a = *XCO@0x0001        ; HIRES.S:564
   *PEELXCO@0x000d = a            ; HIRES.S:565
-  ??? sta :smXCO+1            ; HIRES.S:566
+  patch *:smXCO+1 = a            ; HIRES.S:566
   a = *YCO@0x0002        ; HIRES.S:568
   *PEELYCO@0x000e = a            ; HIRES.S:569
   a = *PAGE@0x0000        ; HIRES.S:571
-  ??? sta :smPAGE+1            ; HIRES.S:572
+  patch *:smPAGE+1 = a            ; HIRES.S:572
   y = #0x00                  ; HIRES.S:574
   a = *VISWIDTH@0x001a        ; HIRES.S:576
   if eq goto SKIPIT       ; HIRES.S:577
   *(PEELBUF@0x0009)[y] = a   ; HIRES.S:578
-  ??? sta :smWIDTH+1            ; HIRES.S:579
+  patch *:smWIDTH+1 = a            ; HIRES.S:579
   c = 1                            ; HIRES.S:581
   a = a - #0x01 - (1 - c)        ; HIRES.S:582
-  ??? sta :smSTART+1            ; HIRES.S:583
+  patch *:smSTART+1 = a            ; HIRES.S:583
 :cont:
   y += 1                         ; HIRES.S:587
   a = *YCO@0x0002        ; HIRES.S:589
@@ -347,11 +347,11 @@ fn LAYRSAVE {
   c = 0                            ; HIRES.S:607
 :smXCO:
   a = a + #0x00 + c              ; HIRES.S:608
-  ??? sta :smBASE+1            ; HIRES.S:609
+  patch *:smBASE+1 = a            ; HIRES.S:609
   a = *(YHI@0xe0c0 + x)   ; HIRES.S:611
 :smPAGE:
   a = a + #0x00 + c              ; HIRES.S:612
-  ??? sta :smBASE+2            ; HIRES.S:613
+  patch *:smBASE+2 = a            ; HIRES.S:613
 :smSTART:
   y = #0x00                  ; HIRES.S:615
 :inloop:
@@ -404,27 +404,27 @@ fn LayGen {
   tail_call DONE                ; HIRES.S:686
 :cont:
   a = *BANK@0x0012        ; HIRES.S:688
-  ??? sta :RAMRD1+1            ; HIRES.S:689
-  ??? sta :RAMRD2+1            ; HIRES.S:690
+  patch *:RAMRD1+1 = a            ; HIRES.S:689
+  patch *:RAMRD2+1 = a            ; HIRES.S:690
   x = *OFFSET@0x0003        ; HIRES.S:692
   a = *(SHIFTL@0xe980 + x)   ; HIRES.S:694
-  ??? sta :91+1            ; HIRES.S:695
+  patch *:91+1 = a            ; HIRES.S:695
   a = *(SHIFTH@0xe987 + x)   ; HIRES.S:696
-  ??? sta :91+2            ; HIRES.S:697
+  patch *:91+2 = a            ; HIRES.S:697
   a = *(CARRYL@0xe98e + x)   ; HIRES.S:699
-  ??? sta :90+1            ; HIRES.S:700
-  ??? sta :92+1            ; HIRES.S:701
+  patch *:90+1 = a            ; HIRES.S:700
+  patch *:92+1 = a            ; HIRES.S:701
   a = *(CARRYH@0xe995 + x)   ; HIRES.S:702
-  ??? sta :90+2            ; HIRES.S:703
-  ??? sta :92+2            ; HIRES.S:704
+  patch *:90+2 = a            ; HIRES.S:703
+  patch *:92+2 = a            ; HIRES.S:704
   a = *(AMASKS@0xe99c + x)   ; HIRES.S:706
-  ??? sta :AMASK+1            ; HIRES.S:707
+  patch *:AMASK+1 = a            ; HIRES.S:707
   a = *(BMASKS@0xe9a3 + x)   ; HIRES.S:708
-  ??? sta :BMASK+1            ; HIRES.S:709
+  patch *:BMASK+1 = a            ; HIRES.S:709
   x = *OPACITY@0x0006        ; HIRES.S:711
   a = *(OPCODE@0xe9aa + x)   ; HIRES.S:712
-  ??? sta :80            ; HIRES.S:713
-  ??? sta :81            ; HIRES.S:714
+  patch *:80 = a            ; HIRES.S:713
+  patch *:81 = a            ; HIRES.S:714
   y = *YCO@0x0002        ; HIRES.S:718
 :nextline:
   a = *(YLO@0xe000 + y)   ; HIRES.S:721
@@ -529,35 +529,35 @@ fn DONE {
 fn LayMask {
   x = *OPACITY@0x0006        ; HIRES.S:834
   a = *(OPCODE@0xe9aa + x)   ; HIRES.S:835
-  ??? sta :masksm1            ; HIRES.S:836
-  ??? sta :masksm2            ; HIRES.S:837
+  patch *:masksm1 = a            ; HIRES.S:836
+  patch *:masksm2 = a            ; HIRES.S:837
   call PREPREP                  ; HIRES.S:839
   call CROP                  ; HIRES.S:841
   if mi goto ]done       ; HIRES.S:842
   a = *BANK@0x0012        ; HIRES.S:844
-  ??? sta :RAMRD1+1            ; HIRES.S:845
-  ??? sta :RAMRD2+1            ; HIRES.S:846
+  patch *:RAMRD1+1 = a            ; HIRES.S:845
+  patch *:RAMRD2+1 = a            ; HIRES.S:846
   x = *OFFSET@0x0003        ; HIRES.S:848
   a = *(SHIFTL@0xe980 + x)   ; HIRES.S:850
-  ??? sta :91+1            ; HIRES.S:851
-  ??? sta :93+1            ; HIRES.S:852
+  patch *:91+1 = a            ; HIRES.S:851
+  patch *:93+1 = a            ; HIRES.S:852
   a = *(SHIFTH@0xe987 + x)   ; HIRES.S:854
-  ??? sta :91+2            ; HIRES.S:855
-  ??? sta :93+2            ; HIRES.S:856
+  patch *:91+2 = a            ; HIRES.S:855
+  patch *:93+2 = a            ; HIRES.S:856
   a = *(CARRYL@0xe98e + x)   ; HIRES.S:858
-  ??? sta :90+1            ; HIRES.S:859
-  ??? sta :92+1            ; HIRES.S:860
-  ??? sta :94+1            ; HIRES.S:861
-  ??? sta :96+1            ; HIRES.S:862
+  patch *:90+1 = a            ; HIRES.S:859
+  patch *:92+1 = a            ; HIRES.S:860
+  patch *:94+1 = a            ; HIRES.S:861
+  patch *:96+1 = a            ; HIRES.S:862
   a = *(CARRYH@0xe995 + x)   ; HIRES.S:864
-  ??? sta :90+2            ; HIRES.S:865
-  ??? sta :92+2            ; HIRES.S:866
-  ??? sta :94+2            ; HIRES.S:867
-  ??? sta :96+2            ; HIRES.S:868
+  patch *:90+2 = a            ; HIRES.S:865
+  patch *:92+2 = a            ; HIRES.S:866
+  patch *:94+2 = a            ; HIRES.S:867
+  patch *:96+2 = a            ; HIRES.S:868
   a = *(AMASKS@0xe99c + x)   ; HIRES.S:870
-  ??? sta :AMASK+1            ; HIRES.S:871
+  patch *:AMASK+1 = a            ; HIRES.S:871
   a = *(BMASKS@0xe9a3 + x)   ; HIRES.S:873
-  ??? sta :BMASK+1            ; HIRES.S:874
+  patch *:BMASK+1 = a            ; HIRES.S:874
   y = *YCO@0x0002        ; HIRES.S:876
 :nextline:
   a = *(YLO@0xe000 + y)   ; HIRES.S:879
@@ -663,32 +663,32 @@ fn LayXOR {
   tail_call DONE                ; HIRES.S:1013
 :cont:
   a = *BANK@0x0012        ; HIRES.S:1015
-  ??? sta :RAMRD1+1            ; HIRES.S:1016
-  ??? sta :RAMRD2+1            ; HIRES.S:1017
+  patch *:RAMRD1+1 = a            ; HIRES.S:1016
+  patch *:RAMRD2+1 = a            ; HIRES.S:1017
   x = *OFFSET@0x0003        ; HIRES.S:1019
   a = *(SHIFTL@0xe980 + x)   ; HIRES.S:1021
-  ??? sta :91+1            ; HIRES.S:1022
+  patch *:91+1 = a            ; HIRES.S:1022
   a = *(SHIFTH@0xe987 + x)   ; HIRES.S:1023
-  ??? sta :91+2            ; HIRES.S:1024
+  patch *:91+2 = a            ; HIRES.S:1024
   a = *(CARRYL@0xe98e + x)   ; HIRES.S:1026
-  ??? sta :90+1            ; HIRES.S:1027
-  ??? sta :92+1            ; HIRES.S:1028
+  patch *:90+1 = a            ; HIRES.S:1027
+  patch *:92+1 = a            ; HIRES.S:1028
   a = *(CARRYH@0xe995 + x)   ; HIRES.S:1029
-  ??? sta :90+2            ; HIRES.S:1030
-  ??? sta :92+2            ; HIRES.S:1031
+  patch *:90+2 = a            ; HIRES.S:1030
+  patch *:92+2 = a            ; HIRES.S:1031
   call shiftoffset                  ; HIRES.S:1033
   a = *(SHIFTL@0xe980 + x)   ; HIRES.S:1035
-  ??? sta :s1+1            ; HIRES.S:1036
+  patch *:s1+1 = a            ; HIRES.S:1036
   a = *(SHIFTH@0xe987 + x)   ; HIRES.S:1037
-  ??? sta :s1+2            ; HIRES.S:1038
+  patch *:s1+2 = a            ; HIRES.S:1038
   a = *(CARRYL@0xe98e + x)   ; HIRES.S:1040
-  ??? sta :c1+1            ; HIRES.S:1041
-  ??? sta :c2+1            ; HIRES.S:1042
+  patch *:c1+1 = a            ; HIRES.S:1041
+  patch *:c2+1 = a            ; HIRES.S:1042
   a = *(CARRYH@0xe995 + x)   ; HIRES.S:1043
-  ??? sta :c1+2            ; HIRES.S:1044
-  ??? sta :c2+2            ; HIRES.S:1045
+  patch *:c1+2 = a            ; HIRES.S:1044
+  patch *:c2+2 = a            ; HIRES.S:1045
   a = *(AMASKS@0xe99c + x)   ; HIRES.S:1047
-  ??? sta :AMASK+1            ; HIRES.S:1048
+  patch *:AMASK+1 = a            ; HIRES.S:1048
   y = *YCO@0x0002        ; HIRES.S:1052
 :0:
   a = *(YLO@0xe000 + y)   ; HIRES.S:1054
@@ -805,27 +805,27 @@ fn MLayGen {
   tail_call DONE                ; HIRES.S:1212
 :cont:
   a = *BANK@0x0012        ; HIRES.S:1214
-  ??? sta :RAMRD1+1            ; HIRES.S:1215
-  ??? sta :RAMRD2+1            ; HIRES.S:1216
+  patch *:RAMRD1+1 = a            ; HIRES.S:1215
+  patch *:RAMRD2+1 = a            ; HIRES.S:1216
   x = *OFFSET@0x0003        ; HIRES.S:1218
   a = *(SHIFTL@0xe980 + x)   ; HIRES.S:1220
-  ??? sta :91+1            ; HIRES.S:1221
+  patch *:91+1 = a            ; HIRES.S:1221
   a = *(SHIFTH@0xe987 + x)   ; HIRES.S:1222
-  ??? sta :91+2            ; HIRES.S:1223
+  patch *:91+2 = a            ; HIRES.S:1223
   a = *(CARRYL@0xe98e + x)   ; HIRES.S:1225
-  ??? sta :90+1            ; HIRES.S:1226
-  ??? sta :92+1            ; HIRES.S:1227
+  patch *:90+1 = a            ; HIRES.S:1226
+  patch *:92+1 = a            ; HIRES.S:1227
   a = *(CARRYH@0xe995 + x)   ; HIRES.S:1228
-  ??? sta :90+2            ; HIRES.S:1229
-  ??? sta :92+2            ; HIRES.S:1230
+  patch *:90+2 = a            ; HIRES.S:1229
+  patch *:92+2 = a            ; HIRES.S:1230
   a = *(AMASKS@0xe99c + x)   ; HIRES.S:1232
   *AMASK@0x0018 = a            ; HIRES.S:1233
   a = *(BMASKS@0xe9a3 + x)   ; HIRES.S:1234
   *BMASK@0x0019 = a            ; HIRES.S:1235
   x = *OPACITY@0x0006        ; HIRES.S:1237
   a = *(OPCODE@0xe9aa + x)   ; HIRES.S:1238
-  ??? sta :80            ; HIRES.S:1239
-  ??? sta :81            ; HIRES.S:1240
+  patch *:80 = a            ; HIRES.S:1239
+  patch *:81 = a            ; HIRES.S:1240
   y = *YCO@0x0002        ; HIRES.S:1244
 :0:
   a = *(YLO@0xe000 + y)   ; HIRES.S:1246
@@ -914,8 +914,8 @@ fn MLayGen {
 fn MLayMask {
   x = *OPACITY@0x0006        ; HIRES.S:1357
   a = *(OPCODE@0xe9aa + x)   ; HIRES.S:1358
-  ??? sta :masksm1            ; HIRES.S:1359
-  ??? sta :masksm2            ; HIRES.S:1360
+  patch *:masksm1 = a            ; HIRES.S:1359
+  patch *:masksm2 = a            ; HIRES.S:1360
   call PREPREP                  ; HIRES.S:1362
   a = *XCO@0x0001        ; HIRES.S:1364
   c = 1                            ; HIRES.S:1365
@@ -926,29 +926,29 @@ fn MLayMask {
   tail_call DONE                ; HIRES.S:1371
 :cont:
   a = *BANK@0x0012        ; HIRES.S:1373
-  ??? sta :RAMRD1+1            ; HIRES.S:1374
-  ??? sta :RAMRD2+1            ; HIRES.S:1375
+  patch *:RAMRD1+1 = a            ; HIRES.S:1374
+  patch *:RAMRD2+1 = a            ; HIRES.S:1375
   x = *OFFSET@0x0003        ; HIRES.S:1377
   a = *(SHIFTL@0xe980 + x)   ; HIRES.S:1379
-  ??? sta :91+1            ; HIRES.S:1380
-  ??? sta :93+1            ; HIRES.S:1381
+  patch *:91+1 = a            ; HIRES.S:1380
+  patch *:93+1 = a            ; HIRES.S:1381
   a = *(SHIFTH@0xe987 + x)   ; HIRES.S:1383
-  ??? sta :91+2            ; HIRES.S:1384
-  ??? sta :93+2            ; HIRES.S:1385
+  patch *:91+2 = a            ; HIRES.S:1384
+  patch *:93+2 = a            ; HIRES.S:1385
   a = *(CARRYL@0xe98e + x)   ; HIRES.S:1387
-  ??? sta :90+1            ; HIRES.S:1388
-  ??? sta :92+1            ; HIRES.S:1389
-  ??? sta :94+1            ; HIRES.S:1390
-  ??? sta :96+1            ; HIRES.S:1391
+  patch *:90+1 = a            ; HIRES.S:1388
+  patch *:92+1 = a            ; HIRES.S:1389
+  patch *:94+1 = a            ; HIRES.S:1390
+  patch *:96+1 = a            ; HIRES.S:1391
   a = *(CARRYH@0xe995 + x)   ; HIRES.S:1393
-  ??? sta :90+2            ; HIRES.S:1394
-  ??? sta :92+2            ; HIRES.S:1395
-  ??? sta :94+2            ; HIRES.S:1396
-  ??? sta :96+2            ; HIRES.S:1397
+  patch *:90+2 = a            ; HIRES.S:1394
+  patch *:92+2 = a            ; HIRES.S:1395
+  patch *:94+2 = a            ; HIRES.S:1396
+  patch *:96+2 = a            ; HIRES.S:1397
   a = *(AMASKS@0xe99c + x)   ; HIRES.S:1399
-  ??? sta :AMASK+1            ; HIRES.S:1400
+  patch *:AMASK+1 = a            ; HIRES.S:1400
   a = *(BMASKS@0xe9a3 + x)   ; HIRES.S:1401
-  ??? sta :BMASK+1            ; HIRES.S:1402
+  patch *:BMASK+1 = a            ; HIRES.S:1402
   y = *YCO@0x0002        ; HIRES.S:1406
 :0:
   a = *(YLO@0xe000 + y)   ; HIRES.S:1408
@@ -1064,32 +1064,32 @@ fn MLayXOR {
   tail_call DONE                ; HIRES.S:1551
 :cont:
   a = *BANK@0x0012        ; HIRES.S:1553
-  ??? sta :RAMRD1+1            ; HIRES.S:1554
-  ??? sta :RAMRD2+1            ; HIRES.S:1555
+  patch *:RAMRD1+1 = a            ; HIRES.S:1554
+  patch *:RAMRD2+1 = a            ; HIRES.S:1555
   x = *OFFSET@0x0003        ; HIRES.S:1557
   a = *(SHIFTL@0xe980 + x)   ; HIRES.S:1559
-  ??? sta :91+1            ; HIRES.S:1560
+  patch *:91+1 = a            ; HIRES.S:1560
   a = *(SHIFTH@0xe987 + x)   ; HIRES.S:1561
-  ??? sta :91+2            ; HIRES.S:1562
+  patch *:91+2 = a            ; HIRES.S:1562
   a = *(CARRYL@0xe98e + x)   ; HIRES.S:1564
-  ??? sta :90+1            ; HIRES.S:1565
-  ??? sta :92+1            ; HIRES.S:1566
+  patch *:90+1 = a            ; HIRES.S:1565
+  patch *:92+1 = a            ; HIRES.S:1566
   a = *(CARRYH@0xe995 + x)   ; HIRES.S:1567
-  ??? sta :90+2            ; HIRES.S:1568
-  ??? sta :92+2            ; HIRES.S:1569
+  patch *:90+2 = a            ; HIRES.S:1568
+  patch *:92+2 = a            ; HIRES.S:1569
   call shiftoffset                  ; HIRES.S:1571
   a = *(SHIFTL@0xe980 + x)   ; HIRES.S:1573
-  ??? sta :s1+1            ; HIRES.S:1574
+  patch *:s1+1 = a            ; HIRES.S:1574
   a = *(SHIFTH@0xe987 + x)   ; HIRES.S:1575
-  ??? sta :s1+2            ; HIRES.S:1576
+  patch *:s1+2 = a            ; HIRES.S:1576
   a = *(CARRYL@0xe98e + x)   ; HIRES.S:1578
-  ??? sta :c1+1            ; HIRES.S:1579
-  ??? sta :c2+1            ; HIRES.S:1580
+  patch *:c1+1 = a            ; HIRES.S:1579
+  patch *:c2+1 = a            ; HIRES.S:1580
   a = *(CARRYH@0xe995 + x)   ; HIRES.S:1581
-  ??? sta :c1+2            ; HIRES.S:1582
-  ??? sta :c2+2            ; HIRES.S:1583
+  patch *:c1+2 = a            ; HIRES.S:1582
+  patch *:c2+2 = a            ; HIRES.S:1583
   a = *(AMASKS@0xe99c + x)   ; HIRES.S:1585
-  ??? sta :AMASK+1            ; HIRES.S:1586
+  patch *:AMASK+1 = a            ; HIRES.S:1586
   y = *YCO@0x0002        ; HIRES.S:1590
 :0:
   a = *(YLO@0xe000 + y)   ; HIRES.S:1592
@@ -1204,17 +1204,17 @@ fn FASTLAY {
   cmp x, #sta              ; HIRES.S:1747
   if eq goto fastlaySTA       ; HIRES.S:1748
   a = *(OPCODE@0xe9aa + x)   ; HIRES.S:1750
-  ??? sta :smod            ; HIRES.S:1751
+  patch *:smod = a            ; HIRES.S:1751
   a = *PAGE@0x0000        ; HIRES.S:1753
-  ??? sta :smPAGE+1            ; HIRES.S:1754
+  patch *:smPAGE+1 = a            ; HIRES.S:1754
   a = *XCO@0x0001        ; HIRES.S:1756
-  ??? sta :smXCO+1            ; HIRES.S:1757
+  patch *:smXCO+1 = a            ; HIRES.S:1757
   y = #0x00                  ; HIRES.S:1759
   a = *(IMAGE@0x0004)[y]   ; HIRES.S:1760
-  ??? sta :smWIDTH+1            ; HIRES.S:1761
+  patch *:smWIDTH+1 = a            ; HIRES.S:1761
   c = 1                            ; HIRES.S:1763
   a = a - #0x01 - (1 - c)        ; HIRES.S:1764
-  ??? sta :smSTART+1            ; HIRES.S:1765
+  patch *:smSTART+1 = a            ; HIRES.S:1765
   a = *YCO@0x0002        ; HIRES.S:1767
   x = a                            ; HIRES.S:1768
   y += 1                         ; HIRES.S:1769
@@ -1222,7 +1222,7 @@ fn FASTLAY {
   if cs goto :ok       ; HIRES.S:1771
   a = #0xff                  ; HIRES.S:1772
 :ok:
-  ??? sta :smTOP+1            ; HIRES.S:1773
+  patch *:smTOP+1 = a            ; HIRES.S:1773
   a = *IMAGE@0x0004        ; HIRES.S:1775
   c = 0                            ; HIRES.S:1776
   a = a + #0x02 + c              ; HIRES.S:1777
@@ -1268,15 +1268,15 @@ fn FASTLAY {
 
 fn fastlaySTA {
   a = *PAGE@0x0000        ; HIRES.S:1826
-  ??? sta :smPAGE+1            ; HIRES.S:1827
+  patch *:smPAGE+1 = a            ; HIRES.S:1827
   a = *XCO@0x0001        ; HIRES.S:1829
-  ??? sta :smXCO+1            ; HIRES.S:1830
+  patch *:smXCO+1 = a            ; HIRES.S:1830
   y = #0x00                  ; HIRES.S:1832
   a = *(IMAGE@0x0004)[y]   ; HIRES.S:1833
-  ??? sta :smWIDTH+1            ; HIRES.S:1834
+  patch *:smWIDTH+1 = a            ; HIRES.S:1834
   c = 1                            ; HIRES.S:1836
   a = a - #0x01 - (1 - c)        ; HIRES.S:1837
-  ??? sta :smSTART+1            ; HIRES.S:1838
+  patch *:smSTART+1 = a            ; HIRES.S:1838
   a = *YCO@0x0002        ; HIRES.S:1840
   x = a                            ; HIRES.S:1841
   y += 1                         ; HIRES.S:1842
@@ -1284,7 +1284,7 @@ fn fastlaySTA {
   if cs goto :ok       ; HIRES.S:1844
   a = #0xff                  ; HIRES.S:1845
 :ok:
-  ??? sta :smTOP+1            ; HIRES.S:1846
+  patch *:smTOP+1 = a            ; HIRES.S:1846
   a = *IMAGE@0x0004        ; HIRES.S:1848
   c = 0                            ; HIRES.S:1849
   a = a + #0x02 + c              ; HIRES.S:1850
@@ -1297,11 +1297,11 @@ fn fastlaySTA {
   c = 0                            ; HIRES.S:1858
 :smXCO:
   a = a + #0x00 + c              ; HIRES.S:1859
-  ??? sta :smod+1            ; HIRES.S:1860
+  patch *:smod+1 = a            ; HIRES.S:1860
   a = *(YHI@0xe0c0 + x)   ; HIRES.S:1862
 :smPAGE:
   a = a + #0x20 + c              ; HIRES.S:1863
-  ??? sta :smod+2            ; HIRES.S:1864
+  patch *:smod+2 = a            ; HIRES.S:1864
 :smSTART:
   y = #0x03                  ; HIRES.S:1866
 :inloop:
@@ -1330,15 +1330,15 @@ fn FASTMASK {
   *$c003@0xc003 = a            ; HIRES.S:1894
   call setimage                  ; HIRES.S:1896
   a = *PAGE@0x0000        ; HIRES.S:1898
-  ??? sta :smPAGE+1            ; HIRES.S:1899
+  patch *:smPAGE+1 = a            ; HIRES.S:1899
   a = *XCO@0x0001        ; HIRES.S:1901
-  ??? sta :smXCO+1            ; HIRES.S:1902
+  patch *:smXCO+1 = a            ; HIRES.S:1902
   y = #0x00                  ; HIRES.S:1904
   a = *(IMAGE@0x0004)[y]   ; HIRES.S:1905
-  ??? sta :smWIDTH+1            ; HIRES.S:1906
+  patch *:smWIDTH+1 = a            ; HIRES.S:1906
   c = 1                            ; HIRES.S:1908
   a = a - #0x01 - (1 - c)        ; HIRES.S:1909
-  ??? sta :smSTART+1            ; HIRES.S:1910
+  patch *:smSTART+1 = a            ; HIRES.S:1910
   a = *YCO@0x0002        ; HIRES.S:1912
   x = a                            ; HIRES.S:1913
   y += 1                         ; HIRES.S:1914
@@ -1346,7 +1346,7 @@ fn FASTMASK {
   if cs goto :ok       ; HIRES.S:1916
   a = #0xff                  ; HIRES.S:1917
 :ok:
-  ??? sta :smTOP+1            ; HIRES.S:1918
+  patch *:smTOP+1 = a            ; HIRES.S:1918
   a = *IMAGE@0x0004        ; HIRES.S:1920
   c = 0                            ; HIRES.S:1921
   a = a + #0x02 + c              ; HIRES.S:1922
@@ -1396,11 +1396,11 @@ fn FASTMASK {
 fn SETFASTMAIN {
   a = #0x02                  ; HIRES.S:1981
 ]setfast:
-  ??? sta ]ramrd1+1            ; HIRES.S:1983
-  ??? sta ]ramrd2+1            ; HIRES.S:1984
-  ??? sta ]ramrd3+1            ; HIRES.S:1985
-  ??? sta ]ramrd4+1            ; HIRES.S:1986
-  ??? sta ]ramrd5+1            ; HIRES.S:1987
+  patch *]ramrd1+1 = a            ; HIRES.S:1983
+  patch *]ramrd2+1 = a            ; HIRES.S:1984
+  patch *]ramrd3+1 = a            ; HIRES.S:1985
+  patch *]ramrd4+1 = a            ; HIRES.S:1986
+  patch *]ramrd5+1 = a            ; HIRES.S:1987
   return                           ; HIRES.S:1988
 }
 
@@ -1409,29 +1409,29 @@ fn SETFASTAUX {
   if ne goto ]setfast       ; HIRES.S:1992
 FASTBLACK:
   a = *color@0x0006        ; HIRES.S:2006
-  ??? sta :smCOLOR+1            ; HIRES.S:2007
+  patch *:smCOLOR+1 = a            ; HIRES.S:2007
   a = *PAGE@0x0000        ; HIRES.S:2009
-  ??? sta :smPAGE+1            ; HIRES.S:2010
+  patch *:smPAGE+1 = a            ; HIRES.S:2010
   a = *XCO@0x0001        ; HIRES.S:2012
-  ??? sta :smXCO+1            ; HIRES.S:2013
+  patch *:smXCO+1 = a            ; HIRES.S:2013
   a = *width@0x0005        ; HIRES.S:2015
   c = 1                            ; HIRES.S:2016
   a = a - #0x01 - (1 - c)        ; HIRES.S:2017
-  ??? sta :smSTART+1            ; HIRES.S:2018
+  patch *:smSTART+1 = a            ; HIRES.S:2018
   a = *YCO@0x0002        ; HIRES.S:2020
   x = a                            ; HIRES.S:2021
   a = a - *height@0x0004 - (1 - c) ; HIRES.S:2022
-  ??? sta :smTOP+1            ; HIRES.S:2023
+  patch *:smTOP+1 = a            ; HIRES.S:2023
 :outloop:
   a = *(YLO@0xe000 + x)   ; HIRES.S:2026
   c = 0                            ; HIRES.S:2027
 :smXCO:
   a = a + #0x00 + c              ; HIRES.S:2028
-  ??? sta :smod+1            ; HIRES.S:2029
+  patch *:smod+1 = a            ; HIRES.S:2029
   a = *(YHI@0xe0c0 + x)   ; HIRES.S:2031
 :smPAGE:
   a = a + #0x20 + c              ; HIRES.S:2032
-  ??? sta :smod+2            ; HIRES.S:2033
+  patch *:smod+2 = a            ; HIRES.S:2033
 :smCOLOR:
   a = #0x80                  ; HIRES.S:2035
 :smSTART:
@@ -1450,29 +1450,29 @@ FASTBLACK:
 
 fn FASTBLACK {
   a = *color@0x0006        ; HIRES.S:2006
-  ??? sta :smCOLOR+1            ; HIRES.S:2007
+  patch *:smCOLOR+1 = a            ; HIRES.S:2007
   a = *PAGE@0x0000        ; HIRES.S:2009
-  ??? sta :smPAGE+1            ; HIRES.S:2010
+  patch *:smPAGE+1 = a            ; HIRES.S:2010
   a = *XCO@0x0001        ; HIRES.S:2012
-  ??? sta :smXCO+1            ; HIRES.S:2013
+  patch *:smXCO+1 = a            ; HIRES.S:2013
   a = *width@0x0005        ; HIRES.S:2015
   c = 1                            ; HIRES.S:2016
   a = a - #0x01 - (1 - c)        ; HIRES.S:2017
-  ??? sta :smSTART+1            ; HIRES.S:2018
+  patch *:smSTART+1 = a            ; HIRES.S:2018
   a = *YCO@0x0002        ; HIRES.S:2020
   x = a                            ; HIRES.S:2021
   a = a - *height@0x0004 - (1 - c) ; HIRES.S:2022
-  ??? sta :smTOP+1            ; HIRES.S:2023
+  patch *:smTOP+1 = a            ; HIRES.S:2023
 :outloop:
   a = *(YLO@0xe000 + x)   ; HIRES.S:2026
   c = 0                            ; HIRES.S:2027
 :smXCO:
   a = a + #0x00 + c              ; HIRES.S:2028
-  ??? sta :smod+1            ; HIRES.S:2029
+  patch *:smod+1 = a            ; HIRES.S:2029
   a = *(YHI@0xe0c0 + x)   ; HIRES.S:2031
 :smPAGE:
   a = a + #0x20 + c              ; HIRES.S:2032
-  ??? sta :smod+2            ; HIRES.S:2033
+  patch *:smod+2 = a            ; HIRES.S:2033
 :smCOLOR:
   a = #0x80                  ; HIRES.S:2035
 :smSTART:
@@ -1491,14 +1491,14 @@ fn FASTBLACK {
 
 fn COPYSCRN {
   a = *IMAGE+1@0x0005        ; HIRES.S:2061
-  ??? sta :dst1+2            ; HIRES.S:2062
+  patch *:dst1+2 = a            ; HIRES.S:2062
   c = 0                            ; HIRES.S:2063
   a = a + #0x10 + c              ; HIRES.S:2064
-  ??? sta :dst2+2            ; HIRES.S:2065
+  patch *:dst2+2 = a            ; HIRES.S:2065
   a = *IMAGE@0x0004        ; HIRES.S:2067
-  ??? sta :org1+2            ; HIRES.S:2068
+  patch *:org1+2 = a            ; HIRES.S:2068
   a = a + #0x10 + c              ; HIRES.S:2069
-  ??? sta :org2+2            ; HIRES.S:2070
+  patch *:org2+2 = a            ; HIRES.S:2070
   x = #0x10                  ; HIRES.S:2072
   y = #0x00                  ; HIRES.S:2074
 :loop:

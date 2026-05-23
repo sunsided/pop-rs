@@ -126,6 +126,43 @@ class StoreAbs:
 
 
 @dataclass(frozen=True)
+class StoreLocal:
+    """`sta/stx/sty :label+N` — store to a *local-label-relative*
+    address. The 6502 `:label` (Merlin local) / `]label` (Merlin
+    macro-local) names aren't in the cross-file symbol table — they
+    only have meaning inside the routine — so we keep the symbolic
+    `(target_label, offset)` instead of resolving to an address.
+
+    Two things wear this shape:
+
+    * **Self-modifying code** (the common case, `offset >= 1`):
+      `sta :smXCO+1` patches the operand byte of the instruction
+      labelled `:smXCO`. POP's HIRES.S blitter is full of it —
+      patching immediate values and absolute addresses at runtime
+      for speed. The standard high-level-port transform converts
+      the patched operand into a mutable variable; that's pass 3's
+      job. Lifting the store as a structured node (instead of
+      leaving it `???`) gives pass 3 a recognisable idiom to match.
+
+    * **Plain stores to a local data label** (`offset == 0`):
+      `sta :buffer`. Not SMC — just a store to a labelled scratch
+      location. We can't tell the two apart at pass 1 without
+      knowing what `:label` points at, so both lift to `StoreLocal`
+      and pass 3 disambiguates from the label's definition.
+
+    The interpreter records the write in `Trace.code_patches`
+    (keyed by `(target_label, offset)`) rather than aliasing real
+    RAM — we don't assemble the program, so there's no real address
+    to write to. Nothing reads that dict back yet; a faithful SMC
+    model is future work."""
+
+    reg: Reg
+    target_label: str
+    offset: int
+    src: SourceRef
+
+
+@dataclass(frozen=True)
 class Goto:
     """`jmp target` — unconditional control transfer.
 
@@ -676,6 +713,7 @@ Instr = (
     | Pha | Pla
     | CmpIndexed | AdcIndexed | SbcIndexed
     | Rol | Ror | ShiftMem
+    | StoreLocal
     | Unsupported
 )
 Item = Label | Instr
@@ -785,6 +823,9 @@ def format_item(item: Item) -> str:
         return f"  {item.reg} = *{_fmt_abs(item.source)}        ; {item.src.short()}"
     if isinstance(item, StoreAbs):
         return f"  *{_fmt_abs(item.target)} = {item.reg}            ; {item.src.short()}"
+    if isinstance(item, StoreLocal):
+        loc = item.target_label if item.offset == 0 else f"{item.target_label}+{item.offset}"
+        return f"  patch *{loc} = {item.reg}            ; {item.src.short()}"
     if isinstance(item, Asl):
         return f"  a = a << 1                       ; {item.src.short()}"
     if isinstance(item, Clc):

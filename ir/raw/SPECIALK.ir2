@@ -283,7 +283,7 @@ fn postload  (aka ]sm) {
 
 fn preload {
   a = *BBundID@0x03f5        ; SPECIALK.S:554
-  ??? sta ]sm+1            ; SPECIALK.S:555
+  patch *]sm+1 = a            ; SPECIALK.S:555
   a = #POPside1                  ; SPECIALK.S:556
   *BBundID@0x03f5 = a            ; SPECIALK.S:557
   return                           ; SPECIALK.S:558
@@ -302,8 +302,8 @@ fn addkey {
 }
 
 fn checkcode {
-  ??? sta :smod+1            ; SPECIALK.S:648
-  ??? stx :smod+2            ; SPECIALK.S:649
+  patch *:smod+1 = a            ; SPECIALK.S:648
+  patch *:smod+2 = x            ; SPECIALK.S:649
   x = *keybufptr@0x00ca        ; SPECIALK.S:651
   y = #0x00                  ; SPECIALK.S:652
 :loop:
@@ -1256,7 +1256,7 @@ fn ZEROSOUND {
   *soundtable@0xb6c0 = a            ; SPECIALK.S:977
   return                           ; SPECIALK.S:978
 ADDSOUND:
-  ??? stx ]temp1            ; SPECIALK.S:993
+  patch *]temp1 = x            ; SPECIALK.S:993
   x = *soundtable@0xb6c0        ; SPECIALK.S:995
   cmp x, #maxsfx              ; SPECIALK.S:996
   if x >= #maxsfx goto :rts  ; SPECIALK.S:997
@@ -1269,7 +1269,7 @@ ADDSOUND:
 }
 
 fn ADDSOUND {
-  ??? stx ]temp1            ; SPECIALK.S:993
+  patch *]temp1 = x            ; SPECIALK.S:993
   x = *soundtable@0xb6c0        ; SPECIALK.S:995
   cmp x, #maxsfx              ; SPECIALK.S:996
   if x >= #maxsfx goto :rts  ; SPECIALK.S:997
@@ -1399,9 +1399,9 @@ fn GETMINLEFT {
   *]count@0x00f1 = a            ; SPECIALK.S:1175
   *]count+1@0x00f2 = a            ; SPECIALK.S:1176
   a = #min                  ; SPECIALK.S:1178
-  ??? sta :sm1+1            ; SPECIALK.S:1179
+  patch *:sm1+1 = a            ; SPECIALK.S:1179
   a = #>min                  ; SPECIALK.S:1180
-  ??? sta :sm2+1            ; SPECIALK.S:1181
+  patch *:sm2+1 = a            ; SPECIALK.S:1181
   call :sub                  ; SPECIALK.S:1182
   *MinLeft@0x0300 = y            ; SPECIALK.S:1183
   cmp y, #0x02              ; SPECIALK.S:1184
@@ -1411,9 +1411,9 @@ fn GETMINLEFT {
   a = #>59*min                  ; SPECIALK.S:1191
   *]count+1@0x00f2 = a            ; SPECIALK.S:1192
   a = #sec                  ; SPECIALK.S:1194
-  ??? sta :sm1+1            ; SPECIALK.S:1195
+  patch *:sm1+1 = a            ; SPECIALK.S:1195
   a = #>sec                  ; SPECIALK.S:1196
-  ??? sta :sm2+1            ; SPECIALK.S:1197
+  patch *:sm2+1 = a            ; SPECIALK.S:1197
   call :sub                  ; SPECIALK.S:1198
   *SecLeft@0x0302 = y            ; SPECIALK.S:1199
   return                           ; SPECIALK.S:1200
@@ -1715,8 +1715,8 @@ fn checkcodes {
 ]rts:
   return                           ; SPECIALK.S:636
 checkcode:
-  ??? sta :smod+1            ; SPECIALK.S:648
-  ??? stx :smod+2            ; SPECIALK.S:649
+  patch *:smod+1 = a            ; SPECIALK.S:648
+  patch *:smod+2 = x            ; SPECIALK.S:649
   x = *keybufptr@0x00ca        ; SPECIALK.S:651
   y = #0x00                  ; SPECIALK.S:652
 :loop:
