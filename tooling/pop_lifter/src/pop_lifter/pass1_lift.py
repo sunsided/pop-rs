@@ -61,6 +61,7 @@ from .ir1 import (
     CmpImm,
     CmpIndirect,
     DecTarget,
+    FlagOp,
     Goto,
     Imm,
     IncTarget,
@@ -73,6 +74,7 @@ from .ir1 import (
     LocalRef,
     Lsr,
     ModuleIR1,
+    Nop,
     Reg,
     Return,
     Routine,
@@ -107,6 +109,17 @@ _NON_CODE_DIRECTIVES = frozenset(
         "asc", "dfb", "dci", "str", "lst", "tr", "xc", "mx", "ent", "ext",
         "use", "rel", "obj", "sav", "lup", "--^", "if", "do", "else",
         "fin", "mac", "eom", "<<<", ">>>",
+        # Merlin data pseudo-ops that emit bytes, not code:
+        #   `rev "STR"` — the ASCII of STR, reversed (POP's cheat-code
+        #     table: `C_skip rev "SKIP"`, `C_devel rev "POP"`, ...).
+        #   `da expr`   — "define address", a 2-byte little-endian
+        #     word (same as `dw`).
+        #   `usr ...`   — a user-defined assembler function; emits
+        #     whatever bytes its definition produces.
+        # Treating them as non-code stops `discover_entries` from
+        # mistaking a data label (e.g. `C_skip`) for a routine entry,
+        # and keeps inline data from surfacing as `??? rev`.
+        "rev", "da", "usr",
     }
 )
 
@@ -403,6 +416,17 @@ def _lift_instr(
         cond = mnemonic[1:]      # strip the leading `b`
         return Branch(cond=cond, target=line.operand.strip(), src=src)
 
+    if mnemonic == "bra":
+        # 65C02 "branch always" — an unconditional relative branch.
+        # Semantically identical to a local `jmp`, so it lowers to the
+        # same `Goto`. (POP is mostly NMOS, but `bra` shows up in a
+        # couple of routines / macros.)
+        if not line.operand:
+            return Unsupported(mnemonic=mnemonic, operand=None, src=src)
+        target = line.operand.strip()
+        kind = "local" if _is_local_label(target) else "tail_call"
+        return Goto(target=target, kind=kind, src=src)
+
     if mnemonic == "jsr":
         if not line.operand:
             return Unsupported(mnemonic=mnemonic, operand=None, src=src)
@@ -431,6 +455,20 @@ def _lift_instr(
 
     if mnemonic == "sec":
         return Sec(src=src)
+
+    if mnemonic == "nop":
+        return Nop(src=src)
+
+    # Processor-status flag set/clear that we model as flag-only,
+    # observable-but-unread ops (see `ir1.FlagOp`).
+    if mnemonic in ("sei", "cli", "sed", "cld"):
+        flag, value = {
+            "sei": ("I", 1),
+            "cli": ("I", 0),
+            "sed": ("D", 1),
+            "cld": ("D", 0),
+        }[mnemonic]
+        return FlagOp(flag=flag, value=value, src=src)
 
     if mnemonic == "adc":
         if line.operand is None:

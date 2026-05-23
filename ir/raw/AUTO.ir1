@@ -1575,5 +1575,4 @@ fn getgdstrength {
   *OppStrength@0x00cc = a            ; AUTO.S:1948
 ]rts:
   return                           ; AUTO.S:1949
-  ??? usr $a9,17,$800,*-org            ; AUTO.S:1954
 }

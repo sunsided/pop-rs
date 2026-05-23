@@ -234,6 +234,32 @@ class Sec:
 
 
 @dataclass(frozen=True)
+class Nop:
+    """`nop` — no operation. No registers, memory, or flags change."""
+
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class FlagOp:
+    """`sei`/`cli` (interrupt-disable, I) and `sed`/`cld` (decimal
+    mode, D) — set or clear a processor-status flag the interpreter
+    doesn't otherwise track.
+
+    `flag` is "I" or "D"; `value` is 0 (clear) or 1 (set). POP does
+    `cld` at boot to guarantee binary arithmetic and never uses
+    decimal mode, and we don't simulate interrupts, so these have no
+    observable effect on the lifted computation. Lifted as explicit
+    nodes (rather than dropped) so the dump preserves the intent and
+    a future decimal/interrupt model has a hook. The interpreter
+    records `trace.i` / `trace.d` but nothing reads them yet."""
+
+    flag: str
+    value: int
+    src: SourceRef
+
+
+@dataclass(frozen=True)
 class AdcImm:
     """`adc #imm` — A = A + imm + C (mod 256); C = overflow."""
 
@@ -740,6 +766,7 @@ Instr = (
     | CmpIndexed | AdcIndexed | SbcIndexed
     | Rol | Ror | ShiftMem
     | StoreLocal | SbcIndirect
+    | Nop | FlagOp
     | Unsupported
 )
 Item = Label | Instr
@@ -858,6 +885,10 @@ def format_item(item: Item) -> str:
         return f"  c = 0                            ; {item.src.short()}"
     if isinstance(item, Sec):
         return f"  c = 1                            ; {item.src.short()}"
+    if isinstance(item, Nop):
+        return f"  nop                              ; {item.src.short()}"
+    if isinstance(item, FlagOp):
+        return f"  {item.flag.lower()} = {item.value}                            ; {item.src.short()}"
     if isinstance(item, AdcImm):
         return f"  a = a + {_fmt_imm(item.imm)} + c              ; {item.src.short()}"
     if isinstance(item, AdcAbs):

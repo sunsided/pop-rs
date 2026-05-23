@@ -1102,7 +1102,6 @@ fn DBarr2 {
   a = a - *ztemp@0x00e9 - (1 - c) ; COLL.S:1507
 ]rts:
   return                           ; COLL.S:1509
-  ??? usr $a9,16,$b00,*-org            ; COLL.S:1514
 }
 
 fn :slice? {

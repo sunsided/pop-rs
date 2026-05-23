@@ -757,7 +757,6 @@ fn DISPVERSION {
 :1:
   a = #" "                  ; MISC.S:1015
   tail_call lrcls                ; MISC.S:1016
-  ??? usr $a9,21,$b00,*-org            ; MISC.S:1021
 }
 
 fn :rdblock {

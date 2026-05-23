@@ -52,6 +52,7 @@ from .ir1 import (
     CmpIndirect,
     Compare,
     DecTarget,
+    FlagOp,
     Goto,
     If,
     Imm,
@@ -66,6 +67,7 @@ from .ir1 import (
     LocalRef,
     Lsr,
     ModuleIR1,
+    Nop,
     Pha,
     Pla,
     Reg,
@@ -118,6 +120,8 @@ class Trace:
     c: int = 0          # carry
     z: int = 0          # zero
     n: int = 0          # negative
+    i: int = 0          # interrupt-disable (set/cleared by sei/cli; unread)
+    d: int = 0          # decimal mode (set/cleared by sed/cld; unread)
     writes: dict[int, int] = field(default_factory=dict)  # addr -> last value
     steps: int = 0
     max_stack_depth: int = 0
@@ -397,6 +401,18 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         return True
     if isinstance(item, Sec):
         trace.c = 1
+        return True
+    if isinstance(item, Nop):
+        return True
+    if isinstance(item, FlagOp):
+        # Records I/D for completeness; nothing reads them. POP runs
+        # in binary mode (cld at boot) and we don't simulate IRQs.
+        if item.flag == "I":
+            trace.i = item.value
+        elif item.flag == "D":
+            trace.d = item.value
+        else:
+            raise InterpError(f"unknown FlagOp flag {item.flag!r}")
         return True
     if isinstance(item, AdcImm):
         total = (trace.a & 0xff) + (item.imm.value & 0xff) + trace.c
