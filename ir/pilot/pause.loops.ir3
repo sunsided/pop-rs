@@ -1,0 +1,14 @@
+; module SUBS from 01 POP Source/Source/SUBS.S
+
+fn PAUSE :outer {
+  push a                           ; SUBS.S:192
+  repeat 0x0100 {    ; SUBS.S:195
+  }
+  a = pop                          ; SUBS.S:196
+  c = 1                            ; SUBS.S:197
+  a = a - #0x01 - (1 - c)        ; SUBS.S:198
+  if a != #0x00 {    ; SUBS.S:199
+    tail_call :outer           ; SUBS.S:199
+  }
+  return                           ; SUBS.S:200
+}

@@ -216,6 +216,32 @@ class ForStmt:
 
 
 @dataclass(frozen=True)
+class RepeatStmt:
+    """`repeat count { body }` — a fixed-count loop, recovered from the
+    6502 full-wrap busy-wait idiom:
+
+        var = #INIT
+        do { body ; var -= 1 } while var != #INIT
+
+    The counter exits only when it cycles back to its start, so a
+    `dex`/`dey` (or `inx`/`iny`) runs the body exactly 256 times
+    regardless of `INIT`. Recognised only when `var` is the counter
+    only (the body never reads or writes it, no `break`/`continue`/
+    calls), so `count` fully captures the loop — the classic timing
+    delay (`PAUSE`).
+
+    The interpreter replays the init, body, and step `count` times, so
+    `var` ends back at `INIT` and flag state matches the original."""
+
+    count: int
+    var: Reg
+    start: Imm
+    step: int          # +1 / -1
+    body: "Block"
+    src: SourceRef
+
+
+@dataclass(frozen=True)
 class BreakStmt:
     """Exit the innermost enclosing loop statement (`LoopStmt` or, after
     loop recovery, `DoWhileStmt`)."""
@@ -295,8 +321,8 @@ class MatchStmt:
 
 Stmt = (
     RawStmt | Assign | CallStmt | TailCallStmt | ReturnStmt
-    | IfStmt | RawIfStmt | LoopStmt | DoWhileStmt | ForStmt | MatchStmt
-    | BreakStmt | ContinueStmt | GotoStmt | LabelStmt
+    | IfStmt | RawIfStmt | LoopStmt | DoWhileStmt | ForStmt | RepeatStmt
+    | MatchStmt | BreakStmt | ContinueStmt | GotoStmt | LabelStmt
 )
 
 
@@ -423,6 +449,12 @@ def _fmt_stmt(stmt: Stmt, indent: int) -> list[str]:
         else:
             rng = f"{_fmt_imm(stmt.start)}..{_fmt_imm(stmt.cond.rhs)}"
         lines = [f"{pad}for {stmt.var} in {rng} {{    ; {stmt.src.short()}"]
+        for s in stmt.body.stmts:
+            lines.extend(_fmt_stmt(s, indent + 1))
+        lines.append(f"{pad}}}")
+        return lines
+    if isinstance(stmt, RepeatStmt):
+        lines = [f"{pad}repeat {stmt.count:#06x} {{    ; {stmt.src.short()}"]
         for s in stmt.body.stmts:
             lines.extend(_fmt_stmt(s, indent + 1))
         lines.append(f"{pad}}}")

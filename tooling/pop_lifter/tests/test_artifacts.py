@@ -28,6 +28,7 @@ IR_PILOT_CUP_PASS3 = REPO_ROOT / "ir" / "pilot" / "cup.pass3.ir3"
 IR_PILOT_CMPSPACE_MATCH = REPO_ROOT / "ir" / "pilot" / "cmpspace.match.ir3"
 IR_PILOT_FASTBLACK_SMC = REPO_ROOT / "ir" / "pilot" / "fastblack.smc.ir1"
 IR_PILOT_CHGSHADPOSN_LOOPS = REPO_ROOT / "ir" / "pilot" / "chgshadposn.loops.ir3"
+IR_PILOT_PAUSE_LOOPS = REPO_ROOT / "ir" / "pilot" / "pause.loops.ir3"
 IR_RAW = REPO_ROOT / "ir" / "raw"
 
 PILOT_ENTRIES = [
@@ -461,6 +462,45 @@ def test_pass3_chgshadposn_loops_artifact_matches(source_dir):
         f"regenerate with:\n"
         f"  pop-lifter loops AUTO.S --entry chgshadposn "
         f"--out {IR_PILOT_CHGSHADPOSN_LOOPS.relative_to(REPO_ROOT)}"
+    )
+
+
+def _regen_pause_loops(source_dir: Path) -> str:
+    from pop_lifter.pass2_reloop import reloop_module
+    from pop_lifter.pass2_struct import structure_module
+    from pop_lifter.pass3_expr import fold_module
+    from pop_lifter.pass3_loops import recover_loops
+    from pop_lifter import ir3 as ir3_mod
+    ast = parse_files(
+        [
+            source_dir / "EQ.S",
+            source_dir / "GAMEEQ.S",
+            source_dir / "SUBS.S",
+        ],
+        search_paths=[source_dir],
+    )
+    subs = next(f for f in ast.files if Path(f.path).name == "SUBS.S")
+    ir1_module = lift_file(subs, ast.symbols(), ["PAUSE"]).module
+    rec = recover_loops(fold_module(reloop_module(structure_module(ir1_module))))
+    return ir3_mod.format_module(rec)
+
+
+def test_pass3_pause_loops_artifact_matches(source_dir):
+    """The PAUSE pilot pins delay-loop recovery: the busy-wait
+    `x = #0 ; do { x -= 1 } while x != 0` collapses to `repeat 0x0100 {}`."""
+    if not IR_PILOT_PAUSE_LOOPS.exists():
+        raise AssertionError(
+            f"missing artifact {IR_PILOT_PAUSE_LOOPS}. regenerate with:\n"
+            f"  pop-lifter loops SUBS.S --entry PAUSE "
+            f"--out {IR_PILOT_PAUSE_LOOPS.relative_to(REPO_ROOT)}"
+        )
+    expected = IR_PILOT_PAUSE_LOOPS.read_text(encoding="utf-8")
+    actual = _regen_pause_loops(source_dir)
+    assert actual == expected, (
+        f"{IR_PILOT_PAUSE_LOOPS.relative_to(REPO_ROOT)} is stale. "
+        f"regenerate with:\n"
+        f"  pop-lifter loops SUBS.S --entry PAUSE "
+        f"--out {IR_PILOT_PAUSE_LOOPS.relative_to(REPO_ROOT)}"
     )
 
 

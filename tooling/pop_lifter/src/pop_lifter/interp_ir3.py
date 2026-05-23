@@ -61,6 +61,7 @@ from .ir3 import (
     ModuleIR3,
     RawIfStmt,
     RawStmt,
+    RepeatStmt,
     ReturnStmt,
     RoutineIR3,
     Stmt,
@@ -326,6 +327,23 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
             raise InterpError(
                 "ForStmt exceeded 1,000,000 iterations — counter bug?"
             )
+        return
+    if isinstance(stmt, RepeatStmt):
+        # Fixed-count busy-wait. Replay the init, body, and step `count`
+        # times — the full byte wrap leaves `var` back at its start.
+        start = stmt.start.value & 0xff
+        if stmt.var is Reg.A:
+            trace.a = start
+        elif stmt.var is Reg.X:
+            trace.x = start
+        else:
+            trace.y = start
+        _set_zn(trace, start)
+        step_op = (DecTarget if stmt.step < 0 else IncTarget)(
+            target=stmt.var, src=stmt.src)
+        for _ in range(stmt.count):
+            _exec_block(stmt.body, modules, aliases, trace)
+            exec_atom(step_op, trace, trace.ram)
         return
     if isinstance(stmt, BreakStmt):
         raise _BreakSignal()
