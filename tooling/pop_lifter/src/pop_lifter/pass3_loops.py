@@ -32,8 +32,12 @@ Then, building on that, a counted loop with a clean induction variable
   with `i < N`  ⇒  `for var in i..N { body }`
   (the `ldx #i : … : inx : cpx #N : bne` shape).
 
-Other bound conditions (memory bounds, `>=`/`<` floors, wrap-around
-delay loops) are left as `do`/`loop`.
+And the full-wrap busy-wait `var = #INIT ; do { body ; var -= 1 }
+while var != #INIT` (exit value equals the start, so the counter cycles
+the whole byte range — 256 iterations) is recovered as a fixed-count
+`repeat 0x100 { body }`, provided `var` is the counter only. Other
+bound conditions (memory bounds, `>=`/`<` floors) are left as
+`do`/`loop`.
 
 **Ordering.** `DoWhileStmt` is a *late* readability node: the fold
 (`pass3_expr`) and `match` recognition (`pass3_match`) walkers don't
@@ -56,17 +60,20 @@ from .ir3 import (
     ContinueStmt,
     DoWhileStmt,
     ForStmt,
+    GotoStmt,
     IfStmt,
+    LabelStmt,
     LoopStmt,
     MatchStmt,
     ModuleIR3,
     RawIfStmt,
     RawStmt,
+    RepeatStmt,
     RoutineIR3,
     Stmt,
     TailCallStmt,
 )
-from .pass3_expr import _writes_reg
+from .pass3_expr import _reads_reg, _writes_reg
 
 # Each comparison operator paired with its negation; an exit test of
 # `y < 0` becomes a continue condition of `y >= 0`.
@@ -211,6 +218,72 @@ def _counter_for(prev: Stmt, dw: DoWhileStmt):
                    cond=dw.cond, body=for_body, src=dw.src)
 
 
+def _delay_body_reads_reg(block: Block, reg) -> bool:
+    """Could anything in `block` read `reg`? A `repeat` exposes no loop
+    variable, so a delay body must not depend on the counter at all.
+    Beyond explicit `RawStmt` reads this is conservative: any structured
+    statement (an `IfStmt`/`MatchStmt` whose condition might inspect the
+    counter, an `Assign` that might index by it, a nested loop, a call,
+    …) is treated as a read. Only `RawStmt`s that don't read `reg` and
+    pure control transfers are accepted."""
+    for s in block.stmts:
+        if isinstance(s, RawStmt):
+            if _reads_reg(s.item, reg):
+                return True
+            continue
+        if isinstance(s, (BreakStmt, ContinueStmt, GotoStmt, LabelStmt)):
+            continue  # control transfer — reads no register
+        return True  # any other node may read the counter
+    return False
+
+
+def _has_break(block: Block) -> bool:
+    for s in block.stmts:
+        if isinstance(s, BreakStmt):
+            return True
+        for attr in ("then_block", "else_block", "body"):
+            inner = getattr(s, attr, None)
+            if inner is not None and hasattr(inner, "stmts") and _has_break(inner):
+                return True
+        if isinstance(s, MatchStmt):
+            for arm in s.arms:
+                if _has_break(arm.body):
+                    return True
+    return False
+
+
+def _delay_loop(prev: Stmt, dw: DoWhileStmt):
+    """If `prev = var = #INIT` and `dw = do { body ; var ±= 1 } while
+    var != #INIT` (the exit value equals the start), the counter wraps
+    the full byte range — the body runs exactly 256 times. Return a
+    `RepeatStmt` if `var` is the counter only (body never reads/writes
+    it, no `break`/`continue`/calls); else None."""
+    if not (isinstance(prev, RawStmt) and isinstance(prev.item, LoadImm)):
+        return None
+    reg = prev.item.reg
+    if dw.cond.op != "!=" or dw.cond.reg is not reg \
+            or not isinstance(dw.cond.rhs, Imm):
+        return None
+    if (dw.cond.rhs.value & 0xff) != (prev.item.imm.value & 0xff):
+        return None  # exit value must equal the start → full 256-iteration wrap
+    body = dw.body.stmts
+    if not body:
+        return None
+    step = body[-1]
+    if not isinstance(step, RawStmt):
+        return None
+    direction = (-1 if isinstance(step.item, DecTarget)
+                 else 1 if isinstance(step.item, IncTarget) else None)
+    if direction is None or step.item.target is not reg:
+        return None
+    rest = Block.of(list(body[:-1]))
+    if (_body_clobbers_counter(rest, reg) or _delay_body_reads_reg(rest, reg)
+            or _has_continue(rest) or _has_break(rest)):
+        return None
+    return RepeatStmt(count=0x100, var=reg, start=prev.item.imm,
+                      step=direction, body=rest, src=dw.src)
+
+
 def recover_block(block: Block) -> Block:
     out: list[Stmt] = []
     for s in block.stmts:
@@ -224,9 +297,9 @@ def recover_block(block: Block) -> Block:
                     src=s.src,
                 )
         if isinstance(s, DoWhileStmt) and out:
-            for_loop = _counter_for(out[-1], s)
-            if for_loop is not None:
-                out[-1] = for_loop  # subsume the preceding init LoadImm
+            promoted = _counter_for(out[-1], s) or _delay_loop(out[-1], s)
+            if promoted is not None:
+                out[-1] = promoted  # subsume the preceding init LoadImm
                 continue
         out.append(s)
     return Block.of(out)
@@ -270,3 +343,8 @@ def dowhile_stats(module: ModuleIR3) -> int:
 def for_stats(module: ModuleIR3) -> int:
     """Total `ForStmt`s (recovered counted loops) across the module."""
     return _stat(module, ForStmt)
+
+
+def repeat_stats(module: ModuleIR3) -> int:
+    """Total `RepeatStmt`s (recovered fixed-count delay loops)."""
+    return _stat(module, RepeatStmt)

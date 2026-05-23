@@ -21,6 +21,7 @@ from pop_lifter.ir1 import (
     LoadImm,
     Reg,
     SourceRef,
+    StoreAbs,
     StoreIndexed,
     Unsupported,
 )
@@ -36,6 +37,7 @@ from pop_lifter.ir3 import (
     ModuleIR3,
     RawIfStmt,
     RawStmt,
+    RepeatStmt,
     ReturnStmt,
     RoutineIR3,
 )
@@ -44,6 +46,7 @@ from pop_lifter.pass3_loops import (
     for_stats,
     recover_loops,
     recover_routine,
+    repeat_stats,
 )
 
 SRC = SourceRef(file="syn", line=0, raw="")
@@ -212,15 +215,17 @@ def test_up_counter_becomes_for():
     assert f.cond.op == "!=" and (f.cond.rhs.value & 0xff) == 5
 
 
-def test_up_counter_with_start_ge_bound_not_promoted():
-    """`start >= N` would wrap (the do-while runs many more iterations
-    than `start..N`) — left as a do-while."""
+def test_up_counter_with_start_eq_bound_is_repeat_not_for():
+    """`start == N` isn't a `start..N` range (it would be empty) — the
+    counter wraps the full byte range instead, so it's recovered as a
+    `repeat`, never a `for`."""
     out = _recover_one([
         _ldimm(Reg.X, 5),
         _loop([RawStmt(IncTarget(target=Reg.X, src=SRC)),
-               _guard(_cmp(Reg.X, "==", 5))]),  # start == N
+               _guard(_cmp(Reg.X, "==", 5))]),  # start == N → full wrap
     ])
-    assert _not_a_for(out)
+    assert not any(isinstance(s, ForStmt) for s in out)
+    assert any(isinstance(s, RepeatStmt) for s in out)
 
 
 def test_up_counter_with_memory_bound_not_promoted():
@@ -292,6 +297,117 @@ def test_for_recovery_is_behaviour_preserving():
     assert list(r2[0x300:0x304]) == [0, 1, 2, 3]
     # Final counter value (0xff after the last dey) must match too.
     assert t1.y == t2.y == 0xff
+
+
+# --------------------------------------------------------------- delay loops
+
+
+def test_full_wrap_delay_becomes_repeat():
+    """`x = #0 ; do { x -= 1 } while x != 0` (exit value == start) wraps
+    the full byte range — recovered as `repeat 0x100 {}`."""
+    out = _recover_one([
+        _ldimm(Reg.X, 0),
+        _loop([_dec(Reg.X), _guard(_cmp(Reg.X, "==", 0))]),
+    ])
+    assert len(out) == 1 and isinstance(out[0], RepeatStmt)
+    r = out[0]
+    assert r.count == 0x100 and r.var is Reg.X and r.step == -1
+    assert len(r.body.stmts) == 0  # the dex is the step, body is empty
+
+
+def test_delay_with_nonmatching_exit_not_repeat():
+    """`x = #5 ; do { dex } while x != 0` exits at 0 (!= start) — a
+    down-counter, not a full wrap, so not a `repeat`."""
+    out = _recover_one([
+        _ldimm(Reg.X, 5),
+        _loop([_dec(Reg.X), _guard(_cmp(Reg.X, "==", 0))]),
+    ])
+    assert not any(isinstance(s, RepeatStmt) for s in out)
+
+
+def test_delay_body_reading_counter_not_repeat():
+    """If the body reads the counter, the per-iteration value matters —
+    `repeat` would lose it, so it's left as a do-while."""
+    body = [RawStmt(StoreIndexed(
+        reg=Reg.X, base=Abs(name="OUT", addr=0x300), index=Reg.X, src=SRC))]
+    out = _recover_one([
+        _ldimm(Reg.X, 0),
+        _loop([*body, _dec(Reg.X), _guard(_cmp(Reg.X, "==", 0))]),
+    ])
+    assert not any(isinstance(s, RepeatStmt) for s in out)
+
+
+def test_delay_body_with_if_inspecting_counter_not_repeat():
+    """A body `if x == 3 { … }` inspects the counter — `repeat` would
+    drop that dependency, so it's left as a do-while. (Reviewer #28.)"""
+    inner_if = IfStmt(
+        cond=_cmp(Reg.X, "==", 3),
+        then_block=Block.of([RawStmt(StoreAbs(
+            reg=Reg.X, target=Abs(name="HIT", addr=0x310), src=SRC))]),
+        else_block=None, src=SRC,
+    )
+    out = _recover_one([
+        _ldimm(Reg.X, 0),
+        _loop([inner_if, _dec(Reg.X), _guard(_cmp(Reg.X, "==", 0))]),
+    ])
+    assert not any(isinstance(s, RepeatStmt) for s in out)
+
+
+def test_delay_body_with_match_on_counter_not_repeat():
+    """A `match x { … }` in the body inspects the counter — not a clean
+    delay. (Reviewer #28.)"""
+    from pop_lifter.ir3 import MatchArm, MatchStmt
+    arm = MatchArm(values=(Imm(value=1, text="#1"),),
+                   body=Block.of([ReturnStmt(src=SRC)]))
+    mat = MatchStmt(reg=Reg.X, arms=(arm,), src=SRC)
+    out = _recover_one([
+        _ldimm(Reg.X, 0),
+        _loop([mat, _dec(Reg.X), _guard(_cmp(Reg.X, "==", 0))]),
+    ])
+    assert not any(isinstance(s, RepeatStmt) for s in out)
+
+
+def test_repeat_count_out_of_range_raises():
+    """`RepeatStmt` is a public node; the interpreter guards a bad count
+    rather than spinning unbounded. (Reviewer #28.)"""
+    import pytest
+    from pop_lifter.interp_ir1 import InterpError
+    for bad in (0, -1, 2_000_000):
+        rep = RepeatStmt(count=bad, var=Reg.X,
+                         start=Imm(value=0, text="#0"), step=-1,
+                         body=Block.of([]), src=SRC)
+        mod = ModuleIR3("M", "syn", [RoutineIR3(
+            name="r", body=Block.of([rep, ReturnStmt(src=SRC)]))])
+        with pytest.raises(InterpError):
+            ir3_run([mod], "r", ram=bytearray(0x10000))
+
+
+def test_delay_recovery_is_behaviour_preserving():
+    """`x = #0 ; do { *MARK += 1 ; dex } while x != 0` increments MARK
+    256 times and leaves x = 0. Recovery to `repeat 0x100` must match."""
+    from pop_lifter.ir1 import IncTarget as _Inc
+    def routine() -> RoutineIR3:
+        return RoutineIR3(name="delay", body=Block.of([
+            _ldimm(Reg.X, 0),
+            _loop([
+                RawStmt(_Inc(target=Abs(name="MARK", addr=0x300), src=SRC)),
+                _dec(Reg.X),
+                _guard(_cmp(Reg.X, "==", 0)),
+            ]),
+            ReturnStmt(src=SRC),
+        ]))
+
+    pre = ModuleIR3("M", "syn", [routine()])
+    post = recover_loops(pre)
+    assert repeat_stats(post) == 1
+
+    r1 = bytearray(0x10000)
+    t1 = ir3_run([pre], "delay", ram=r1)
+    r2 = bytearray(0x10000)
+    t2 = ir3_run([post], "delay", ram=r2)
+    assert r1 == r2
+    assert r2[0x300] == 0x00  # incremented 256 times, wraps back to 0
+    assert t1.x == t2.x == 0  # counter wrapped back to its start
 
 
 # --------------------------------------------------------------- behavioural

@@ -26,7 +26,7 @@ from .pass1_lift import discover_entries, lift_file
 from .pass2_reloop import is_unstructured, reloop_module
 from .pass2_struct import elision_stats, fusion_stats, structure_module
 from .pass3_expr import fold_module, fold_stats
-from .pass3_loops import dowhile_stats, for_stats, recover_loops
+from .pass3_loops import dowhile_stats, for_stats, recover_loops, repeat_stats
 from .pass3_match import match_stats, recognize_module
 from .pass3_smc import recognize_smc, smc_store_count, smc_var_count
 
@@ -540,8 +540,9 @@ def _cmd_loops(args: argparse.Namespace) -> int:
     !exit`, and a counted loop is promoted to a `for` (down-counter
     `y = #N ; do { … ; y -= 1 } while y >= 0` ⇒ `for y in (0..=N).rev()`;
     up-counter `x = #i ; do { … ; x += 1 } while x != N` ⇒ `for x in
-    i..N`). Writes the IR3 dump to `--out` (or stdout); the summary
-    reports how many `for` and `do-while` loops were recovered."""
+    i..N`); a full-wrap busy-wait becomes `repeat 0x100 { … }`. Writes
+    the IR3 dump to `--out` (or stdout); the summary reports how many
+    `for`, `repeat`, and `do-while` loops were recovered."""
     src_dir = _resolve_source_dir(args)
     if src_dir is None:
         return 2
@@ -566,6 +567,7 @@ def _cmd_loops(args: argparse.Namespace) -> int:
     total_routines = 0
     total_dowhile = 0
     total_for = 0
+    total_repeat = 0
     handled: set[str] = set()
     for file_path in file_paths:
         file_ast = next(
@@ -587,6 +589,7 @@ def _cmd_loops(args: argparse.Namespace) -> int:
         total_routines += len(recovered.routines)
         total_dowhile += dowhile_stats(recovered)
         total_for += for_stats(recovered)
+        total_repeat += repeat_stats(recovered)
         dumps.append(ir3_mod.format_module(recovered))
         handled.update(local_entries)
 
@@ -605,7 +608,8 @@ def _cmd_loops(args: argparse.Namespace) -> int:
         out_path.write_text(text, encoding="utf-8")
         print(
             f"wrote {out_path} ({total_routines} routines, "
-            f"{total_for} for loops + {total_dowhile} do-while loops recovered)"
+            f"{total_for} for + {total_repeat} repeat + {total_dowhile} "
+            f"do-while loops recovered)"
         )
     else:
         sys.stdout.write(text)
@@ -1002,7 +1006,8 @@ def main(argv: list[str] | None = None) -> int:
         "loops",
         help="Pass 3: run pass 1 + 2 + reloop + fold, then recover "
              "bottom-tested loops as `do { … } while` shapes and "
-             "down/up-counters as `for` loops.",
+             "down/up-counters as `for` loops and full-wrap delays as "
+             "`repeat` loops.",
     )
     p_loops.add_argument(
         "file", nargs="+",
