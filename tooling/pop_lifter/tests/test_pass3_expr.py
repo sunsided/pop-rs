@@ -151,6 +151,20 @@ def test_load_with_no_following_store_is_left_alone():
     assert len(out) == 2
 
 
+def test_no_fold_across_unsupported_opcode():
+    """An `Unsupported` opcode has unknown semantics — it may read A or
+    its flags — so liveness must not step past it. `a = SRC ; *DST = a ;
+    ??? ; a = #0` stays unfolded. (Reviewer #20.)"""
+    from pop_lifter.ir1 import Unsupported
+    out = _fold([
+        _load_a_abs("SRC", 0x10),
+        _store_a_abs("DST", 0x20),
+        _raw(Unsupported(mnemonic="wat", operand=None, src=SRC)),
+        _kill_a(),
+    ])
+    assert not any(isinstance(s, Assign) for s in out)
+
+
 def _if_y(then_stmts: list, cond_reg: Reg = Reg.Y) -> IfStmt:
     return IfStmt(
         cond=Compare(reg=cond_reg, op="==", rhs=Imm(value=0, text="#0")),

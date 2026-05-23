@@ -72,6 +72,7 @@ from .ir1 import (
     StoreIndirect,
     StoreLocal,
     Transfer,
+    Unsupported,
 )
 from .ir3 import (
     Assign,
@@ -110,7 +111,14 @@ def _writes_a(item) -> bool:
 
 
 def _reads_a(item) -> bool:
-    """True if the IR1 atom consumes the accumulator's current value."""
+    """True if the IR1 atom consumes the accumulator's current value.
+
+    `Unsupported` opcodes count as a read: their semantics are unknown,
+    so they might read A (or its flags). Treating them as a read makes
+    them a hard barrier for liveness — the fold never steps past an
+    opcode the lifter hasn't modelled yet."""
+    if isinstance(item, Unsupported):
+        return True
     if isinstance(item, (StoreAbs, StoreIndexed, StoreIndirect, StoreLocal)):
         return item.reg is Reg.A
     if isinstance(item, Transfer):
