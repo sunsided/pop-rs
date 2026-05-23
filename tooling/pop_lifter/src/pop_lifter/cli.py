@@ -30,6 +30,7 @@ from .pass3_loops import dowhile_stats, for_stats, recover_loops, repeat_stats
 from .pass3_match import match_stats, recognize_module
 from .pass3_smc import recognize_smc, smc_store_count, smc_var_count
 from .pass3_temps import recover_temps, temp_stats
+from .pass4_emit_rust import emit_module, lower_stats
 
 DEFAULT_SOURCE_REL = Path("01 POP Source/Source")
 
@@ -696,6 +697,88 @@ def _cmd_temps(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------- emit (pass 4)
+
+
+def _cmd_emit(args: argparse.Namespace) -> int:
+    """Run the full pass-3 chain (reloop + fold + loop + temp recovery)
+    then emit Rust source from the structured IR3. This first slice lays
+    down module / routine scaffolding and lowers leaf expressions
+    (folded `Assign`s and `return`s); statements not yet lowered appear
+    as `// TODO(pass4)` / `// raw:` comments. Writes the `.rs` text to
+    `--out` (or stdout); the summary reports lowered vs. deferred
+    top-level statements."""
+    src_dir = _resolve_source_dir(args)
+    if src_dir is None:
+        return 2
+
+    file_paths: list[Path] = []
+    for raw in args.file:
+        p = Path(raw)
+        if not p.is_absolute():
+            candidate = src_dir / p
+            if candidate.is_file():
+                p = candidate
+        if not p.is_file():
+            print(f"error: input file not found: {raw}", file=sys.stderr)
+            return 2
+        file_paths.append(p)
+
+    base = [src_dir / n for n in ("EQ.S", "GAMEEQ.S") if (src_dir / n).exists()]
+    ast = parse_files([*base, *file_paths], search_paths=[src_dir])
+    symbols = ast.symbols()
+
+    dumps: list[str] = []
+    total_routines = 0
+    total_lowered = 0
+    total_deferred = 0
+    handled: set[str] = set()
+    for file_path in file_paths:
+        file_ast = next(
+            (f for f in ast.files if Path(f.path).resolve() == file_path.resolve()),
+            None,
+        )
+        if file_ast is None:
+            print(
+                f"error: file {file_path} was not loaded by the parser",
+                file=sys.stderr,
+            )
+            return 1
+        defined = set(discover_entries(file_ast))
+        local_entries = [e for e in args.entry if e in defined and e not in handled]
+        if not local_entries:
+            continue
+        ir3_module = reloop_module(structure_module(lift_file(file_ast, symbols, local_entries).module))
+        recovered = recover_temps(recover_loops(fold_module(ir3_module)))
+        total_routines += len(recovered.routines)
+        lowered, deferred = lower_stats(recovered)
+        total_lowered += lowered
+        total_deferred += deferred
+        dumps.append(emit_module(recovered))
+        handled.update(local_entries)
+
+    missing = [e for e in args.entry if e not in handled]
+    if missing:
+        print(
+            f"error: entries not found in any input file: {missing}",
+            file=sys.stderr,
+        )
+        return 1
+
+    text = "\n".join(dumps)
+    if args.out:
+        out_path = Path(args.out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(text, encoding="utf-8")
+        print(
+            f"wrote {out_path} ({total_routines} routines, "
+            f"{total_lowered} stmts lowered, {total_deferred} deferred)"
+        )
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
 # ---------------------------------------------------------------- smc (pass 3)
 
 
@@ -1122,6 +1205,26 @@ def main(argv: list[str] | None = None) -> int:
         help="If given, write the IR3 dump here instead of stdout.",
     )
     p_temps.set_defaults(func=_cmd_temps)
+
+    p_emit = sub.add_parser(
+        "emit",
+        help="Pass 4 (skeleton slice): run the full pass-3 chain, then emit "
+             "Rust source — module / routine scaffolding plus leaf-expression "
+             "lowering of folded assigns.",
+    )
+    p_emit.add_argument(
+        "file", nargs="+",
+        help=".S file (absolute path or relative to the source dir).",
+    )
+    p_emit.add_argument(
+        "--entry", action="append", required=True,
+        help="Routine entry-point label. May be passed multiple times.",
+    )
+    p_emit.add_argument(
+        "--out", default=None,
+        help="If given, write the .rs output here instead of stdout.",
+    )
+    p_emit.set_defaults(func=_cmd_emit)
 
     p_lift_all = sub.add_parser(
         "lift-all",
