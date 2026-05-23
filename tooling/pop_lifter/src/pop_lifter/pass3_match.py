@@ -22,11 +22,12 @@ behaviour-preserving:
 * The keys must be **distinct** — then at most one arm matches, so the
   arm order doesn't matter.
 * Every arm's body must **terminate** (last statement is a return /
-  tail-call / break / continue / goto) — so a matched arm never falls
-  through into the next case, and the whole `match` falls through to
-  the following statement only when nothing matched (the `if`-chain's
-  exact behaviour; the chain's fall-through tail stays put as an
-  implicit default).
+  tail-call / break / continue) — so a matched arm never falls through
+  into the next case, and the whole `match` falls through to the
+  following statement only when nothing matched (the `if`-chain's exact
+  behaviour; the chain's fall-through tail stays put as an implicit
+  default). `goto` is excluded: it only occurs in unstructured
+  routines, which this transform leaves alone.
 
 Arms with structurally identical bodies are merged into one arm with
 several keys (`K1 | K2 => ...`) — common because the asm shares one
@@ -42,7 +43,6 @@ from .ir3 import (
     Block,
     BreakStmt,
     ContinueStmt,
-    GotoStmt,
     IfStmt,
     LoopStmt,
     MatchArm,
@@ -57,11 +57,14 @@ from .ir3 import (
 
 
 def _terminates(block: Block) -> bool:
-    """Does `block` end in an unconditional control transfer? Then a
-    matched arm can't fall through into the next case."""
+    """Does `block` end in a structured control transfer? Then a matched
+    arm can't fall through into the next case. `GotoStmt` is *not*
+    accepted: it only appears in routines the relooper couldn't
+    structure (which the IR3 interpreter rejects anyway), so match
+    recognition stays within fully-structured, interpretable code."""
     return bool(block.stmts) and isinstance(
         block.stmts[-1],
-        (ReturnStmt, TailCallStmt, BreakStmt, ContinueStmt, GotoStmt),
+        (ReturnStmt, TailCallStmt, BreakStmt, ContinueStmt),
     )
 
 
