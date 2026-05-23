@@ -33,8 +33,15 @@ type-folded expressions. Those land in pass 3.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from .ir1 import Compare, Item, SourceRef
+
+if TYPE_CHECKING:
+    # Referenced only in the string annotations on `Assign` / `BinExpr`
+    # (the concrete value types live in ir1; ir3 imports them lazily
+    # inside the formatter to avoid a heavier import at module load).
+    from .ir1 import Abs, Imm, IndexedAbs, IndirectY
 
 
 # A `RawStmt` wraps a non-control-flow IR1/IR2 item. The relooper
@@ -44,6 +51,29 @@ from .ir1 import Compare, Item, SourceRef
 @dataclass(frozen=True)
 class RawStmt:
     item: Item
+
+
+@dataclass(frozen=True)
+class BinExpr:
+    """`lhs op rhs` — a pass-3 folded 8-bit arithmetic expression.
+    Collapses the accumulator compute-and-store idiom
+    `a = LHS ; clc ; adc RHS ; sta DST` (and the `sec ; sbc` subtract
+    form) into a single `DST = LHS + RHS` assignment, dropping the
+    load, the carry set-up, and the add/sub.
+
+    `op` is `"+"` (clc + adc) or `"-"` (sec + sbc) — the carry set-up
+    pins the operation to pure 8-bit add / subtract, with the result
+    wrapping mod 256. `lhs` is the dropped load's value; `rhs` is the
+    add/sub operand. Both are drawn from the same value forms as
+    `Assign.source` (`Imm` / `Abs` / `IndexedAbs` / `IndirectY`).
+
+    Produced only when A *and* the carry are dead after the store, so
+    the dropped flag side-effects can't be observed (the IR3
+    interpreter checks this via the differential tests)."""
+
+    op: str  # "+" | "-"
+    lhs: "Imm | Abs | IndexedAbs | IndirectY"
+    rhs: "Imm | Abs | IndexedAbs | IndirectY"
 
 
 @dataclass(frozen=True)
@@ -57,7 +87,8 @@ class Assign:
     (`Abs` for `sta addr`, `IndexedAbs` for `sta tbl,x`, `IndirectY`
     for `sta (ptr),y`). `source` is the value the dropped load
     produced — an `Imm` (`lda #k`) or one of the same memory-read
-    forms (`Abs` / `IndexedAbs` / `IndirectY`).
+    forms (`Abs` / `IndexedAbs` / `IndirectY`) — or a `BinExpr` when
+    a `clc ; adc` / `sec ; sbc` was folded in (slice 2).
 
     Produced only when the load's value flows *exclusively* into the
     store(s) and `A` is dead afterwards, so the fold is
@@ -65,7 +96,7 @@ class Assign:
     differential tests)."""
 
     target: "Abs | IndexedAbs | IndirectY"
-    source: "Imm | Abs | IndexedAbs | IndirectY"
+    source: "Imm | Abs | IndexedAbs | IndirectY | BinExpr"
     src: SourceRef
 
 
@@ -249,6 +280,8 @@ def _fmt_stmt(stmt: Stmt, indent: int) -> list[str]:
                 return f"*({_fmt_abs(v.ptr)})[y]"
             if isinstance(v, Abs):
                 return f"*{_fmt_abs(v)}"
+            if isinstance(v, BinExpr):
+                return f"{_loc(v.lhs)} {v.op} {_loc(v.rhs)}"
             return repr(v)
 
         return [f"{pad}{_loc(stmt.target)} = {_loc(stmt.source)}    ; {stmt.src.short()}"]

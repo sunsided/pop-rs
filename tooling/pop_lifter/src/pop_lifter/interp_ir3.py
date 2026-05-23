@@ -35,6 +35,7 @@ from .interp_ir1 import run as ir1_run
 from .ir1 import Abs, Imm, IndexedAbs, IndirectY, ModuleIR1, Routine as IR1Routine
 from .ir3 import (
     Assign,
+    BinExpr,
     Block,
     BreakStmt,
     CallStmt,
@@ -169,6 +170,16 @@ def _assign_read(value, trace: Trace, src) -> int:
         return trace.ram[_resolve_indirect_y(value, trace, trace.ram)]
     if isinstance(value, Abs):
         return trace.ram[_real_addr(value.addr, src)]
+    if isinstance(value, BinExpr):
+        # Folded `clc ; adc` / `sec ; sbc`: pure 8-bit add / subtract,
+        # result wraps mod 256 (the carry set-up pinned the operation).
+        lhs = _assign_read(value.lhs, trace, src)
+        rhs = _assign_read(value.rhs, trace, src)
+        if value.op == "+":
+            return (lhs + rhs) & 0xff
+        if value.op == "-":
+            return (lhs - rhs) & 0xff
+        raise InterpError(f"unknown BinExpr op: {value.op!r}")
     raise InterpError(f"unknown Assign source type: {type(value).__name__}")
 
 

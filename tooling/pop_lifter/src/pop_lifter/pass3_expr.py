@@ -1,4 +1,4 @@
-"""Pass 3 (semantic recovery), slice 1: accumulator copy folding.
+"""Pass 3 (semantic recovery): accumulator expression folding.
 
 The structured IR3 from pass 2 still carries the 6502 accumulator
 round-trip explicitly:
@@ -11,31 +11,42 @@ dropping the intermediate `a`:
 
     *(Char + y) = *(ztemp)[y]
 
-It also handles the constant-store idiom (`a = #1 ; *CharID = a` ⇒
-`CharID = 1`) and runs of stores fed by one load (`a = #0 ; sta X ;
-sta Y` ⇒ `X = 0 ; Y = 0`).
+**Slice 1 — copy folding.** The constant-store idiom
+(`a = #1 ; *CharID = a` ⇒ `CharID = 1`) and runs of stores fed by one
+load (`a = #0 ; sta X ; sta Y` ⇒ `X = 0 ; Y = 0`).
 
-Scope (slice 1) — deliberately conservative, behaviour-preserving:
+**Slice 2 — arithmetic folding.** The compute-and-store idiom collapses
+the load + carry set-up + add/subtract into a `BinExpr`:
+
+    a = X ; clc ; adc #8 ; sta Y   ⇒   Y = X + 8
+    a = X ; sec ; sbc #8 ; sta Y   ⇒   Y = X - 8
+
+The explicit `clc`/`sec` pins the op to a pure 8-bit add / subtract.
+
+Deliberately conservative, behaviour-preserving:
 
 * **Accumulator only.** The X/Y copies (`ldx`/`stx`) are rarer; a
   later slice generalises.
 * **Adjacent runs.** A foldable group is a `load A` immediately
-  followed by one or more consecutive A-stores. Requiring adjacency
-  sidesteps the source-clobbering question — nothing runs between
-  the load and the stores, so a memory source can't be overwritten
-  before the copy.
+  followed by its store(s) (with the `clc`/`sec` + `adc`/`sbc` in
+  between for the arithmetic form). Requiring adjacency sidesteps the
+  source-clobbering question — nothing runs between the load and the
+  stores, so a memory operand can't be overwritten before the copy.
 * **Dead-after check.** The load is only dropped when `A` is dead
   after the store run: the next thing that touches A writes it
   (reassignment), or — inside a loop body whose first A-touch is a
-  write — control wraps back to that write. `Return` / `Call` /
-  `TailCall` / conditions / arithmetic all count as A-reads, so a
-  value that escapes via a call or return (A might be a return
-  value) is never folded away.
+  write — control wraps back to that write. For an arithmetic fold the
+  **carry** the add/sub set must *also* be dead (so a 16-bit add's
+  high-byte `adc` is never folded — its carry feeds the next op). A
+  single store only for the arithmetic form (the stored value isn't
+  the source, so a multi-store run isn't an idempotent write-back).
+  `Return` / `Call` / `TailCall` count as reads, so a value escaping
+  via a call or return is never folded away.
 * Anything ambiguous is left exactly as pass 2 produced it.
 
-Out of scope (later slices): arithmetic expression trees
-(`a = X ; clc ; adc #8 ; sta Y` ⇒ `Y = X + 8`), `match` recognition
-from chained `if a == K`, SMC patch → operand-variable.
+Out of scope (later slices): expression trees deeper than one op,
+`match` recognition from chained `if a == K`, SMC patch →
+operand-variable.
 """
 
 from __future__ import annotations
@@ -49,10 +60,12 @@ from .ir1 import (
     Asl,
     Bit,
     Bitwise,
+    Clc,
     CmpAbs,
     CmpImm,
     CmpIndexed,
     CmpIndirect,
+    IndexedAbs,
     LoadAbs,
     LoadImm,
     LoadIndexed,
@@ -67,6 +80,8 @@ from .ir1 import (
     SbcImm,
     SbcIndexed,
     SbcIndirect,
+    Sec,
+    ShiftMem,
     StoreAbs,
     StoreIndexed,
     StoreIndirect,
@@ -76,6 +91,7 @@ from .ir1 import (
 )
 from .ir3 import (
     Assign,
+    BinExpr,
     Block,
     BreakStmt,
     CallStmt,
@@ -143,7 +159,6 @@ def _is_a_load(item):
     if isinstance(item, LoadAbs) and item.reg is Reg.A:
         return item.source
     if isinstance(item, LoadIndexed) and item.reg is Reg.A:
-        from .ir1 import IndexedAbs
         return IndexedAbs(base=item.base, index=item.index)
     if isinstance(item, LoadIndirect) and item.reg is Reg.A:
         return item.source
@@ -158,11 +173,114 @@ def _a_store_target(item):
     if isinstance(item, StoreAbs) and item.reg is Reg.A:
         return item.target
     if isinstance(item, StoreIndexed) and item.reg is Reg.A:
-        from .ir1 import IndexedAbs
         return IndexedAbs(base=item.base, index=item.index)
     if isinstance(item, StoreIndirect) and item.reg is Reg.A:
         return item.target
     return None
+
+
+def _store_run(stmts: list[Stmt], start: int):
+    """Maximal run of consecutive A-stores beginning at `stmts[start]`,
+    returned as `(list_of_(target, src), index_after_run)`."""
+    run: list[tuple[object, object]] = []
+    k = start
+    n = len(stmts)
+    while k < n and isinstance(stmts[k], RawStmt):
+        tgt = _a_store_target(stmts[k].item)
+        if tgt is None:
+            break
+        run.append((tgt, stmts[k].item.src))
+        k += 1
+    return run, k
+
+
+# ---------------------------------------------------------------- carry read/write classification
+
+
+def _reads_c(item) -> bool:
+    """True if the IR1 atom consumes the carry flag. `adc`/`sbc` add it
+    in; `rol`/`ror` (and their memory forms) rotate it through. Unknown
+    opcodes count as a read so liveness never steps past them."""
+    if isinstance(item, Unsupported):
+        return True
+    if isinstance(item, (
+        AdcImm, AdcAbs, AdcIndexed, SbcImm, SbcAbs, SbcIndexed, SbcIndirect,
+        Rol, Ror,
+    )):
+        return True
+    if isinstance(item, ShiftMem):
+        return item.op in ("rol", "ror")
+    return False
+
+
+def _writes_c(item) -> bool:
+    """True if the IR1 atom redefines the carry flag without first
+    depending on it (so it kills any previous carry). `clc`/`sec` set
+    it; `cmp` and `asl`/`lsr` derive it fresh. (`adc`/`sbc`/`rol`/`ror`
+    also write carry but *read* it first — they're handled as reads,
+    which is the conservative call for liveness.)"""
+    if isinstance(item, (Clc, Sec)):
+        return True
+    if isinstance(item, (CmpImm, CmpAbs, CmpIndexed, CmpIndirect)):
+        return True
+    if isinstance(item, (Asl, Lsr)):
+        return True
+    if isinstance(item, ShiftMem):
+        return item.op in ("asl", "lsr")
+    return False
+
+
+# ---------------------------------------------------------------- arithmetic pattern
+
+
+def _arith_operand(item):
+    """Extract the add/sub operand value (`Imm` / `Abs` / `IndexedAbs` /
+    `IndirectY`) from an `adc`/`sbc` atom."""
+    if isinstance(item, (AdcImm, SbcImm)):
+        return item.imm
+    if isinstance(item, (AdcAbs, SbcAbs)):
+        return item.source
+    if isinstance(item, (AdcIndexed, SbcIndexed)):
+        return IndexedAbs(base=item.base, index=item.index)
+    if isinstance(item, SbcIndirect):
+        return item.source
+    return None
+
+
+def _arith_after_load(stmts: list[Stmt], i: int):
+    """If the load at `stmts[i]` is immediately followed by a carry
+    set-up + add/subtract — `clc ; adc OP` or `sec ; sbc OP` — return
+    `(op, operand, store_start_idx)`; else None.
+
+    Requiring the explicit `clc`/`sec` pins the operation to a pure
+    8-bit add / subtract (no dependence on the incoming carry), so the
+    folded `BinExpr` is exact. A bare `adc`/`sbc` with no preceding
+    carry set-up (e.g. the high byte of a 16-bit add) is left alone."""
+    if i + 2 >= len(stmts):
+        return None
+    s1, s2 = stmts[i + 1], stmts[i + 2]
+    if not (isinstance(s1, RawStmt) and isinstance(s2, RawStmt)):
+        return None
+    setup, arith = s1.item, s2.item
+    if isinstance(setup, Clc) and isinstance(arith, (AdcImm, AdcAbs, AdcIndexed)):
+        return ("+", _arith_operand(arith), i + 3)
+    if isinstance(setup, Sec) and isinstance(
+        arith, (SbcImm, SbcAbs, SbcIndexed, SbcIndirect)
+    ):
+        return ("-", _arith_operand(arith), i + 3)
+    return None
+
+
+def _cond_reads_a(cond) -> bool:
+    return cond.reg is Reg.A
+
+
+def _cond_reads_c(cond) -> bool:
+    # An IR3 `Compare` re-derives `reg vs rhs` from registers — it never
+    # reads the carry flag. (Carry branches that weren't fused to a
+    # register compare stay as `RawIfStmt`, which the scan treats as a
+    # hard barrier.)
+    return False
 
 
 # ---------------------------------------------------------------- A liveness over IR3
@@ -226,17 +344,25 @@ def _first_a_touch_is_write(block: Block) -> bool:
 # ---------------------------------------------------------------- the fold
 
 
-def _a_dead_from(
+def _dead_from(
     stmts: list[Stmt],
     idx: int,
     *,
+    reads,
+    writes,
+    cond_reads,
     dead_fallthrough: bool,
     dead_break: bool,
     dead_continue: bool,
 ) -> bool:
-    """Is A dead from `stmts[idx:]` onward — i.e. overwritten before
-    being read on *every* control-flow path? Path-sensitive: each way
-    out of the current statement list carries its own deadness:
+    """Is the tracked resource (A, or the carry flag) dead from
+    `stmts[idx:]` onward — i.e. overwritten before being read on
+    *every* control-flow path?
+
+    `reads` / `writes` classify a `RawStmt`'s atom; `cond_reads` says
+    whether an `IfStmt`'s `Compare` consumes the resource. The scan is
+    path-sensitive: each way out of the current statement list carries
+    its own deadness:
 
     * `dead_fallthrough` — control runs off the end of this list.
     * `dead_break` — a `break` exits the innermost enclosing loop.
@@ -244,36 +370,35 @@ def _a_dead_from(
 
     Per-statement rules:
 
-    * `RawStmt` that writes A without reading → dead (True); that reads
-      A → live (False); otherwise step past it.
-    * `Call`/`TailCall`/`Return` → live (A may be an argument / return
-      value).
-    * `RawIfStmt` → live: the dropped load set Z/N, which the store run
-      leaves intact, so a raw flag-branch may observe them. (An
-      `IfStmt` uses a self-contained `Compare`, so its *condition*
-      reads no flags — but each of its branches is still scanned.)
-    * `IfStmt` whose condition reads A → live; otherwise A is dead past
-      it only if dead on *both* the taken branch and the fall-through.
+    * `RawStmt` that `reads` the resource → live (False); that `writes`
+      it (without reading) → dead (True); otherwise step past it.
+    * `Call`/`TailCall`/`Return` → live (the resource may be an
+      argument / return value).
+    * `RawIfStmt` → live: it reads raw 6502 flags, which the dropped
+      op may have set (Z/N for a load, plus carry for `adc`/`sbc`).
+    * `IfStmt` whose condition reads the resource → live; otherwise
+      dead past it only if dead on *both* the taken branch and the
+      fall-through.
     * A nested `LoopStmt`, `Goto`/`Label`, or any unrecognised stmt →
-      live (out of scope for slice 1; never step past it).
+      live (never step past it).
 
-    Unlike the earlier `_stmt_touches_a`-based scan, this never steps
-    past a compound statement on the strength of "its body doesn't
-    touch A" alone — a nested flag-branch or early exit is honoured.
+    This never steps past a compound statement on the strength of "its
+    body doesn't touch the resource" alone — a nested flag-branch or
+    early exit is honoured.
     """
     n = len(stmts)
     i = idx
     while i < n:
         s = stmts[i]
         if isinstance(s, RawStmt):
-            if _reads_a(s.item):
+            if reads(s.item):
                 return False
-            if _writes_a(s.item):
+            if writes(s.item):
                 return True
             i += 1
             continue
         if isinstance(s, Assign):
-            i += 1  # folded copy touches neither A nor flags
+            i += 1  # a folded copy / expr touches neither A nor flags
             continue
         if isinstance(s, (CallStmt, TailCallStmt, ReturnStmt)):
             return False
@@ -284,28 +409,19 @@ def _a_dead_from(
         if isinstance(s, RawIfStmt):
             return False
         if isinstance(s, IfStmt):
-            if s.cond.reg is Reg.A:
+            if cond_reads(s.cond):
                 return False
             # Deadness of everything after this `if` (the false edge,
             # and the then-block's own fall-through both land here).
-            rest = _a_dead_from(
-                stmts, i + 1,
-                dead_fallthrough=dead_fallthrough,
-                dead_break=dead_break,
-                dead_continue=dead_continue,
-            )
-            then_dead = _a_dead_from(
-                list(s.then_block.stmts), 0,
-                dead_fallthrough=rest,
-                dead_break=dead_break,
-                dead_continue=dead_continue,
+            kw = dict(reads=reads, writes=writes, cond_reads=cond_reads,
+                      dead_break=dead_break, dead_continue=dead_continue)
+            rest = _dead_from(stmts, i + 1, dead_fallthrough=dead_fallthrough, **kw)
+            then_dead = _dead_from(
+                list(s.then_block.stmts), 0, dead_fallthrough=rest, **kw
             )
             if s.else_block is not None:
-                else_dead = _a_dead_from(
-                    list(s.else_block.stmts), 0,
-                    dead_fallthrough=rest,
-                    dead_break=dead_break,
-                    dead_continue=dead_continue,
+                else_dead = _dead_from(
+                    list(s.else_block.stmts), 0, dead_fallthrough=rest, **kw
                 )
             else:
                 else_dead = rest
@@ -314,6 +430,26 @@ def _a_dead_from(
         # past it.
         return False
     return dead_fallthrough
+
+
+def _a_dead_from(stmts, idx, *, dead_fallthrough, dead_break, dead_continue) -> bool:
+    """A-liveness wrapper over `_dead_from`."""
+    return _dead_from(
+        stmts, idx,
+        reads=_reads_a, writes=_writes_a, cond_reads=_cond_reads_a,
+        dead_fallthrough=dead_fallthrough,
+        dead_break=dead_break, dead_continue=dead_continue,
+    )
+
+
+def _c_dead_from(stmts, idx, *, dead_fallthrough, dead_break, dead_continue) -> bool:
+    """Carry-liveness wrapper over `_dead_from`."""
+    return _dead_from(
+        stmts, idx,
+        reads=_reads_c, writes=_writes_c, cond_reads=_cond_reads_c,
+        dead_fallthrough=dead_fallthrough,
+        dead_break=dead_break, dead_continue=dead_continue,
+    )
 
 
 def _fold_block(
@@ -379,28 +515,44 @@ def _fold_block(
                 ),
             )
 
-        # Try to start a copy run at a foldable A-load.
+        # Try to start a fold run at a foldable A-load.
         if isinstance(stmt, RawStmt):
             source = _is_a_load(stmt.item)
             if source is not None:
-                # Collect the maximal run of consecutive A-stores
-                # immediately after the load.
-                targets: list[tuple[object, object]] = []  # (target, src)
-                j = i + 1
-                while j < n and isinstance(stmts[j], RawStmt):
-                    tgt = _a_store_target(stmts[j].item)
-                    if tgt is None:
-                        break
-                    targets.append((tgt, stmts[j].item.src))
-                    j += 1
-                if targets and _a_dead_from(
-                    stmts, j,
+                edge = dict(
                     dead_fallthrough=dead_fallthrough,
                     dead_break=dead_break,
                     dead_continue=dead_continue,
-                ):
-                    # Fold: drop the load, replace each store with an
-                    # Assign carrying the load's source.
+                )
+
+                # (1) Arithmetic fold: load ; clc/sec ; adc/sbc ; sta.
+                # Single store only — the stored value isn't the source
+                # value, so a multi-store run isn't an idempotent
+                # write-back and could clobber the operand. A *and* the
+                # carry the add/sub set must be dead afterwards.
+                arith = _arith_after_load(stmts, i)
+                if arith is not None and arith[1] is not None:
+                    op, operand, store_start = arith
+                    targets, j = _store_run(stmts, store_start)
+                    if (
+                        len(targets) == 1
+                        and _a_dead_from(stmts, j, **edge)
+                        and _c_dead_from(stmts, j, **edge)
+                    ):
+                        tgt, ssrc = targets[0]
+                        out.append(Assign(
+                            target=tgt,
+                            source=BinExpr(op=op, lhs=source, rhs=operand),
+                            src=ssrc,
+                        ))
+                        i = j
+                        continue
+
+                # (2) Pure copy fold: load ; sta [; sta ...]. A run of
+                # stores fed by one load; sound for multiple stores
+                # because each writes the (unchanged) source value.
+                targets, j = _store_run(stmts, i + 1)
+                if targets and _a_dead_from(stmts, j, **edge):
                     for tgt, ssrc in targets:
                         out.append(Assign(target=tgt, source=source, src=ssrc))
                     i = j

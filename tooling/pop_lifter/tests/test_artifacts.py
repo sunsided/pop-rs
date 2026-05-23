@@ -24,6 +24,7 @@ IR_PILOT_CHECKFLOOR_IR2 = REPO_ROOT / "ir" / "pilot" / "checkfloor.ir2"
 IR_PILOT_CHECKFLOOR_IR3 = REPO_ROOT / "ir" / "pilot" / "checkfloor.ir3"
 IR_PILOT_CHGSHADPOSN_IR3 = REPO_ROOT / "ir" / "pilot" / "chgshadposn.ir3"
 IR_PILOT_CHGSHADPOSN_PASS3 = REPO_ROOT / "ir" / "pilot" / "chgshadposn.pass3.ir3"
+IR_PILOT_CUP_PASS3 = REPO_ROOT / "ir" / "pilot" / "cup.pass3.ir3"
 IR_RAW = REPO_ROOT / "ir" / "raw"
 
 PILOT_ENTRIES = [
@@ -300,6 +301,46 @@ def test_pass3_chgshadposn_fold_artifact_matches(source_dir):
         f"regenerate with:\n"
         f"  pop-lifter fold AUTO.S --entry chgshadposn "
         f"--out {IR_PILOT_CHGSHADPOSN_PASS3.relative_to(REPO_ROOT)}"
+    )
+
+
+def _regen_cup_pass3(source_dir: Path) -> str:
+    from pop_lifter.pass2_reloop import reloop_module
+    from pop_lifter.pass2_struct import structure_module
+    from pop_lifter.pass3_expr import fold_module
+    from pop_lifter import ir3 as ir3_mod
+    ast = parse_files(
+        [
+            source_dir / "EQ.S",
+            source_dir / "GAMEEQ.S",
+            source_dir / "AUTO.S",
+        ],
+        search_paths=[source_dir],
+    )
+    auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
+    ir1_module = lift_file(auto, ast.symbols(), ["Cup"]).module
+    ir3_module = fold_module(reloop_module(structure_module(ir1_module)))
+    return ir3_mod.format_module(ir3_module)
+
+
+def test_pass3_cup_fold_artifact_matches(source_dir):
+    """The Cup pass-3 pilot pins arithmetic folding: `CharBlockY +=
+    #3` collapses to a `BinExpr`, while the `CharScrn` copy stays
+    unfolded (a call sits between load and store) and the `CharY +=
+    #0xbd` stays unfolded (A is live at the `return`)."""
+    if not IR_PILOT_CUP_PASS3.exists():
+        raise AssertionError(
+            f"missing artifact {IR_PILOT_CUP_PASS3}. regenerate with:\n"
+            f"  pop-lifter fold AUTO.S --entry Cup "
+            f"--out {IR_PILOT_CUP_PASS3.relative_to(REPO_ROOT)}"
+        )
+    expected = IR_PILOT_CUP_PASS3.read_text(encoding="utf-8")
+    actual = _regen_cup_pass3(source_dir)
+    assert actual == expected, (
+        f"{IR_PILOT_CUP_PASS3.relative_to(REPO_ROOT)} is stale. "
+        f"regenerate with:\n"
+        f"  pop-lifter fold AUTO.S --entry Cup "
+        f"--out {IR_PILOT_CUP_PASS3.relative_to(REPO_ROOT)}"
     )
 
 
