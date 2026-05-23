@@ -25,12 +25,16 @@ from .interp_ir1 import (
     Trace,
     _branch_taken,
     _eval_compare,
+    _indexed_addr,
+    _real_addr,
     _resolve,
+    _resolve_indirect_y,
     exec_atom,
 )
 from .interp_ir1 import run as ir1_run
-from .ir1 import ModuleIR1, Routine as IR1Routine
+from .ir1 import Abs, Imm, IndexedAbs, IndirectY, ModuleIR1, Routine as IR1Routine
 from .ir3 import (
+    Assign,
     Block,
     BreakStmt,
     CallStmt,
@@ -150,6 +154,37 @@ def _exec_block(block: Block, modules, aliases, trace: Trace) -> None:
         _exec_stmt(stmt, modules, aliases, trace)
 
 
+def _assign_read(value, trace: Trace, src) -> int:
+    """Read the source of a pass-3 `Assign` — an immediate or one of the
+    memory-read forms — at the current register state. Mirrors the
+    load-side of `exec_atom` so the fold's interpretation can't drift
+    from the unfolded `lda` it replaced. `src` is the Assign's
+    `SourceRef`, threaded into the address gates so a synthetic-label
+    failure points at the right source line."""
+    if isinstance(value, Imm):
+        return value.value & 0xff
+    if isinstance(value, IndexedAbs):
+        return trace.ram[_indexed_addr(value, trace, src)]
+    if isinstance(value, IndirectY):
+        return trace.ram[_resolve_indirect_y(value, trace, trace.ram)]
+    if isinstance(value, Abs):
+        return trace.ram[_real_addr(value.addr, src)]
+    raise InterpError(f"unknown Assign source type: {type(value).__name__}")
+
+
+def _assign_addr(target, trace: Trace, src) -> int:
+    """Resolve the destination address of a pass-3 `Assign`. Mirrors the
+    store-side of `exec_atom`. `src` is threaded into the address gates
+    for the same diagnostics reason as `_assign_read`."""
+    if isinstance(target, IndexedAbs):
+        return _indexed_addr(target, trace, src)
+    if isinstance(target, IndirectY):
+        return _resolve_indirect_y(target, trace, trace.ram)
+    if isinstance(target, Abs):
+        return _real_addr(target.addr, src)
+    raise InterpError(f"unknown Assign target type: {type(target).__name__}")
+
+
 def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
     if isinstance(stmt, RawStmt):
         handled = exec_atom(stmt.item, trace, trace.ram)
@@ -157,6 +192,16 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
             raise InterpError(
                 f"IR3 RawStmt wraps a non-atom item: {type(stmt.item).__name__}"
             )
+        return
+    if isinstance(stmt, Assign):
+        # `target = source`, the dropped `lda`/`sta` round-trip. Read the
+        # source then write the destination — A and the Z/N flags the
+        # original load set are intentionally NOT touched (pass 3 only
+        # folds when they're dead).
+        value = _assign_read(stmt.source, trace, stmt.src)
+        addr = _assign_addr(stmt.target, trace, stmt.src)
+        trace.ram[addr] = value
+        trace.writes[addr] = value
         return
     if isinstance(stmt, CallStmt):
         callee = _resolve(modules, aliases, stmt.target)

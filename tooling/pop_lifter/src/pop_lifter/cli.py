@@ -25,6 +25,7 @@ from .pass0_parse import ProgramAST, parse_files
 from .pass1_lift import discover_entries, lift_file
 from .pass2_reloop import is_unstructured, reloop_module
 from .pass2_struct import elision_stats, fusion_stats, structure_module
+from .pass3_expr import fold_module, fold_stats
 
 DEFAULT_SOURCE_REL = Path("01 POP Source/Source")
 
@@ -372,6 +373,84 @@ def _cmd_reloop(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------- fold (pass 3 slice 1)
+
+
+def _cmd_fold(args: argparse.Namespace) -> int:
+    """Run passes 1 + 2 (fusion/elision) + reloop + pass-3 accumulator
+    copy folding for the given files / entries. Writes the folded IR3
+    dump to `--out` (or stdout). The summary line reports how many
+    `lda`/`sta` round-trips collapsed into direct `Assign`s."""
+    src_dir = _resolve_source_dir(args)
+    if src_dir is None:
+        return 2
+
+    file_paths: list[Path] = []
+    for raw in args.file:
+        p = Path(raw)
+        if not p.is_absolute():
+            candidate = src_dir / p
+            if candidate.is_file():
+                p = candidate
+        if not p.is_file():
+            print(f"error: input file not found: {raw}", file=sys.stderr)
+            return 2
+        file_paths.append(p)
+
+    base = [src_dir / n for n in ("EQ.S", "GAMEEQ.S") if (src_dir / n).exists()]
+    ast = parse_files([*base, *file_paths], search_paths=[src_dir])
+    symbols = ast.symbols()
+
+    dumps: list[str] = []
+    total_routines = 0
+    total_assigns = 0
+    handled: set[str] = set()
+    for file_path in file_paths:
+        file_ast = next(
+            (f for f in ast.files if Path(f.path).resolve() == file_path.resolve()),
+            None,
+        )
+        if file_ast is None:
+            print(
+                f"error: file {file_path} was not loaded by the parser",
+                file=sys.stderr,
+            )
+            return 1
+        defined = set(discover_entries(file_ast))
+        local_entries = [e for e in args.entry if e in defined and e not in handled]
+        if not local_entries:
+            continue
+        ir1_module = lift_file(file_ast, symbols, local_entries).module
+        ir2_module = structure_module(ir1_module)
+        ir3_module = reloop_module(ir2_module)
+        folded = fold_module(ir3_module)
+        total_routines += len(folded.routines)
+        total_assigns += fold_stats(folded)
+        dumps.append(ir3_mod.format_module(folded))
+        handled.update(local_entries)
+
+    missing = [e for e in args.entry if e not in handled]
+    if missing:
+        print(
+            f"error: entries not found in any input file: {missing}",
+            file=sys.stderr,
+        )
+        return 1
+
+    text = "\n".join(dumps)
+    if args.out:
+        out_path = Path(args.out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(text, encoding="utf-8")
+        print(
+            f"wrote {out_path} ({total_routines} routines, "
+            f"{total_assigns} folded assigns)"
+        )
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
 # ---------------------------------------------------------------- lift-all
 
 def _cmd_lift_all(args: argparse.Namespace) -> int:
@@ -622,6 +701,26 @@ def main(argv: list[str] | None = None) -> int:
         help="If given, write IR3 dump here instead of stdout.",
     )
     p_reloop.set_defaults(func=_cmd_reloop)
+
+    p_fold = sub.add_parser(
+        "fold",
+        help="Pass 3 slice 1: run pass 1 + 2 + reloop, then fold "
+             "accumulator copy round-trips (lda SRC ; sta DST) into "
+             "direct memory assignments.",
+    )
+    p_fold.add_argument(
+        "file", nargs="+",
+        help=".S file (absolute path or relative to the source dir).",
+    )
+    p_fold.add_argument(
+        "--entry", action="append", required=True,
+        help="Routine entry-point label. May be passed multiple times.",
+    )
+    p_fold.add_argument(
+        "--out", default=None,
+        help="If given, write folded IR3 dump here instead of stdout.",
+    )
+    p_fold.set_defaults(func=_cmd_fold)
 
     p_lift_all = sub.add_parser(
         "lift-all",

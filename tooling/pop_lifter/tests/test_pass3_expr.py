@@ -1,0 +1,376 @@
+"""Pass 3 slice 1 — accumulator copy folding.
+
+Two flavours of test:
+
+* **Synthetic unit tests** drive the folder (`_fold_block` /
+  `fold_routine`) over hand-built IR3 to pin the fold rules: a dead
+  accumulator copy collapses to an `Assign`, a multi-store run folds to
+  one `Assign` per store, and anything where `A` stays live (a trailing
+  store/cmp/return, a non-copyable `Transfer` source) is left exactly as
+  pass 2 produced it.
+* **Behavioural equivalence** lifts the real `chgshadposn` through pass
+  1 + 2 + reloop, then folds it, and asserts the IR3 interpreter
+  produces byte-identical RAM before and after folding — the fold must
+  not change observable behaviour.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from pop_lifter.interp_ir3 import run as ir3_run
+from pop_lifter.ir1 import (
+    Abs,
+    Compare,
+    Imm,
+    IndexedAbs,
+    LoadAbs,
+    LoadImm,
+    ModuleIR1,
+    Reg,
+    Return,
+    Routine,
+    SourceRef,
+    StoreAbs,
+    Transfer,
+)
+from pop_lifter.ir3 import (
+    Assign,
+    Block,
+    BreakStmt,
+    CallStmt,
+    IfStmt,
+    LoopStmt,
+    RawIfStmt,
+    RawStmt,
+    ReturnStmt,
+    RoutineIR3,
+)
+from pop_lifter import ir3 as ir3_mod
+from pop_lifter.pass0_parse import parse_files
+from pop_lifter.pass1_lift import discover_entries, lift_file
+from pop_lifter.pass2_reloop import reloop_module
+from pop_lifter.pass2_struct import structure_module
+from pop_lifter.pass3_expr import fold_module, fold_routine, fold_stats
+
+SRC = SourceRef(file="syn", line=0, raw="")
+
+
+def _raw(item) -> RawStmt:
+    return RawStmt(item=item)
+
+
+def _load_a_abs(name: str, addr: int) -> RawStmt:
+    return _raw(LoadAbs(reg=Reg.A, source=Abs(name=name, addr=addr), src=SRC))
+
+
+def _store_a_abs(name: str, addr: int) -> RawStmt:
+    return _raw(StoreAbs(reg=Reg.A, target=Abs(name=name, addr=addr), src=SRC))
+
+
+def _kill_a() -> RawStmt:
+    """`lda #0` — a write that redefines A (and Z/N), proving the prior
+    A value dead."""
+    return _raw(LoadImm(reg=Reg.A, imm=Imm(value=0, text="#0"), src=SRC))
+
+
+def _fold(stmts: list) -> list:
+    routine = RoutineIR3(name="syn", body=Block.of(stmts))
+    return list(fold_routine(routine).body.stmts)
+
+
+# --------------------------------------------------------------- synthetic
+
+
+def test_simple_copy_folds_when_a_dead():
+    """`a = SRC ; *DST = a ; a = #0` — the round-trip collapses to
+    `*DST = SRC`, dropping the load, because the trailing `a = #0`
+    redefines A before any read."""
+    out = _fold([_load_a_abs("SRC", 0x10), _store_a_abs("DST", 0x20), _kill_a()])
+    assert len(out) == 2
+    assign, tail = out
+    assert isinstance(assign, Assign)
+    assert isinstance(assign.target, Abs) and assign.target.addr == 0x20
+    assert isinstance(assign.source, Abs) and assign.source.addr == 0x10
+    # The reassigning load survives untouched (nothing to fold into it).
+    assert isinstance(tail, RawStmt) and isinstance(tail.item, LoadImm)
+
+
+def test_constant_multi_store_folds_to_one_assign_each():
+    """`a = #1 ; *X = a ; *Y = a ; a = #0` ⇒ `*X = #1 ; *Y = #1`."""
+    out = _fold([
+        _raw(LoadImm(reg=Reg.A, imm=Imm(value=1, text="#1"), src=SRC)),
+        _store_a_abs("X", 0x30),
+        _store_a_abs("Y", 0x31),
+        _kill_a(),
+    ])
+    assert len(out) == 3
+    a0, a1, tail = out
+    assert isinstance(a0, Assign) and a0.target.addr == 0x30
+    assert isinstance(a1, Assign) and a1.target.addr == 0x31
+    for a in (a0, a1):
+        assert isinstance(a.source, Imm) and a.source.value == 1
+    assert isinstance(tail, RawStmt)
+
+
+def test_no_fold_when_a_live_via_return():
+    """`a = SRC ; *DST = a ; return` — A might be a return value, so the
+    load is NOT dropped."""
+    out = _fold([_load_a_abs("SRC", 0x10), _store_a_abs("DST", 0x20), ReturnStmt(src=SRC)])
+    assert [type(s) for s in out] == [RawStmt, RawStmt, ReturnStmt]
+    assert not any(isinstance(s, Assign) for s in out)
+
+
+def test_no_fold_when_a_live_via_call():
+    """A trailing `call` may pass A as an argument — conservatively a
+    read, so no fold."""
+    out = _fold([
+        _load_a_abs("SRC", 0x10),
+        _store_a_abs("DST", 0x20),
+        CallStmt(target="callee", src=SRC),
+        _kill_a(),
+    ])
+    assert not any(isinstance(s, Assign) for s in out)
+
+
+def test_transfer_source_is_not_foldable():
+    """`txa ; *DST = a ; a = #0` — a `Transfer` writes A but its source
+    isn't a standalone copyable value, so the store stays a raw store."""
+    out = _fold([
+        _raw(Transfer(src_reg=Reg.X, dst_reg=Reg.A, src=SRC)),
+        _store_a_abs("DST", 0x20),
+        _kill_a(),
+    ])
+    assert not any(isinstance(s, Assign) for s in out)
+
+
+def test_load_with_no_following_store_is_left_alone():
+    """A bare `a = SRC` with no store after it has nothing to fold."""
+    out = _fold([_load_a_abs("SRC", 0x10), _kill_a()])
+    assert not any(isinstance(s, Assign) for s in out)
+    assert len(out) == 2
+
+
+def test_no_fold_across_unsupported_opcode():
+    """An `Unsupported` opcode has unknown semantics — it may read A or
+    its flags — so liveness must not step past it. `a = SRC ; *DST = a ;
+    ??? ; a = #0` stays unfolded. (Reviewer #20.)"""
+    from pop_lifter.ir1 import Unsupported
+    out = _fold([
+        _load_a_abs("SRC", 0x10),
+        _store_a_abs("DST", 0x20),
+        _raw(Unsupported(mnemonic="wat", operand=None, src=SRC)),
+        _kill_a(),
+    ])
+    assert not any(isinstance(s, Assign) for s in out)
+
+
+def _if_y(then_stmts: list, cond_reg: Reg = Reg.Y) -> IfStmt:
+    return IfStmt(
+        cond=Compare(reg=cond_reg, op="==", rhs=Imm(value=0, text="#0")),
+        then_block=Block.of(then_stmts),
+        else_block=None,
+        src=SRC,
+    )
+
+
+def test_no_fold_when_nested_if_can_return():
+    """`a = SRC ; *DST = a ; if y == 0 { return } ; a = #0` must NOT
+    fold: on the `y == 0` path control returns with A still holding the
+    loaded value. The earlier `_stmt_touches_a` scan stepped past this
+    `if` because its body 'doesn't touch A'. (Reviewer #20.)"""
+    out = _fold([
+        _load_a_abs("SRC", 0x10),
+        _store_a_abs("DST", 0x20),
+        _if_y([ReturnStmt(src=SRC)]),
+        _kill_a(),
+    ])
+    assert not any(isinstance(s, Assign) for s in out)
+
+
+def test_no_fold_when_nested_if_holds_raw_flag_branch():
+    """A `RawIfStmt` nested inside an `if` body reads the Z/N flags the
+    dropped load set — folding would change behaviour. The scan must
+    not step past the outer `if` just because its body doesn't touch A.
+    (Reviewer #20.)"""
+    inner = RawIfStmt(
+        cond="eq",
+        then_block=Block.of([
+            # stx — touches X/memory, not A — so the body 'doesn't touch A'.
+            _raw(StoreAbs(reg=Reg.X, target=Abs(name="T", addr=0x40), src=SRC)),
+        ]),
+        else_block=None,
+        src=SRC,
+    )
+    out = _fold([
+        _load_a_abs("SRC", 0x10),
+        _store_a_abs("DST", 0x20),
+        _if_y([inner]),
+        _kill_a(),
+    ])
+    assert not any(isinstance(s, Assign) for s in out)
+
+
+def _loop_copy_routine(post_loop: list) -> RoutineIR3:
+    """A chgshadposn-shaped loop: the copy run sits at the top of the
+    body, the exit guard (`if ... { break }`) at the bottom. `post_loop`
+    is spliced in after the loop — it decides whether the break path
+    leaves A dead."""
+    loop = LoopStmt(
+        body=Block.of([
+            _load_a_abs("SRC", 0x10),
+            _store_a_abs("DST", 0x20),
+            _if_y([BreakStmt(src=SRC)]),
+        ]),
+        src=SRC,
+    )
+    return RoutineIR3(name="syn", body=Block.of([loop, *post_loop]))
+
+
+def test_loop_copy_folds_when_break_target_kills_a():
+    """Break exits to code that overwrites A before reading it (`a =
+    #0`), so the loop-body copy is dead on every path and folds."""
+    routine = _loop_copy_routine(post_loop=[_kill_a(), ReturnStmt(src=SRC)])
+    loop = fold_routine(routine).body.stmts[0]
+    assert isinstance(loop, LoopStmt)
+    assert any(isinstance(s, Assign) for s in loop.body.stmts)
+
+
+def test_loop_copy_not_folded_when_break_target_reads_a():
+    """If the post-loop code reads A before overwriting it (here a store
+    of A), the loaded value escapes via the break path — no fold."""
+    routine = _loop_copy_routine(
+        post_loop=[_store_a_abs("OUT", 0x50), ReturnStmt(src=SRC)]
+    )
+    loop = fold_routine(routine).body.stmts[0]
+    assert isinstance(loop, LoopStmt)
+    assert not any(isinstance(s, Assign) for s in loop.body.stmts)
+
+
+# --------------------------------------------------------------- chgshadposn
+
+
+def _chgshadposn_modules(source_dir: Path):
+    """Lift chgshadposn through pass 1 + 2 + reloop, returning both the
+    pre-fold IR3 module and the folded one."""
+    ast = parse_files(
+        [source_dir / "EQ.S", source_dir / "GAMEEQ.S", source_dir / "AUTO.S"],
+        search_paths=[source_dir],
+    )
+    auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
+    ir1 = lift_file(auto, ast.symbols(), ["chgshadposn"]).module
+    ir3 = reloop_module(structure_module(ir1))
+    folded = fold_module(ir3)
+    return ir3, folded
+
+
+def _jumpseq_stub() -> ModuleIR1:
+    """chgshadposn ends with `call jumpseq`. Stub it as an IR1 routine
+    that records the accumulator it was handed (to 0x300) so the
+    differential test also pins that A reaches the call unchanged."""
+    body = [
+        StoreAbs(reg=Reg.A, target=Abs(name="mark", addr=0x300), src=SRC),
+        Return(src=SRC),
+    ]
+    return ModuleIR1(name="STUB", file="syn", routines=[Routine(name="jumpseq", body=body)])
+
+
+def test_chgshadposn_fold_is_behaviour_preserving(source_dir):
+    """Interpret the relooped IR3 and the folded IR3 from identical RAM;
+    they must end byte-for-byte identical. This is the soundness gate on
+    the fold."""
+    ir3, folded = _chgshadposn_modules(source_dir)
+    stub = _jumpseq_stub()
+
+    def seed() -> bytearray:
+        ram = bytearray(0x10000)
+        # a = x = 0 at entry, so ztemp ends up pointing at 0x0000; the
+        # loop copies mem[0x00..0x06] into Char[0..6]. Seed a pattern.
+        for i in range(8):
+            ram[i] = 0x10 + i
+        return ram
+
+    ram_pre = seed()
+    ir3_run([ir3, stub], "chgshadposn", ram=ram_pre)
+
+    ram_post = seed()
+    ir3_run([folded, stub], "chgshadposn", ram=ram_post)
+
+    assert ram_pre == ram_post, "fold changed observable RAM — unsound"
+
+
+def test_chgshadposn_fold_structure(source_dir):
+    """Pin the headline folds: the loop body becomes a single
+    `Assign` (`*(Char + y) = *(ztemp)[y]`), a `CharID = #1` Assign
+    appears at top level, and the `PlayCount` store before the
+    `return` is NOT folded (A may be a return value)."""
+    _, folded = _chgshadposn_modules(source_dir)
+    routine = folded.find("chgshadposn")
+    assert routine is not None
+
+    # Exactly two folds across the routine: the loop copy + CharID.
+    assert fold_stats(folded) == 2
+
+    from pop_lifter.ir3 import LoopStmt
+
+    loop = next(s for s in routine.body.stmts if isinstance(s, LoopStmt))
+    loop_assigns = [s for s in loop.body.stmts if isinstance(s, Assign)]
+    assert len(loop_assigns) == 1
+    copy = loop_assigns[0]
+    assert isinstance(copy.target, IndexedAbs) and copy.target.base.name == "Char"
+
+    # Top-level CharID = #1 fold.
+    top_assigns = [s for s in routine.body.stmts if isinstance(s, Assign)]
+    assert any(
+        isinstance(a.target, Abs) and a.target.name == "CharID"
+        and isinstance(a.source, Imm) and a.source.value == 1
+        for a in top_assigns
+    )
+
+    # The PlayCount store stays a raw store (blocked by the return).
+    assert not any(
+        isinstance(a.target, Abs) and a.target.name == "PlayCount"
+        for a in top_assigns
+    )
+
+
+# --------------------------------------------------------------- whole tree
+
+
+def test_fold_whole_tree_is_robust_and_idempotent(source_dir):
+    """Fold every relooped module across the whole source tree. Two
+    guards: folding never crashes, and it's idempotent — re-folding an
+    already-folded module is a no-op (an `Assign` carries no `A` to
+    fold). Also asserts folding actually fires somewhere, so a future
+    regression that silently disables the pass gets caught."""
+    files = sorted(source_dir.glob("*.S"))
+    base_order = [source_dir / "EQ.S", source_dir / "GAMEEQ.S"]
+    base = [p for p in base_order if p.exists()]
+    others = [p for p in files if p not in base]
+    ast = parse_files([*base, *others], search_paths=[source_dir])
+    symbols = ast.symbols()
+
+    total_assigns = 0
+    for src_path in files:
+        file_ast = next(
+            (f for f in ast.files if Path(f.path).resolve() == src_path.resolve()),
+            None,
+        )
+        if file_ast is None:
+            continue
+        entries = discover_entries(file_ast)
+        if not entries:
+            continue
+        ir1 = lift_file(file_ast, symbols, entries).module
+        if not ir1.routines:
+            continue
+        ir3 = reloop_module(structure_module(ir1))
+        folded = fold_module(ir3)
+        total_assigns += fold_stats(folded)
+        # Idempotent: folding the folded module changes nothing.
+        twice = fold_module(folded)
+        assert ir3_mod.format_module(twice) == ir3_mod.format_module(folded), (
+            f"fold not idempotent on {src_path.name}"
+        )
+
+    assert total_assigns > 0, "folding fired nowhere across the tree"
