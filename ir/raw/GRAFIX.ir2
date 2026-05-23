@@ -804,7 +804,7 @@ fn PREAD {
 ]rts:
   return                           ; GRAFIX.S:1220
 :beat:
-  ??? nop             ; GRAFIX.S:1222
+  nop                              ; GRAFIX.S:1222
   if pl goto :nextpdl       ; GRAFIX.S:1223
 SETCENTER:
   call normspeed                  ; GRAFIX.S:1233
@@ -1451,7 +1451,7 @@ fn VBLANK  (aka :loop1) {
 }
 
 fn VBLANKIIc {
-  ??? cli             ; GRAFIX.S:1956
+  i = 0                            ; GRAFIX.S:1956
 :loop1:
   bit *vblflag@0x01fb                ; GRAFIX.S:1958
   if pl goto :loop1       ; GRAFIX.S:1959
@@ -1460,7 +1460,7 @@ fn VBLANKIIc {
   bit *vblflag@0x01fb                ; GRAFIX.S:1962
   if pl goto :loop2       ; GRAFIX.S:1963
   *vblflag@0x01fb >>= 1                 ; GRAFIX.S:1964
-  ??? sei             ; GRAFIX.S:1966
+  i = 1                            ; GRAFIX.S:1966
   return                           ; GRAFIX.S:1967
 }
 
@@ -1483,7 +1483,7 @@ fn InitVBLANK {
   *VBLvect+1@0x019b = a            ; GRAFIX.S:1993
   a = #>VBLANKIIc                  ; GRAFIX.S:1994
   *VBLvect+2@0x019c = a            ; GRAFIX.S:1995
-  ??? sei             ; GRAFIX.S:1997
+  i = 1                            ; GRAFIX.S:1997
   *$c079@0xc079 = a            ; GRAFIX.S:1998
   *$c05b@0xc05b = a            ; GRAFIX.S:1999
   *$c078@0xc078 = a            ; GRAFIX.S:2000

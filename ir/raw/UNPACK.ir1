@@ -489,8 +489,6 @@ fn SETDHIRES {
   bit *DHIRESon@0xc05e                ; UNPACK.S:651
   *TEXToff@0xc050 = a            ; UNPACK.S:653
   return                           ; UNPACK.S:654
-  ??? da ]2            ; UNPACK.S:664
-  ??? da ]2            ; UNPACK.S:669
 FADEIN:
   *RAMRDmain@0xc002 = a            ; UNPACK.S:682
   patch *:sm1+2 = a            ; UNPACK.S:683
@@ -528,7 +526,7 @@ FADEIN:
 :sm2:
   ??? mvn 0,1            ; UNPACK.S:730
   ??? plb             ; UNPACK.S:731
-  ??? bra PalFade            ; UNPACK.S:735
+  tail_call PalFade                ; UNPACK.S:735
 }
 
 fn FADEIN {
@@ -568,7 +566,7 @@ fn FADEIN {
 :sm2:
   ??? mvn 0,1            ; UNPACK.S:730
   ??? plb             ; UNPACK.S:731
-  ??? bra PalFade            ; UNPACK.S:735
+  tail_call PalFade                ; UNPACK.S:735
 }
 
 fn LOADSUPER {
