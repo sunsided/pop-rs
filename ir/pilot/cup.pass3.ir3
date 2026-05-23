@@ -1,0 +1,14 @@
+; module AUTO from 01 POP Source/Source/AUTO.S
+
+fn Cup {
+  a = *CharScrn@0x004b        ; AUTO.S:1705
+  call getup                ; AUTO.S:1706
+  *CharScrn@0x004b = a            ; AUTO.S:1707
+  *CharBlockY@0x0045 = *CharBlockY@0x0045 + #0x03    ; AUTO.S:1712
+  a = *CharY@0x0042        ; AUTO.S:1714
+  c = 0                            ; AUTO.S:1715
+  a = a + #0xbd + c              ; AUTO.S:1716
+  *CharY@0x0042 = a            ; AUTO.S:1717
+  x = #0x03                  ; AUTO.S:1719
+  return                           ; AUTO.S:1720
+}

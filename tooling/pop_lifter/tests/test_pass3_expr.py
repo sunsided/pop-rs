@@ -21,6 +21,9 @@ from pathlib import Path
 from pop_lifter.interp_ir3 import run as ir3_run
 from pop_lifter.ir1 import (
     Abs,
+    AdcAbs,
+    AdcImm,
+    Clc,
     Compare,
     Imm,
     IndexedAbs,
@@ -30,12 +33,15 @@ from pop_lifter.ir1 import (
     Reg,
     Return,
     Routine,
+    SbcImm,
+    Sec,
     SourceRef,
     StoreAbs,
     Transfer,
 )
 from pop_lifter.ir3 import (
     Assign,
+    BinExpr,
     Block,
     BreakStmt,
     CallStmt,
@@ -247,6 +253,123 @@ def test_loop_copy_not_folded_when_break_target_reads_a():
     assert not any(isinstance(s, Assign) for s in loop.body.stmts)
 
 
+# --------------------------------------------------------------- arithmetic (slice 2)
+
+
+def _clc() -> RawStmt:
+    return _raw(Clc(src=SRC))
+
+
+def _sec() -> RawStmt:
+    return _raw(Sec(src=SRC))
+
+
+def _adc_imm(v: int) -> RawStmt:
+    return _raw(AdcImm(imm=Imm(value=v, text=f"#{v}"), src=SRC))
+
+
+def _sbc_imm(v: int) -> RawStmt:
+    return _raw(SbcImm(imm=Imm(value=v, text=f"#{v}"), src=SRC))
+
+
+# A dead-after tail that also redefines carry (`lda #0 ; clc`) — an
+# arithmetic fold needs *both* A and the carry the add/sub set to be
+# dead, and a bare `lda #0` leaves carry live at the routine's
+# fall-through.
+def _kill_ac() -> list:
+    return [_kill_a(), _clc()]
+
+
+def test_arith_add_imm_folds():
+    """`a = X ; clc ; adc #8 ; *Y = a ; ...` ⇒ `*Y = X + #8`."""
+    out = _fold([
+        _load_a_abs("X", 0x10), _clc(), _adc_imm(8),
+        _store_a_abs("Y", 0x20), *_kill_ac(),
+    ])
+    assigns = [s for s in out if isinstance(s, Assign)]
+    assert len(assigns) == 1
+    expr = assigns[0].source
+    assert isinstance(expr, BinExpr) and expr.op == "+"
+    assert isinstance(expr.lhs, Abs) and expr.lhs.addr == 0x10
+    assert isinstance(expr.rhs, Imm) and expr.rhs.value == 8
+    assert assigns[0].target.addr == 0x20
+
+
+def test_arith_sub_imm_folds():
+    """`a = X ; sec ; sbc #8 ; *Y = a ; ...` ⇒ `*Y = X - #8`."""
+    out = _fold([
+        _load_a_abs("X", 0x10), _sec(), _sbc_imm(8),
+        _store_a_abs("Y", 0x20), *_kill_ac(),
+    ])
+    assigns = [s for s in out if isinstance(s, Assign)]
+    assert len(assigns) == 1
+    assert isinstance(assigns[0].source, BinExpr) and assigns[0].source.op == "-"
+
+
+def test_arith_memory_operand_folds():
+    """`a = X ; clc ; adc Z ; *Y = a ; ...` ⇒ `*Y = X + Z`."""
+    out = _fold([
+        _load_a_abs("X", 0x10),
+        _clc(),
+        _raw(AdcAbs(source=Abs(name="Z", addr=0x30), src=SRC)),
+        _store_a_abs("Y", 0x20),
+        *_kill_ac(),
+    ])
+    assigns = [s for s in out if isinstance(s, Assign)]
+    assert len(assigns) == 1
+    expr = assigns[0].source
+    assert isinstance(expr, BinExpr) and isinstance(expr.rhs, Abs)
+    assert expr.rhs.addr == 0x30
+
+
+def test_no_arith_fold_when_carry_live_at_return():
+    """Even with A dead, if the carry the add set is never redefined
+    before the routine falls through to `return`, the fold is refused
+    (carry could be a return value)."""
+    out = _fold([
+        _load_a_abs("X", 0x10), _clc(), _adc_imm(8),
+        _store_a_abs("Y", 0x20), _kill_a(),  # kills A but NOT carry
+    ])
+    assert not any(isinstance(s, Assign) for s in out)
+
+
+def test_no_arith_fold_without_carry_setup():
+    """A bare `adc` with no preceding `clc` depends on the incoming
+    carry, so it can't be a pure `+` — left alone. A and carry are
+    both dead afterwards (`*_kill_ac()`), so the missing `clc` is the
+    *only* reason the fold is refused — a regression that dropped the
+    carry-set-up requirement would make this fold and fail the test."""
+    out = _fold([
+        _load_a_abs("X", 0x10), _adc_imm(8), _store_a_abs("Y", 0x20), *_kill_ac(),
+    ])
+    assert not any(isinstance(s, Assign) for s in out)
+
+
+def test_no_arith_fold_when_carry_live():
+    """16-bit add idiom: the low byte's `adc` sets a carry the high
+    byte's `adc` reads. Folding the low add would drop that carry —
+    so the carry-liveness check must block it."""
+    out = _fold([
+        _load_a_abs("lo", 0x10), _clc(), _adc_imm(8), _store_a_abs("lo", 0x10),
+        _load_a_abs("hi", 0x11), _adc_imm(0), _store_a_abs("hi", 0x11),
+        _kill_a(),
+    ])
+    assert not any(isinstance(s, Assign) for s in out)
+
+
+def test_no_arith_fold_multi_store():
+    """`a = X ; clc ; adc #8 ; *Y = a ; *Z = a` — multi-store arithmetic
+    isn't an idempotent write-back (a target could alias the operand),
+    so the fold is refused. A and carry are both dead afterwards
+    (`*_kill_ac()`), so the multi-store restriction is the *only*
+    blocker — re-enabling multi-store arithmetic would fail this test."""
+    out = _fold([
+        _load_a_abs("X", 0x10), _clc(), _adc_imm(8),
+        _store_a_abs("Y", 0x20), _store_a_abs("Z", 0x21), *_kill_ac(),
+    ])
+    assert not any(isinstance(s, Assign) for s in out)
+
+
 # --------------------------------------------------------------- chgshadposn
 
 
@@ -332,6 +455,69 @@ def test_chgshadposn_fold_structure(source_dir):
         isinstance(a.target, Abs) and a.target.name == "PlayCount"
         for a in top_assigns
     )
+
+
+# --------------------------------------------------------------- Cup (arithmetic)
+
+
+def _cup_modules(source_dir: Path):
+    ast = parse_files(
+        [source_dir / "EQ.S", source_dir / "GAMEEQ.S", source_dir / "AUTO.S"],
+        search_paths=[source_dir],
+    )
+    auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
+    ir1 = lift_file(auto, ast.symbols(), ["Cup"]).module
+    ir3 = reloop_module(structure_module(ir1))
+    return ir3, fold_module(ir3)
+
+
+def _getup_stub() -> ModuleIR1:
+    """Cup opens with `a = CharScrn ; jsr getup ; sta CharScrn`. Stub
+    getup to rewrite A (here `a = #0x55`) so the differential test
+    exercises a non-trivial accumulator value flowing through the call."""
+    body = [
+        LoadImm(reg=Reg.A, imm=Imm(value=0x55, text="#$55"), src=SRC),
+        Return(src=SRC),
+    ]
+    return ModuleIR1(name="STUB", file="syn", routines=[Routine(name="getup", body=body)])
+
+
+def test_cup_fold_is_behaviour_preserving(source_dir):
+    """Interpret Cup's relooped IR3 and folded IR3 (with the `CharBlockY
+    += 3` arithmetic fold) from identical RAM — they must end
+    byte-for-byte identical."""
+    ir3, folded = _cup_modules(source_dir)
+    stub = _getup_stub()
+
+    def seed() -> bytearray:
+        ram = bytearray(0x10000)
+        ram[0x004b] = 0x12  # CharScrn
+        ram[0x0045] = 0x40  # CharBlockY (+3 -> 0x43)
+        ram[0x0042] = 0x90  # CharY      (+0xbd -> wraps)
+        return ram
+
+    ram_pre = seed()
+    ir3_run([ir3, stub], "Cup", ram=ram_pre)
+    ram_post = seed()
+    ir3_run([folded, stub], "Cup", ram=ram_post)
+
+    assert ram_pre == ram_post, "arithmetic fold changed observable RAM — unsound"
+    # Sanity: the fold actually computed CharBlockY + 3.
+    assert ram_post[0x0045] == 0x43
+
+
+def test_cup_fold_structure(source_dir):
+    """`CharBlockY = CharBlockY + #3` folds; the `CharScrn` copy (call
+    between load and store) and the `CharY += #0xbd` (A live at the
+    return) stay unfolded — exactly one fold."""
+    _, folded = _cup_modules(source_dir)
+    routine = folded.find("Cup")
+    assert fold_stats(folded) == 1
+    assign = next(s for s in routine.body.stmts if isinstance(s, Assign))
+    assert isinstance(assign.source, BinExpr) and assign.source.op == "+"
+    assert assign.target.name == "CharBlockY"
+    assert assign.source.lhs.name == "CharBlockY"
+    assert isinstance(assign.source.rhs, Imm) and assign.source.rhs.value == 3
 
 
 # --------------------------------------------------------------- whole tree
