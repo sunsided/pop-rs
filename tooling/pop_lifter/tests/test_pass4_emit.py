@@ -276,6 +276,12 @@ def test_compare_sign_test_bmi():
     assert _emit_compare(c) == "(self.a as i8) < 0"
 
 
+def test_compare_unexpected_sign_test_op_raises():
+    # rhs=None must be a sign test ("<0"/">=0"); anything else surfaces.
+    with pytest.raises(ValueError, match="unexpected sign-test Compare op"):
+        _emit_compare(Compare(reg=Reg.A, op="==", rhs=None))
+
+
 # ---------------------------------------------------------------- control-flow lowering
 
 

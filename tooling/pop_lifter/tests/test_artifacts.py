@@ -419,7 +419,8 @@ def test_pass4_chgshadposn_rs_artifact_matches(source_dir):
     """The chgshadposn pass-4 pilot pins control-flow lowering: the
     down-counter `for y in (0..=6).rev()` becomes an inlined
     `self.y = 0x06; loop { … step … if !(signed cond) { break; } }`,
-    and the `jumpseq` tail call lowers to `self.jumpseq();`."""
+    and the `jumpseq` call lowers to `self.jumpseq();` (a regular call
+    here — more statements follow it, so it is not a tail call)."""
     if not IR_PILOT_CHGSHADPOSN_RS.exists():
         raise AssertionError(
             f"missing artifact {IR_PILOT_CHGSHADPOSN_RS}. regenerate with:\n"

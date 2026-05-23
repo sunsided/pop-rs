@@ -128,8 +128,15 @@ def _emit_compare(c: Compare) -> str:
     * `rhs=Abs` / `rhs=IndexedAbs`: compare against a memory byte."""
     reg = f"self.{c.reg}"
     if c.rhs is None:
-        # op is ">=0" or "<0" — add spacing for readability.
-        op_str = ">= 0" if c.op == ">=0" else "< 0"
+        # Sign test (N-flag): op is ">=0" (bpl) or "<0" (bmi). Validate
+        # explicitly so an unexpected op surfaces rather than silently
+        # emitting the wrong predicate.
+        if c.op == ">=0":
+            op_str = ">= 0"
+        elif c.op == "<0":
+            op_str = "< 0"
+        else:
+            raise ValueError(f"unexpected sign-test Compare op: {c.op!r}")
         return f"({reg} as i8) {op_str}"
     rhs = _emit_value(c.rhs)
     return f"{reg} {c.op} {rhs}"
