@@ -696,6 +696,95 @@ def test_demand_skelprog_folds_across_tailcall(source_dir):
     assert isinstance(body[1], TailCallStmt) and body[1].target == "GuardProg"
 
 
+# ----------------------------------------- interprocedural carry demand
+
+
+def _target_kills_carry(name="target") -> RoutineIR3:
+    """A target whose first act is `clc` — kills carry before reading it."""
+    return _routine(name, [_clc(), _ldimm(Reg.A, 0), ReturnStmt(src=SRC)])
+
+
+def _target_reads_carry(name="target") -> RoutineIR3:
+    """A target whose first act is `adc` — reads the incoming carry."""
+    return _routine(name, [_adc_imm(0), _sta(Reg.A, "OUT", 0x400), ReturnStmt(src=SRC)])
+
+
+def _target_preserves_carry(name="target") -> RoutineIR3:
+    """A target that never touches carry — it passes through on return."""
+    return _routine(name, [_ldimm(Reg.X, 1), ReturnStmt(src=SRC)])
+
+
+def _arith_caller_jsr(name="caller") -> RoutineIR3:
+    """`lda X ; clc ; adc #8 ; sta Y ; jsr target` — fold requires carry
+    dead at the `jsr`. A is killed by the callee's `lda #0`."""
+    return _routine(name, [
+        _load_a_abs("X", 0x10), _clc(), _adc_imm(8),
+        _store_a_abs("Y", 0x20),
+        CallStmt(target="target", src=SRC),
+    ])
+
+
+def _arith_caller_jmp(name="caller") -> RoutineIR3:
+    """`lda X ; clc ; adc #8 ; sta Y ; jmp target`."""
+    return _routine(name, [
+        _load_a_abs("X", 0x10), _clc(), _adc_imm(8),
+        _store_a_abs("Y", 0x20),
+        TailCallStmt(target="target", src=SRC),
+    ])
+
+
+def test_demand_carry_not_read_by_call_folds():
+    """`clc ; adc #8 ; sta Y ; jsr target` folds to `Y = X + 8` when
+    the callee kills carry before reading it (starts with `clc`)."""
+    mod = ModuleIR3(name="M", file="syn",
+                    routines=[_arith_caller_jsr(), _target_kills_carry()])
+    folded = fold_module(mod)
+    assigns = [s for s in folded.find("caller").body.stmts if isinstance(s, Assign)]
+    assert len(assigns) == 1
+    assert isinstance(assigns[0].source, BinExpr) and assigns[0].source.op == "+"
+
+
+def test_demand_carry_read_by_call_blocks_fold():
+    """`clc ; adc #8 ; sta Y ; jsr target` must NOT fold when the callee
+    reads carry first (starts with `adc`)."""
+    mod = ModuleIR3(name="M", file="syn",
+                    routines=[_arith_caller_jsr(), _target_reads_carry()])
+    folded = fold_module(mod)
+    assert not any(isinstance(s, Assign) for s in folded.find("caller").body.stmts)
+
+
+def test_demand_carry_not_read_by_tailcall_folds():
+    """`clc ; adc #8 ; sta Y ; jmp target` folds when target kills carry."""
+    target = _routine("target", [_clc(), _ldimm(Reg.A, 0), _ldimm(Reg.A, 1), ReturnStmt(src=SRC)])
+    mod = ModuleIR3(name="M", file="syn",
+                    routines=[_arith_caller_jmp(), target])
+    folded = fold_module(mod)
+    assigns = [s for s in folded.find("caller").body.stmts if isinstance(s, Assign)]
+    assert len(assigns) == 1
+    assert isinstance(assigns[0].source, BinExpr) and assigns[0].source.op == "+"
+
+
+def test_demand_carry_preserved_by_tailcall_blocks_fold():
+    """Target preserves carry (never touches it) and returns — carry
+    escapes to the outer caller, so the fold is blocked."""
+    mod = ModuleIR3(name="M", file="syn",
+                    routines=[_arith_caller_jmp(), _target_preserves_carry()])
+    folded = fold_module(mod)
+    assert not any(isinstance(s, Assign) for s in folded.find("caller").body.stmts)
+
+
+def test_demand_carry_unknown_target_blocks_fold():
+    """A call to an out-of-module target conservatively demands carry."""
+    caller = _routine("caller", [
+        _load_a_abs("X", 0x10), _clc(), _adc_imm(8),
+        _store_a_abs("Y", 0x20),
+        CallStmt(target="external", src=SRC),
+    ])
+    mod = ModuleIR3(name="M", file="syn", routines=[caller])
+    folded = fold_module(mod)
+    assert not any(isinstance(s, Assign) for s in folded.find("caller").body.stmts)
+
+
 # --------------------------------------------------------------- whole tree
 
 
