@@ -209,9 +209,11 @@ def _assign_read(value, trace: Trace, src) -> int:
             if value.op == "rotl":
                 new_c = (val >> 7) & 1
                 val = ((val << 1) | c) & 0xff
-            else:  # "rotr"
+            elif value.op == "rotr":
                 new_c = val & 1
                 val = ((val >> 1) | (c << 7)) & 0xff
+            else:
+                raise InterpError(f"unknown RotateExpr op: {value.op!r}")
             c = new_c
         # Carry-out not written back — dead by the fold's soundness condition.
         return val

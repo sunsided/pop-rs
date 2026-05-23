@@ -500,8 +500,7 @@ def _fmt_stmt(stmt: Stmt, indent: int) -> list[str]:
             if isinstance(v, BinExpr):
                 return f"{_loc(v.lhs)} {v.op} {_loc(v.rhs)}"
             if isinstance(v, RotateExpr):
-                tag = "rotl" if v.op == "rotl" else "rotr"
-                return f"{tag}({_loc(v.operand)}, {v.count})"
+                return f"{v.op}({_loc(v.operand)}, {v.count})"
             return repr(v)
 
         return [f"{pad}{_loc(stmt.target)} = {_loc(stmt.source)}    ; {stmt.src.short()}"]
