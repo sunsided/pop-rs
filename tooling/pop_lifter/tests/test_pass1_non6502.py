@@ -79,14 +79,15 @@ def test_nop_lifts_and_is_a_noop():
 
 
 def test_sei_cli_set_clear_interrupt_flag():
-    assert _lift_instr(_line("sei"), {}, set()) == FlagOp(
-        flag="I", value=1, src=_lift_instr(_line("sei"), {}, set()).src
-    )
-    src = SourceRef(file="syn", line=0, raw="")
+    sei = _lift_instr(_line("sei"), {}, set())
+    cli = _lift_instr(_line("cli"), {}, set())
+    assert sei == FlagOp(flag="I", value=1, src=sei.src)
+    assert cli == FlagOp(flag="I", value=0, src=cli.src)
+    # sei sets I, cli clears it.
     t = Trace(ram=bytearray(0x10000), a=0, x=0, y=0)
-    exec_atom(FlagOp(flag="I", value=1, src=src), t, t.ram)
+    exec_atom(sei, t, t.ram)
     assert t.i == 1
-    exec_atom(FlagOp(flag="I", value=0, src=src), t, t.ram)
+    exec_atom(cli, t, t.ram)
     assert t.i == 0
 
 
@@ -95,10 +96,12 @@ def test_sed_cld_set_clear_decimal_flag():
     cld = _lift_instr(_line("cld"), {}, set())
     assert isinstance(sed, FlagOp) and sed.flag == "D" and sed.value == 1
     assert isinstance(cld, FlagOp) and cld.flag == "D" and cld.value == 0
-    src = SourceRef(file="syn", line=0, raw="")
+    # sed sets D, cld clears it back.
     t = Trace(ram=bytearray(0x10000), a=0, x=0, y=0)
     exec_atom(sed, t, t.ram)
     assert t.d == 1
+    exec_atom(cld, t, t.ram)
+    assert t.d == 0
 
 
 def test_flagop_does_not_touch_zn_c():
