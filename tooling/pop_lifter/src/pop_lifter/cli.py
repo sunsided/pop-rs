@@ -537,10 +537,11 @@ def _cmd_match(args: argparse.Namespace) -> int:
 def _cmd_loops(args: argparse.Namespace) -> int:
     """Run pass 1 + 2 + reloop + fold, then recover loops: a bottom-test
     `loop { body ; if exit { break } }` becomes `do { body } while
-    !exit`, and a down-counter (`y = #N ; do { … ; y -= 1 } while y >=
-    0`) is promoted to `for y in (0..=N).rev() { … }`. Writes the IR3
-    dump to `--out` (or stdout); the summary reports how many `for` and
-    `do-while` loops were recovered."""
+    !exit`, and a counted loop is promoted to a `for` (down-counter
+    `y = #N ; do { … ; y -= 1 } while y >= 0` ⇒ `for y in (0..=N).rev()`;
+    up-counter `x = #i ; do { … ; x += 1 } while x != N` ⇒ `for x in
+    i..N`). Writes the IR3 dump to `--out` (or stdout); the summary
+    reports how many `for` and `do-while` loops were recovered."""
     src_dir = _resolve_source_dir(args)
     if src_dir is None:
         return 2
@@ -1001,7 +1002,7 @@ def main(argv: list[str] | None = None) -> int:
         "loops",
         help="Pass 3: run pass 1 + 2 + reloop + fold, then recover "
              "bottom-tested loops as `do { … } while` shapes and "
-             "down-counters as `for` loops.",
+             "down/up-counters as `for` loops.",
     )
     p_loops.add_argument(
         "file", nargs="+",
