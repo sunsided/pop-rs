@@ -24,9 +24,13 @@ from pop_lifter.ir1 import (
     Abs,
     AdcImm,
     Asl,
+    Bit,
     Bitwise,
     Clc,
+    CmpAbs,
     CmpImm,
+    CmpIndexed,
+    CmpIndirect,
     DecTarget,
     Imm,
     IncTarget,
@@ -37,6 +41,7 @@ from pop_lifter.ir1 import (
     LoadIndexed,
     LoadIndirect,
     LocalRef,
+    Pha,
     Reg,
     Rol,
     Ror,
@@ -208,11 +213,10 @@ def test_raw_load_abs_is_lowered():
 
 
 def test_raw_deferred_atom_is_comment():
-    # `cmp #imm` only sets Z/N/C flags with no register effect; that
-    # flag model isn't lowered yet, so it stays as a `// raw:` comment.
-    out = _emit_one(RawStmt(item=CmpImm(reg=Reg.A, imm=_imm(0), src=SRC)))
+    # `pha` needs a stack model that isn't lowered yet, so it stays as a
+    # `// raw:` comment rather than emitting wrong code.
+    out = _emit_one(RawStmt(item=Pha(src=SRC)))
     assert out.startswith("// raw: ")
-    assert "cmp" in out
 
 
 def test_call_stmt_lowered():
@@ -272,12 +276,13 @@ def test_lower_stats_counts_top_level():
         Assign(target=_abs("Y", 0x20), source=_imm(1), src=SRC),  # lowered
         RawStmt(item=StoreAbs(reg=Reg.A, target=_abs("Z", 0x30), src=SRC)),  # lowered (data-movement)
         RawStmt(item=Clc(src=SRC)),  # lowered (carry op)
-        RawStmt(item=CmpImm(reg=Reg.A, imm=_imm(0), src=SRC)),  # deferred (Z/N-only)
+        RawStmt(item=CmpImm(reg=Reg.A, imm=_imm(0), src=SRC)),  # lowered (cmp flags)
+        RawStmt(item=Pha(src=SRC)),  # deferred (stack)
         CallStmt(target="sub", src=SRC),  # lowered
         ReturnStmt(src=SRC),  # lowered
     ]
     lowered, deferred = lower_stats(_module([_routine(stmts)]))
-    assert (lowered, deferred) == (5, 1)
+    assert (lowered, deferred) == (6, 1)
 
 
 # ---------------------------------------------------------------- compare expressions
@@ -554,6 +559,55 @@ def test_indirect_ptr_with_offset_folds_into_high_byte():
     out = emit_module(_module([_routine([load, ReturnStmt(src=SRC)], name="r")]))
     assert "self.a = self.ram[(self.ram[sym::ztemp + 1] as usize " in out
     assert "(self.ram[sym::ztemp + 2] as usize) << 8) + self.y as usize];" in out
+
+
+# ---------------------------------------------------------------- cmp / bit flag lowering
+
+
+def test_raw_cmp_imm():
+    lines = _emit_stmt(RawStmt(item=CmpImm(reg=Reg.A, imm=_imm(0x05), src=SRC)), 0)
+    assert lines == [
+        "let _o: u8 = 0x05;",
+        "self.c = (self.a >= _o) as u8;",
+        "self.z = (self.a == _o) as u8;",
+        "self.n = self.a.wrapping_sub(_o) >> 7;",
+    ]
+
+
+def test_raw_cmp_uses_compared_register():
+    # cpx/cpy compare X/Y, not A.
+    lines = _emit_stmt(RawStmt(item=CmpImm(reg=Reg.X, imm=_imm(0x01), src=SRC)), 0)
+    assert lines[1] == "self.c = (self.x >= _o) as u8;"
+    assert lines[3] == "self.n = self.x.wrapping_sub(_o) >> 7;"
+
+
+def test_raw_cmp_abs_and_indexed():
+    abs_lines = _emit_stmt(RawStmt(item=CmpAbs(reg=Reg.A, source=_abs("M", 0x40), src=SRC)), 0)
+    assert abs_lines[0] == "let _o: u8 = self.ram[0x0040];"
+    idx = CmpIndexed(reg=Reg.A, base=_abs("tbl", 0x0200), index=Reg.X, src=SRC)
+    idx_lines = _emit_stmt(RawStmt(item=idx), 0)
+    assert idx_lines[0] == "let _o: u8 = self.ram[0x0200 + self.x as usize];"
+
+
+def test_raw_cmp_indirect():
+    item = CmpIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
+    lines = _emit_stmt(RawStmt(item=item), 0)
+    assert lines[0] == (
+        "let _o: u8 = self.ram[(self.ram[0x0020] as usize "
+        "| (self.ram[0x0021] as usize) << 8) + self.y as usize];"
+    )
+    assert lines[1] == "self.c = (self.a >= _o) as u8;"
+
+
+def test_raw_bit_imm_and_abs():
+    imm_lines = _emit_stmt(RawStmt(item=Bit(source=_imm(0x80), src=SRC)), 0)
+    assert imm_lines == [
+        "let _o: u8 = 0x80;",
+        "self.z = ((self.a & _o) == 0) as u8;",
+        "self.n = _o >> 7;",
+    ]
+    abs_lines = _emit_stmt(RawStmt(item=Bit(source=_abs("sw", 0xC010), src=SRC)), 0)
+    assert abs_lines[0] == "let _o: u8 = self.ram[0xc010];"
 
 
 # ---------------------------------------------------------------- symbolic address constants
