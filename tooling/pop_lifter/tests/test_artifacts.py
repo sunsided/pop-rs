@@ -377,8 +377,10 @@ def test_pass4_cup_rs_artifact_matches(source_dir):
     `CharBlockY += #3` lowers to a `wrapping_add` assignment and the
     `CharID = #1` immediate lowers to a direct store. The unfolded
     data-movement atoms (`lda CharScrn`, `sta CharScrn`, `ldx #3`) now
-    lower to direct register/memory moves; only the carry-bearing
-    `clc ; adc #$bd` pair stays as `// raw:` comments."""
+    lower to direct register/memory moves, and every RAM address keeps
+    its source symbol via a `sym::` constant (`self.ram[sym::CharScrn]`).
+    Only the carry-bearing `clc ; adc #$bd` pair stays a `// raw:`
+    comment."""
     if not IR_PILOT_CUP_RS.exists():
         raise AssertionError(
             f"missing artifact {IR_PILOT_CUP_RS}. regenerate with:\n"
@@ -424,8 +426,9 @@ def test_pass4_chgshadposn_rs_artifact_matches(source_dir):
     and the `jumpseq` call lowers to `self.jumpseq();` (a regular call
     here — more statements follow it, so it is not a tail call). The
     surrounding `sta ztemp` / `ldy #7` / `lda #0` / `sta PlayCount`
-    data-movement atoms now lower to direct moves; only the indirect
-    `lda (ztemp),y` stays as a `// raw:` comment."""
+    data-movement atoms now lower to direct moves, and the `ztemp+1`
+    high-byte store keeps its symbol as `self.ram[sym::ztemp + 1]`.
+    Only the indirect `lda (ztemp),y` stays as a `// raw:` comment."""
     if not IR_PILOT_CHGSHADPOSN_RS.exists():
         raise AssertionError(
             f"missing artifact {IR_PILOT_CHGSHADPOSN_RS}. regenerate with:\n"

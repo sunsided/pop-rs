@@ -7,20 +7,28 @@
 // `LabelStmt` are deferred to later slices; they appear as
 // `// TODO(pass4): …` or `// raw: …` comments.
 // The `Cpu` receiver and flat `self.ram` model are provisional,
-// pending the state/trait design slice.
+// pending the state/trait design slice. RAM addresses keep their
+// source symbol names via the `sym` constants below.
 //
 // source: 01 POP Source/Source/AUTO.S
 
+#[allow(non_upper_case_globals)]
+mod sym {
+    pub const CharBlockY: usize = 0x0045;
+    pub const CharScrn: usize = 0x004b;
+    pub const CharY: usize = 0x0042;
+}
+
 impl Cpu {
     fn Cup(&mut self) {
-        self.a = self.ram[0x004b];
+        self.a = self.ram[sym::CharScrn];
         self.getup();
-        self.ram[0x004b] = self.a;
-        self.ram[0x0045] = (self.ram[0x0045]).wrapping_add(0x03);
-        self.a = self.ram[0x0042];
+        self.ram[sym::CharScrn] = self.a;
+        self.ram[sym::CharBlockY] = (self.ram[sym::CharBlockY]).wrapping_add(0x03);
+        self.a = self.ram[sym::CharY];
         // raw: c = 0                            ; AUTO.S:1715
         // raw: a = a + #0xbd + c              ; AUTO.S:1716
-        self.ram[0x0042] = self.a;
+        self.ram[sym::CharY] = self.a;
         self.x = 0x03;
         return;
     }

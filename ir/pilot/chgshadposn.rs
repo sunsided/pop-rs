@@ -7,17 +7,26 @@
 // `LabelStmt` are deferred to later slices; they appear as
 // `// TODO(pass4): …` or `// raw: …` comments.
 // The `Cpu` receiver and flat `self.ram` model are provisional,
-// pending the state/trait design slice.
+// pending the state/trait design slice. RAM addresses keep their
+// source symbol names via the `sym` constants below.
 //
 // source: 01 POP Source/Source/AUTO.S
 
+#[allow(non_upper_case_globals)]
+mod sym {
+    pub const Char: usize = 0x0040;
+    pub const CharID: usize = 0x004d;
+    pub const PlayCount: usize = 0x00a0;
+    pub const ztemp: usize = 0x00f0;
+}
+
 impl Cpu {
     fn chgshadposn(&mut self) {
-        self.ram[0x00f0] = self.a;
-        self.ram[0x00f1] = self.x;
+        self.ram[sym::ztemp] = self.a;
+        self.ram[sym::ztemp + 1] = self.x;
         self.y = 0x06;
         loop {
-            self.ram[0x0040 + self.y as usize] = todo!("indirect (ztemp),y read");
+            self.ram[sym::Char + self.y as usize] = todo!("indirect (ztemp),y read");
             self.y = self.y.wrapping_sub(0x01);
             if !((self.y as i8) >= 0) {
                 break;
@@ -26,9 +35,9 @@ impl Cpu {
         self.y = 0x07;
         // raw: a = *(ztemp@0x00f0)[y]   ; AUTO.S:1057
         self.jumpseq();
-        self.ram[0x004d] = 0x01;
+        self.ram[sym::CharID] = 0x01;
         self.a = 0x00;
-        self.ram[0x00a0] = self.a;
+        self.ram[sym::PlayCount] = self.a;
         return;
     }
 }

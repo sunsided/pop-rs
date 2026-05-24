@@ -493,3 +493,48 @@ def test_raw_inc_local_ref_deferred():
 def test_raw_load_indirect_deferred():
     item = LoadIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
     assert _raw(item).startswith("// raw: ")
+
+
+# ---------------------------------------------------------------- symbolic address constants
+
+
+def test_module_emits_sym_block_and_references():
+    a = Assign(target=_abs("PlayCount", 0xa0), source=_imm(0), src=SRC)
+    out = emit_module(_module([_routine([a, ReturnStmt(src=SRC)], name="r")]))
+    assert "#[allow(non_upper_case_globals)]" in out
+    assert "mod sym {" in out
+    assert "    pub const PlayCount: usize = 0x00a0;" in out
+    assert "self.ram[sym::PlayCount] = 0x00;" in out
+
+
+def test_module_sym_offset_name():
+    # `ztemp+1` resolves to the base `ztemp` const plus the offset, with
+    # the base address recovered as 0xf1 - 1 = 0xf0.
+    store = RawStmt(item=StoreAbs(reg=Reg.X, target=_abs("ztemp+1", 0xf1), src=SRC))
+    out = emit_module(_module([_routine([store, ReturnStmt(src=SRC)], name="r")]))
+    assert "    pub const ztemp: usize = 0x00f0;" in out
+    assert "self.ram[sym::ztemp + 1] = self.x;" in out
+
+
+def test_module_sym_conflict_falls_back_to_literal():
+    # One name resolving to two addresses can't be a single const, so
+    # both occurrences stay literal rather than emit a wrong constant.
+    s1 = Assign(target=_abs("dup", 0x10), source=_imm(0), src=SRC)
+    s2 = Assign(target=_abs("dup", 0x20), source=_imm(0), src=SRC)
+    out = emit_module(_module([_routine([s1, s2, ReturnStmt(src=SRC)], name="r")]))
+    assert "mod sym" not in out
+    assert "self.ram[0x0010] = 0x00;" in out
+    assert "self.ram[0x0020] = 0x00;" in out
+
+
+def test_module_sym_unclean_name_falls_back_to_literal():
+    # A name that isn't a valid Rust identifier can't become a const.
+    s = Assign(target=_abs("we.ird", 0x30), source=_imm(0), src=SRC)
+    out = emit_module(_module([_routine([s, ReturnStmt(src=SRC)], name="r")]))
+    assert "mod sym" not in out
+    assert "self.ram[0x0030] = 0x00;" in out
+
+
+def test_module_without_named_addresses_has_no_sym_block():
+    out = emit_module(_module([_routine([ReturnStmt(src=SRC)], name="r")]))
+    assert "mod sym" not in out
