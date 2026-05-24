@@ -22,13 +22,29 @@ import pytest
 
 from pop_lifter.ir1 import (
     Abs,
+    AdcImm,
+    Asl,
+    Bitwise,
+    Clc,
+    CmpImm,
+    DecTarget,
     Imm,
+    IncTarget,
     IndexedAbs,
     IndirectY,
     LoadAbs,
+    LoadImm,
+    LoadIndexed,
+    LoadIndirect,
+    LocalRef,
     Reg,
+    Rol,
+    Ror,
+    Sec,
     SourceRef,
     StoreAbs,
+    StoreIndexed,
+    Transfer,
 )
 from pop_lifter.ir1 import Compare
 from pop_lifter.ir3 import (
@@ -59,6 +75,7 @@ from pop_lifter.pass4_emit_rust import (
     _emit_stmt,
     _emit_value,
     emit_module,
+    emit_modules,
     emit_routine,
     lower_stats,
 )
@@ -90,8 +107,8 @@ def _routine(stmts: list, name: str = "r", aliases=None) -> RoutineIR3:
     )
 
 
-def _module(routines: list) -> ModuleIR3:
-    return ModuleIR3(name="m", file="syn/AUTO.S", routines=routines)
+def _module(routines: list, file: str = "syn/AUTO.S") -> ModuleIR3:
+    return ModuleIR3(name="m", file=file, routines=routines)
 
 
 # ---------------------------------------------------------------- value lowering
@@ -177,11 +194,17 @@ def test_return_stmt():
     assert _emit_one(ReturnStmt(src=SRC)) == "return;"
 
 
-def test_raw_stmt_is_comment():
+def test_raw_load_abs_is_lowered():
     raw = RawStmt(item=LoadAbs(reg=Reg.A, source=_abs("X", 0x10), src=SRC))
-    out = _emit_one(raw)
+    assert _emit_one(raw) == "self.a = self.ram[0x0010];"
+
+
+def test_raw_deferred_atom_is_comment():
+    # `cmp #imm` only sets Z/N/C flags with no register effect; that
+    # flag model isn't lowered yet, so it stays as a `// raw:` comment.
+    out = _emit_one(RawStmt(item=CmpImm(reg=Reg.A, imm=_imm(0), src=SRC)))
     assert out.startswith("// raw: ")
-    assert "X@0x0010" in out
+    assert "cmp" in out
 
 
 def test_call_stmt_lowered():
@@ -239,12 +262,14 @@ def test_module_separates_routines_with_blank_line():
 def test_lower_stats_counts_top_level():
     stmts = [
         Assign(target=_abs("Y", 0x20), source=_imm(1), src=SRC),  # lowered
-        RawStmt(item=StoreAbs(reg=Reg.A, target=_abs("Z", 0x30), src=SRC)),  # deferred
-        CallStmt(target="sub", src=SRC),  # lowered (CallStmt is now real code)
+        RawStmt(item=StoreAbs(reg=Reg.A, target=_abs("Z", 0x30), src=SRC)),  # lowered (data-movement)
+        RawStmt(item=Clc(src=SRC)),  # lowered (carry op)
+        RawStmt(item=CmpImm(reg=Reg.A, imm=_imm(0), src=SRC)),  # deferred (Z/N-only)
+        CallStmt(target="sub", src=SRC),  # lowered
         ReturnStmt(src=SRC),  # lowered
     ]
     lowered, deferred = lower_stats(_module([_routine(stmts)]))
-    assert (lowered, deferred) == (3, 1)
+    assert (lowered, deferred) == (5, 1)
 
 
 # ---------------------------------------------------------------- compare expressions
@@ -406,3 +431,192 @@ def test_save_restore_temp():
     assert _emit_one(SaveTemp(slot=0, src=SRC)) == "let tmp0 = self.a;"
     assert _emit_one(RestoreTemp(slot=0, src=SRC)) == "self.a = tmp0;"
     assert _emit_one(SaveTemp(slot=3, src=SRC)) == "let tmp3 = self.a;"
+
+
+# ---------------------------------------------------------------- raw atom lowering
+
+
+def _raw(item) -> str:
+    return _emit_one(RawStmt(item=item))
+
+
+def test_raw_load_imm():
+    assert _raw(LoadImm(reg=Reg.X, imm=_imm(0x12), src=SRC)) == "self.x = 0x12;"
+
+
+def test_raw_load_imm_opvar_deferred():
+    # A self-modifying-code operand variable can't be lowered to a static
+    # byte, so the whole load stays a `// raw:` comment.
+    smc = Imm(value=0, text="#smXCO", opvar="smXCO")
+    out = _raw(LoadImm(reg=Reg.A, imm=smc, src=SRC))
+    assert out.startswith("// raw: ")
+
+
+def test_raw_load_indexed():
+    item = LoadIndexed(reg=Reg.A, base=_abs("tbl", 0x0200), index=Reg.Y, src=SRC)
+    assert _raw(item) == "self.a = self.ram[0x0200 + self.y as usize];"
+
+
+def test_raw_store_abs():
+    assert _raw(StoreAbs(reg=Reg.Y, target=_abs("Z", 0x30), src=SRC)) == "self.ram[0x0030] = self.y;"
+
+
+def test_raw_store_indexed():
+    item = StoreIndexed(reg=Reg.A, base=_abs("tbl", 0x0200), index=Reg.X, src=SRC)
+    assert _raw(item) == "self.ram[0x0200 + self.x as usize] = self.a;"
+
+
+def test_raw_transfer():
+    assert _raw(Transfer(src_reg=Reg.A, dst_reg=Reg.X, src=SRC)) == "self.x = self.a;"
+
+
+def test_raw_bitwise_and_or_eor():
+    assert _raw(Bitwise(op="and", source=_imm(0x0f), src=SRC)) == "self.a &= 0x0f;"
+    assert _raw(Bitwise(op="or", source=_abs("M", 0x40), src=SRC)) == "self.a |= self.ram[0x0040];"
+    eor_indexed = Bitwise(op="eor", source=IndexedAbs(base=_abs("t", 0x0200), index=Reg.X), src=SRC)
+    assert _raw(eor_indexed) == "self.a ^= self.ram[0x0200 + self.x as usize];"
+
+
+def test_raw_bitwise_indirect_deferred():
+    item = Bitwise(op="and", source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
+    assert _raw(item).startswith("// raw: ")
+
+
+def test_raw_inc_dec_register():
+    assert _raw(IncTarget(target=Reg.X, src=SRC)) == "self.x = self.x.wrapping_add(1);"
+    assert _raw(DecTarget(target=Reg.Y, src=SRC)) == "self.y = self.y.wrapping_sub(1);"
+
+
+def test_raw_inc_dec_memory():
+    assert _raw(IncTarget(target=_abs("M", 0x40), src=SRC)) == "self.ram[0x0040] = self.ram[0x0040].wrapping_add(1);"
+    assert _raw(DecTarget(target=_abs("M", 0x40), src=SRC)) == "self.ram[0x0040] = self.ram[0x0040].wrapping_sub(1);"
+
+
+def test_raw_inc_local_ref_deferred():
+    # `inc :smod+2` bumps a self-modifying-code operand byte — deferred.
+    item = IncTarget(target=LocalRef(label=":smod", offset=2), src=SRC)
+    assert _raw(item).startswith("// raw: ")
+
+
+def test_raw_load_indirect_deferred():
+    item = LoadIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
+    assert _raw(item).startswith("// raw: ")
+
+
+# ---------------------------------------------------------------- symbolic address constants
+
+
+def test_module_emits_sym_block_and_references():
+    a = Assign(target=_abs("PlayCount", 0xa0), source=_imm(0), src=SRC)
+    out = emit_module(_module([_routine([a, ReturnStmt(src=SRC)], name="r")]))
+    assert "#[allow(non_upper_case_globals)]" in out
+    assert "mod sym {" in out
+    assert "    pub const PlayCount: usize = 0x00a0;" in out
+    assert "self.ram[sym::PlayCount] = 0x00;" in out
+
+
+def test_module_sym_offset_name():
+    # `ztemp+1` resolves to the base `ztemp` const plus the offset, with
+    # the base address recovered as 0xf1 - 1 = 0xf0.
+    store = RawStmt(item=StoreAbs(reg=Reg.X, target=_abs("ztemp+1", 0xf1), src=SRC))
+    out = emit_module(_module([_routine([store, ReturnStmt(src=SRC)], name="r")]))
+    assert "    pub const ztemp: usize = 0x00f0;" in out
+    assert "self.ram[sym::ztemp + 1] = self.x;" in out
+
+
+def test_module_sym_conflict_falls_back_to_literal():
+    # One name resolving to two addresses can't be a single const, so
+    # both occurrences stay literal rather than emit a wrong constant.
+    s1 = Assign(target=_abs("dup", 0x10), source=_imm(0), src=SRC)
+    s2 = Assign(target=_abs("dup", 0x20), source=_imm(0), src=SRC)
+    out = emit_module(_module([_routine([s1, s2, ReturnStmt(src=SRC)], name="r")]))
+    assert "mod sym" not in out
+    assert "self.ram[0x0010] = 0x00;" in out
+    assert "self.ram[0x0020] = 0x00;" in out
+
+
+def test_module_sym_unclean_name_falls_back_to_literal():
+    # A name that isn't a valid Rust identifier can't become a const.
+    s = Assign(target=_abs("we.ird", 0x30), source=_imm(0), src=SRC)
+    out = emit_module(_module([_routine([s, ReturnStmt(src=SRC)], name="r")]))
+    assert "mod sym" not in out
+    assert "self.ram[0x0030] = 0x00;" in out
+
+
+def test_module_without_named_addresses_has_no_sym_block():
+    out = emit_module(_module([_routine([ReturnStmt(src=SRC)], name="r")]))
+    assert "mod sym" not in out
+
+
+# ---------------------------------------------------------------- carry-arithmetic atom lowering
+
+
+def test_raw_clc_and_sec():
+    assert _raw(Clc(src=SRC)) == "self.c = 0;"
+    assert _raw(Sec(src=SRC)) == "self.c = 1;"
+
+
+def test_raw_adc_imm():
+    lines = _emit_stmt(RawStmt(item=AdcImm(imm=_imm(0xbd), src=SRC)), 0)
+    assert lines[0] == "let _r = (self.a as u16) + (0xbd) as u16 + (self.c as u16);"
+    assert lines[1] == "self.a = _r as u8;"
+    assert lines[2] == "self.c = (_r >> 8) as u8;"
+
+
+def test_raw_asl_and_lsr():
+    asl_lines = _emit_stmt(RawStmt(item=Asl(src=SRC)), 0)
+    assert asl_lines[0] == "self.c = self.a >> 7;"
+    assert asl_lines[1] == "self.a = self.a.wrapping_shl(1);"
+    lsr_lines = _emit_stmt(RawStmt(item=Ror(src=SRC)), 0)
+    assert lsr_lines[0] == "let _c = self.a & 1;"
+    assert lsr_lines[2] == "self.c = _c;"
+
+
+def test_raw_rol_and_ror():
+    rol = _emit_stmt(RawStmt(item=Rol(src=SRC)), 0)
+    assert rol[0] == "let _c = self.a >> 7;"
+    assert rol[1] == "self.a = self.a.wrapping_shl(1) | self.c;"
+    assert rol[2] == "self.c = _c;"
+    ror = _emit_stmt(RawStmt(item=Ror(src=SRC)), 0)
+    assert ror[1] == "self.a = self.a.wrapping_shr(1) | (self.c << 7);"
+
+
+# ---------------------------------------------------------------- multi-module emit
+
+
+def test_emit_modules_single_matches_emit_module():
+    # The single-module path must stay byte-identical to the standalone
+    # form so the pilots don't churn.
+    store = Assign(target=_abs("PlayCount", 0xA0), source=_imm(0), src=SRC)
+    m = _module([_routine([store, ReturnStmt(src=SRC)], name="r")])
+    assert emit_modules([m]) == emit_module(m)
+
+
+def test_emit_modules_shares_one_sym_block():
+    # Two modules with named addresses must not each emit a `mod sym`:
+    # a Rust file may declare a module name only once.
+    s1 = Assign(target=_abs("PlayCount", 0xA0), source=_imm(0), src=SRC)
+    s2 = Assign(target=_abs("CharID", 0x4D), source=_imm(1), src=SRC)
+    m1 = _module([_routine([s1, ReturnStmt(src=SRC)], name="a")], file="syn/A.S")
+    m2 = _module([_routine([s2, ReturnStmt(src=SRC)], name="b")], file="syn/B.S")
+    out = emit_modules([m1, m2])
+    assert out.count("mod sym {") == 1
+    # Both files contribute their own impl block and source line.
+    assert out.count("impl Cpu {") == 2
+    assert "// source: A.S" in out and "// source: B.S" in out
+    # The merged block carries symbols from both modules.
+    assert "pub const PlayCount: usize = 0x00a0;" in out
+    assert "pub const CharID: usize = 0x004d;" in out
+
+
+def test_emit_modules_conflicting_symbol_falls_back_to_literal():
+    # The same base name resolving to two addresses across files is a
+    # conflict: it must drop out of `mod sym` and stay literal everywhere.
+    s1 = Assign(target=_abs("dup", 0x10), source=_imm(0), src=SRC)
+    s2 = Assign(target=_abs("dup", 0x20), source=_imm(0), src=SRC)
+    m1 = _module([_routine([s1, ReturnStmt(src=SRC)], name="a")], file="syn/A.S")
+    m2 = _module([_routine([s2, ReturnStmt(src=SRC)], name="b")], file="syn/B.S")
+    out = emit_modules([m1, m2])
+    assert "sym::dup" not in out
+    assert "self.ram[0x0010]" in out
+    assert "self.ram[0x0020]" in out

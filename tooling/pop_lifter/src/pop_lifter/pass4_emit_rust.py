@@ -1,23 +1,33 @@
 """Pass 4: emit Rust source from IR3.
 
-First slice (skeleton) lowered module / routine scaffolding and leaf
-expressions (folded `Assign`s, `return`). This second slice lowers
-*all structured control flow*:
+Earlier slices lowered module / routine scaffolding, leaf expressions
+(folded `Assign`s, `return`), *all structured control flow*, and
+*data-movement `RawStmt` atoms* (loads, stores, transfers, bitwise,
+inc/dec) — the carry-/flag-free instructions that map directly onto
+register/memory moves.
 
-* `IfStmt` → `if <cond> { … } [else { … }]`
-* `LoopStmt` → `loop { … }`
-* `DoWhileStmt` → `loop { body; if !(<cond>) { break; } }`
-* `ForStmt` → init + `loop { body; step; if !(<cond>) { break; } }`
-* `RepeatStmt` → init + `for _ in 0..<count>usize { body; step; }`
-* `BreakStmt` / `ContinueStmt` → `break;` / `continue;`
-* `MatchStmt` → `match self.<reg> { val => { body }, … _ => {} }`
-* `CallStmt` / `TailCallStmt` → `self.<target>();` / `self.<target>(); return;`
-* `SaveTemp` / `RestoreTemp` → `let tmp{n} = self.a;` / `self.a = tmp{n};`
+This slice adds the *carry-arithmetic `RawStmt` atoms* — instructions
+that read or write the 6502 carry flag (`self.c: u8`, provisional):
 
-Still deferred (appear as `// TODO(pass4): lower <Kind>` comments):
-`RawStmt` (unfolded IR1 atoms — a later slice), `Wide16Stmt` (16-bit
-carry chain), `RawIfStmt` (raw flag condition — needs atom context),
-`GotoStmt` / `LabelStmt` (structural escape hatches).
+* `Clc` / `Sec` → `self.c = 0;` / `self.c = 1;`
+* `AdcImm` / `AdcAbs` / `AdcIndexed` → 8-bit add with carry via u16
+* `SbcImm` / `SbcAbs` / `SbcIndexed` → 8-bit subtract-with-borrow via
+  the `A + ~operand + C` trick (identical to the 6502's own arithmetic)
+* `Asl` / `Lsr` / `Rol` / `Ror` → accumulator shift/rotate
+* `ShiftMem` (asl/lsr/rol/ror on a memory byte)
+* `FlagOp` (`sei`/`cli`/`sed`/`cld`) → `self.i`/`self.d` flag bytes
+
+`self.c`, `self.i`, `self.d` are provisional — they belong to the same
+`Cpu` design slice as `self.ram`. `Z`/`N` are not yet modeled: the
+atoms that update only Z/N without touching C (`Cmp*`, `Bit`) stay
+deferred as `// raw:` comments.
+
+Still deferred:
+* `Cmp*` / `Bit` — set Z/N (and C for cmp), need a full flag model;
+* `SbcIndirect` / `LoadIndirect` / `StoreIndirect` — indirect addressing;
+* `StoreLocal` / `StoreOpVar`, `LocalRef` inc/dec — self-modifying code;
+* `Pha` / `Pla` — stack;
+* `Wide16Stmt`, `RawIfStmt`, `GotoStmt` / `LabelStmt`.
 
 Memory model and receiver (`Cpu` / `self.ram`) remain provisional
 pending the Game/Renderer/Audio/Input design slice.
@@ -25,7 +35,39 @@ pending the Game/Renderer/Audio/Input design slice.
 
 from __future__ import annotations
 
-from .ir1 import Abs, Compare, Imm, IndexedAbs, IndirectY
+import re
+
+from .ir1 import (
+    Abs,
+    AdcAbs,
+    AdcImm,
+    AdcIndexed,
+    Asl,
+    Bitwise,
+    Clc,
+    Compare,
+    DecTarget,
+    FlagOp,
+    Imm,
+    IncTarget,
+    IndexedAbs,
+    IndirectY,
+    LoadAbs,
+    LoadImm,
+    LoadIndexed,
+    Lsr,
+    Reg,
+    Rol,
+    Ror,
+    SbcAbs,
+    SbcImm,
+    SbcIndexed,
+    Sec,
+    ShiftMem,
+    StoreAbs,
+    StoreIndexed,
+    Transfer,
+)
 from .ir3 import (
     Assign,
     BinExpr,
@@ -74,28 +116,112 @@ def _emit_imm(imm: Imm) -> str:
     return f"0x{imm.value & 0xff:02x}"
 
 
-def _emit_value(v) -> str:
+# A symbolic name is a Rust-ident base with an optional `+N` / `-N`
+# offset (Merlin's `ztemp+1` form for a 16-bit pointer's high byte).
+_SYM_NAME_RE = re.compile(r"^(?P<base>[A-Za-z_][A-Za-z0-9_]*)(?P<off>[+-]\d+)?$")
+
+
+class SymTable:
+    """Recovers symbolic RAM-address constants from the `Abs` operands a
+    module references, so `self.ram[0x00a0]` can render as
+    `self.ram[sym::PlayCount]` and keep the source's intent.
+
+    Built in two phases because emission is the only place that knows
+    which addresses are actually rendered as an index:
+
+    1. *record*: emit the module once with a fresh table; every `Abs`
+       reaching `index()` is noted and rendered as a bare literal.
+    2. `finalize()`: resolve each `name(+off)` to a `sym::<base>` const
+       whose value is `addr - off`. A base that resolves to two
+       different addresses, or a name that isn't a clean ident, falls
+       back to the literal so the output never lies.
+    3. *render*: emit again; `index()` now returns the `sym::` form."""
+
+    def __init__(self) -> None:
+        self._seen: list[tuple[str, int]] = []
+        self._consts: dict[str, int] = {}
+        self._final = False
+
+    @staticmethod
+    def _parse(name: str) -> tuple[str, int] | None:
+        m = _SYM_NAME_RE.match(name)
+        if m is None:
+            return None
+        return m.group("base"), int(m.group("off") or 0)
+
+    def index(self, a: Abs) -> str:
+        """Render `a` as the `self.ram[...]` index expression."""
+        if not self._final:
+            self._seen.append((a.name, a.addr))
+            return _addr(a.addr)
+        parsed = self._parse(a.name)
+        if parsed is not None:
+            base, off = parsed
+            if self._consts.get(base) == a.addr - off:
+                if off == 0:
+                    return f"sym::{base}"
+                return f"sym::{base} {'+' if off > 0 else '-'} {abs(off)}"
+        return _addr(a.addr)
+
+    def finalize(self) -> None:
+        candidates: dict[str, int] = {}
+        conflicted: set[str] = set()
+        for name, addr in self._seen:
+            parsed = self._parse(name)
+            if parsed is None:
+                continue
+            base, base_addr = parsed[0], addr - parsed[1]
+            if base in candidates and candidates[base] != base_addr:
+                conflicted.add(base)
+            else:
+                candidates.setdefault(base, base_addr)
+        self._consts = {b: a for b, a in candidates.items() if b not in conflicted}
+        self._final = True
+
+    def render_block(self, indent: str) -> list[str]:
+        if not self._consts:
+            return []
+        lines = [
+            f"{indent}#[allow(non_upper_case_globals)]",
+            f"{indent}mod sym {{",
+        ]
+        for name in sorted(self._consts):
+            lines.append(f"{indent}    pub const {name}: usize = {_addr(self._consts[name])};")
+        lines.append(f"{indent}}}")
+        return lines
+
+
+def _abs_index(a: Abs, syms: SymTable | None) -> str:
+    """Render the index of `self.ram[<index>]` for an absolute address —
+    a `sym::` reference when a symbol table resolves it, else the
+    `0x..` literal."""
+    if syms is None:
+        return _addr(a.addr)
+    return syms.index(a)
+
+
+def _emit_value(v, syms: SymTable | None = None) -> str:
     """Render an `Assign` source or compare RHS as a Rust r-value."""
     if isinstance(v, Imm):
         return _emit_imm(v)
     if isinstance(v, Abs):
-        return f"self.ram[{_addr(v.addr)}]"
+        return f"self.ram[{_abs_index(v, syms)}]"
     if isinstance(v, IndexedAbs):
-        return f"self.ram[{_addr(v.base.addr)} + self.{v.index} as usize]"
+        return f"self.ram[{_abs_index(v.base, syms)} + self.{v.index} as usize]"
     if isinstance(v, IndirectY):
         # `(ptr),y` needs a 16-bit pointer fetch + Y — deferred.
         return f'todo!("indirect ({v.ptr.name}),y read")'
     if isinstance(v, BinExpr):
-        return _emit_binexpr(v)
+        return _emit_binexpr(v, syms)
     if isinstance(v, RotateExpr):
         # rotl/rotr read the carry flag, so they are methods on the CPU.
-        return f"self.{v.op}({_emit_value(v.operand)}, {v.count})"
+        return f"self.{v.op}({_emit_value(v.operand, syms)}, {v.count})"
     raise ValueError(f"unknown Assign source type: {type(v).__name__}")
 
 
-def _emit_binexpr(v: BinExpr) -> str:
-    lhs = _emit_value(v.lhs)
-    rhs = _emit_value(v.rhs)
+def _emit_binexpr(v: BinExpr, syms: SymTable | None = None) -> str:
+    lhs = _emit_value(v.lhs, syms)
+    rhs = _emit_value(v.rhs, syms)
     if v.op == "+":
         return f"({lhs}).wrapping_add({rhs})"
     if v.op == "-":
@@ -107,17 +233,17 @@ def _emit_binexpr(v: BinExpr) -> str:
     raise ValueError(f"unknown BinExpr op: {v.op!r}")
 
 
-def _emit_target(target) -> str | None:
+def _emit_target(target, syms: SymTable | None = None) -> str | None:
     """Render an `Assign` target as a Rust assignable place, or `None`
     when the destination form isn't lowered yet."""
     if isinstance(target, Abs):
-        return f"self.ram[{_addr(target.addr)}]"
+        return f"self.ram[{_abs_index(target, syms)}]"
     if isinstance(target, IndexedAbs):
-        return f"self.ram[{_addr(target.base.addr)} + self.{target.index} as usize]"
+        return f"self.ram[{_abs_index(target.base, syms)} + self.{target.index} as usize]"
     return None  # IndirectY and anything else: deferred
 
 
-def _emit_compare(c: Compare) -> str:
+def _emit_compare(c: Compare, syms: SymTable | None = None) -> str:
     """Render a pass-3 `Compare` as a Rust boolean expression.
 
     * `rhs=None` is a sign test (N-flag): `op` is `">=0"` or `"<0"`.
@@ -138,21 +264,172 @@ def _emit_compare(c: Compare) -> str:
         else:
             raise ValueError(f"unexpected sign-test Compare op: {c.op!r}")
         return f"({reg} as i8) {op_str}"
-    rhs = _emit_value(c.rhs)
+    rhs = _emit_value(c.rhs, syms)
     return f"{reg} {c.op} {rhs}"
+
+
+# ---------------------------------------------------------------- raw atoms
+
+
+_BITWISE_OPS = {"and": "&", "or": "|", "eor": "^"}
+
+
+def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
+    """Lower an unfolded IR1 data-movement atom to Rust statement
+    fragments (no indentation), or return `None` when the atom isn't
+    lowered in this slice so the caller falls back to a `// raw:`
+    comment.
+
+    Covers the carry-/flag-free register and memory moves. Carry- or
+    flag-bearing atoms (adc/sbc/shifts/cmp/bit/clc/sec), indirect
+    addressing, self-modifying code, and the stack stay deferred."""
+    if isinstance(item, LoadImm):
+        # An opvar immediate is a runtime-patched SMC byte; lowering it
+        # to its assembled value would be wrong, so defer the whole load.
+        if item.imm.opvar is not None:
+            return None
+        return [f"self.{item.reg} = {_emit_imm(item.imm)};"]
+
+    if isinstance(item, LoadAbs):
+        return [f"self.{item.reg} = self.ram[{_abs_index(item.source, syms)}];"]
+
+    if isinstance(item, LoadIndexed):
+        place = f"self.ram[{_abs_index(item.base, syms)} + self.{item.index} as usize]"
+        return [f"self.{item.reg} = {place};"]
+
+    if isinstance(item, StoreAbs):
+        return [f"self.ram[{_abs_index(item.target, syms)}] = self.{item.reg};"]
+
+    if isinstance(item, StoreIndexed):
+        place = f"self.ram[{_abs_index(item.base, syms)} + self.{item.index} as usize]"
+        return [f"{place} = self.{item.reg};"]
+
+    if isinstance(item, Transfer):
+        return [f"self.{item.dst_reg} = self.{item.src_reg};"]
+
+    if isinstance(item, Bitwise):
+        op = _BITWISE_OPS.get(item.op)
+        # `(ptr),y` sources need a pointer fetch — deferred with the rest
+        # of indirect addressing.
+        if op is None or not isinstance(item.source, (Imm, Abs, IndexedAbs)):
+            return None
+        return [f"self.a {op}= {_emit_value(item.source, syms)};"]
+
+    if isinstance(item, (IncTarget, DecTarget)):
+        method = "wrapping_add" if isinstance(item, IncTarget) else "wrapping_sub"
+        target = item.target
+        if isinstance(target, Reg):
+            return [f"self.{target} = self.{target}.{method}(1);"]
+        if isinstance(target, Abs):
+            place = f"self.ram[{_abs_index(target, syms)}]"
+            return [f"{place} = {place}.{method}(1);"]
+        return None  # LocalRef: self-modifying-code operand bump — deferred
+
+    # ---- carry / flag operations ----------------------------------------
+
+    if isinstance(item, Clc):
+        return ["self.c = 0;"]
+
+    if isinstance(item, Sec):
+        return ["self.c = 1;"]
+
+    if isinstance(item, FlagOp):
+        flag = item.flag.lower()
+        return [f"self.{flag} = {item.value};"]
+
+    if isinstance(item, (AdcImm, AdcAbs, AdcIndexed)):
+        if isinstance(item, AdcImm):
+            rhs = f"({_emit_imm(item.imm)}) as u16"
+        elif isinstance(item, AdcAbs):
+            rhs = f"self.ram[{_abs_index(item.source, syms)}] as u16"
+        else:
+            rhs = f"self.ram[{_abs_index(item.base, syms)} + self.{item.index} as usize] as u16"
+        return [
+            f"let _r = (self.a as u16) + {rhs} + (self.c as u16);",
+            "self.a = _r as u8;",
+            "self.c = (_r >> 8) as u8;",
+        ]
+
+    if isinstance(item, (SbcImm, SbcAbs, SbcIndexed)):
+        # 6502 SBC uses the A + ~operand + C identity so the borrow
+        # convention (C=1 means "no borrow") falls out naturally.
+        if isinstance(item, SbcImm):
+            rhs = f"(!{_emit_imm(item.imm)}) as u16"
+        elif isinstance(item, SbcAbs):
+            rhs = f"(!self.ram[{_abs_index(item.source, syms)}]) as u16"
+        else:
+            rhs = f"(!self.ram[{_abs_index(item.base, syms)} + self.{item.index} as usize]) as u16"
+        return [
+            f"let _r = (self.a as u16) + {rhs} + (self.c as u16);",
+            "self.a = _r as u8;",
+            "self.c = (_r >> 8) as u8;",
+        ]
+
+    if isinstance(item, Asl):
+        return [
+            "self.c = self.a >> 7;",
+            "self.a = self.a.wrapping_shl(1);",
+        ]
+
+    if isinstance(item, Lsr):
+        return [
+            "self.c = self.a & 1;",
+            "self.a = self.a.wrapping_shr(1);",
+        ]
+
+    if isinstance(item, Rol):
+        return [
+            "let _c = self.a >> 7;",
+            "self.a = self.a.wrapping_shl(1) | self.c;",
+            "self.c = _c;",
+        ]
+
+    if isinstance(item, Ror):
+        return [
+            "let _c = self.a & 1;",
+            "self.a = self.a.wrapping_shr(1) | (self.c << 7);",
+            "self.c = _c;",
+        ]
+
+    if isinstance(item, ShiftMem):
+        place = f"self.ram[{_abs_index(item.target, syms)}]"
+        if item.op == "asl":
+            return [
+                f"self.c = {place} >> 7;",
+                f"{place} = {place}.wrapping_shl(1);",
+            ]
+        if item.op == "lsr":
+            return [
+                f"self.c = {place} & 1;",
+                f"{place} = {place}.wrapping_shr(1);",
+            ]
+        if item.op == "rol":
+            return [
+                f"let _c = {place} >> 7;",
+                f"{place} = {place}.wrapping_shl(1) | self.c;",
+                "self.c = _c;",
+            ]
+        if item.op == "ror":
+            return [
+                f"let _c = {place} & 1;",
+                f"{place} = {place}.wrapping_shr(1) | (self.c << 7);",
+                "self.c = _c;",
+            ]
+
+    return None
 
 
 # ---------------------------------------------------------------- statements
 
 
-def _emit_stmt(stmt, indent: int) -> list[str]:
+def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
     pad = INDENT * indent
 
     if isinstance(stmt, Assign):
-        place = _emit_target(stmt.target)
+        place = _emit_target(stmt.target, syms)
         if place is None:
             return [f"{pad}// TODO(pass4): store via {type(stmt.target).__name__}"]
-        return [f"{pad}{place} = {_emit_value(stmt.source)};"]
+        return [f"{pad}{place} = {_emit_value(stmt.source, syms)};"]
 
     if isinstance(stmt, ReturnStmt):
         return [f"{pad}return;"]
@@ -176,29 +453,29 @@ def _emit_stmt(stmt, indent: int) -> list[str]:
         return [f"{pad}self.a = tmp{stmt.slot};"]
 
     if isinstance(stmt, IfStmt):
-        lines = [f"{pad}if {_emit_compare(stmt.cond)} {{"]
+        lines = [f"{pad}if {_emit_compare(stmt.cond, syms)} {{"]
         for s in stmt.then_block.stmts:
-            lines.extend(_emit_stmt(s, indent + 1))
+            lines.extend(_emit_stmt(s, indent + 1, syms))
         if stmt.else_block is not None:
             lines.append(f"{pad}}} else {{")
             for s in stmt.else_block.stmts:
-                lines.extend(_emit_stmt(s, indent + 1))
+                lines.extend(_emit_stmt(s, indent + 1, syms))
         lines.append(f"{pad}}}")
         return lines
 
     if isinstance(stmt, LoopStmt):
         lines = [f"{pad}loop {{"]
         for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1))
+            lines.extend(_emit_stmt(s, indent + 1, syms))
         lines.append(f"{pad}}}")
         return lines
 
     if isinstance(stmt, DoWhileStmt):
-        cond = _emit_compare(stmt.cond)
+        cond = _emit_compare(stmt.cond, syms)
         inner = INDENT * (indent + 1)
         lines = [f"{pad}loop {{"]
         for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1))
+            lines.extend(_emit_stmt(s, indent + 1, syms))
         lines += [
             f"{inner}if !({cond}) {{",
             f"{inner}    break;",
@@ -210,14 +487,14 @@ def _emit_stmt(stmt, indent: int) -> list[str]:
     if isinstance(stmt, ForStmt):
         step_method = "wrapping_sub" if stmt.step < 0 else "wrapping_add"
         step_lit = f"0x{abs(stmt.step) & 0xff:02x}"
-        cond = _emit_compare(stmt.cond)
+        cond = _emit_compare(stmt.cond, syms)
         inner = INDENT * (indent + 1)
         lines = [
             f"{pad}self.{stmt.var} = {_emit_imm(stmt.start)};",
             f"{pad}loop {{",
         ]
         for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1))
+            lines.extend(_emit_stmt(s, indent + 1, syms))
         lines += [
             f"{inner}self.{stmt.var} = self.{stmt.var}.{step_method}({step_lit});",
             f"{inner}if !({cond}) {{",
@@ -236,7 +513,7 @@ def _emit_stmt(stmt, indent: int) -> list[str]:
             f"{pad}for _ in 0..{stmt.count}usize {{",
         ]
         for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1))
+            lines.extend(_emit_stmt(s, indent + 1, syms))
         lines += [
             f"{inner}self.{stmt.var} = self.{stmt.var}.{step_method}({step_lit});",
             f"{pad}}}",
@@ -249,12 +526,15 @@ def _emit_stmt(stmt, indent: int) -> list[str]:
             vals = " | ".join(f"0x{v.value & 0xff:02x}" for v in arm.values)
             lines.append(f"{pad}    {vals} => {{")
             for s in arm.body.stmts:
-                lines.extend(_emit_stmt(s, indent + 2))
+                lines.extend(_emit_stmt(s, indent + 2, syms))
             lines.append(f"{pad}    }}")
         lines += [f"{pad}    _ => {{}}", f"{pad}}}"]
         return lines
 
     if isinstance(stmt, RawStmt):
+        lowered = _emit_raw(stmt.item, syms)
+        if lowered is not None:
+            return [f"{pad}{line}" for line in lowered]
         from .ir1 import format_item
         return [f"{pad}// raw: {format_item(stmt.item).strip()}"]
 
@@ -264,39 +544,97 @@ def _emit_stmt(stmt, indent: int) -> list[str]:
 # ---------------------------------------------------------------- routines / module
 
 
-def emit_routine(routine: RoutineIR3, indent: int = 1) -> list[str]:
+def emit_routine(routine: RoutineIR3, indent: int = 1, syms: SymTable | None = None) -> list[str]:
     pad = INDENT * indent
     lines: list[str] = []
     if routine.entry_aliases:
         lines.append(f"{pad}// aliases: {', '.join(routine.entry_aliases)}")
     lines.append(f"{pad}fn {routine.name}(&mut self) {{")
     for s in routine.body.stmts:
-        lines.extend(_emit_stmt(s, indent + 1))
+        lines.extend(_emit_stmt(s, indent + 1, syms))
     lines.append(f"{pad}}}")
     return lines
 
 
-def emit_module(module: ModuleIR3) -> str:
-    from .ir1 import _portable_path
-    lines = [
-        "// @generated by pop_lifter — DO NOT EDIT.",
-        "//",
-        "// Pass 4 skeleton slice: module + routine scaffolding with leaf-",
-        "// expression and control-flow lowering. `RawStmt` atoms, `Wide16Stmt`,",
-        "// `RawIfStmt`, and `GotoStmt`/`LabelStmt` are deferred to later slices;",
-        "// they appear as `// TODO(pass4): …` or `// raw: …` comments.",
-        "// The `Cpu` receiver and flat `self.ram` model are provisional,",
-        "// pending the state/trait design slice.",
-        "//",
-        f"// source: {_portable_path(module.file)}",
-        "",
-        "impl Cpu {",
-    ]
+_HEADER = [
+    "// @generated by pop_lifter — DO NOT EDIT.",
+    "//",
+    "// Pass 4 skeleton slice: module + routine scaffolding with leaf-",
+    "// expression, control-flow, data-movement, and carry-arithmetic",
+    "// `RawStmt` lowering. Carry is `self.c: u8` (provisional).",
+    "// Z/N-only atoms (`Cmp*`, `Bit`), indirect addressing, SMC,",
+    "// the stack, `Wide16Stmt`, `RawIfStmt`, and `GotoStmt`/",
+    "// `LabelStmt` are deferred; they appear as `// raw: …` or",
+    "// `// TODO(pass4): …` comments.",
+    "// The `Cpu` receiver and `self.ram`/`self.c` are provisional,",
+    "// pending the state/trait design slice. RAM addresses keep their",
+    "// source symbol names via the `sym` constants below.",
+]
+
+
+def _record_syms(module: ModuleIR3, syms: SymTable) -> None:
+    """Phase-1 recording pass: emit each routine into `syms` so every
+    rendered `Abs` index is noted. The produced lines are discarded; only
+    the table's `_seen` accumulation matters. Safe to call across several
+    modules before a single `finalize()`."""
+    for routine in module.routines:
+        emit_routine(routine, indent=1, syms=syms)
+
+
+def _emit_impl_block(module: ModuleIR3, syms: SymTable) -> list[str]:
+    lines = ["impl Cpu {"]
     for i, routine in enumerate(module.routines):
         if i:
             lines.append("")
-        lines.extend(emit_routine(routine, indent=1))
+        lines.extend(emit_routine(routine, indent=1, syms=syms))
     lines.append("}")
+    return lines
+
+
+def emit_module(module: ModuleIR3) -> str:
+    """Emit one IR3 module as a standalone Rust source file."""
+    return emit_modules([module])
+
+
+def emit_modules(modules: list[ModuleIR3]) -> str:
+    """Emit one or more IR3 modules into a single Rust source file.
+
+    All modules share one `mod sym { ... }` block: a Rust file may hold
+    only one module item of a given name, so emitting a `mod sym` per
+    source (as `emit_module` did when its outputs were concatenated)
+    produced a duplicate-module compile error. Symbols are recorded
+    across every module before a single `finalize()`, so the global
+    conflict rule (a base resolving to two addresses falls back to a
+    literal everywhere) holds across files too. Each module keeps its own
+    `// source:` line and `impl Cpu { ... }` block — several inherent
+    `impl` blocks for one type are valid Rust.
+
+    For a single module the output is byte-identical to the previous
+    standalone form."""
+    from .ir1 import _portable_path
+
+    # Phase 1: record every rendered `Abs` across all modules into one
+    # table, then resolve to named constants. The recorded output is
+    # discarded.
+    syms = SymTable()
+    for module in modules:
+        _record_syms(module, syms)
+    syms.finalize()
+
+    lines = [*_HEADER, "//"]
+    for module in modules:
+        lines.append(f"// source: {_portable_path(module.file)}")
+    lines.append("")
+
+    sym_block = syms.render_block("")
+    if sym_block:
+        lines.extend(sym_block)
+        lines.append("")
+
+    for i, module in enumerate(modules):
+        if i:
+            lines.append("")
+        lines.extend(_emit_impl_block(module, syms))
     return "\n".join(lines) + "\n"
 
 
@@ -307,7 +645,14 @@ def lower_stats(module: ModuleIR3) -> tuple[int, int]:
     lowered = deferred = 0
     for routine in module.routines:
         for s in routine.body.stmts:
-            if isinstance(s, _LOWERED_TYPES):
+            if isinstance(s, RawStmt):
+                # A raw atom counts as lowered only when this slice
+                # produces real Rust for it (data-movement atoms).
+                if _emit_raw(s.item) is not None:
+                    lowered += 1
+                else:
+                    deferred += 1
+            elif isinstance(s, _LOWERED_TYPES):
                 lowered += 1
             else:
                 deferred += 1

@@ -30,7 +30,7 @@ from .pass3_loops import dowhile_stats, for_stats, recover_loops, repeat_stats
 from .pass3_match import match_stats, recognize_module
 from .pass3_smc import recognize_smc, smc_store_count, smc_var_count
 from .pass3_temps import recover_temps, temp_stats
-from .pass4_emit_rust import emit_module, lower_stats
+from .pass4_emit_rust import emit_modules, lower_stats
 
 DEFAULT_SOURCE_REL = Path("01 POP Source/Source")
 
@@ -728,7 +728,7 @@ def _cmd_emit(args: argparse.Namespace) -> int:
     ast = parse_files([*base, *file_paths], search_paths=[src_dir])
     symbols = ast.symbols()
 
-    dumps: list[str] = []
+    modules = []
     total_routines = 0
     total_lowered = 0
     total_deferred = 0
@@ -754,7 +754,7 @@ def _cmd_emit(args: argparse.Namespace) -> int:
         lowered, deferred = lower_stats(recovered)
         total_lowered += lowered
         total_deferred += deferred
-        dumps.append(emit_module(recovered))
+        modules.append(recovered)
         handled.update(local_entries)
 
     missing = [e for e in args.entry if e not in handled]
@@ -765,7 +765,9 @@ def _cmd_emit(args: argparse.Namespace) -> int:
         )
         return 1
 
-    text = "\n".join(dumps)
+    # Emit every module into one file sharing a single `mod sym` block,
+    # so concatenated output stays a valid single Rust module.
+    text = emit_modules(modules) if modules else ""
     if args.out:
         out_path = Path(args.out)
         out_path.parent.mkdir(parents=True, exist_ok=True)
