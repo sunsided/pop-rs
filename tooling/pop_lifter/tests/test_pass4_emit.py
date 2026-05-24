@@ -75,6 +75,7 @@ from pop_lifter.pass4_emit_rust import (
     _emit_stmt,
     _emit_value,
     emit_module,
+    emit_modules,
     emit_routine,
     lower_stats,
 )
@@ -106,8 +107,8 @@ def _routine(stmts: list, name: str = "r", aliases=None) -> RoutineIR3:
     )
 
 
-def _module(routines: list) -> ModuleIR3:
-    return ModuleIR3(name="m", file="syn/AUTO.S", routines=routines)
+def _module(routines: list, file: str = "syn/AUTO.S") -> ModuleIR3:
+    return ModuleIR3(name="m", file=file, routines=routines)
 
 
 # ---------------------------------------------------------------- value lowering
@@ -578,3 +579,44 @@ def test_raw_rol_and_ror():
     assert rol[2] == "self.c = _c;"
     ror = _emit_stmt(RawStmt(item=Ror(src=SRC)), 0)
     assert ror[1] == "self.a = self.a.wrapping_shr(1) | (self.c << 7);"
+
+
+# ---------------------------------------------------------------- multi-module emit
+
+
+def test_emit_modules_single_matches_emit_module():
+    # The single-module path must stay byte-identical to the standalone
+    # form so the pilots don't churn.
+    store = Assign(target=_abs("PlayCount", 0xA0), source=_imm(0), src=SRC)
+    m = _module([_routine([store, ReturnStmt(src=SRC)], name="r")])
+    assert emit_modules([m]) == emit_module(m)
+
+
+def test_emit_modules_shares_one_sym_block():
+    # Two modules with named addresses must not each emit a `mod sym`:
+    # a Rust file may declare a module name only once.
+    s1 = Assign(target=_abs("PlayCount", 0xA0), source=_imm(0), src=SRC)
+    s2 = Assign(target=_abs("CharID", 0x4D), source=_imm(1), src=SRC)
+    m1 = _module([_routine([s1, ReturnStmt(src=SRC)], name="a")], file="syn/A.S")
+    m2 = _module([_routine([s2, ReturnStmt(src=SRC)], name="b")], file="syn/B.S")
+    out = emit_modules([m1, m2])
+    assert out.count("mod sym {") == 1
+    # Both files contribute their own impl block and source line.
+    assert out.count("impl Cpu {") == 2
+    assert "// source: A.S" in out and "// source: B.S" in out
+    # The merged block carries symbols from both modules.
+    assert "pub const PlayCount: usize = 0x00a0;" in out
+    assert "pub const CharID: usize = 0x004d;" in out
+
+
+def test_emit_modules_conflicting_symbol_falls_back_to_literal():
+    # The same base name resolving to two addresses across files is a
+    # conflict: it must drop out of `mod sym` and stay literal everywhere.
+    s1 = Assign(target=_abs("dup", 0x10), source=_imm(0), src=SRC)
+    s2 = Assign(target=_abs("dup", 0x20), source=_imm(0), src=SRC)
+    m1 = _module([_routine([s1, ReturnStmt(src=SRC)], name="a")], file="syn/A.S")
+    m2 = _module([_routine([s2, ReturnStmt(src=SRC)], name="b")], file="syn/B.S")
+    out = emit_modules([m1, m2])
+    assert "sym::dup" not in out
+    assert "self.ram[0x0010]" in out
+    assert "self.ram[0x0020]" in out
