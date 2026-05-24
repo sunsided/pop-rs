@@ -547,6 +547,15 @@ def test_indirect_high_byte_resolves_to_symbol():
     assert "(self.ram[sym::ztemp + 1] as usize) << 8) + self.y as usize];" in out
 
 
+def test_indirect_ptr_with_offset_folds_into_high_byte():
+    # An already-offset pointer `(ztemp+1),y` must keep symbol resolution:
+    # the high byte is `ztemp+2`, not the unparseable `ztemp+1+1`.
+    load = RawStmt(item=LoadIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ztemp+1", 0xF1)), src=SRC))
+    out = emit_module(_module([_routine([load, ReturnStmt(src=SRC)], name="r")]))
+    assert "self.a = self.ram[(self.ram[sym::ztemp + 1] as usize " in out
+    assert "(self.ram[sym::ztemp + 2] as usize) << 8) + self.y as usize];" in out
+
+
 # ---------------------------------------------------------------- symbolic address constants
 
 

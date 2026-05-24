@@ -206,17 +206,33 @@ def _abs_index(a: Abs, syms: SymTable | None) -> str:
     return syms.index(a)
 
 
+def _offset_abs(a: Abs, delta: int) -> Abs:
+    """Return `a` shifted by `delta` bytes, keeping a name that
+    `SymTable` can still resolve. If `a.name` already parses as
+    `base(+/-off)`, fold `delta` into that offset (so `ztemp+1` + 1
+    becomes `ztemp+2`, and a net-zero offset drops back to `base`);
+    otherwise append a fresh offset to the raw name."""
+    parsed = SymTable._parse(a.name)
+    addr = (a.addr + delta) & 0xFFFF
+    if parsed is not None:
+        base, off = parsed
+        new_off = off + delta
+        name = base if new_off == 0 else f"{base}{new_off:+d}"
+    else:
+        name = f"{a.name}{delta:+d}"
+    return Abs(name=name, addr=addr)
+
+
 def _indirect_index(iy: IndirectY, syms: SymTable | None) -> str:
     """Render the `self.ram[<index>]` index for a `(ptr),y` effective
     address: fetch the 16-bit pointer from the zero-page bytes at `ptr`
-    (low) and `ptr + 1` (high), then add Y. The high byte is rendered as
-    a `ptr + 1` operand so it resolves to `sym::<ptr> + 1` when the base
-    is named. Matches the interpreter's permissive rule (no page wrap on
-    the pointer, no 16-bit wrap on `+ Y`) and the unmasked `IndexedAbs`
-    form."""
+    (low) and `ptr + 1` (high), then add Y. The high byte is rendered via
+    `_offset_abs(ptr, 1)` so it resolves to `sym::<base> + <off+1>` even
+    when `ptr` itself carries an offset (`(ztemp+1),y`). Matches the
+    interpreter's permissive rule (no page wrap on the pointer, no 16-bit
+    wrap on `+ Y`) and the unmasked `IndexedAbs` form."""
     lo = f"self.ram[{_abs_index(iy.ptr, syms)}]"
-    hi_abs = Abs(name=f"{iy.ptr.name}+1", addr=(iy.ptr.addr + 1) & 0xFFFF)
-    hi = f"self.ram[{_abs_index(hi_abs, syms)}]"
+    hi = f"self.ram[{_abs_index(_offset_abs(iy.ptr, 1), syms)}]"
     return f"({lo} as usize | ({hi} as usize) << 8) + self.y as usize"
 
 
