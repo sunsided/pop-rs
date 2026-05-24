@@ -22,8 +22,11 @@ import pytest
 
 from pop_lifter.ir1 import (
     Abs,
+    AdcImm,
+    Asl,
     Bitwise,
     Clc,
+    CmpImm,
     DecTarget,
     Imm,
     IncTarget,
@@ -35,6 +38,9 @@ from pop_lifter.ir1 import (
     LoadIndirect,
     LocalRef,
     Reg,
+    Rol,
+    Ror,
+    Sec,
     SourceRef,
     StoreAbs,
     StoreIndexed,
@@ -193,11 +199,11 @@ def test_raw_load_abs_is_lowered():
 
 
 def test_raw_deferred_atom_is_comment():
-    # A carry-bearing atom (`clc`) has no lowering yet, so it stays as a
-    # `// raw:` comment rather than emitting wrong code.
-    out = _emit_one(RawStmt(item=Clc(src=SRC)))
+    # `cmp #imm` only sets Z/N/C flags with no register effect; that
+    # flag model isn't lowered yet, so it stays as a `// raw:` comment.
+    out = _emit_one(RawStmt(item=CmpImm(reg=Reg.A, imm=_imm(0), src=SRC)))
     assert out.startswith("// raw: ")
-    assert "c = 0" in out
+    assert "cmp" in out
 
 
 def test_call_stmt_lowered():
@@ -255,13 +261,14 @@ def test_module_separates_routines_with_blank_line():
 def test_lower_stats_counts_top_level():
     stmts = [
         Assign(target=_abs("Y", 0x20), source=_imm(1), src=SRC),  # lowered
-        RawStmt(item=StoreAbs(reg=Reg.A, target=_abs("Z", 0x30), src=SRC)),  # lowered (data-movement raw)
-        RawStmt(item=Clc(src=SRC)),  # deferred (carry-bearing raw)
-        CallStmt(target="sub", src=SRC),  # lowered (CallStmt is now real code)
+        RawStmt(item=StoreAbs(reg=Reg.A, target=_abs("Z", 0x30), src=SRC)),  # lowered (data-movement)
+        RawStmt(item=Clc(src=SRC)),  # lowered (carry op)
+        RawStmt(item=CmpImm(reg=Reg.A, imm=_imm(0), src=SRC)),  # deferred (Z/N-only)
+        CallStmt(target="sub", src=SRC),  # lowered
         ReturnStmt(src=SRC),  # lowered
     ]
     lowered, deferred = lower_stats(_module([_routine(stmts)]))
-    assert (lowered, deferred) == (4, 1)
+    assert (lowered, deferred) == (5, 1)
 
 
 # ---------------------------------------------------------------- compare expressions
@@ -538,3 +545,36 @@ def test_module_sym_unclean_name_falls_back_to_literal():
 def test_module_without_named_addresses_has_no_sym_block():
     out = emit_module(_module([_routine([ReturnStmt(src=SRC)], name="r")]))
     assert "mod sym" not in out
+
+
+# ---------------------------------------------------------------- carry-arithmetic atom lowering
+
+
+def test_raw_clc_and_sec():
+    assert _raw(Clc(src=SRC)) == "self.c = 0;"
+    assert _raw(Sec(src=SRC)) == "self.c = 1;"
+
+
+def test_raw_adc_imm():
+    lines = _emit_stmt(RawStmt(item=AdcImm(imm=_imm(0xbd), src=SRC)), 0)
+    assert lines[0] == "let _r = (self.a as u16) + (0xbd) as u16 + (self.c as u16);"
+    assert lines[1] == "self.a = _r as u8;"
+    assert lines[2] == "self.c = (_r >> 8) as u8;"
+
+
+def test_raw_asl_and_lsr():
+    asl_lines = _emit_stmt(RawStmt(item=Asl(src=SRC)), 0)
+    assert asl_lines[0] == "self.c = self.a >> 7;"
+    assert asl_lines[1] == "self.a = self.a.wrapping_shl(1);"
+    lsr_lines = _emit_stmt(RawStmt(item=Ror(src=SRC)), 0)
+    assert lsr_lines[0] == "let _c = self.a & 1;"
+    assert lsr_lines[2] == "self.c = _c;"
+
+
+def test_raw_rol_and_ror():
+    rol = _emit_stmt(RawStmt(item=Rol(src=SRC)), 0)
+    assert rol[0] == "let _c = self.a >> 7;"
+    assert rol[1] == "self.a = self.a.wrapping_shl(1) | self.c;"
+    assert rol[2] == "self.c = _c;"
+    ror = _emit_stmt(RawStmt(item=Ror(src=SRC)), 0)
+    assert ror[1] == "self.a = self.a.wrapping_shr(1) | (self.c << 7);"

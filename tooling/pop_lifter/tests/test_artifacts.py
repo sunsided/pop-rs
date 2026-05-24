@@ -373,14 +373,12 @@ def _regen_cup_rs(source_dir: Path) -> str:
 
 
 def test_pass4_cup_rs_artifact_matches(source_dir):
-    """The Cup pass-4 pilot pins the Rust skeleton emitter: the folded
-    `CharBlockY += #3` lowers to a `wrapping_add` assignment and the
-    `CharID = #1` immediate lowers to a direct store. The unfolded
-    data-movement atoms (`lda CharScrn`, `sta CharScrn`, `ldx #3`) now
-    lower to direct register/memory moves, and every RAM address keeps
-    its source symbol via a `sym::` constant (`self.ram[sym::CharScrn]`).
-    Only the carry-bearing `clc ; adc #$bd` pair stays a `// raw:`
-    comment."""
+    """The Cup pass-4 pilot pins the Rust skeleton emitter output after
+    all data-movement and carry-arithmetic raw-atom lowering. The folded
+    `CharBlockY += 3` becomes `wrapping_add`, unfolded loads/stores lower
+    to direct register/memory moves with `sym::` names, and the previously
+    deferred `clc ; adc #$bd` pair now expands to `self.c = 0` plus a
+    `u16` carry-add. Cup has no remaining `// raw:` comments."""
     if not IR_PILOT_CUP_RS.exists():
         raise AssertionError(
             f"missing artifact {IR_PILOT_CUP_RS}. regenerate with:\n"
@@ -424,11 +422,12 @@ def test_pass4_chgshadposn_rs_artifact_matches(source_dir):
     down-counter `for y in (0..=6).rev()` becomes an inlined
     `self.y = 0x06; loop { … step … if !(signed cond) { break; } }`,
     and the `jumpseq` call lowers to `self.jumpseq();` (a regular call
-    here — more statements follow it, so it is not a tail call). The
-    surrounding `sta ztemp` / `ldy #7` / `lda #0` / `sta PlayCount`
-    data-movement atoms now lower to direct moves, and the `ztemp+1`
-    high-byte store keeps its symbol as `self.ram[sym::ztemp + 1]`.
-    Only the indirect `lda (ztemp),y` stays as a `// raw:` comment."""
+    here — more statements follow it, so it is not a tail call). All
+    data-movement (`sta ztemp`, `ldy #7`, `lda #0`, `sta PlayCount`)
+    and carry-arithmetic atoms are lowered; RAM addresses keep their
+    symbols (`sym::ztemp`, `sym::PlayCount`). Only the indirect
+    `lda (ztemp),y` stays as a `// raw:` comment (pointer fetch
+    deferred)."""
     if not IR_PILOT_CHGSHADPOSN_RS.exists():
         raise AssertionError(
             f"missing artifact {IR_PILOT_CHGSHADPOSN_RS}. regenerate with:\n"

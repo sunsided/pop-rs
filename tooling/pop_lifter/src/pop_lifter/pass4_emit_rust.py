@@ -1,30 +1,32 @@
 """Pass 4: emit Rust source from IR3.
 
 Earlier slices lowered module / routine scaffolding, leaf expressions
-(folded `Assign`s, `return`), and *all structured control flow*
-(`IfStmt` / `LoopStmt` / `DoWhileStmt` / `ForStmt` / `RepeatStmt`,
-`BreakStmt` / `ContinueStmt`, `MatchStmt`, `CallStmt` / `TailCallStmt`,
-`SaveTemp` / `RestoreTemp`).
+(folded `Assign`s, `return`), *all structured control flow*, and
+*data-movement `RawStmt` atoms* (loads, stores, transfers, bitwise,
+inc/dec) — the carry-/flag-free instructions that map directly onto
+register/memory moves.
 
-This slice lowers the *data-movement `RawStmt` atoms* — the unfolded
-IR1 instructions pass 3 couldn't collapse into an `Assign`, but which
-still map directly onto a register/memory move with no carry- or
-flag-flow to model:
+This slice adds the *carry-arithmetic `RawStmt` atoms* — instructions
+that read or write the 6502 carry flag (`self.c: u8`, provisional):
 
-* `LoadImm` / `LoadAbs` / `LoadIndexed` → `self.<reg> = <value>;`
-* `StoreAbs` / `StoreIndexed` → `self.ram[<addr>] = self.<reg>;`
-* `Transfer` (`tax`/`tay`/`txa`/`tya`) → `self.<dst> = self.<src>;`
-* `Bitwise` (`and`/`ora`/`eor`) → `self.a &= <value>;` (`|=` / `^=`)
-* `IncTarget` / `DecTarget` (reg or memory) → `<place> = <place>.wrapping_add(1);`
+* `Clc` / `Sec` → `self.c = 0;` / `self.c = 1;`
+* `AdcImm` / `AdcAbs` / `AdcIndexed` → 8-bit add with carry via u16
+* `SbcImm` / `SbcAbs` / `SbcIndexed` → 8-bit subtract-with-borrow via
+  the `A + ~operand + C` trick (identical to the 6502's own arithmetic)
+* `Asl` / `Lsr` / `Rol` / `Ror` → accumulator shift/rotate
+* `ShiftMem` (asl/lsr/rol/ror on a memory byte)
+* `FlagOp` (`sei`/`cli`/`sed`/`cld`) → `self.i`/`self.d` flag bytes
 
-Still deferred — these stay as `// raw: …` (or `// TODO(pass4): …`)
-comments until their model lands:
+`self.c`, `self.i`, `self.d` are provisional — they belong to the same
+`Cpu` design slice as `self.ram`. `Z`/`N` are not yet modeled: the
+atoms that update only Z/N without touching C (`Cmp*`, `Bit`) stay
+deferred as `// raw:` comments.
 
-* carry/flag-bearing atoms (`Clc`/`Sec`/`AdcImm`/`SbcImm`/`Asl`/`Lsr`/
-  `Rol`/`Ror`/`ShiftMem`/`Cmp*`/`Bit`) — need a processor-flag model;
-* indirect addressing (`(ptr),y` loads/stores) — needs a pointer fetch;
-* self-modifying code (`StoreLocal`/`StoreOpVar`, `LocalRef` inc/dec);
-* the stack (`Pha`/`Pla`);
+Still deferred:
+* `Cmp*` / `Bit` — set Z/N (and C for cmp), need a full flag model;
+* `SbcIndirect` / `LoadIndirect` / `StoreIndirect` — indirect addressing;
+* `StoreLocal` / `StoreOpVar`, `LocalRef` inc/dec — self-modifying code;
+* `Pha` / `Pla` — stack;
 * `Wide16Stmt`, `RawIfStmt`, `GotoStmt` / `LabelStmt`.
 
 Memory model and receiver (`Cpu` / `self.ram`) remain provisional
@@ -37,9 +39,15 @@ import re
 
 from .ir1 import (
     Abs,
+    AdcAbs,
+    AdcImm,
+    AdcIndexed,
+    Asl,
     Bitwise,
+    Clc,
     Compare,
     DecTarget,
+    FlagOp,
     Imm,
     IncTarget,
     IndexedAbs,
@@ -47,7 +55,15 @@ from .ir1 import (
     LoadAbs,
     LoadImm,
     LoadIndexed,
+    Lsr,
     Reg,
+    Rol,
+    Ror,
+    SbcAbs,
+    SbcImm,
+    SbcIndexed,
+    Sec,
+    ShiftMem,
     StoreAbs,
     StoreIndexed,
     Transfer,
@@ -309,6 +325,97 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             return [f"{place} = {place}.{method}(1);"]
         return None  # LocalRef: self-modifying-code operand bump — deferred
 
+    # ---- carry / flag operations ----------------------------------------
+
+    if isinstance(item, Clc):
+        return ["self.c = 0;"]
+
+    if isinstance(item, Sec):
+        return ["self.c = 1;"]
+
+    if isinstance(item, FlagOp):
+        flag = item.flag.lower()
+        return [f"self.{flag} = {item.value};"]
+
+    if isinstance(item, (AdcImm, AdcAbs, AdcIndexed)):
+        if isinstance(item, AdcImm):
+            rhs = f"({_emit_imm(item.imm)}) as u16"
+        elif isinstance(item, AdcAbs):
+            rhs = f"self.ram[{_abs_index(item.source, syms)}] as u16"
+        else:
+            rhs = f"self.ram[{_abs_index(item.base, syms)} + self.{item.index} as usize] as u16"
+        return [
+            f"let _r = (self.a as u16) + {rhs} + (self.c as u16);",
+            "self.a = _r as u8;",
+            "self.c = (_r >> 8) as u8;",
+        ]
+
+    if isinstance(item, (SbcImm, SbcAbs, SbcIndexed)):
+        # 6502 SBC uses the A + ~operand + C identity so the borrow
+        # convention (C=1 means "no borrow") falls out naturally.
+        if isinstance(item, SbcImm):
+            rhs = f"(!{_emit_imm(item.imm)}) as u16"
+        elif isinstance(item, SbcAbs):
+            rhs = f"(!self.ram[{_abs_index(item.source, syms)}]) as u16"
+        else:
+            rhs = f"(!self.ram[{_abs_index(item.base, syms)} + self.{item.index} as usize]) as u16"
+        return [
+            f"let _r = (self.a as u16) + {rhs} + (self.c as u16);",
+            "self.a = _r as u8;",
+            "self.c = (_r >> 8) as u8;",
+        ]
+
+    if isinstance(item, Asl):
+        return [
+            "self.c = self.a >> 7;",
+            "self.a = self.a.wrapping_shl(1);",
+        ]
+
+    if isinstance(item, Lsr):
+        return [
+            "self.c = self.a & 1;",
+            "self.a = self.a.wrapping_shr(1);",
+        ]
+
+    if isinstance(item, Rol):
+        return [
+            "let _c = self.a >> 7;",
+            "self.a = self.a.wrapping_shl(1) | self.c;",
+            "self.c = _c;",
+        ]
+
+    if isinstance(item, Ror):
+        return [
+            "let _c = self.a & 1;",
+            "self.a = self.a.wrapping_shr(1) | (self.c << 7);",
+            "self.c = _c;",
+        ]
+
+    if isinstance(item, ShiftMem):
+        place = f"self.ram[{_abs_index(item.target, syms)}]"
+        if item.op == "asl":
+            return [
+                f"self.c = {place} >> 7;",
+                f"{place} = {place}.wrapping_shl(1);",
+            ]
+        if item.op == "lsr":
+            return [
+                f"self.c = {place} & 1;",
+                f"{place} = {place}.wrapping_shr(1);",
+            ]
+        if item.op == "rol":
+            return [
+                f"let _c = {place} >> 7;",
+                f"{place} = {place}.wrapping_shl(1) | self.c;",
+                "self.c = _c;",
+            ]
+        if item.op == "ror":
+            return [
+                f"let _c = {place} & 1;",
+                f"{place} = {place}.wrapping_shr(1) | (self.c << 7);",
+                "self.c = _c;",
+            ]
+
     return None
 
 
@@ -464,12 +571,13 @@ def emit_module(module: ModuleIR3) -> str:
         "// @generated by pop_lifter — DO NOT EDIT.",
         "//",
         "// Pass 4 skeleton slice: module + routine scaffolding with leaf-",
-        "// expression, control-flow, and data-movement `RawStmt` lowering.",
-        "// Carry/flag-bearing atoms, indirect addressing, self-modifying",
-        "// code, the stack, `Wide16Stmt`, `RawIfStmt`, and `GotoStmt`/",
-        "// `LabelStmt` are deferred to later slices; they appear as",
-        "// `// TODO(pass4): …` or `// raw: …` comments.",
-        "// The `Cpu` receiver and flat `self.ram` model are provisional,",
+        "// expression, control-flow, data-movement, and carry-arithmetic",
+        "// `RawStmt` lowering. Carry is `self.c: u8` (provisional).",
+        "// Z/N-only atoms (`Cmp*`, `Bit`), indirect addressing, SMC,",
+        "// the stack, `Wide16Stmt`, `RawIfStmt`, and `GotoStmt`/",
+        "// `LabelStmt` are deferred; they appear as `// raw: …` or",
+        "// `// TODO(pass4): …` comments.",
+        "// The `Cpu` receiver and `self.ram`/`self.c` are provisional,",
         "// pending the state/trait design slice. RAM addresses keep their",
         "// source symbol names via the `sym` constants below.",
         "//",
