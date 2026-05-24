@@ -1,23 +1,31 @@
 """Pass 4: emit Rust source from IR3.
 
-First slice (skeleton) lowered module / routine scaffolding and leaf
-expressions (folded `Assign`s, `return`). This second slice lowers
-*all structured control flow*:
+Earlier slices lowered module / routine scaffolding, leaf expressions
+(folded `Assign`s, `return`), and *all structured control flow*
+(`IfStmt` / `LoopStmt` / `DoWhileStmt` / `ForStmt` / `RepeatStmt`,
+`BreakStmt` / `ContinueStmt`, `MatchStmt`, `CallStmt` / `TailCallStmt`,
+`SaveTemp` / `RestoreTemp`).
 
-* `IfStmt` → `if <cond> { … } [else { … }]`
-* `LoopStmt` → `loop { … }`
-* `DoWhileStmt` → `loop { body; if !(<cond>) { break; } }`
-* `ForStmt` → init + `loop { body; step; if !(<cond>) { break; } }`
-* `RepeatStmt` → init + `for _ in 0..<count>usize { body; step; }`
-* `BreakStmt` / `ContinueStmt` → `break;` / `continue;`
-* `MatchStmt` → `match self.<reg> { val => { body }, … _ => {} }`
-* `CallStmt` / `TailCallStmt` → `self.<target>();` / `self.<target>(); return;`
-* `SaveTemp` / `RestoreTemp` → `let tmp{n} = self.a;` / `self.a = tmp{n};`
+This slice lowers the *data-movement `RawStmt` atoms* — the unfolded
+IR1 instructions pass 3 couldn't collapse into an `Assign`, but which
+still map directly onto a register/memory move with no carry- or
+flag-flow to model:
 
-Still deferred (appear as `// TODO(pass4): lower <Kind>` comments):
-`RawStmt` (unfolded IR1 atoms — a later slice), `Wide16Stmt` (16-bit
-carry chain), `RawIfStmt` (raw flag condition — needs atom context),
-`GotoStmt` / `LabelStmt` (structural escape hatches).
+* `LoadImm` / `LoadAbs` / `LoadIndexed` → `self.<reg> = <value>;`
+* `StoreAbs` / `StoreIndexed` → `self.ram[<addr>] = self.<reg>;`
+* `Transfer` (`tax`/`tay`/`txa`/`tya`) → `self.<dst> = self.<src>;`
+* `Bitwise` (`and`/`ora`/`eor`) → `self.a &= <value>;` (`|=` / `^=`)
+* `IncTarget` / `DecTarget` (reg or memory) → `<place> = <place>.wrapping_add(1);`
+
+Still deferred — these stay as `// raw: …` (or `// TODO(pass4): …`)
+comments until their model lands:
+
+* carry/flag-bearing atoms (`Clc`/`Sec`/`AdcImm`/`SbcImm`/`Asl`/`Lsr`/
+  `Rol`/`Ror`/`ShiftMem`/`Cmp*`/`Bit`) — need a processor-flag model;
+* indirect addressing (`(ptr),y` loads/stores) — needs a pointer fetch;
+* self-modifying code (`StoreLocal`/`StoreOpVar`, `LocalRef` inc/dec);
+* the stack (`Pha`/`Pla`);
+* `Wide16Stmt`, `RawIfStmt`, `GotoStmt` / `LabelStmt`.
 
 Memory model and receiver (`Cpu` / `self.ram`) remain provisional
 pending the Game/Renderer/Audio/Input design slice.
@@ -25,7 +33,23 @@ pending the Game/Renderer/Audio/Input design slice.
 
 from __future__ import annotations
 
-from .ir1 import Abs, Compare, Imm, IndexedAbs, IndirectY
+from .ir1 import (
+    Abs,
+    Bitwise,
+    Compare,
+    DecTarget,
+    Imm,
+    IncTarget,
+    IndexedAbs,
+    IndirectY,
+    LoadAbs,
+    LoadImm,
+    LoadIndexed,
+    Reg,
+    StoreAbs,
+    StoreIndexed,
+    Transfer,
+)
 from .ir3 import (
     Assign,
     BinExpr,
@@ -142,6 +166,66 @@ def _emit_compare(c: Compare) -> str:
     return f"{reg} {c.op} {rhs}"
 
 
+# ---------------------------------------------------------------- raw atoms
+
+
+_BITWISE_OPS = {"and": "&", "or": "|", "eor": "^"}
+
+
+def _emit_raw(item) -> list[str] | None:
+    """Lower an unfolded IR1 data-movement atom to Rust statement
+    fragments (no indentation), or return `None` when the atom isn't
+    lowered in this slice so the caller falls back to a `// raw:`
+    comment.
+
+    Covers the carry-/flag-free register and memory moves. Carry- or
+    flag-bearing atoms (adc/sbc/shifts/cmp/bit/clc/sec), indirect
+    addressing, self-modifying code, and the stack stay deferred."""
+    if isinstance(item, LoadImm):
+        # An opvar immediate is a runtime-patched SMC byte; lowering it
+        # to its assembled value would be wrong, so defer the whole load.
+        if item.imm.opvar is not None:
+            return None
+        return [f"self.{item.reg} = {_emit_imm(item.imm)};"]
+
+    if isinstance(item, LoadAbs):
+        return [f"self.{item.reg} = self.ram[{_addr(item.source.addr)}];"]
+
+    if isinstance(item, LoadIndexed):
+        place = f"self.ram[{_addr(item.base.addr)} + self.{item.index} as usize]"
+        return [f"self.{item.reg} = {place};"]
+
+    if isinstance(item, StoreAbs):
+        return [f"self.ram[{_addr(item.target.addr)}] = self.{item.reg};"]
+
+    if isinstance(item, StoreIndexed):
+        place = f"self.ram[{_addr(item.base.addr)} + self.{item.index} as usize]"
+        return [f"{place} = self.{item.reg};"]
+
+    if isinstance(item, Transfer):
+        return [f"self.{item.dst_reg} = self.{item.src_reg};"]
+
+    if isinstance(item, Bitwise):
+        op = _BITWISE_OPS.get(item.op)
+        # `(ptr),y` sources need a pointer fetch — deferred with the rest
+        # of indirect addressing.
+        if op is None or not isinstance(item.source, (Imm, Abs, IndexedAbs)):
+            return None
+        return [f"self.a {op}= {_emit_value(item.source)};"]
+
+    if isinstance(item, (IncTarget, DecTarget)):
+        method = "wrapping_add" if isinstance(item, IncTarget) else "wrapping_sub"
+        target = item.target
+        if isinstance(target, Reg):
+            return [f"self.{target} = self.{target}.{method}(1);"]
+        if isinstance(target, Abs):
+            place = f"self.ram[{_addr(target.addr)}]"
+            return [f"{place} = {place}.{method}(1);"]
+        return None  # LocalRef: self-modifying-code operand bump — deferred
+
+    return None
+
+
 # ---------------------------------------------------------------- statements
 
 
@@ -255,6 +339,9 @@ def _emit_stmt(stmt, indent: int) -> list[str]:
         return lines
 
     if isinstance(stmt, RawStmt):
+        lowered = _emit_raw(stmt.item)
+        if lowered is not None:
+            return [f"{pad}{line}" for line in lowered]
         from .ir1 import format_item
         return [f"{pad}// raw: {format_item(stmt.item).strip()}"]
 
@@ -282,9 +369,11 @@ def emit_module(module: ModuleIR3) -> str:
         "// @generated by pop_lifter — DO NOT EDIT.",
         "//",
         "// Pass 4 skeleton slice: module + routine scaffolding with leaf-",
-        "// expression and control-flow lowering. `RawStmt` atoms, `Wide16Stmt`,",
-        "// `RawIfStmt`, and `GotoStmt`/`LabelStmt` are deferred to later slices;",
-        "// they appear as `// TODO(pass4): …` or `// raw: …` comments.",
+        "// expression, control-flow, and data-movement `RawStmt` lowering.",
+        "// Carry/flag-bearing atoms, indirect addressing, self-modifying",
+        "// code, the stack, `Wide16Stmt`, `RawIfStmt`, and `GotoStmt`/",
+        "// `LabelStmt` are deferred to later slices; they appear as",
+        "// `// TODO(pass4): …` or `// raw: …` comments.",
         "// The `Cpu` receiver and flat `self.ram` model are provisional,",
         "// pending the state/trait design slice.",
         "//",
@@ -307,7 +396,14 @@ def lower_stats(module: ModuleIR3) -> tuple[int, int]:
     lowered = deferred = 0
     for routine in module.routines:
         for s in routine.body.stmts:
-            if isinstance(s, _LOWERED_TYPES):
+            if isinstance(s, RawStmt):
+                # A raw atom counts as lowered only when this slice
+                # produces real Rust for it (data-movement atoms).
+                if _emit_raw(s.item) is not None:
+                    lowered += 1
+                else:
+                    deferred += 1
+            elif isinstance(s, _LOWERED_TYPES):
                 lowered += 1
             else:
                 deferred += 1

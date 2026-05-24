@@ -22,13 +22,23 @@ import pytest
 
 from pop_lifter.ir1 import (
     Abs,
+    Bitwise,
+    Clc,
+    DecTarget,
     Imm,
+    IncTarget,
     IndexedAbs,
     IndirectY,
     LoadAbs,
+    LoadImm,
+    LoadIndexed,
+    LoadIndirect,
+    LocalRef,
     Reg,
     SourceRef,
     StoreAbs,
+    StoreIndexed,
+    Transfer,
 )
 from pop_lifter.ir1 import Compare
 from pop_lifter.ir3 import (
@@ -177,11 +187,17 @@ def test_return_stmt():
     assert _emit_one(ReturnStmt(src=SRC)) == "return;"
 
 
-def test_raw_stmt_is_comment():
+def test_raw_load_abs_is_lowered():
     raw = RawStmt(item=LoadAbs(reg=Reg.A, source=_abs("X", 0x10), src=SRC))
-    out = _emit_one(raw)
+    assert _emit_one(raw) == "self.a = self.ram[0x0010];"
+
+
+def test_raw_deferred_atom_is_comment():
+    # A carry-bearing atom (`clc`) has no lowering yet, so it stays as a
+    # `// raw:` comment rather than emitting wrong code.
+    out = _emit_one(RawStmt(item=Clc(src=SRC)))
     assert out.startswith("// raw: ")
-    assert "X@0x0010" in out
+    assert "c = 0" in out
 
 
 def test_call_stmt_lowered():
@@ -239,12 +255,13 @@ def test_module_separates_routines_with_blank_line():
 def test_lower_stats_counts_top_level():
     stmts = [
         Assign(target=_abs("Y", 0x20), source=_imm(1), src=SRC),  # lowered
-        RawStmt(item=StoreAbs(reg=Reg.A, target=_abs("Z", 0x30), src=SRC)),  # deferred
+        RawStmt(item=StoreAbs(reg=Reg.A, target=_abs("Z", 0x30), src=SRC)),  # lowered (data-movement raw)
+        RawStmt(item=Clc(src=SRC)),  # deferred (carry-bearing raw)
         CallStmt(target="sub", src=SRC),  # lowered (CallStmt is now real code)
         ReturnStmt(src=SRC),  # lowered
     ]
     lowered, deferred = lower_stats(_module([_routine(stmts)]))
-    assert (lowered, deferred) == (3, 1)
+    assert (lowered, deferred) == (4, 1)
 
 
 # ---------------------------------------------------------------- compare expressions
@@ -406,3 +423,73 @@ def test_save_restore_temp():
     assert _emit_one(SaveTemp(slot=0, src=SRC)) == "let tmp0 = self.a;"
     assert _emit_one(RestoreTemp(slot=0, src=SRC)) == "self.a = tmp0;"
     assert _emit_one(SaveTemp(slot=3, src=SRC)) == "let tmp3 = self.a;"
+
+
+# ---------------------------------------------------------------- raw atom lowering
+
+
+def _raw(item) -> str:
+    return _emit_one(RawStmt(item=item))
+
+
+def test_raw_load_imm():
+    assert _raw(LoadImm(reg=Reg.X, imm=_imm(0x12), src=SRC)) == "self.x = 0x12;"
+
+
+def test_raw_load_imm_opvar_deferred():
+    # A self-modifying-code operand variable can't be lowered to a static
+    # byte, so the whole load stays a `// raw:` comment.
+    smc = Imm(value=0, text="#smXCO", opvar="smXCO")
+    out = _raw(LoadImm(reg=Reg.A, imm=smc, src=SRC))
+    assert out.startswith("// raw: ")
+
+
+def test_raw_load_indexed():
+    item = LoadIndexed(reg=Reg.A, base=_abs("tbl", 0x0200), index=Reg.Y, src=SRC)
+    assert _raw(item) == "self.a = self.ram[0x0200 + self.y as usize];"
+
+
+def test_raw_store_abs():
+    assert _raw(StoreAbs(reg=Reg.Y, target=_abs("Z", 0x30), src=SRC)) == "self.ram[0x0030] = self.y;"
+
+
+def test_raw_store_indexed():
+    item = StoreIndexed(reg=Reg.A, base=_abs("tbl", 0x0200), index=Reg.X, src=SRC)
+    assert _raw(item) == "self.ram[0x0200 + self.x as usize] = self.a;"
+
+
+def test_raw_transfer():
+    assert _raw(Transfer(src_reg=Reg.A, dst_reg=Reg.X, src=SRC)) == "self.x = self.a;"
+
+
+def test_raw_bitwise_and_or_eor():
+    assert _raw(Bitwise(op="and", source=_imm(0x0f), src=SRC)) == "self.a &= 0x0f;"
+    assert _raw(Bitwise(op="or", source=_abs("M", 0x40), src=SRC)) == "self.a |= self.ram[0x0040];"
+    eor_indexed = Bitwise(op="eor", source=IndexedAbs(base=_abs("t", 0x0200), index=Reg.X), src=SRC)
+    assert _raw(eor_indexed) == "self.a ^= self.ram[0x0200 + self.x as usize];"
+
+
+def test_raw_bitwise_indirect_deferred():
+    item = Bitwise(op="and", source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
+    assert _raw(item).startswith("// raw: ")
+
+
+def test_raw_inc_dec_register():
+    assert _raw(IncTarget(target=Reg.X, src=SRC)) == "self.x = self.x.wrapping_add(1);"
+    assert _raw(DecTarget(target=Reg.Y, src=SRC)) == "self.y = self.y.wrapping_sub(1);"
+
+
+def test_raw_inc_dec_memory():
+    assert _raw(IncTarget(target=_abs("M", 0x40), src=SRC)) == "self.ram[0x0040] = self.ram[0x0040].wrapping_add(1);"
+    assert _raw(DecTarget(target=_abs("M", 0x40), src=SRC)) == "self.ram[0x0040] = self.ram[0x0040].wrapping_sub(1);"
+
+
+def test_raw_inc_local_ref_deferred():
+    # `inc :smod+2` bumps a self-modifying-code operand byte — deferred.
+    item = IncTarget(target=LocalRef(label=":smod", offset=2), src=SRC)
+    assert _raw(item).startswith("// raw: ")
+
+
+def test_raw_load_indirect_deferred():
+    item = LoadIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
+    assert _raw(item).startswith("// raw: ")
