@@ -40,10 +40,12 @@ from pop_lifter.ir1 import (
     Reg,
     Rol,
     Ror,
+    SbcIndirect,
     Sec,
     SourceRef,
     StoreAbs,
     StoreIndexed,
+    StoreIndirect,
     Transfer,
 )
 from pop_lifter.ir1 import Compare
@@ -132,9 +134,12 @@ def test_value_indexed_read():
     assert _emit_value(iv) == "self.ram[0x0200 + self.x as usize]"
 
 
-def test_value_indirect_y_deferred():
+def test_value_indirect_y():
     out = _emit_value(IndirectY(ptr=_abs("ptr", 0x20)))
-    assert out == 'todo!("indirect (ptr),y read")'
+    assert out == (
+        "self.ram[(self.ram[0x0020] as usize "
+        "| (self.ram[0x0021] as usize) << 8) + self.y as usize]"
+    )
 
 
 def test_value_binexpr_add():
@@ -185,9 +190,12 @@ def test_assign_indexed_target():
     assert _emit_one(a) == "self.ram[0x0200 + self.y as usize] = 0x00;"
 
 
-def test_assign_indirect_y_target_deferred():
+def test_assign_indirect_y_target():
     a = Assign(target=IndirectY(ptr=_abs("ptr", 0x20)), source=_imm(0), src=SRC)
-    assert _emit_one(a) == "// TODO(pass4): store via IndirectY"
+    assert _emit_one(a) == (
+        "self.ram[(self.ram[0x0020] as usize "
+        "| (self.ram[0x0021] as usize) << 8) + self.y as usize] = 0x00;"
+    )
 
 
 def test_return_stmt():
@@ -477,9 +485,12 @@ def test_raw_bitwise_and_or_eor():
     assert _raw(eor_indexed) == "self.a ^= self.ram[0x0200 + self.x as usize];"
 
 
-def test_raw_bitwise_indirect_deferred():
+def test_raw_bitwise_indirect():
     item = Bitwise(op="and", source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
-    assert _raw(item).startswith("// raw: ")
+    assert _raw(item) == (
+        "self.a &= self.ram[(self.ram[0x0020] as usize "
+        "| (self.ram[0x0021] as usize) << 8) + self.y as usize];"
+    )
 
 
 def test_raw_inc_dec_register():
@@ -498,9 +509,42 @@ def test_raw_inc_local_ref_deferred():
     assert _raw(item).startswith("// raw: ")
 
 
-def test_raw_load_indirect_deferred():
+def _indirect(name: str, addr: int) -> str:
+    return (
+        f"self.ram[(self.ram[{addr:#06x}] as usize "
+        f"| (self.ram[{addr + 1:#06x}] as usize) << 8) + self.y as usize]"
+    )
+
+
+def test_raw_load_indirect():
     item = LoadIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
-    assert _raw(item).startswith("// raw: ")
+    assert _raw(item) == f"self.a = {_indirect('ptr', 0x20)};"
+
+
+def test_raw_store_indirect():
+    item = StoreIndirect(reg=Reg.A, target=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
+    assert _raw(item) == f"{_indirect('ptr', 0x20)} = self.a;"
+
+
+def test_raw_sbc_indirect():
+    item = SbcIndirect(source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
+    lines = _emit_stmt(RawStmt(item=item), 0)
+    assert lines[0] == (
+        "let _r = (self.a as u16) + (!self.ram[(self.ram[0x0020] as usize "
+        "| (self.ram[0x0021] as usize) << 8) + self.y as usize]) as u16 + (self.c as u16);"
+    )
+    assert lines[1] == "self.a = _r as u8;"
+    assert lines[2] == "self.c = (_r >> 8) as u8;"
+
+
+def test_indirect_high_byte_resolves_to_symbol():
+    # The `ptr + 1` high byte must reuse the base's `sym::` const when the
+    # low byte registers it, matching the `ztemp + 1` store form.
+    lo = Assign(target=_abs("ztemp", 0xF0), source=_imm(0), src=SRC)
+    load = RawStmt(item=LoadIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ztemp", 0xF0)), src=SRC))
+    out = emit_module(_module([_routine([lo, load, ReturnStmt(src=SRC)], name="r")]))
+    assert "self.a = self.ram[(self.ram[sym::ztemp] as usize " in out
+    assert "(self.ram[sym::ztemp + 1] as usize) << 8) + self.y as usize];" in out
 
 
 # ---------------------------------------------------------------- symbolic address constants

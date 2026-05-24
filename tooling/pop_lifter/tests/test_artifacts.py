@@ -422,12 +422,12 @@ def test_pass4_chgshadposn_rs_artifact_matches(source_dir):
     down-counter `for y in (0..=6).rev()` becomes an inlined
     `self.y = 0x06; loop { … step … if !(signed cond) { break; } }`,
     and the `jumpseq` call lowers to `self.jumpseq();` (a regular call
-    here — more statements follow it, so it is not a tail call). All
-    data-movement (`sta ztemp`, `ldy #7`, `lda #0`, `sta PlayCount`)
-    and carry-arithmetic atoms are lowered; RAM addresses keep their
-    symbols (`sym::ztemp`, `sym::PlayCount`). Only the indirect
-    `lda (ztemp),y` stays as a `// raw:` comment (pointer fetch
-    deferred)."""
+    here — more statements follow it, so it is not a tail call). Both
+    `(ztemp),y` reads — the folded `Char[y] = (ztemp),y` in the loop and
+    the standalone `lda (ztemp),y` — now lower to the 16-bit pointer
+    fetch `self.ram[(self.ram[sym::ztemp] | self.ram[sym::ztemp + 1] <<
+    8) + y]`, with the high byte resolving to `sym::ztemp + 1`. The
+    routine has no remaining `// raw:` / `todo!` lines."""
     if not IR_PILOT_CHGSHADPOSN_RS.exists():
         raise AssertionError(
             f"missing artifact {IR_PILOT_CHGSHADPOSN_RS}. regenerate with:\n"

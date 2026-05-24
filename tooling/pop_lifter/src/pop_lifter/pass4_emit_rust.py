@@ -1,36 +1,39 @@
 """Pass 4: emit Rust source from IR3.
 
 Earlier slices lowered module / routine scaffolding, leaf expressions
-(folded `Assign`s, `return`), *all structured control flow*, and
+(folded `Assign`s, `return`), *all structured control flow*,
 *data-movement `RawStmt` atoms* (loads, stores, transfers, bitwise,
-inc/dec) — the carry-/flag-free instructions that map directly onto
-register/memory moves.
+inc/dec), and the *carry-arithmetic atoms* (`clc`/`sec`/`adc`/`sbc`/
+shifts, over `self.c: u8`).
 
-This slice adds the *carry-arithmetic `RawStmt` atoms* — instructions
-that read or write the 6502 carry flag (`self.c: u8`, provisional):
+This slice adds *post-indexed indirect addressing* — the `(ptr),y`
+form. The effective address is a 16-bit zero-page pointer fetch plus Y:
 
-* `Clc` / `Sec` → `self.c = 0;` / `self.c = 1;`
-* `AdcImm` / `AdcAbs` / `AdcIndexed` → 8-bit add with carry via u16
-* `SbcImm` / `SbcAbs` / `SbcIndexed` → 8-bit subtract-with-borrow via
-  the `A + ~operand + C` trick (identical to the 6502's own arithmetic)
-* `Asl` / `Lsr` / `Rol` / `Ror` → accumulator shift/rotate
-* `ShiftMem` (asl/lsr/rol/ror on a memory byte)
-* `FlagOp` (`sei`/`cli`/`sed`/`cld`) → `self.i`/`self.d` flag bytes
+    self.ram[(self.ram[ptr] as usize
+              | (self.ram[ptr + 1] as usize) << 8) + self.y as usize]
 
-`self.c`, `self.i`, `self.d` are provisional — they belong to the same
-`Cpu` design slice as `self.ram`. `Z`/`N` are not yet modeled: the
-atoms that update only Z/N without touching C (`Cmp*`, `Bit`) stay
-deferred as `// raw:` comments.
+lowered through one `_indirect_index` helper and reused by every site
+that can carry an `IndirectY`:
+
+* folded `Assign` source / target (e.g. `dst[y] = (ptr),y`);
+* `LoadIndirect` (`lda (ptr),y`) / `StoreIndirect` (`sta (ptr),y`);
+* `Bitwise` with a `(ptr),y` source (`and`/`ora`/`eor (ptr),y`);
+* `SbcIndirect` (`sbc (ptr),y`), via the same `A + ~operand + C` trick.
+
+The high byte renders as a `ptr + 1` operand so it resolves to
+`sym::<ptr> + 1` when the base is named. No page wrap on the pointer
+and no 16-bit wrap on `+ Y`, matching the interpreter's permissive rule
+and the unmasked `IndexedAbs` lowering.
 
 Still deferred:
-* `Cmp*` / `Bit` — set Z/N (and C for cmp), need a full flag model;
-* `SbcIndirect` / `LoadIndirect` / `StoreIndirect` — indirect addressing;
+* `Cmp*` / `Bit` / `CmpIndirect` — set Z/N (and C for cmp), need a full
+  flag model;
 * `StoreLocal` / `StoreOpVar`, `LocalRef` inc/dec — self-modifying code;
 * `Pha` / `Pla` — stack;
 * `Wide16Stmt`, `RawIfStmt`, `GotoStmt` / `LabelStmt`.
 
-Memory model and receiver (`Cpu` / `self.ram`) remain provisional
-pending the Game/Renderer/Audio/Input design slice.
+Memory model and receiver (`Cpu` / `self.ram` / `self.c`) remain
+provisional pending the Game/Renderer/Audio/Input design slice.
 """
 
 from __future__ import annotations
@@ -55,6 +58,7 @@ from .ir1 import (
     LoadAbs,
     LoadImm,
     LoadIndexed,
+    LoadIndirect,
     Lsr,
     Reg,
     Rol,
@@ -62,10 +66,12 @@ from .ir1 import (
     SbcAbs,
     SbcImm,
     SbcIndexed,
+    SbcIndirect,
     Sec,
     ShiftMem,
     StoreAbs,
     StoreIndexed,
+    StoreIndirect,
     Transfer,
 )
 from .ir3 import (
@@ -200,6 +206,20 @@ def _abs_index(a: Abs, syms: SymTable | None) -> str:
     return syms.index(a)
 
 
+def _indirect_index(iy: IndirectY, syms: SymTable | None) -> str:
+    """Render the `self.ram[<index>]` index for a `(ptr),y` effective
+    address: fetch the 16-bit pointer from the zero-page bytes at `ptr`
+    (low) and `ptr + 1` (high), then add Y. The high byte is rendered as
+    a `ptr + 1` operand so it resolves to `sym::<ptr> + 1` when the base
+    is named. Matches the interpreter's permissive rule (no page wrap on
+    the pointer, no 16-bit wrap on `+ Y`) and the unmasked `IndexedAbs`
+    form."""
+    lo = f"self.ram[{_abs_index(iy.ptr, syms)}]"
+    hi_abs = Abs(name=f"{iy.ptr.name}+1", addr=(iy.ptr.addr + 1) & 0xFFFF)
+    hi = f"self.ram[{_abs_index(hi_abs, syms)}]"
+    return f"({lo} as usize | ({hi} as usize) << 8) + self.y as usize"
+
+
 def _emit_value(v, syms: SymTable | None = None) -> str:
     """Render an `Assign` source or compare RHS as a Rust r-value."""
     if isinstance(v, Imm):
@@ -209,8 +229,7 @@ def _emit_value(v, syms: SymTable | None = None) -> str:
     if isinstance(v, IndexedAbs):
         return f"self.ram[{_abs_index(v.base, syms)} + self.{v.index} as usize]"
     if isinstance(v, IndirectY):
-        # `(ptr),y` needs a 16-bit pointer fetch + Y — deferred.
-        return f'todo!("indirect ({v.ptr.name}),y read")'
+        return f"self.ram[{_indirect_index(v, syms)}]"
     if isinstance(v, BinExpr):
         return _emit_binexpr(v, syms)
     if isinstance(v, RotateExpr):
@@ -240,7 +259,9 @@ def _emit_target(target, syms: SymTable | None = None) -> str | None:
         return f"self.ram[{_abs_index(target, syms)}]"
     if isinstance(target, IndexedAbs):
         return f"self.ram[{_abs_index(target.base, syms)} + self.{target.index} as usize]"
-    return None  # IndirectY and anything else: deferred
+    if isinstance(target, IndirectY):
+        return f"self.ram[{_indirect_index(target, syms)}]"
+    return None  # anything else: deferred
 
 
 def _emit_compare(c: Compare, syms: SymTable | None = None) -> str:
@@ -275,14 +296,13 @@ _BITWISE_OPS = {"and": "&", "or": "|", "eor": "^"}
 
 
 def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
-    """Lower an unfolded IR1 data-movement atom to Rust statement
-    fragments (no indentation), or return `None` when the atom isn't
-    lowered in this slice so the caller falls back to a `// raw:`
-    comment.
+    """Lower an unfolded IR1 atom to Rust statement fragments (no
+    indentation), or return `None` when the atom isn't lowered yet so
+    the caller falls back to a `// raw:` comment.
 
-    Covers the carry-/flag-free register and memory moves. Carry- or
-    flag-bearing atoms (adc/sbc/shifts/cmp/bit/clc/sec), indirect
-    addressing, self-modifying code, and the stack stay deferred."""
+    Covers register/memory moves, carry arithmetic (adc/sbc/shifts),
+    and `(ptr),y` indirect loads/stores/bitwise/sbc. Flag-only atoms
+    (cmp/bit), self-modifying code, and the stack stay deferred."""
     if isinstance(item, LoadImm):
         # An opvar immediate is a runtime-patched SMC byte; lowering it
         # to its assembled value would be wrong, so defer the whole load.
@@ -297,6 +317,9 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         place = f"self.ram[{_abs_index(item.base, syms)} + self.{item.index} as usize]"
         return [f"self.{item.reg} = {place};"]
 
+    if isinstance(item, LoadIndirect):
+        return [f"self.{item.reg} = self.ram[{_indirect_index(item.source, syms)}];"]
+
     if isinstance(item, StoreAbs):
         return [f"self.ram[{_abs_index(item.target, syms)}] = self.{item.reg};"]
 
@@ -304,14 +327,15 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         place = f"self.ram[{_abs_index(item.base, syms)} + self.{item.index} as usize]"
         return [f"{place} = self.{item.reg};"]
 
+    if isinstance(item, StoreIndirect):
+        return [f"self.ram[{_indirect_index(item.target, syms)}] = self.{item.reg};"]
+
     if isinstance(item, Transfer):
         return [f"self.{item.dst_reg} = self.{item.src_reg};"]
 
     if isinstance(item, Bitwise):
         op = _BITWISE_OPS.get(item.op)
-        # `(ptr),y` sources need a pointer fetch — deferred with the rest
-        # of indirect addressing.
-        if op is None or not isinstance(item.source, (Imm, Abs, IndexedAbs)):
+        if op is None or not isinstance(item.source, (Imm, Abs, IndexedAbs, IndirectY)):
             return None
         return [f"self.a {op}= {_emit_value(item.source, syms)};"]
 
@@ -350,15 +374,17 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             "self.c = (_r >> 8) as u8;",
         ]
 
-    if isinstance(item, (SbcImm, SbcAbs, SbcIndexed)):
+    if isinstance(item, (SbcImm, SbcAbs, SbcIndexed, SbcIndirect)):
         # 6502 SBC uses the A + ~operand + C identity so the borrow
         # convention (C=1 means "no borrow") falls out naturally.
         if isinstance(item, SbcImm):
             rhs = f"(!{_emit_imm(item.imm)}) as u16"
         elif isinstance(item, SbcAbs):
             rhs = f"(!self.ram[{_abs_index(item.source, syms)}]) as u16"
-        else:
+        elif isinstance(item, SbcIndexed):
             rhs = f"(!self.ram[{_abs_index(item.base, syms)} + self.{item.index} as usize]) as u16"
+        else:
+            rhs = f"(!self.ram[{_indirect_index(item.source, syms)}]) as u16"
         return [
             f"let _r = (self.a as u16) + {rhs} + (self.c as u16);",
             "self.a = _r as u8;",
@@ -560,12 +586,11 @@ _HEADER = [
     "// @generated by pop_lifter — DO NOT EDIT.",
     "//",
     "// Pass 4 skeleton slice: module + routine scaffolding with leaf-",
-    "// expression, control-flow, data-movement, and carry-arithmetic",
-    "// `RawStmt` lowering. Carry is `self.c: u8` (provisional).",
-    "// Z/N-only atoms (`Cmp*`, `Bit`), indirect addressing, SMC,",
-    "// the stack, `Wide16Stmt`, `RawIfStmt`, and `GotoStmt`/",
-    "// `LabelStmt` are deferred; they appear as `// raw: …` or",
-    "// `// TODO(pass4): …` comments.",
+    "// expression, control-flow, data-movement, carry-arithmetic, and",
+    "// `(ptr),y` indirect lowering. Carry is `self.c: u8` (provisional).",
+    "// Z/N-only atoms (`Cmp*`, `Bit`), SMC, the stack, `Wide16Stmt`,",
+    "// `RawIfStmt`, and `GotoStmt`/`LabelStmt` are deferred; they appear",
+    "// as `// raw: …` or `// TODO(pass4): …` comments.",
     "// The `Cpu` receiver and `self.ram`/`self.c` are provisional,",
     "// pending the state/trait design slice. RAM addresses keep their",
     "// source symbol names via the `sym` constants below.",
