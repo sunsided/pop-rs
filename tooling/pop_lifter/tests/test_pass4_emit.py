@@ -43,6 +43,7 @@ from pop_lifter.ir1 import (
     LoadIndexed,
     LoadIndirect,
     LocalRef,
+    OpVarRef,
     Pha,
     Pla,
     Reg,
@@ -609,6 +610,15 @@ def test_raw_store_op_addr_writes_byte_halves():
         "self.smc.smBASE_lo = self.reg.a;"
     assert _raw(StoreOpAddr(reg=Reg.X, name="smBASE", half="hi", src=SRC)) == \
         "self.smc.smBASE_hi = self.reg.x;"
+
+
+def test_raw_inc_dec_op_var_ref_bumps_field():
+    # inc/dec of a recognised operand var read-modify-writes the field;
+    # `half` selects the immediate byte or an address byte.
+    assert _raw(IncTarget(target=OpVarRef(name="smBASE", half="hi"), src=SRC)) == \
+        "self.smc.smBASE_hi = self.smc.smBASE_hi.wrapping_add(1);"
+    assert _raw(DecTarget(target=OpVarRef(name="smXCO", half=None), src=SRC)) == \
+        "self.smc.smXCO = self.smc.smXCO.wrapping_sub(1);"
 
 
 def test_address_opvar_operand_composes_runtime_base():

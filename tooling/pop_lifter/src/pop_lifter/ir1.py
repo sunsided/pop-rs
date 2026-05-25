@@ -636,14 +636,32 @@ class LocalRef:
 
 
 @dataclass(frozen=True)
+class OpVarRef:
+    """Target of an `inc`/`dec` on a *recognised* SMC operand variable —
+    the read-modify-write analog of `StoreOpVar` / `StoreOpAddr`. Pass 3's
+    SMC recognition rewrites an `IncTarget`/`DecTarget` whose `LocalRef`
+    names an operand-var site into this form. `name` is the operand
+    variable; `half` is `None` (the immediate operand byte → field
+    `<name>`) or `"lo"` / `"hi"` (an address operand byte → `<name>_lo` /
+    `<name>_hi`). The interpreter bumps the same `operand_vars` /
+    `operand_addr_lo`/`_hi` slot the matching store writes and the patched
+    instruction reads, so the bump actually takes effect."""
+
+    name: str
+    half: str | None
+
+
+@dataclass(frozen=True)
 class IncTarget:
     """`inx` / `iny` / `inc addr` / `inc :label+N` — add 1 to a
     register, memory location, or self-modifying-code operand byte.
     Sets Z/N on the result; does NOT touch C. `target` is a `Reg`
-    (X or Y — `ina` doesn't exist on stock 6502), an `Abs` for
-    memory counters, or a `LocalRef` for SMC operand bumps."""
+    (X or Y — `ina` doesn't exist on stock 6502), an `Abs` for memory
+    counters, a `LocalRef` for an unrecognised SMC operand bump, or an
+    `OpVarRef` once pass-3 SMC recognition connects it to an operand
+    variable."""
 
-    target: "Reg | Abs | LocalRef"
+    target: "Reg | Abs | LocalRef | OpVarRef"
     src: SourceRef
 
 
@@ -652,7 +670,7 @@ class DecTarget:
     """`dex` / `dey` / `dec addr` / `dec :label+N` — same as
     `IncTarget` but decrement. Sets Z/N; does NOT touch C."""
 
-    target: "Reg | Abs | LocalRef"
+    target: "Reg | Abs | LocalRef | OpVarRef"
     src: SourceRef
 
 
@@ -1026,6 +1044,9 @@ def format_item(item: Item) -> str:
     if isinstance(item, (IncTarget, DecTarget)):
         if isinstance(item.target, Reg):
             tgt = str(item.target)
+        elif isinstance(item.target, OpVarRef):
+            half = f".{item.target.half}" if item.target.half else ""
+            tgt = f"opvar {item.target.name}{half}"
         elif isinstance(item.target, LocalRef):
             loc = item.target.label
             if item.target.offset != 0:

@@ -68,6 +68,7 @@ from .ir1 import (
     Lsr,
     ModuleIR1,
     Nop,
+    OpVarRef,
     Pha,
     Pla,
     Reg,
@@ -621,12 +622,31 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
             else:
                 trace.y = new
             _set_zn(trace, new)
+        elif isinstance(item.target, OpVarRef):
+            # Recognised SMC operand bump (`inc :smod+2` where `:smod` is
+            # an operand-var site). Bump the same slot the matching store
+            # writes and the patched instruction reads, so the faithful
+            # model stays consistent. The store always precedes the bump
+            # in practice, so the missing-slot seed (0) isn't normally hit.
+            t = item.target
+            if t.half is None:
+                sink = trace.operand_vars
+            elif t.half == "lo":
+                sink = trace.operand_addr_lo
+            elif t.half == "hi":
+                sink = trace.operand_addr_hi
+            else:
+                raise InterpError(
+                    f"OpVarRef.half must be None/'lo'/'hi', got {t.half!r}"
+                )
+            new = (sink.get(t.name, 0) + delta) & 0xff
+            sink[t.name] = new
+            _set_zn(trace, new)
         elif isinstance(item.target, LocalRef):
-            # SMC operand bump (`inc :smod+2`). Route through the
-            # code_patches side channel like StoreLocal; the patched
-            # operand has no real address. We seed missing slots at 0
-            # so a bump-before-store reads as 0 (best-effort — a
-            # faithful SMC model is future work).
+            # Unrecognised SMC operand bump. Route through the
+            # code_patches side channel like an opaque StoreLocal; the
+            # patched operand has no real address. We seed missing slots
+            # at 0 so a bump-before-store reads as 0 (best-effort).
             key = (item.target.label, item.target.offset)
             new = (trace.code_patches.get(key, 0) + delta) & 0xff
             trace.code_patches[key] = new
