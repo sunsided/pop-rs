@@ -116,8 +116,10 @@ from .ir1 import (
     LoadIndexed,
     LoadIndirect,
     Lsr,
+    MemBitOp,
     OpVarRef,
     Pha,
+    Phy,
     Pla,
     Reg,
     Rol,
@@ -722,6 +724,19 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
 
     if isinstance(item, Pha):
         return ["self.stack.push(self.reg.a);"]
+
+    if isinstance(item, Phy):
+        return ["self.stack.push(self.reg.y);"]
+
+    if isinstance(item, MemBitOp):
+        # 65C02 tsb/trb: test A against memory (Z), then set / reset those
+        # bits. `!self.reg.a` is Rust's bitwise complement on `u8`.
+        place = f"self.mem[{_abs_index(item.target, syms)}]"
+        rmw = f"{place} |= self.reg.a;" if item.op == "tsb" else f"{place} &= !self.reg.a;"
+        return [
+            f"self.flags.z = (self.reg.a & {place}) == 0;",
+            rmw,
+        ]
 
     if isinstance(item, Pla):
         return [

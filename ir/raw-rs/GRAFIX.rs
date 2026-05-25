@@ -2108,7 +2108,8 @@ impl Cpu {
             return;
         }
         self.reg.a = 0x80;
-        // raw: ??? tsb $C036            ; GRAFIX.S:2052
+        self.flags.z = (self.reg.a & self.mem[0xc036]) == 0;
+        self.mem[0xc036] |= self.reg.a;
         return;
     }
 
@@ -2122,7 +2123,8 @@ impl Cpu {
         self.mem[0xc034] = self.reg.a;
         self.mem[0xc022] = 0xf0;
         self.reg.a = 0x80;
-        // raw: ??? trb $c036            ; GRAFIX.S:2073
+        self.flags.z = (self.reg.a & self.mem[0xc036]) == 0;
+        self.mem[0xc036] &= !self.reg.a;
         return;
     }
 
@@ -2135,7 +2137,7 @@ impl Cpu {
         // 65816 (IIgs-only, not modeled): xce  ; GRAFIX.S:2093
         // 65816 (IIgs-only, not modeled): rep $30  ; GRAFIX.S:2094
         self.stack.push(self.reg.a);
-        // raw: ??? phy             ; GRAFIX.S:2096
+        self.stack.push(self.reg.y);
         self.reg.x = 0x03;
         self.reg.a = self.stack.pop().expect("pla on empty stack");
         self.flags.z = self.reg.a == 0;
@@ -2152,7 +2154,7 @@ impl Cpu {
         // 65816 (IIgs-only, not modeled): rep $30  ; GRAFIX.S:2115
         self.reg.a &= 0xff;
         self.stack.push(self.reg.a);
-        // raw: ??? phy             ; GRAFIX.S:2118
+        self.stack.push(self.reg.y);
         self.reg.x = 0x03;
         self.flags.c = true;
         // 65816 (IIgs-only, not modeled): xce  ; GRAFIX.S:2122

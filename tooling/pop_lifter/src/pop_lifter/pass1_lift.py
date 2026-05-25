@@ -48,7 +48,9 @@ from .ir1 import (
     Bitwise,
     CmpIndexed,
     IndexedAbs,
+    MemBitOp,
     Pha,
+    Phy,
     Pla,
     Rol,
     Ror,
@@ -486,6 +488,16 @@ def _lift_instr(
             return ShiftMem(op=mnemonic, target=addr, src=src)
         return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
 
+    if mnemonic in ("tsb", "trb"):
+        # 65C02 test-and-set / test-and-reset bits in memory. Absolute
+        # operand only (POP uses `tsb/trb $C036` for the IIgs speed reg).
+        if line.operand is None:
+            return Unsupported(mnemonic=mnemonic, operand=None, src=src)
+        addr = _parse_absolute(line.operand, equates)
+        if addr is not None:
+            return MemBitOp(op=mnemonic, target=addr, src=src)
+        return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
+
     if mnemonic == "clc":
         return Clc(src=src)
 
@@ -564,6 +576,9 @@ def _lift_instr(
         return Pha(src=src)
     if mnemonic == "pla":
         return Pla(src=src)
+    if mnemonic == "phy":
+        # 65C02 push-Y. No operand; rides the same value stack as pha.
+        return Phy(src=src)
 
     # Index-register inc/dec — single-byte opcodes, no operand.
     if mnemonic in ("inx", "iny"):
