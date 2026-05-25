@@ -103,6 +103,7 @@ from .ir1 import (
     CmpImm,
     CmpIndexed,
     CmpIndirect,
+    CmpLocal,
     Compare,
     DecTarget,
     FlagOp,
@@ -115,6 +116,7 @@ from .ir1 import (
     LoadImm,
     LoadIndexed,
     LoadIndirect,
+    LoadLocal,
     Lsr,
     MemBitOp,
     OpVarRef,
@@ -133,6 +135,7 @@ from .ir1 import (
     StoreAbs,
     StoreIndexed,
     StoreIndirect,
+    StoreLocal,
     StoreOpAddr,
     StoreOpVar,
     Transfer,
@@ -396,6 +399,14 @@ def _indirect_index(iy: IndirectY, syms: SymTable | None) -> str:
     return f"({lo} as usize | ({hi} as usize) << 8) + self.reg.y as usize"
 
 
+def _local_key(label: str, offset: int) -> str:
+    """Render the `(label, offset)` key for the `self.local` byte store
+    shared by `StoreLocal` / `LoadLocal` / `CmpLocal`. Local (`:`) and
+    Merlin-variable (`]`) names have no resolved address, so the symbolic
+    name string itself is the key (`(":pitch", 1)`)."""
+    return f'("{label}", {offset})'
+
+
 def _indirect_x_index(ix: IndirectX, syms: SymTable | None) -> str:
     """Render the `self.mem[<index>]` index for a `(ptr,x)` pre-indexed
     effective address: add X to the zero-page pointer location (with
@@ -417,6 +428,8 @@ def _cmp_operand(item, syms: SymTable | None) -> str:
         return f"self.mem[{_abs_index(item.source, syms)}]"
     if isinstance(item, CmpIndexed):
         return f"self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize]"
+    if isinstance(item, CmpLocal):
+        return f"self.local.get(&{_local_key(item.source_label, item.offset)}).copied().unwrap_or(0)"
     return f"self.mem[{_indirect_index(item.source, syms)}]"  # CmpIndirect
 
 
@@ -549,6 +562,15 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
     if isinstance(item, LoadAbs):
         return [f"self.reg.{item.reg} = self.mem[{_abs_index(item.source, syms)}];"]
 
+    if isinstance(item, LoadLocal):
+        reg = f"self.reg.{item.reg}"
+        key = _local_key(item.source_label, item.offset)
+        return [
+            f"{reg} = self.local.get(&{key}).copied().unwrap_or(0);",
+            f"self.flags.z = {reg} == 0;",
+            f"self.flags.n = ({reg} >> 7) != 0;",
+        ]
+
     if isinstance(item, LoadIndexed):
         place = f"self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize]"
         return [f"self.reg.{item.reg} = {place};"]
@@ -587,6 +609,12 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             return [f"self.reg.{target} = self.reg.{target}.{method}(1);"]
         if isinstance(target, Abs):
             place = f"self.mem[{_abs_index(target, syms)}]"
+            return [f"{place} = {place}.{method}(1);"]
+        if isinstance(target, IndexedAbs):
+            place = (
+                f"self.mem[{_abs_index(target.base, syms)} "
+                f"+ self.reg.{target.index} as usize]"
+            )
             return [f"{place} = {place}.{method}(1);"]
         if isinstance(target, OpVarRef):
             # Recognised SMC operand bump: read-modify-write the operand
@@ -695,7 +723,7 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
 
     # ---- flag-only comparisons ------------------------------------------
 
-    if isinstance(item, (CmpImm, CmpAbs, CmpIndexed, CmpIndirect)):
+    if isinstance(item, (CmpImm, CmpAbs, CmpIndexed, CmpIndirect, CmpLocal)):
         reg = f"self.reg.{item.reg}"
         return [
             f"let _o: u8 = {_cmp_operand(item, syms)};",
@@ -745,12 +773,24 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             "self.flags.n = (self.reg.a >> 7) != 0;",
         ]
 
+    if isinstance(item, StoreLocal):
+        # Local-label / Merlin-variable store. The recognised SMC operand
+        # patches were already rewritten to StoreOpVar/StoreOpAddr by
+        # pass 3; what reaches here is local *data* stores (`sta ]flag`)
+        # plus unrecognised opcode/branch-target patches. All ride the
+        # `self.local` keyed byte store that LoadLocal/CmpLocal read back
+        # (a dead write for the patch cases, which have no modelled
+        # reader — we don't re-execute patched code).
+        return [
+            f"self.local.insert({_local_key(item.target_label, item.offset)}, "
+            f"self.reg.{item.reg});"
+        ]
+
     # ---- self-modifying code (recognised immediate-operand patch) -------
     # `pass3_smc` rewrote `sta :label+1` (patching the `#imm` byte of the
     # instruction at `:label`) into a `StoreOpVar`, and marked that
     # instruction's `Imm.opvar` so it reads the same provisional operand
-    # variable (`self.<name>`) written here. The opaque `StoreLocal`
-    # (address/branch patches) has no consumer model yet and stays raw.
+    # variable (`self.<name>`) written here.
 
     if isinstance(item, StoreOpVar):
         return [f"self.smc.{_mangle(item.name)} = self.reg.{item.reg};"]
@@ -1107,6 +1147,9 @@ def _emit_state_defs(smc_fields: list[str]) -> list[str]:
         "    pub mem: Box<[u8; 0x10000]>,",
         "    pub stack: Vec<u8>,",
         "    pub smc: Smc,",
+        "    // Local-label / Merlin-variable byte store, keyed by symbolic",
+        "    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.",
+        "    pub local: std::collections::HashMap<(&'static str, u8), u8>,",
         "}",
         "",
         "impl Cpu {",
@@ -1117,6 +1160,7 @@ def _emit_state_defs(smc_fields: list[str]) -> list[str]:
         "            mem: Box::new([0u8; 0x10000]),",
         "            stack: Vec::new(),",
         "            smc: Smc::default(),",
+        "            local: std::collections::HashMap::new(),",
         "        }",
         "    }",
         "}",

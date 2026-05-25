@@ -69,7 +69,7 @@ pub fn setmain(cpu: &mut Cpu) {
 
 pub fn driveon(cpu: &mut Cpu) {
     cpu.reg.a = 0x00;
-    // raw: patch *:delay = a            ; MASTER.S:302
+    cpu.local.insert((":delay", 0), cpu.reg.a);
     setaux(cpu);
     let _o: u8 = cpu.mem[sym::RWBANK1];
     cpu.flags.z = (cpu.reg.a & _o) == 0;
@@ -78,14 +78,14 @@ pub fn driveon(cpu: &mut Cpu) {
     cpu.flags.z = (cpu.reg.a & _o) == 0;
     cpu.flags.n = (_o >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::BBundID];
-    // raw: patch *:IDbyte = a            ; MASTER.S:314
+    cpu.local.insert((":IDbyte", 0), cpu.reg.a);
     crate::ext::rw18(cpu);
     crate::ext::rw18(cpu);
     return;
 }
 
 pub fn driveon1(cpu: &mut Cpu) {
-    // raw: patch *:delay = a            ; MASTER.S:302
+    cpu.local.insert((":delay", 0), cpu.reg.a);
     setaux(cpu);
     let _o: u8 = cpu.mem[sym::RWBANK1];
     cpu.flags.z = (cpu.reg.a & _o) == 0;
@@ -94,7 +94,7 @@ pub fn driveon1(cpu: &mut Cpu) {
     cpu.flags.z = (cpu.reg.a & _o) == 0;
     cpu.flags.n = (_o >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::BBundID];
-    // raw: patch *:IDbyte = a            ; MASTER.S:314
+    cpu.local.insert((":IDbyte", 0), cpu.reg.a);
     crate::ext::rw18(cpu);
     crate::ext::rw18(cpu);
     return;
@@ -262,12 +262,14 @@ pub fn vidstuff(cpu: &mut Cpu) {
     crate::ext::rw18(cpu);
     loop {
         crate::ext::rw18(cpu);
-        // raw: ??? lda :sm            ; MASTER.S:509
+        cpu.reg.a = cpu.local.get(&(":sm", 0)).copied().unwrap_or(0);
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.flags.c = false;
         let _r = (cpu.reg.a as u16) + (0x12) as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
-        // raw: patch *:sm = a            ; MASTER.S:512
+        cpu.local.insert((":sm", 0), cpu.reg.a);
         let _o: u8 = 0x6c;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;

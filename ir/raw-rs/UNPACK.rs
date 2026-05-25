@@ -36,6 +36,9 @@ pub struct Cpu {
     pub mem: Box<[u8; 0x10000]>,
     pub stack: Vec<u8>,
     pub smc: Smc,
+    // Local-label / Merlin-variable byte store, keyed by symbolic
+    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.
+    pub local: std::collections::HashMap<(&'static str, u8), u8>,
 }
 
 impl Cpu {
@@ -46,6 +49,7 @@ impl Cpu {
             mem: Box::new([0u8; 0x10000]),
             stack: Vec::new(),
             smc: Smc::default(),
+            local: std::collections::HashMap::new(),
         }
     }
 }
@@ -926,8 +930,8 @@ impl Cpu {
 
     fn FADEIN(&mut self) {
         self.mem[sym::RAMRDmain] = self.reg.a;
-        // raw: patch *:sm1+2 = a            ; UNPACK.S:683
-        // raw: patch *:sm2+2 = a            ; UNPACK.S:684
+        self.local.insert((":sm1", 2), self.reg.a);
+        self.local.insert((":sm2", 2), self.reg.a);
         self.flags.c = false;
         // 65816 (IIgs-only, not modeled): xce  ; UNPACK.S:687
         // 65816 (IIgs-only, not modeled): sep $30  ; UNPACK.S:689
@@ -978,9 +982,11 @@ impl Cpu {
     fn loadscrn(&mut self) {
         self.reg.a = 0x20;
         loop {
-            // raw: patch *:sm = a            ; UNPACK.S:868
+            self.local.insert((":sm", 0), self.reg.a);
             self.rw18();
-            // raw: ??? lda :sm            ; UNPACK.S:872
+            self.reg.a = self.local.get(&(":sm", 0)).copied().unwrap_or(0);
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.flags.c = false;
             let _r = (self.reg.a as u16) + (0x12) as u16 + (self.flags.c as u16);
             self.reg.a = _r as u8;

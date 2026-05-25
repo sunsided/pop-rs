@@ -1121,13 +1121,13 @@ pub fn LayGen(cpu: &mut Cpu) {
                 cpu.smc._90_hi = cpu.reg.a;
                 cpu.smc._92_hi = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::AMASKS + cpu.reg.x as usize];
-                // raw: patch *:AMASK+1 = a            ; HIRES.S:707
+                cpu.local.insert((":AMASK", 1), cpu.reg.a);
                 cpu.reg.a = cpu.mem[sym::BMASKS + cpu.reg.x as usize];
-                // raw: patch *:BMASK+1 = a            ; HIRES.S:709
+                cpu.local.insert((":BMASK", 1), cpu.reg.a);
                 cpu.reg.x = cpu.mem[sym::OPACITY];
                 cpu.reg.a = cpu.mem[sym::OPCODE + cpu.reg.x as usize];
-                // raw: patch *:80 = a            ; HIRES.S:713
-                // raw: patch *:81 = a            ; HIRES.S:714
+                cpu.local.insert((":80", 0), cpu.reg.a);
+                cpu.local.insert((":81", 0), cpu.reg.a);
                 cpu.reg.y = cpu.mem[sym::YCO];
                 pc = 3;
             }
@@ -1325,8 +1325,8 @@ pub fn LayMask(cpu: &mut Cpu) {
             0 => {
                 cpu.reg.x = cpu.mem[sym::OPACITY];
                 cpu.reg.a = cpu.mem[sym::OPCODE + cpu.reg.x as usize];
-                // raw: patch *:masksm1 = a            ; HIRES.S:836
-                // raw: patch *:masksm2 = a            ; HIRES.S:837
+                cpu.local.insert((":masksm1", 0), cpu.reg.a);
+                cpu.local.insert((":masksm2", 0), cpu.reg.a);
                 PREPREP(cpu);
                 CROP(cpu);
                 if cpu.flags.n {
@@ -1603,7 +1603,7 @@ pub fn LayXOR(cpu: &mut Cpu) {
                 cpu.smc.c1_hi = cpu.reg.a;
                 cpu.smc.c2_hi = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::AMASKS + cpu.reg.x as usize];
-                // raw: patch *:AMASK+1 = a            ; HIRES.S:1048
+                cpu.local.insert((":AMASK", 1), cpu.reg.a);
                 cpu.reg.y = cpu.mem[sym::YCO];
                 pc = 3;
             }
@@ -1848,8 +1848,8 @@ pub fn MLayGen(cpu: &mut Cpu) {
                 cpu.mem[sym::BMASK] = cpu.reg.a;
                 cpu.reg.x = cpu.mem[sym::OPACITY];
                 cpu.reg.a = cpu.mem[sym::OPCODE + cpu.reg.x as usize];
-                // raw: patch *:80 = a            ; HIRES.S:1239
-                // raw: patch *:81 = a            ; HIRES.S:1240
+                cpu.local.insert((":80", 0), cpu.reg.a);
+                cpu.local.insert((":81", 0), cpu.reg.a);
                 cpu.reg.y = cpu.mem[sym::YCO];
                 pc = 3;
             }
@@ -2027,8 +2027,8 @@ pub fn MLayMask(cpu: &mut Cpu) {
             0 => {
                 cpu.reg.x = cpu.mem[sym::OPACITY];
                 cpu.reg.a = cpu.mem[sym::OPCODE + cpu.reg.x as usize];
-                // raw: patch *:masksm1 = a            ; HIRES.S:1359
-                // raw: patch *:masksm2 = a            ; HIRES.S:1360
+                cpu.local.insert((":masksm1", 0), cpu.reg.a);
+                cpu.local.insert((":masksm2", 0), cpu.reg.a);
                 PREPREP(cpu);
                 cpu.reg.a = cpu.mem[sym::XCO];
                 cpu.flags.c = true;
@@ -2071,7 +2071,7 @@ pub fn MLayMask(cpu: &mut Cpu) {
                 cpu.reg.a = cpu.mem[sym::AMASKS + cpu.reg.x as usize];
                 cpu.smc.AMASK = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::BMASKS + cpu.reg.x as usize];
-                // raw: patch *:BMASK+1 = a            ; HIRES.S:1402
+                cpu.local.insert((":BMASK", 1), cpu.reg.a);
                 cpu.reg.y = cpu.mem[sym::YCO];
                 pc = 3;
             }
@@ -2541,7 +2541,7 @@ pub fn FASTLAY(cpu: &mut Cpu) {
             }
             2 => {
                 cpu.reg.a = cpu.mem[sym::OPCODE + cpu.reg.x as usize];
-                // raw: patch *:smod = a            ; HIRES.S:1751
+                cpu.local.insert((":smod", 0), cpu.reg.a);
                 cpu.reg.a = cpu.mem[sym::PAGE];
                 cpu.smc.smPAGE = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::XCO];
@@ -2948,11 +2948,11 @@ pub fn FASTMASK(cpu: &mut Cpu) {
 
 pub fn SETFASTMAIN(cpu: &mut Cpu) {
     cpu.reg.a = 0x02;
-    // raw: patch *]ramrd1+1 = a            ; HIRES.S:1983
-    // raw: patch *]ramrd2+1 = a            ; HIRES.S:1984
-    // raw: patch *]ramrd3+1 = a            ; HIRES.S:1985
-    // raw: patch *]ramrd4+1 = a            ; HIRES.S:1986
-    // raw: patch *]ramrd5+1 = a            ; HIRES.S:1987
+    cpu.local.insert(("]ramrd1", 1), cpu.reg.a);
+    cpu.local.insert(("]ramrd2", 1), cpu.reg.a);
+    cpu.local.insert(("]ramrd3", 1), cpu.reg.a);
+    cpu.local.insert(("]ramrd4", 1), cpu.reg.a);
+    cpu.local.insert(("]ramrd5", 1), cpu.reg.a);
     return;
 }
 

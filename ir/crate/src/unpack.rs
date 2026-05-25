@@ -840,8 +840,8 @@ pub fn SETDHIRES(cpu: &mut Cpu) {
 
 pub fn FADEIN(cpu: &mut Cpu) {
     cpu.mem[sym::RAMRDmain] = cpu.reg.a;
-    // raw: patch *:sm1+2 = a            ; UNPACK.S:683
-    // raw: patch *:sm2+2 = a            ; UNPACK.S:684
+    cpu.local.insert((":sm1", 2), cpu.reg.a);
+    cpu.local.insert((":sm2", 2), cpu.reg.a);
     cpu.flags.c = false;
     // 65816 (IIgs-only, not modeled): xce  ; UNPACK.S:687
     // 65816 (IIgs-only, not modeled): sep $30  ; UNPACK.S:689
@@ -892,9 +892,11 @@ pub fn LOADSUPER(cpu: &mut Cpu) {
 pub fn loadscrn(cpu: &mut Cpu) {
     cpu.reg.a = 0x20;
     loop {
-        // raw: patch *:sm = a            ; UNPACK.S:868
+        cpu.local.insert((":sm", 0), cpu.reg.a);
         crate::ext::rw18(cpu);
-        // raw: ??? lda :sm            ; UNPACK.S:872
+        cpu.reg.a = cpu.local.get(&(":sm", 0)).copied().unwrap_or(0);
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.flags.c = false;
         let _r = (cpu.reg.a as u16) + (0x12) as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;

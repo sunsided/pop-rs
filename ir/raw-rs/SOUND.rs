@@ -36,6 +36,9 @@ pub struct Cpu {
     pub mem: Box<[u8; 0x10000]>,
     pub stack: Vec<u8>,
     pub smc: Smc,
+    // Local-label / Merlin-variable byte store, keyed by symbolic
+    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.
+    pub local: std::collections::HashMap<(&'static str, u8), u8>,
 }
 
 impl Cpu {
@@ -46,6 +49,7 @@ impl Cpu {
             mem: Box::new([0u8; 0x10000]),
             stack: Vec::new(),
             smc: Smc::default(),
+            local: std::collections::HashMap::new(),
         }
     }
 }
@@ -110,9 +114,9 @@ impl Cpu {
         }
         self.reg.x = self.reg.a;
         self.reg.a = self.mem[sym::lookup + self.reg.x as usize];
-        // raw: patch *:sm+1 = a            ; SOUND.S:134
+        self.local.insert((":sm", 1), self.reg.a);
         self.reg.a = self.mem[sym::lookup + 1 + self.reg.x as usize];
-        // raw: patch *:sm+2 = a            ; SOUND.S:136
+        self.local.insert((":sm", 2), self.reg.a);
         self._24ffff();
         return;
     }
@@ -264,8 +268,8 @@ impl Cpu {
         loop {
             match pc {
                 0 => {
-                    // raw: patch *:pitch = y            ; SOUND.S:332
-                    // raw: patch *:pitch+1 = x            ; SOUND.S:333
+                    self.local.insert((":pitch", 0), self.reg.y);
+                    self.local.insert((":pitch", 1), self.reg.x);
                     pc = 1;
                 }
                 1 => {
@@ -281,7 +285,10 @@ impl Cpu {
                 }
                 3 => {
                     self.reg.y = self.reg.y.wrapping_add(1);
-                    // raw: ??? cpy :pitch            ; SOUND.S:341
+                    let _o: u8 = self.local.get(&(":pitch", 0)).copied().unwrap_or(0);
+                    self.flags.c = self.reg.y >= _o;
+                    self.flags.z = self.reg.y == _o;
+                    self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
                     if !self.flags.c {
                         pc = 3;
                     } else {
@@ -290,7 +297,10 @@ impl Cpu {
                 }
                 4 => {
                     self.reg.x = self.reg.x.wrapping_add(1);
-                    // raw: ??? cpx :pitch+1            ; SOUND.S:345
+                    let _o: u8 = self.local.get(&(":pitch", 1)).copied().unwrap_or(0);
+                    self.flags.c = self.reg.x >= _o;
+                    self.flags.z = self.reg.x == _o;
+                    self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
                     if !self.flags.c {
                         pc = 2;
                     } else {

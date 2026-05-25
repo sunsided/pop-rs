@@ -554,7 +554,7 @@ ADDSOUND:
   *(soundtable@0xb6c0 + x) = a   ; SPECIALK.S:1000
   *soundtable@0xb6c0 = x            ; SPECIALK.S:1001
 :rts:
-  ??? ldx ]temp1            ; SPECIALK.S:1003
+  x = *]temp1            ; SPECIALK.S:1003
   return                           ; SPECIALK.S:1004
 }
 
@@ -567,7 +567,7 @@ fn ADDSOUND {
   *(soundtable@0xb6c0 + x) = a   ; SPECIALK.S:1000
   *soundtable@0xb6c0 = x            ; SPECIALK.S:1001
 :rts:
-  ??? ldx ]temp1            ; SPECIALK.S:1003
+  x = *]temp1            ; SPECIALK.S:1003
   return                           ; SPECIALK.S:1004
 }
 

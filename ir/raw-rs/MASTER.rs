@@ -36,6 +36,9 @@ pub struct Cpu {
     pub mem: Box<[u8; 0x10000]>,
     pub stack: Vec<u8>,
     pub smc: Smc,
+    // Local-label / Merlin-variable byte store, keyed by symbolic
+    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.
+    pub local: std::collections::HashMap<(&'static str, u8), u8>,
 }
 
 impl Cpu {
@@ -46,6 +49,7 @@ impl Cpu {
             mem: Box::new([0u8; 0x10000]),
             stack: Vec::new(),
             smc: Smc::default(),
+            local: std::collections::HashMap::new(),
         }
     }
 }
@@ -155,7 +159,7 @@ impl Cpu {
 
     fn driveon(&mut self) {
         self.reg.a = 0x00;
-        // raw: patch *:delay = a            ; MASTER.S:302
+        self.local.insert((":delay", 0), self.reg.a);
         self.setaux();
         let _o: u8 = self.mem[sym::RWBANK1];
         self.flags.z = (self.reg.a & _o) == 0;
@@ -164,14 +168,14 @@ impl Cpu {
         self.flags.z = (self.reg.a & _o) == 0;
         self.flags.n = (_o >> 7) != 0;
         self.reg.a = self.mem[sym::BBundID];
-        // raw: patch *:IDbyte = a            ; MASTER.S:314
+        self.local.insert((":IDbyte", 0), self.reg.a);
         self.rw18();
         self.rw18();
         return;
     }
 
     fn driveon1(&mut self) {
-        // raw: patch *:delay = a            ; MASTER.S:302
+        self.local.insert((":delay", 0), self.reg.a);
         self.setaux();
         let _o: u8 = self.mem[sym::RWBANK1];
         self.flags.z = (self.reg.a & _o) == 0;
@@ -180,7 +184,7 @@ impl Cpu {
         self.flags.z = (self.reg.a & _o) == 0;
         self.flags.n = (_o >> 7) != 0;
         self.reg.a = self.mem[sym::BBundID];
-        // raw: patch *:IDbyte = a            ; MASTER.S:314
+        self.local.insert((":IDbyte", 0), self.reg.a);
         self.rw18();
         self.rw18();
         return;
@@ -348,12 +352,14 @@ impl Cpu {
         self.rw18();
         loop {
             self.rw18();
-            // raw: ??? lda :sm            ; MASTER.S:509
+            self.reg.a = self.local.get(&(":sm", 0)).copied().unwrap_or(0);
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.flags.c = false;
             let _r = (self.reg.a as u16) + (0x12) as u16 + (self.flags.c as u16);
             self.reg.a = _r as u8;
             self.flags.c = (_r >> 8) != 0;
-            // raw: patch *:sm = a            ; MASTER.S:512
+            self.local.insert((":sm", 0), self.reg.a);
             let _o: u8 = 0x6c;
             self.flags.c = self.reg.a >= _o;
             self.flags.z = self.reg.a == _o;

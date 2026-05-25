@@ -203,7 +203,7 @@ fn vidstuff {
   call rw18                  ; MASTER.S:502
 :loop:
   call rw18                  ; MASTER.S:506
-  ??? lda :sm            ; MASTER.S:509
+  a = *:sm            ; MASTER.S:509
   c = 0                            ; MASTER.S:510
   a = a + #0x12 + c              ; MASTER.S:511
   patch *:sm = a            ; MASTER.S:512

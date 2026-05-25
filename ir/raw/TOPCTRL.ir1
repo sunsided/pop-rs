@@ -17,7 +17,7 @@ fn INITSYSTEM {
   *ALTZPon@0xc009 = a            ; TOPCTRL.S:121
   call setcenter                  ; TOPCTRL.S:123
   call setfastaux                  ; TOPCTRL.S:125
-  ??? lda #FinalDisk!1            ; TOPCTRL.S:127
+  a = #FinalDisk!1                  ; TOPCTRL.S:127
   *develment@0x020e = a            ; TOPCTRL.S:128
   call initgame                  ; TOPCTRL.S:130
   x = #0x00                  ; TOPCTRL.S:132

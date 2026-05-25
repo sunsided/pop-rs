@@ -38,6 +38,9 @@ pub struct Cpu {
     pub mem: Box<[u8; 0x10000]>,
     pub stack: Vec<u8>,
     pub smc: Smc,
+    // Local-label / Merlin-variable byte store, keyed by symbolic
+    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.
+    pub local: std::collections::HashMap<(&'static str, u8), u8>,
 }
 
 impl Cpu {
@@ -48,6 +51,7 @@ impl Cpu {
             mem: Box::new([0u8; 0x10000]),
             stack: Vec::new(),
             smc: Smc::default(),
+            local: std::collections::HashMap::new(),
         }
     }
 }

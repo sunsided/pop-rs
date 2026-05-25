@@ -1392,17 +1392,17 @@ pub fn add(cpu: &mut Cpu) {
 
 pub fn setback(cpu: &mut Cpu) {
     cpu.reg.a = 0x99;
-    // raw: patch *]add+1 = a            ; FRAMEADV.S:1165
+    cpu.local.insert(("]add", 1), cpu.reg.a);
     cpu.reg.a = 0x04;
-    // raw: patch *]add+2 = a            ; FRAMEADV.S:1167
+    cpu.local.insert(("]add", 2), cpu.reg.a);
     return;
 }
 
 pub fn setmid(cpu: &mut Cpu) {
     cpu.reg.a = 0x2c;
-    // raw: patch *]add+1 = a            ; FRAMEADV.S:1171
+    cpu.local.insert(("]add", 1), cpu.reg.a);
     cpu.reg.a = 0x01;
-    // raw: patch *]add+2 = a            ; FRAMEADV.S:1173
+    cpu.local.insert(("]add", 2), cpu.reg.a);
     return;
 }
 

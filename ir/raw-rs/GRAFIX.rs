@@ -37,6 +37,9 @@ pub struct Cpu {
     pub mem: Box<[u8; 0x10000]>,
     pub stack: Vec<u8>,
     pub smc: Smc,
+    // Local-label / Merlin-variable byte store, keyed by symbolic
+    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.
+    pub local: std::collections::HashMap<(&'static str, u8), u8>,
 }
 
 impl Cpu {
@@ -47,6 +50,7 @@ impl Cpu {
             mem: Box::new([0u8; 0x10000]),
             stack: Vec::new(),
             smc: Smc::default(),
+            local: std::collections::HashMap::new(),
         }
     }
 }
@@ -1125,7 +1129,7 @@ impl Cpu {
                     }
                 }
                 3 => {
-                    // raw: ??? inc joyX,x            ; GRAFIX.S:1209
+                    self.mem[sym::joyX + self.reg.x as usize] = self.mem[sym::joyX + self.reg.x as usize].wrapping_add(1);
                     pc = 4;
                 }
                 4 => {
@@ -1350,8 +1354,8 @@ impl Cpu {
         loop {
             match pc {
                 0 => {
-                    // raw: patch *:pitch = y            ; GRAFIX.S:1344
-                    // raw: patch *:pitch+1 = x            ; GRAFIX.S:1345
+                    self.local.insert((":pitch", 0), self.reg.y);
+                    self.local.insert((":pitch", 1), self.reg.x);
                     pc = 1;
                 }
                 1 => {
@@ -1367,7 +1371,10 @@ impl Cpu {
                 }
                 3 => {
                     self.reg.y = self.reg.y.wrapping_add(1);
-                    // raw: ??? cpy :pitch            ; GRAFIX.S:1350
+                    let _o: u8 = self.local.get(&(":pitch", 0)).copied().unwrap_or(0);
+                    self.flags.c = self.reg.y >= _o;
+                    self.flags.z = self.reg.y == _o;
+                    self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
                     if !self.flags.c {
                         pc = 3;
                     } else {
@@ -1376,7 +1383,10 @@ impl Cpu {
                 }
                 4 => {
                     self.reg.x = self.reg.x.wrapping_add(1);
-                    // raw: ??? cpx :pitch+1            ; GRAFIX.S:1353
+                    let _o: u8 = self.local.get(&(":pitch", 1)).copied().unwrap_or(0);
+                    self.flags.c = self.reg.x >= _o;
+                    self.flags.z = self.reg.x == _o;
+                    self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
                     if !self.flags.c {
                         pc = 2;
                     } else {

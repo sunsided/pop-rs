@@ -40,6 +40,9 @@ pub struct Cpu {
     pub mem: Box<[u8; 0x10000]>,
     pub stack: Vec<u8>,
     pub smc: Smc,
+    // Local-label / Merlin-variable byte store, keyed by symbolic
+    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.
+    pub local: std::collections::HashMap<(&'static str, u8), u8>,
 }
 
 impl Cpu {
@@ -50,6 +53,7 @@ impl Cpu {
             mem: Box::new([0u8; 0x10000]),
             stack: Vec::new(),
             smc: Smc::default(),
+            local: std::collections::HashMap::new(),
         }
     }
 }
@@ -436,7 +440,7 @@ impl Cpu {
 
     fn preload(&mut self) {
         self.reg.a = self.mem[sym::BBundID];
-        // raw: patch *]sm+1 = a            ; SPECIALK.S:555
+        self.local.insert(("]sm", 1), self.reg.a);
         self.reg.a = 0xa9;
         self.mem[sym::BBundID] = self.reg.a;
         return;
@@ -868,18 +872,16 @@ impl Cpu {
     }
 
     fn ADDSOUND(&mut self) {
-        // raw: patch *]temp1 = x            ; SPECIALK.S:993
+        self.local.insert(("]temp1", 0), self.reg.x);
         self.reg.x = self.mem[sym::soundtable];
-        let _o: u8 = 0x20;
-        self.flags.c = self.reg.x >= _o;
-        self.flags.z = self.reg.x == _o;
-        self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
         if self.reg.x < 0x20 {
             self.reg.x = self.reg.x.wrapping_add(1);
             self.mem[sym::soundtable + self.reg.x as usize] = self.reg.a;
             self.mem[sym::soundtable] = self.reg.x;
         }
-        // raw: ??? ldx ]temp1            ; SPECIALK.S:1003
+        self.reg.x = self.local.get(&("]temp1", 0)).copied().unwrap_or(0);
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         return;
     }
 

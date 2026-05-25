@@ -74,6 +74,9 @@ pub struct Cpu {
     pub mem: Box<[u8; 0x10000]>,
     pub stack: Vec<u8>,
     pub smc: Smc,
+    // Local-label / Merlin-variable byte store, keyed by symbolic
+    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.
+    pub local: std::collections::HashMap<(&'static str, u8), u8>,
 }
 
 impl Cpu {
@@ -84,6 +87,7 @@ impl Cpu {
             mem: Box::new([0u8; 0x10000]),
             stack: Vec::new(),
             smc: Smc::default(),
+            local: std::collections::HashMap::new(),
         }
     }
 }
@@ -1255,13 +1259,13 @@ impl Cpu {
                     self.smc._90_hi = self.reg.a;
                     self.smc._92_hi = self.reg.a;
                     self.reg.a = self.mem[sym::AMASKS + self.reg.x as usize];
-                    // raw: patch *:AMASK+1 = a            ; HIRES.S:707
+                    self.local.insert((":AMASK", 1), self.reg.a);
                     self.reg.a = self.mem[sym::BMASKS + self.reg.x as usize];
-                    // raw: patch *:BMASK+1 = a            ; HIRES.S:709
+                    self.local.insert((":BMASK", 1), self.reg.a);
                     self.reg.x = self.mem[sym::OPACITY];
                     self.reg.a = self.mem[sym::OPCODE + self.reg.x as usize];
-                    // raw: patch *:80 = a            ; HIRES.S:713
-                    // raw: patch *:81 = a            ; HIRES.S:714
+                    self.local.insert((":80", 0), self.reg.a);
+                    self.local.insert((":81", 0), self.reg.a);
                     self.reg.y = self.mem[sym::YCO];
                     pc = 3;
                 }
@@ -1459,8 +1463,8 @@ impl Cpu {
                 0 => {
                     self.reg.x = self.mem[sym::OPACITY];
                     self.reg.a = self.mem[sym::OPCODE + self.reg.x as usize];
-                    // raw: patch *:masksm1 = a            ; HIRES.S:836
-                    // raw: patch *:masksm2 = a            ; HIRES.S:837
+                    self.local.insert((":masksm1", 0), self.reg.a);
+                    self.local.insert((":masksm2", 0), self.reg.a);
                     self.PREPREP();
                     self.CROP();
                     if self.flags.n {
@@ -1737,7 +1741,7 @@ impl Cpu {
                     self.smc.c1_hi = self.reg.a;
                     self.smc.c2_hi = self.reg.a;
                     self.reg.a = self.mem[sym::AMASKS + self.reg.x as usize];
-                    // raw: patch *:AMASK+1 = a            ; HIRES.S:1048
+                    self.local.insert((":AMASK", 1), self.reg.a);
                     self.reg.y = self.mem[sym::YCO];
                     pc = 3;
                 }
@@ -1982,8 +1986,8 @@ impl Cpu {
                     self.mem[sym::BMASK] = self.reg.a;
                     self.reg.x = self.mem[sym::OPACITY];
                     self.reg.a = self.mem[sym::OPCODE + self.reg.x as usize];
-                    // raw: patch *:80 = a            ; HIRES.S:1239
-                    // raw: patch *:81 = a            ; HIRES.S:1240
+                    self.local.insert((":80", 0), self.reg.a);
+                    self.local.insert((":81", 0), self.reg.a);
                     self.reg.y = self.mem[sym::YCO];
                     pc = 3;
                 }
@@ -2161,8 +2165,8 @@ impl Cpu {
                 0 => {
                     self.reg.x = self.mem[sym::OPACITY];
                     self.reg.a = self.mem[sym::OPCODE + self.reg.x as usize];
-                    // raw: patch *:masksm1 = a            ; HIRES.S:1359
-                    // raw: patch *:masksm2 = a            ; HIRES.S:1360
+                    self.local.insert((":masksm1", 0), self.reg.a);
+                    self.local.insert((":masksm2", 0), self.reg.a);
                     self.PREPREP();
                     self.reg.a = self.mem[sym::XCO];
                     self.flags.c = true;
@@ -2205,7 +2209,7 @@ impl Cpu {
                     self.reg.a = self.mem[sym::AMASKS + self.reg.x as usize];
                     self.smc.AMASK = self.reg.a;
                     self.reg.a = self.mem[sym::BMASKS + self.reg.x as usize];
-                    // raw: patch *:BMASK+1 = a            ; HIRES.S:1402
+                    self.local.insert((":BMASK", 1), self.reg.a);
                     self.reg.y = self.mem[sym::YCO];
                     pc = 3;
                 }
@@ -2675,7 +2679,7 @@ impl Cpu {
                 }
                 2 => {
                     self.reg.a = self.mem[sym::OPCODE + self.reg.x as usize];
-                    // raw: patch *:smod = a            ; HIRES.S:1751
+                    self.local.insert((":smod", 0), self.reg.a);
                     self.reg.a = self.mem[sym::PAGE];
                     self.smc.smPAGE = self.reg.a;
                     self.reg.a = self.mem[sym::XCO];
@@ -3082,11 +3086,11 @@ impl Cpu {
 
     fn SETFASTMAIN(&mut self) {
         self.reg.a = 0x02;
-        // raw: patch *]ramrd1+1 = a            ; HIRES.S:1983
-        // raw: patch *]ramrd2+1 = a            ; HIRES.S:1984
-        // raw: patch *]ramrd3+1 = a            ; HIRES.S:1985
-        // raw: patch *]ramrd4+1 = a            ; HIRES.S:1986
-        // raw: patch *]ramrd5+1 = a            ; HIRES.S:1987
+        self.local.insert(("]ramrd1", 1), self.reg.a);
+        self.local.insert(("]ramrd2", 1), self.reg.a);
+        self.local.insert(("]ramrd3", 1), self.reg.a);
+        self.local.insert(("]ramrd4", 1), self.reg.a);
+        self.local.insert(("]ramrd5", 1), self.reg.a);
         return;
     }
 

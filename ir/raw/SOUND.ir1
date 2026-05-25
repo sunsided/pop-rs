@@ -200,10 +200,10 @@ fn tone {
   y = #0x00                  ; SOUND.S:338
 :inloop:
   y += 1                         ; SOUND.S:340
-  ??? cpy :pitch            ; SOUND.S:341
+  cmp y, *:pitch    ; SOUND.S:341
   if cc goto :inloop       ; SOUND.S:342
   x += 1                         ; SOUND.S:344
-  ??? cpx :pitch+1            ; SOUND.S:345
+  cmp x, *:pitch+1    ; SOUND.S:345
   if cc goto :midloop       ; SOUND.S:346
   c = 1                            ; SOUND.S:348
   a = a - #0x01 - (1 - c)        ; SOUND.S:349

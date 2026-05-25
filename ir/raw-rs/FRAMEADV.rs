@@ -36,6 +36,9 @@ pub struct Cpu {
     pub mem: Box<[u8; 0x10000]>,
     pub stack: Vec<u8>,
     pub smc: Smc,
+    // Local-label / Merlin-variable byte store, keyed by symbolic
+    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.
+    pub local: std::collections::HashMap<(&'static str, u8), u8>,
 }
 
 impl Cpu {
@@ -46,6 +49,7 @@ impl Cpu {
             mem: Box::new([0u8; 0x10000]),
             stack: Vec::new(),
             smc: Smc::default(),
+            local: std::collections::HashMap::new(),
         }
     }
 }
@@ -1559,17 +1563,17 @@ impl Cpu {
 
     fn setback(&mut self) {
         self.reg.a = 0x99;
-        // raw: patch *]add+1 = a            ; FRAMEADV.S:1165
+        self.local.insert(("]add", 1), self.reg.a);
         self.reg.a = 0x04;
-        // raw: patch *]add+2 = a            ; FRAMEADV.S:1167
+        self.local.insert(("]add", 2), self.reg.a);
         return;
     }
 
     fn setmid(&mut self) {
         self.reg.a = 0x2c;
-        // raw: patch *]add+1 = a            ; FRAMEADV.S:1171
+        self.local.insert(("]add", 1), self.reg.a);
         self.reg.a = 0x01;
-        // raw: patch *]add+2 = a            ; FRAMEADV.S:1173
+        self.local.insert(("]add", 2), self.reg.a);
         return;
     }
 

@@ -33,7 +33,7 @@ pub fn entry(cpu: &mut Cpu) {
     cpu.flags.c = (cpu.reg.a & 1) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shr(1);
     cpu.reg.a |= 0xc0;
-    // raw: patch *:rdsect+2 = a            ; BOOT.S:49
+    cpu.local.insert((":rdsect", 2), cpu.reg.a);
     cpu.reg.a = 0x0f;
     cpu.mem[sym::sector] = cpu.reg.a;
     loop {

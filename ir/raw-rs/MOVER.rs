@@ -36,6 +36,9 @@ pub struct Cpu {
     pub mem: Box<[u8; 0x10000]>,
     pub stack: Vec<u8>,
     pub smc: Smc,
+    // Local-label / Merlin-variable byte store, keyed by symbolic
+    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.
+    pub local: std::collections::HashMap<(&'static str, u8), u8>,
 }
 
 impl Cpu {
@@ -46,6 +49,7 @@ impl Cpu {
             mem: Box::new([0u8; 0x10000]),
             stack: Vec::new(),
             smc: Smc::default(),
+            local: std::collections::HashMap::new(),
         }
     }
 }
@@ -773,7 +777,7 @@ impl Cpu {
                 }
                 14 => {
                     self.reg.a = 0x00;
-                    // raw: patch *]cleanflag = a            ; MOVER.S:637
+                    self.local.insert(("]cleanflag", 0), self.reg.a);
                     pc = 15;
                 }
                 15 => {
@@ -789,7 +793,7 @@ impl Cpu {
                 }
                 16 => {
                     self.reg.a = 0xff;
-                    // raw: patch *]cleanflag = a            ; MOVER.S:649
+                    self.local.insert(("]cleanflag", 0), self.reg.a);
                     pc = 17;
                 }
                 17 => {
@@ -802,8 +806,10 @@ impl Cpu {
                     }
                 }
                 18 => {
-                    // raw: ??? lda ]cleanflag            ; MOVER.S:656
-                    if self.flags.z {
+                    self.reg.a = self.local.get(&("]cleanflag", 0)).copied().unwrap_or(0);
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
+                    if self.reg.a == 0x00 {
                         pc = 12;
                     } else {
                         pc = 19;
@@ -879,7 +885,7 @@ impl Cpu {
                 }
                 1 => {
                     self.reg.a = 0x00;
-                    // raw: patch *]cleanflag = a            ; MOVER.S:637
+                    self.local.insert(("]cleanflag", 0), self.reg.a);
                     pc = 2;
                 }
                 2 => {
@@ -895,7 +901,7 @@ impl Cpu {
                 }
                 3 => {
                     self.reg.a = 0xff;
-                    // raw: patch *]cleanflag = a            ; MOVER.S:649
+                    self.local.insert(("]cleanflag", 0), self.reg.a);
                     pc = 4;
                 }
                 4 => {
@@ -908,8 +914,10 @@ impl Cpu {
                     }
                 }
                 5 => {
-                    // raw: ??? lda ]cleanflag            ; MOVER.S:656
-                    if self.flags.z {
+                    self.reg.a = self.local.get(&("]cleanflag", 0)).copied().unwrap_or(0);
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
+                    if self.reg.a == 0x00 {
                         pc = 12;
                     } else {
                         pc = 6;

@@ -24,8 +24,7 @@ pub fn INITSYSTEM(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     crate::ext::setcenter(cpu);
     crate::ext::setfastaux(cpu);
-    // raw: ??? lda #FinalDisk!1            ; TOPCTRL.S:127
-    cpu.mem[sym::develment] = cpu.reg.a;
+    cpu.mem[sym::develment] = 0x00;
     initgame(cpu);
     cpu.reg.x = 0x00;
     cpu.reg.a = cpu.reg.x;

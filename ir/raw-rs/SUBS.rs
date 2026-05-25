@@ -37,6 +37,9 @@ pub struct Cpu {
     pub mem: Box<[u8; 0x10000]>,
     pub stack: Vec<u8>,
     pub smc: Smc,
+    // Local-label / Merlin-variable byte store, keyed by symbolic
+    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.
+    pub local: std::collections::HashMap<(&'static str, u8), u8>,
 }
 
 impl Cpu {
@@ -47,6 +50,7 @@ impl Cpu {
             mem: Box::new([0u8; 0x10000]),
             stack: Vec::new(),
             smc: Smc::default(),
+            local: std::collections::HashMap::new(),
         }
     }
 }
@@ -485,7 +489,7 @@ impl Cpu {
             self.reg.a = self.mem[sym::pstarcount + self.reg.x as usize];
             if self.reg.a == 0x00 {
             } else {
-                // raw: ??? dec pstarcount,x            ; SUBS.S:364
+                self.mem[sym::pstarcount + self.reg.x as usize] = self.mem[sym::pstarcount + self.reg.x as usize].wrapping_sub(1);
                 if !self.flags.z {
                 } else {
                     self.reg.a = self.reg.x;

@@ -275,6 +275,22 @@ class LoadAbs:
 
 
 @dataclass(frozen=True)
+class LoadLocal:
+    """`lda/ldx/ldy :label+N` / `]label+N` — load from a *local-label-
+    relative* address. The read counterpart to `StoreLocal`: local
+    (`:`) and Merlin-variable (`]`) names aren't in the resolved symbol
+    table, so the address stays symbolic as `(source_label, offset)`.
+    The pair share a per-`Cpu` keyed byte store (`self.local`), so a
+    `sta ]flag` followed by `lda ]flag` round-trips. Sets Z/N like any
+    load."""
+
+    reg: Reg
+    source_label: str
+    offset: int
+    src: SourceRef
+
+
+@dataclass(frozen=True)
 class Asl:
     """`asl a` — shift accumulator left one bit. New C = old bit 7;
     new A = (A << 1) & 0xff."""
@@ -702,20 +718,20 @@ class IncTarget:
     register, memory location, or self-modifying-code operand byte.
     Sets Z/N on the result; does NOT touch C. `target` is a `Reg`
     (X or Y — `ina` doesn't exist on stock 6502), an `Abs` for memory
-    counters, a `LocalRef` for an unrecognised SMC operand bump, or an
-    `OpVarRef` once pass-3 SMC recognition connects it to an operand
-    variable."""
+    counters, an `IndexedAbs` for the `inc addr,x` indexed form, a
+    `LocalRef` for an unrecognised SMC operand bump, or an `OpVarRef`
+    once pass-3 SMC recognition connects it to an operand variable."""
 
-    target: "Reg | Abs | LocalRef | OpVarRef"
+    target: "Reg | Abs | IndexedAbs | LocalRef | OpVarRef"
     src: SourceRef
 
 
 @dataclass(frozen=True)
 class DecTarget:
-    """`dex` / `dey` / `dec addr` / `dec :label+N` — same as
-    `IncTarget` but decrement. Sets Z/N; does NOT touch C."""
+    """`dex` / `dey` / `dec addr` / `dec :label+N` / `dec addr,x` — same
+    as `IncTarget` but decrement. Sets Z/N; does NOT touch C."""
 
-    target: "Reg | Abs | LocalRef | OpVarRef"
+    target: "Reg | Abs | IndexedAbs | LocalRef | OpVarRef"
     src: SourceRef
 
 
@@ -806,6 +822,20 @@ class CmpAbs:
 
     reg: Reg
     source: Abs
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class CmpLocal:
+    """`cmp/cpx/cpy :label+N` / `]label+N` — compare a register against a
+    byte read from a *local-label-relative* address. Same flag effect as
+    `CmpAbs` (sets Z/N/C, leaves registers alone); the operand is read
+    from the shared local byte store (`self.local`) that `StoreLocal`
+    writes, mirroring `LoadLocal`."""
+
+    reg: Reg
+    source_label: str
+    offset: int
     src: SourceRef
 
 
@@ -911,7 +941,7 @@ Instr = (
     | Pha | Pla | Phy | MemBitOp
     | CmpIndexed | AdcIndexed | SbcIndexed
     | Rol | Ror | ShiftMem
-    | StoreLocal | StoreOpVar | StoreOpAddr | SbcIndirect
+    | StoreLocal | LoadLocal | CmpLocal | StoreOpVar | StoreOpAddr | SbcIndirect
     | Nop | FlagOp
     | Unsupported
 )
@@ -1033,6 +1063,9 @@ def format_item(item: Item) -> str:
     if isinstance(item, StoreLocal):
         loc = item.target_label if item.offset == 0 else f"{item.target_label}+{item.offset}"
         return f"  patch *{loc} = {item.reg}            ; {item.src.short()}"
+    if isinstance(item, LoadLocal):
+        loc = item.source_label if item.offset == 0 else f"{item.source_label}+{item.offset}"
+        return f"  {item.reg} = *{loc}            ; {item.src.short()}"
     if isinstance(item, StoreOpVar):
         return f"  opvar {item.name} = {item.reg}            ; {item.src.short()}"
     if isinstance(item, StoreOpAddr):
@@ -1100,6 +1133,9 @@ def format_item(item: Item) -> str:
         return f"  cmp {item.reg}, {_fmt_imm(item.imm)}              ; {item.src.short()}"
     if isinstance(item, CmpAbs):
         return f"  cmp {item.reg}, *{_fmt_abs(item.source)}    ; {item.src.short()}"
+    if isinstance(item, CmpLocal):
+        loc = item.source_label if item.offset == 0 else f"{item.source_label}+{item.offset}"
+        return f"  cmp {item.reg}, *{loc}    ; {item.src.short()}"
     if isinstance(item, Branch):
         return f"  if {item.cond} goto {item.target}       ; {item.src.short()}"
     if isinstance(item, If):
@@ -1122,6 +1158,8 @@ def format_item(item: Item) -> str:
             if item.target.offset != 0:
                 loc = f"{loc}+{item.target.offset}"
             tgt = f"patch *{loc}"
+        elif isinstance(item.target, IndexedAbs):
+            tgt = f"*({_fmt_abs(item.target.base)} + {item.target.index})"
         else:
             tgt = f"*{_fmt_abs(item.target)}"
         sym = "+= 1" if isinstance(item, IncTarget) else "-= 1"

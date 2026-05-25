@@ -666,7 +666,7 @@ pub fn triggate(cpu: &mut Cpu) {
             }
             14 => {
                 cpu.reg.a = 0x00;
-                // raw: patch *]cleanflag = a            ; MOVER.S:637
+                cpu.local.insert(("]cleanflag", 0), cpu.reg.a);
                 pc = 15;
             }
             15 => {
@@ -682,7 +682,7 @@ pub fn triggate(cpu: &mut Cpu) {
             }
             16 => {
                 cpu.reg.a = 0xff;
-                // raw: patch *]cleanflag = a            ; MOVER.S:649
+                cpu.local.insert(("]cleanflag", 0), cpu.reg.a);
                 pc = 17;
             }
             17 => {
@@ -695,8 +695,10 @@ pub fn triggate(cpu: &mut Cpu) {
                 }
             }
             18 => {
-                // raw: ??? lda ]cleanflag            ; MOVER.S:656
-                if cpu.flags.z {
+                cpu.reg.a = cpu.local.get(&("]cleanflag", 0)).copied().unwrap_or(0);
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
+                if cpu.reg.a == 0x00 {
                     pc = 12;
                 } else {
                     pc = 19;
@@ -772,7 +774,7 @@ pub fn ANIMTRANS(cpu: &mut Cpu) {
             }
             1 => {
                 cpu.reg.a = 0x00;
-                // raw: patch *]cleanflag = a            ; MOVER.S:637
+                cpu.local.insert(("]cleanflag", 0), cpu.reg.a);
                 pc = 2;
             }
             2 => {
@@ -788,7 +790,7 @@ pub fn ANIMTRANS(cpu: &mut Cpu) {
             }
             3 => {
                 cpu.reg.a = 0xff;
-                // raw: patch *]cleanflag = a            ; MOVER.S:649
+                cpu.local.insert(("]cleanflag", 0), cpu.reg.a);
                 pc = 4;
             }
             4 => {
@@ -801,8 +803,10 @@ pub fn ANIMTRANS(cpu: &mut Cpu) {
                 }
             }
             5 => {
-                // raw: ??? lda ]cleanflag            ; MOVER.S:656
-                if cpu.flags.z {
+                cpu.reg.a = cpu.local.get(&("]cleanflag", 0)).copied().unwrap_or(0);
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
+                if cpu.reg.a == 0x00 {
                     pc = 12;
                 } else {
                     pc = 6;

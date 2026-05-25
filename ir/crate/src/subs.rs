@@ -349,7 +349,7 @@ pub fn pstars(cpu: &mut Cpu) {
         cpu.reg.a = cpu.mem[sym::pstarcount + cpu.reg.x as usize];
         if cpu.reg.a == 0x00 {
         } else {
-            // raw: ??? dec pstarcount,x            ; SUBS.S:364
+            cpu.mem[sym::pstarcount + cpu.reg.x as usize] = cpu.mem[sym::pstarcount + cpu.reg.x as usize].wrapping_sub(1);
             if !cpu.flags.z {
             } else {
                 cpu.reg.a = cpu.reg.x;

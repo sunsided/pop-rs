@@ -964,7 +964,7 @@ pub fn PREAD(cpu: &mut Cpu) {
                 }
             }
             3 => {
-                // raw: ??? inc joyX,x            ; GRAFIX.S:1209
+                cpu.mem[sym::joyX + cpu.reg.x as usize] = cpu.mem[sym::joyX + cpu.reg.x as usize].wrapping_add(1);
                 pc = 4;
             }
             4 => {
@@ -1189,8 +1189,8 @@ pub fn tone(cpu: &mut Cpu) {
     loop {
         match pc {
             0 => {
-                // raw: patch *:pitch = y            ; GRAFIX.S:1344
-                // raw: patch *:pitch+1 = x            ; GRAFIX.S:1345
+                cpu.local.insert((":pitch", 0), cpu.reg.y);
+                cpu.local.insert((":pitch", 1), cpu.reg.x);
                 pc = 1;
             }
             1 => {
@@ -1206,7 +1206,10 @@ pub fn tone(cpu: &mut Cpu) {
             }
             3 => {
                 cpu.reg.y = cpu.reg.y.wrapping_add(1);
-                // raw: ??? cpy :pitch            ; GRAFIX.S:1350
+                let _o: u8 = cpu.local.get(&(":pitch", 0)).copied().unwrap_or(0);
+                cpu.flags.c = cpu.reg.y >= _o;
+                cpu.flags.z = cpu.reg.y == _o;
+                cpu.flags.n = (cpu.reg.y.wrapping_sub(_o) >> 7) != 0;
                 if !cpu.flags.c {
                     pc = 3;
                 } else {
@@ -1215,7 +1218,10 @@ pub fn tone(cpu: &mut Cpu) {
             }
             4 => {
                 cpu.reg.x = cpu.reg.x.wrapping_add(1);
-                // raw: ??? cpx :pitch+1            ; GRAFIX.S:1353
+                let _o: u8 = cpu.local.get(&(":pitch", 1)).copied().unwrap_or(0);
+                cpu.flags.c = cpu.reg.x >= _o;
+                cpu.flags.z = cpu.reg.x == _o;
+                cpu.flags.n = (cpu.reg.x.wrapping_sub(_o) >> 7) != 0;
                 if !cpu.flags.c {
                     pc = 2;
                 } else {

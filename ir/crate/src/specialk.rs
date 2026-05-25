@@ -324,7 +324,7 @@ pub fn postload(cpu: &mut Cpu) {
 
 pub fn preload(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::BBundID];
-    // raw: patch *]sm+1 = a            ; SPECIALK.S:555
+    cpu.local.insert(("]sm", 1), cpu.reg.a);
     cpu.reg.a = 0xa9;
     cpu.mem[sym::BBundID] = cpu.reg.a;
     return;
@@ -756,18 +756,16 @@ pub fn ZEROSOUND(cpu: &mut Cpu) {
 }
 
 pub fn ADDSOUND(cpu: &mut Cpu) {
-    // raw: patch *]temp1 = x            ; SPECIALK.S:993
+    cpu.local.insert(("]temp1", 0), cpu.reg.x);
     cpu.reg.x = cpu.mem[sym::soundtable];
-    let _o: u8 = 0x20;
-    cpu.flags.c = cpu.reg.x >= _o;
-    cpu.flags.z = cpu.reg.x == _o;
-    cpu.flags.n = (cpu.reg.x.wrapping_sub(_o) >> 7) != 0;
     if cpu.reg.x < 0x20 {
         cpu.reg.x = cpu.reg.x.wrapping_add(1);
         cpu.mem[sym::soundtable + cpu.reg.x as usize] = cpu.reg.a;
         cpu.mem[sym::soundtable] = cpu.reg.x;
     }
-    // raw: ??? ldx ]temp1            ; SPECIALK.S:1003
+    cpu.reg.x = cpu.local.get(&("]temp1", 0)).copied().unwrap_or(0);
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     return;
 }
 

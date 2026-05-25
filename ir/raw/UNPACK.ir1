@@ -584,7 +584,7 @@ fn loadscrn {
 :loop:
   patch *:sm = a            ; UNPACK.S:868
   call rw18                  ; UNPACK.S:869
-  ??? lda :sm            ; UNPACK.S:872
+  a = *:sm            ; UNPACK.S:872
   c = 0                            ; UNPACK.S:873
   a = a + #0x12 + c              ; UNPACK.S:874
   cmp a, #0x9e              ; UNPACK.S:875

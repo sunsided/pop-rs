@@ -244,12 +244,22 @@ def test_raw_pla_pops_and_sets_flags():
 
 
 def test_raw_deferred_atom_is_comment():
-    # An SMC operand patch needs a consumer model that isn't lowered yet,
-    # so it stays as a `// raw:` comment rather than emitting wrong code.
-    out = _emit_one(RawStmt(item=StoreLocal(
-        reg=Reg.A, target_label="smXCO", offset=1, src=SRC,
+    # An unrecognised SMC operand bump (`inc :smod+2` on a LocalRef) has
+    # no consumer model yet, so it stays a `// raw:` comment rather than
+    # emitting wrong code.
+    out = _emit_one(RawStmt(item=IncTarget(
+        target=LocalRef(label=":smod", offset=2), src=SRC,
     )))
     assert out.startswith("// raw: ")
+
+
+def test_store_local_lowers_to_local_insert():
+    # StoreLocal now backs the `self.local` keyed byte store that
+    # LoadLocal/CmpLocal read; it lowers instead of deferring.
+    out = _emit_one(RawStmt(item=StoreLocal(
+        reg=Reg.A, target_label="]flag", offset=0, src=SRC,
+    )))
+    assert out == 'self.local.insert(("]flag", 0), self.reg.a);'
 
 
 def test_call_stmt_lowered():
@@ -411,8 +421,8 @@ def test_lower_stats_counts_top_level():
         RawStmt(item=Clc(src=SRC)),  # lowered (carry op)
         RawStmt(item=CmpImm(reg=Reg.A, imm=_imm(0), src=SRC)),  # lowered (cmp flags)
         RawStmt(item=Pha(src=SRC)),  # lowered (stack)
-        RawStmt(item=StoreLocal(  # deferred (SMC operand patch)
-            reg=Reg.A, target_label="smXCO", offset=1, src=SRC)),
+        RawStmt(item=IncTarget(  # deferred (unrecognised SMC operand bump)
+            target=LocalRef(label=":smod", offset=2), src=SRC)),
         CallStmt(target="sub", src=SRC),  # lowered
         ReturnStmt(src=SRC),  # lowered
     ]
