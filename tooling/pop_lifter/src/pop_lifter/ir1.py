@@ -850,6 +850,26 @@ class Unsupported:
     src: SourceRef
 
 
+# 65816-only instructions (absent on the 6502 / 65C02). POP uses these
+# solely in Apple IIgs code paths gated behind `lda IIGS` and bracketed by
+# Merlin's `xc`/`xc off` — native-mode setup, bank registers, and the
+# `mvn` block move for the Super Hires picture/palette. They're inert on
+# the stock-Apple-II target we lift, so we mark them as intentional
+# out-of-scope platform stubs rather than generic unknown opcodes. (65C02
+# ops like `phy`/`tsb`/`trb` are *not* here — they're modellable later.)
+OPS_65816 = frozenset({
+    "xce", "rep", "sep", "mvn", "mvp", "phb", "plb", "phk", "phd", "pld",
+    "tcd", "tdc", "tcs", "tsc", "txy", "tyx", "jml", "jsl", "rtl", "brl",
+    "cop", "per", "wdm", "xba", "pei", "pea",
+})
+
+
+def is_65816(mnemonic: str) -> bool:
+    """True if `mnemonic` is a 65816-only opcode — an IIgs-platform op the
+    lifter deliberately leaves as an out-of-scope stub (see `OPS_65816`)."""
+    return mnemonic in OPS_65816
+
+
 Instr = (
     LoadImm | StoreAbs | Goto | Return | Call
     | LoadAbs | Asl | Clc | Sec | AdcImm | AdcAbs
@@ -1118,6 +1138,11 @@ def format_item(item: Item) -> str:
         )
     if isinstance(item, Unsupported):
         op = item.operand if item.operand else ""
+        if is_65816(item.mnemonic):
+            return (
+                f"  {item.mnemonic} {op}            "
+                f"; 65816/IIgs op (not modeled) — {item.src.short()}"
+            )
         return f"  ??? {item.mnemonic} {op}            ; {item.src.short()}"
     raise TypeError(f"unknown IR1 item: {type(item)}")
 

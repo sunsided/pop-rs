@@ -923,7 +923,13 @@ def _emit_stmt(
         lowered = _emit_raw(stmt.item, syms)
         if lowered is not None:
             return [f"{pad}{line}" for line in lowered]
-        from .ir1 import format_item
+        from .ir1 import Unsupported, format_item, is_65816
+        if isinstance(stmt.item, Unsupported) and is_65816(stmt.item.mnemonic):
+            op = f" {stmt.item.operand}" if stmt.item.operand else ""
+            return [
+                f"{pad}// 65816 (IIgs-only, not modeled): "
+                f"{stmt.item.mnemonic}{op}  ; {stmt.item.src.short()}"
+            ]
         return [f"{pad}// raw: {format_item(stmt.item).strip()}"]
 
     return [f"{pad}// TODO(pass4): lower {type(stmt).__name__}"]

@@ -494,13 +494,13 @@ FADEIN:
   patch *:sm1+2 = a            ; UNPACK.S:683
   patch *:sm2+2 = a            ; UNPACK.S:684
   c = 0                            ; UNPACK.S:686
-  ??? xce             ; UNPACK.S:687
-  ??? sep $30            ; UNPACK.S:689
+  xce             ; 65816/IIgs op (not modeled) — UNPACK.S:687
+  sep $30            ; 65816/IIgs op (not modeled) — UNPACK.S:689
   a = #0x1e                  ; UNPACK.S:691
   *$C035@0xc035 = a            ; UNPACK.S:692
   a = #0x41                  ; UNPACK.S:693
   *$C029@0xc029 = a            ; UNPACK.S:694
-  ??? rep $30            ; UNPACK.S:696
+  rep $30            ; 65816/IIgs op (not modeled) — UNPACK.S:696
   a = #0x00                  ; UNPACK.S:701
   x = #0x1e                  ; UNPACK.S:702
 :scbclr:
@@ -511,21 +511,21 @@ FADEIN:
   x = #0x00                  ; UNPACK.S:710
   y = #0x00                  ; UNPACK.S:711
   a = #32000-1                  ; UNPACK.S:712
-  ??? phb             ; UNPACK.S:713
+  phb             ; 65816/IIgs op (not modeled) — UNPACK.S:713
 :sm1:
-  ??? mvn $E1,1            ; UNPACK.S:714
-  ??? plb             ; UNPACK.S:715
-  ??? sep $20            ; UNPACK.S:719
+  mvn $E1,1            ; 65816/IIgs op (not modeled) — UNPACK.S:714
+  plb             ; 65816/IIgs op (not modeled) — UNPACK.S:715
+  sep $20            ; 65816/IIgs op (not modeled) — UNPACK.S:719
   a = #0xc1                  ; UNPACK.S:720
   *$C029@0xc029 = a            ; UNPACK.S:721
-  ??? rep $20            ; UNPACK.S:722
+  rep $20            ; 65816/IIgs op (not modeled) — UNPACK.S:722
   x = #0x00                  ; UNPACK.S:726
   y = #new_palette                  ; UNPACK.S:727
   a = #32-1                  ; UNPACK.S:728
-  ??? phb             ; UNPACK.S:729
+  phb             ; 65816/IIgs op (not modeled) — UNPACK.S:729
 :sm2:
-  ??? mvn 0,1            ; UNPACK.S:730
-  ??? plb             ; UNPACK.S:731
+  mvn 0,1            ; 65816/IIgs op (not modeled) — UNPACK.S:730
+  plb             ; 65816/IIgs op (not modeled) — UNPACK.S:731
   tail_call PalFade                ; UNPACK.S:735
 }
 
@@ -534,13 +534,13 @@ fn FADEIN {
   patch *:sm1+2 = a            ; UNPACK.S:683
   patch *:sm2+2 = a            ; UNPACK.S:684
   c = 0                            ; UNPACK.S:686
-  ??? xce             ; UNPACK.S:687
-  ??? sep $30            ; UNPACK.S:689
+  xce             ; 65816/IIgs op (not modeled) — UNPACK.S:687
+  sep $30            ; 65816/IIgs op (not modeled) — UNPACK.S:689
   a = #0x1e                  ; UNPACK.S:691
   *$C035@0xc035 = a            ; UNPACK.S:692
   a = #0x41                  ; UNPACK.S:693
   *$C029@0xc029 = a            ; UNPACK.S:694
-  ??? rep $30            ; UNPACK.S:696
+  rep $30            ; 65816/IIgs op (not modeled) — UNPACK.S:696
   a = #0x00                  ; UNPACK.S:701
   x = #0x1e                  ; UNPACK.S:702
 :scbclr:
@@ -551,21 +551,21 @@ fn FADEIN {
   x = #0x00                  ; UNPACK.S:710
   y = #0x00                  ; UNPACK.S:711
   a = #32000-1                  ; UNPACK.S:712
-  ??? phb             ; UNPACK.S:713
+  phb             ; 65816/IIgs op (not modeled) — UNPACK.S:713
 :sm1:
-  ??? mvn $E1,1            ; UNPACK.S:714
-  ??? plb             ; UNPACK.S:715
-  ??? sep $20            ; UNPACK.S:719
+  mvn $E1,1            ; 65816/IIgs op (not modeled) — UNPACK.S:714
+  plb             ; 65816/IIgs op (not modeled) — UNPACK.S:715
+  sep $20            ; 65816/IIgs op (not modeled) — UNPACK.S:719
   a = #0xc1                  ; UNPACK.S:720
   *$C029@0xc029 = a            ; UNPACK.S:721
-  ??? rep $20            ; UNPACK.S:722
+  rep $20            ; 65816/IIgs op (not modeled) — UNPACK.S:722
   x = #0x00                  ; UNPACK.S:726
   y = #new_palette                  ; UNPACK.S:727
   a = #32-1                  ; UNPACK.S:728
-  ??? phb             ; UNPACK.S:729
+  phb             ; 65816/IIgs op (not modeled) — UNPACK.S:729
 :sm2:
-  ??? mvn 0,1            ; UNPACK.S:730
-  ??? plb             ; UNPACK.S:731
+  mvn 0,1            ; 65816/IIgs op (not modeled) — UNPACK.S:730
+  plb             ; 65816/IIgs op (not modeled) — UNPACK.S:731
   tail_call PalFade                ; UNPACK.S:735
 }
 
