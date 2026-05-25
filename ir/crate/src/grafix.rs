@@ -1980,10 +1980,12 @@ pub fn getparam(cpu: &mut Cpu) {
     cpu.flags.c = false;
     // 65816 (IIgs-only, not modeled): xce  ; GRAFIX.S:2093
     // 65816 (IIgs-only, not modeled): rep $30  ; GRAFIX.S:2094
-    let tmp0 = cpu.reg.a;
+    cpu.stack.push(cpu.reg.a);
     cpu.stack.push(cpu.reg.y);
     cpu.reg.x = 0x03;
-    cpu.reg.a = tmp0;
+    cpu.reg.a = cpu.stack.pop().expect("pla on empty stack");
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = true;
     // 65816 (IIgs-only, not modeled): xce  ; GRAFIX.S:2101
     cpu.reg.y = cpu.reg.a;

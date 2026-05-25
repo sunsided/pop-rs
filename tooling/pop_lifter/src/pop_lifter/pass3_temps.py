@@ -63,7 +63,7 @@ from dataclasses import replace
 from itertools import count
 from typing import Iterator
 
-from .ir1 import Pha, Pla, Unsupported
+from .ir1 import Pha, Phy, Pla, Unsupported
 from .ir3 import (
     Assign,
     Block,
@@ -101,9 +101,14 @@ def _is_stack_barrier(s: Stmt) -> bool:
     stack itself — returns True."""
     if isinstance(s, RawStmt):
         # pha/pla are the bracket tokens, handled before this check.
-        # A plain modelled op leaves the byte stack alone; an
-        # Unsupported op (e.g. php/plp lowered as unknown) might not.
-        return isinstance(s.item, Unsupported)
+        # A plain modelled op leaves the byte stack alone, so it's
+        # spanned. But anything else that mutates the byte stack is a
+        # barrier: a `pha` before it can't be soundly paired with a
+        # `pla` after it, because that `pla` pops the *intervening*
+        # value, not the saved A. That covers `Phy` (65C02 push-Y, e.g.
+        # the `pha ; phy ; … ; pla` in `getparam`) and any `Unsupported`
+        # op that might touch the stack (e.g. php/plp lowered as unknown).
+        return isinstance(s.item, (Phy, Unsupported))
     if isinstance(s, (Assign, Wide16Stmt, SaveTemp, RestoreTemp, CallStmt)):
         return False
     # Return / TailCall / If / RawIf / Loop / DoWhile / For / Repeat /

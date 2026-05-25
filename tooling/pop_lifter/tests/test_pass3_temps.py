@@ -24,6 +24,7 @@ from pop_lifter.ir1 import (
     LoadAbs,
     LoadImm,
     Pha,
+    Phy,
     Pla,
     Reg,
     SourceRef,
@@ -42,6 +43,7 @@ from pop_lifter.ir3 import (
     SaveTemp,
 )
 from pop_lifter.pass3_temps import recover_routine, recover_temps, temp_stats
+from pop_lifter.pass4_emit_rust import emit_routine
 
 SRC = SourceRef(file="syn", line=0, raw="")
 
@@ -79,6 +81,10 @@ def _pha() -> RawStmt:
 
 def _pla() -> RawStmt:
     return _raw(Pla(src=SRC))
+
+
+def _phy() -> RawStmt:
+    return _raw(Phy(src=SRC))
 
 
 def _unsupported() -> RawStmt:
@@ -157,6 +163,36 @@ def test_no_match_across_unsupported():
     """An Unsupported op (might touch the stack, e.g. php) is a barrier."""
     out = _recover([_pha(), _unsupported(), _pla()])
     assert not any(isinstance(s, (SaveTemp, RestoreTemp)) for s in out)
+
+
+def test_no_match_across_phy_push():
+    """`push a ; push y ; a = pop` (the 65C02 idiom in `getparam`) must
+    NOT pair the `pha` with the `pla`: on the value stack the pop reads
+    back the intervening `phy` byte (Y), not the saved A. `Phy` is a
+    stack barrier, so all three stay raw ops — folding into a SaveTemp/
+    RestoreTemp would drop the pop and its Z/N effect. Regression for the
+    pass-3 bug flagged on PR #58."""
+    out = _recover([_pha(), _phy(), _pla()])
+    assert not any(isinstance(s, (SaveTemp, RestoreTemp)) for s in out)
+    assert isinstance(out[0].item, Pha)
+    assert isinstance(out[1].item, Phy)
+    assert isinstance(out[2].item, Pla)
+
+
+def test_phy_between_push_pop_emits_faithful_stack_ops():
+    """End-to-end through pass 3 + pass 4: `pha ; phy ; pla` lowers to two
+    real pushes and a pop (popping the Y byte into A), never a temp
+    rewrite that would silently restore the saved A and drop the pop."""
+    routine = RoutineIR3(name="syn", body=Block.of([
+        _pha(), _phy(), _pla(), ReturnStmt(src=SRC),
+    ]))
+    text = "\n".join(emit_routine(recover_temps(
+        ModuleIR3(name="m", file="syn", routines=[routine])
+    ).routines[0]))
+    assert "let tmp" not in text
+    assert "self.stack.push(self.reg.a);" in text
+    assert "self.stack.push(self.reg.y);" in text
+    assert 'self.reg.a = self.stack.pop().expect("pla on empty stack");' in text
 
 
 def test_unmatched_push_left_raw():
@@ -285,3 +321,21 @@ def test_behaviour_nested():
     assert tb.writes == ta.writes
     assert tb.ram[0x21] == ta.ram[0x21] == 0xBB
     assert tb.ram[0x22] == ta.ram[0x22] == 0xAA
+
+
+def test_behaviour_phy_between_push_pop_pops_the_y_byte():
+    """`pha ; phy ; pla` pops the *phy* byte (Y), not the saved A —
+    recovery must leave this unchanged. A=0x42, Y=0x55; after the pop A
+    holds 0x55, and the interpreter agrees before and after pass 3."""
+    ldy = _raw(LoadImm(reg=Reg.Y, imm=_imm(0x55), src=SRC))
+    stmts = [
+        _lda_imm(0x42),     # A = 0x42  (pushed first, left orphaned)
+        ldy,                # Y = 0x55  (pushed on top by phy)
+        _pha(),
+        _phy(),
+        _pla(),             # pops 0x55 (Y) into A
+        _sta("R", 0x40),    # R = 0x55
+    ]
+    tb, ta = _run_both(_module(stmts), {})
+    assert tb.writes == ta.writes
+    assert tb.ram[0x40] == ta.ram[0x40] == 0x55

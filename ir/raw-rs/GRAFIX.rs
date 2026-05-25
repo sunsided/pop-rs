@@ -2136,10 +2136,12 @@ impl Cpu {
         self.flags.c = false;
         // 65816 (IIgs-only, not modeled): xce  ; GRAFIX.S:2093
         // 65816 (IIgs-only, not modeled): rep $30  ; GRAFIX.S:2094
-        let tmp0 = self.reg.a;
+        self.stack.push(self.reg.a);
         self.stack.push(self.reg.y);
         self.reg.x = 0x03;
-        self.reg.a = tmp0;
+        self.reg.a = self.stack.pop().expect("pla on empty stack");
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.flags.c = true;
         // 65816 (IIgs-only, not modeled): xce  ; GRAFIX.S:2101
         self.reg.y = self.reg.a;
