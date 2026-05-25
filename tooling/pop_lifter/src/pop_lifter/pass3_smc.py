@@ -137,12 +137,18 @@ def recognize_routine(routine: Routine) -> Routine:
     for label, idx in imm_idx.items():
         instr = new[idx]
         new[idx] = replace(instr, imm=replace(instr.imm, opvar=imm_var[label]))
-    # Mark the patched address operand likewise.
+    # Mark the patched address operand likewise, recording which byte
+    # halves are patched so the emitter knows which to read from a field
+    # and which to bake from the assembled address.
     for label, idx in addr_idx.items():
         instr = new[idx]
         field = _ADDR_OP_FIELD[type(instr)]
         operand = getattr(instr, field)
-        new[idx] = replace(instr, **{field: replace(operand, opvar=addr_var[label])})
+        halves = tuple(
+            h for off, h in ((1, "lo"), (2, "hi")) if off in offsets_for[label]
+        )
+        new[idx] = replace(instr, **{field: replace(
+            operand, opvar=addr_var[label], opvar_halves=halves)})
 
     return replace(routine, body=new)
 
@@ -158,21 +164,27 @@ def recognize_smc(module: ModuleIR1) -> ModuleIR1:
 def smc_var_count(module: ModuleIR1) -> int:
     """Number of distinct operand variables recognised — counted per
     routine (a local label is routine-scoped, so the same name in two
-    routines is two variables) and summed. This is the count of patched
-    instructions now modelled faithfully, which may be fewer than the
+    routines is two variables) and summed. Counts both immediate
+    (`StoreOpVar`) and 16-bit address (`StoreOpAddr`) operands; the two
+    namespaces are disjoint per routine (a label patches one or the
+    other), so a plain name-set union is exact. May be fewer than the
     number of patch *stores* (`smc_store_count`) when several stores
-    rewrite the same operand."""
+    rewrite the same operand (e.g. a low + high byte pair)."""
     return sum(
-        len({it.name for it in r.body if isinstance(it, StoreOpVar)})
+        len({
+            it.name for it in r.body
+            if isinstance(it, (StoreOpVar, StoreOpAddr))
+        })
         for r in module.routines
     )
 
 
 def smc_store_count(module: ModuleIR1) -> int:
-    """Total `StoreOpVar` patch *stores* produced across the module."""
+    """Total patch *stores* produced across the module — both immediate
+    (`StoreOpVar`) and address-byte (`StoreOpAddr`) patches."""
     return sum(
         1
         for r in module.routines
         for it in r.body
-        if isinstance(it, StoreOpVar)
+        if isinstance(it, (StoreOpVar, StoreOpAddr))
     )

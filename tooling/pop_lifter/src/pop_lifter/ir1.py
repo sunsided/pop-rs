@@ -95,11 +95,18 @@ class Abs:
     `:label+1`, high byte from `:label+2`). Pass 3's SMC recognition sets
     it on the instruction a patch pair targets; the interpreter reads the
     patched address from `Trace.operand_addr_lo`/`_hi`, falling back to
-    the assembled `addr` byte for any half that was never patched."""
+    the assembled `addr` byte for any half that was never patched.
+
+    `opvar_halves` records which byte halves are actually patched
+    (`("lo",)`, `("hi",)`, or `("lo", "hi")`) so the emitter can read the
+    operand-variable field for a patched half but bake the assembled
+    `addr` byte for an un-patched one — matching the interpreter's
+    per-byte fallback instead of reading an uninitialised field."""
 
     name: str
     addr: int
     opvar: str | None = None
+    opvar_halves: tuple[str, ...] = ()
 
 
 # Other operand kinds (`IndexedX`, `IndexedY`, `IndY`, `IndX`) will land

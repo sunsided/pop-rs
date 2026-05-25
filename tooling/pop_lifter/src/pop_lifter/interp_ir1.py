@@ -433,8 +433,14 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         # patched 16-bit operand, which the marked `Abs` reads via
         # `_abs_base`.
         value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
-        sink = trace.operand_addr_lo if item.half == "lo" else trace.operand_addr_hi
-        sink[item.name] = value
+        if item.half == "lo":
+            trace.operand_addr_lo[item.name] = value
+        elif item.half == "hi":
+            trace.operand_addr_hi[item.name] = value
+        else:
+            raise InterpError(
+                f"StoreOpAddr.half must be 'lo' or 'hi', got {item.half!r}"
+            )
         return True
     if isinstance(item, StoreIndexed):
         value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]

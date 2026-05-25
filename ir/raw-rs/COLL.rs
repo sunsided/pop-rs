@@ -230,8 +230,8 @@ impl Cpu {
             }
             self.a |= self.ram[sym::ztemp];
             self.x = self.ram[sym::tempblockx];
-            self.ram[((self.smodCD_hi as usize) << 8 | self.smodCD_lo as usize) + self.x as usize] = self.a;
-            self.ram[((self.smodSN_hi as usize) << 8 | self.smodSN_lo as usize) + self.x as usize] = self.ram[sym::tempscrn];
+            self.ram[((0x03) << 8 | (self.smodCD_lo as usize)) + self.x as usize] = self.a;
+            self.ram[((0x03) << 8 | (self.smodSN_lo as usize)) + self.x as usize] = self.ram[sym::tempscrn];
             self.a = self.ram[sym::blockedge];
             self.c = 0;
             let _r = (self.a as u16) + (0x0e) as u16 + (self.c as u16);
@@ -321,8 +321,8 @@ impl Cpu {
         self.smodCD_lo = self.x;
         self.x = 0x09;
         loop {
-            self.ram[sym::SNlastframe + self.x as usize] = self.ram[((self.smodSN_hi as usize) << 8 | self.smodSN_lo as usize) + self.x as usize];
-            self.ram[sym::CDlastframe + self.x as usize] = self.ram[((self.smodCD_hi as usize) << 8 | self.smodCD_lo as usize) + self.x as usize];
+            self.ram[sym::SNlastframe + self.x as usize] = self.ram[((0x03) << 8 | (self.smodSN_lo as usize)) + self.x as usize];
+            self.ram[sym::CDlastframe + self.x as usize] = self.ram[((0x03) << 8 | (self.smodCD_lo as usize)) + self.x as usize];
             self.a = 0xff;
             self.ram[sym::SNthisframe + self.x as usize] = self.a;
             self.ram[sym::SNabove + self.x as usize] = self.a;

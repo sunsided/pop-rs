@@ -328,11 +328,18 @@ def _abs_index(a: Abs, syms: SymTable | None) -> str:
     `0x..` literal.
 
     An SMC address operand (`a.opvar` set) instead composes its runtime
-    16-bit base from the provisional low / high byte fields the matching
-    `StoreOpAddr` writes, so the patched address takes effect."""
+    16-bit base from the low / high byte fields the matching `StoreOpAddr`
+    writes — but only for the halves actually patched (`a.opvar_halves`);
+    an un-patched half bakes the assembled `addr` byte, matching the
+    interpreter's per-byte fallback instead of reading an uninitialised
+    field."""
     if a.opvar is not None:
         name = _mangle(a.opvar)
-        return f"((self.{name}_hi as usize) << 8 | self.{name}_lo as usize)"
+        hi = (f"self.{name}_hi as usize" if "hi" in a.opvar_halves
+              else f"0x{(a.addr >> 8) & 0xff:02x}")
+        lo = (f"self.{name}_lo as usize" if "lo" in a.opvar_halves
+              else f"0x{a.addr & 0xff:02x}")
+        return f"(({hi}) << 8 | ({lo}))"
     if syms is None:
         return _addr(a.addr)
     return syms.index(a)

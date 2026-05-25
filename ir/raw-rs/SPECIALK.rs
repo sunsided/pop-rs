@@ -428,7 +428,7 @@ impl Cpu {
                     pc = 2;
                 }
                 2 => {
-                    self.a = self.ram[((self.smod_hi as usize) << 8 | self.smod_lo as usize) + self.y as usize];
+                    self.a = self.ram[((self.smod_hi as usize) << 8 | (self.smod_lo as usize)) + self.y as usize];
                     if self.a == 0x00 {
                         pc = 10;
                     } else {

@@ -612,14 +612,22 @@ def test_raw_store_op_addr_writes_byte_halves():
 
 
 def test_address_opvar_operand_composes_runtime_base():
-    # An `Abs` marked with an address opvar reads its base from the
-    # patched low/high byte fields instead of the assembled address.
-    base = Abs(name="$2000", addr=0x2000, opvar="smBASE")
+    # A fully-patched address opvar reads both byte halves from fields.
+    base = Abs(name="$2000", addr=0x2000, opvar="smBASE", opvar_halves=("lo", "hi"))
     item = LoadIndexed(reg=Reg.A, base=base, index=Reg.Y, src=SRC)
     assert _raw(item) == (
         "self.a = self.ram[((self.smBASE_hi as usize) << 8 "
-        "| self.smBASE_lo as usize) + self.y as usize];"
+        "| (self.smBASE_lo as usize)) + self.y as usize];"
     )
+
+
+def test_address_opvar_partial_patch_bakes_assembled_byte():
+    # A low-byte-only patch reads `_lo` from a field but bakes the
+    # assembled high byte (matching the interpreter's per-byte fallback),
+    # rather than reading an uninitialised `_hi` field.
+    base = Abs(name="$12ab", addr=0x12ab, opvar="smodCD", opvar_halves=("lo",))
+    item = LoadAbs(reg=Reg.A, source=base, src=SRC)
+    assert _raw(item) == "self.a = self.ram[((0x12) << 8 | (self.smodCD_lo as usize))];"
 
 
 def test_raw_load_indexed():
