@@ -41,10 +41,18 @@ idiom — to two chained byte ops over `u16`: the low byte's bit-8 feeds
 the high byte (subtract via the `src + ~op + 1` identity), then `A` and
 `C` take the high-byte result and carry-out, preserving both stores.
 
+This slice also lowers the relooper's *dispatch fallback* — the
+`DispatchStmt` (`loop { match pc { ... } }`) that pass 2 now emits for
+routines it can't reduce to natural loops/conditionals (irreducible
+flow, multi-back-edge loops, mid-body exits). Each numbered state is a
+`match` arm holding the block's atoms; edges become `pc = <state>;`
+transitions (`GotoStateStmt`). This replaces the old `GotoStmt` /
+`LabelStmt` escape hatch, so those routines now emit valid structured
+Rust instead of unresolved gotos.
+
 Still deferred:
 * `StoreLocal` / `StoreOpVar`, `LocalRef` inc/dec — self-modifying code;
-* `Pha` / `Pla` — stack;
-* `RawIfStmt`, `GotoStmt` / `LabelStmt`.
+* `Pha` / `Pla` — stack.
 
 Memory model and receiver (`Cpu` / `self.ram` / `self.c` / `self.z` /
 `self.n`) remain provisional pending the Game/Renderer/Audio/Input
@@ -100,13 +108,16 @@ from .ir3 import (
     BreakStmt,
     CallStmt,
     ContinueStmt,
+    DispatchStmt,
     DoWhileStmt,
     ForStmt,
+    GotoStateStmt,
     IfStmt,
     LabeledBlock,
     LoopStmt,
     MatchStmt,
     ModuleIR3,
+    RawIfStmt,
     RawStmt,
     RepeatStmt,
     RestoreTemp,
@@ -123,10 +134,11 @@ INDENT = "    "
 # Statement types that produce real Rust code (not a comment placeholder).
 _LOWERED_TYPES = (
     Assign, ReturnStmt,
-    IfStmt, LoopStmt, DoWhileStmt, ForStmt, RepeatStmt,
+    IfStmt, RawIfStmt, LoopStmt, DoWhileStmt, ForStmt, RepeatStmt,
     BreakStmt, ContinueStmt, MatchStmt,
     CallStmt, TailCallStmt,
     SaveTemp, RestoreTemp, Wide16Stmt, LabeledBlock,
+    DispatchStmt, GotoStateStmt,
 )
 
 
@@ -349,6 +361,29 @@ def _emit_compare(c: Compare, syms: SymTable | None = None) -> str:
         return f"({reg} as i8) {op_str}"
     rhs = _emit_value(c.rhs, syms)
     return f"{reg} {c.op} {rhs}"
+
+
+# A `RawIfStmt.cond` is a raw 6502 branch suffix — the flag test pass 2
+# couldn't fuse into a `Compare`. Map each to the provisional flag model
+# (`self.z`/`self.c`/`self.n`), mirroring `interp_ir1._branch_taken`.
+# The overflow flag (`vs`/`vc`) isn't tracked anywhere in the lifter, so
+# it has no entry; `_emit_branch_cond` flags it rather than guessing.
+_BRANCH_COND_RS = {
+    "eq": "self.z != 0",
+    "ne": "self.z == 0",
+    "cs": "self.c != 0",
+    "cc": "self.c == 0",
+    "mi": "self.n != 0",
+    "pl": "self.n == 0",
+}
+
+
+def _emit_branch_cond(cond: str) -> str:
+    rs = _BRANCH_COND_RS.get(cond)
+    if rs is not None:
+        return rs
+    # Overflow flag not modeled — keep the routine compiling but mark it.
+    return f"false /* TODO(pass4): branch on {cond} (V flag not modeled) */"
 
 
 # ---------------------------------------------------------------- raw atoms
@@ -608,6 +643,17 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
         lines.append(f"{pad}}}")
         return lines
 
+    if isinstance(stmt, RawIfStmt):
+        lines = [f"{pad}if {_emit_branch_cond(stmt.cond)} {{"]
+        for s in stmt.then_block.stmts:
+            lines.extend(_emit_stmt(s, indent + 1, syms))
+        if stmt.else_block is not None:
+            lines.append(f"{pad}}} else {{")
+            for s in stmt.else_block.stmts:
+                lines.extend(_emit_stmt(s, indent + 1, syms))
+        lines.append(f"{pad}}}")
+        return lines
+
     if isinstance(stmt, LoopStmt):
         lines = [f"{pad}loop {{"]
         for s in stmt.body.stmts:
@@ -676,6 +722,28 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
         lines += [f"{pad}    _ => {{}}", f"{pad}}}"]
         return lines
 
+    if isinstance(stmt, GotoStateStmt):
+        return [f"{pad}pc = {stmt.state};"]
+
+    if isinstance(stmt, DispatchStmt):
+        inner = INDENT * (indent + 1)
+        lines = [
+            f"{pad}let mut pc: u32 = {stmt.entry};",
+            f"{pad}loop {{",
+            f"{inner}match pc {{",
+        ]
+        for arm in stmt.arms:
+            lines.append(f"{inner}{INDENT}{arm.state} => {{")
+            for s in arm.body.stmts:
+                lines.extend(_emit_stmt(s, indent + 3, syms))
+            lines.append(f"{inner}{INDENT}}}")
+        lines += [
+            f"{inner}{INDENT}_ => unreachable!(),",
+            f"{inner}}}",
+            f"{pad}}}",
+        ]
+        return lines
+
     if isinstance(stmt, RawStmt):
         lowered = _emit_raw(stmt.item, syms)
         if lowered is not None:
@@ -707,9 +775,10 @@ _HEADER = [
     "// Pass 4 skeleton slice: module + routine scaffolding with leaf-",
     "// expression, control-flow, data-movement, carry-arithmetic,",
     "// `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.",
-    "// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). SMC, the",
-    "// stack, `RawIfStmt`, and `GotoStmt`/`LabelStmt` are deferred; they",
-    "// appear as `// raw: …` or `// TODO(pass4): …` comments.",
+    "// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured",
+    "// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC",
+    "// and the stack are deferred; they appear as `// raw: …` /",
+    "// `// TODO(pass4): …` comments.",
     "// The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are",
     "// provisional, pending the state/trait design slice. RAM addresses",
     "// keep their source symbol names via the `sym` constants below.",

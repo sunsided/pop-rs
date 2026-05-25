@@ -3,9 +3,10 @@
 // Pass 4 skeleton slice: module + routine scaffolding with leaf-
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
-// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). SMC, the
-// stack, `RawIfStmt`, and `GotoStmt`/`LabelStmt` are deferred; they
-// appear as `// raw: …` or `// TODO(pass4): …` comments.
+// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
+// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
+// and the stack are deferred; they appear as `// raw: …` /
+// `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -445,7 +446,14 @@ impl Cpu {
             if self.a == 0x00 {
             } else {
                 // raw: ??? dec pstarcount,x            ; SUBS.S:364
-                // TODO(pass4): lower RawIfStmt
+                if self.z == 0 {
+                } else {
+                    self.a = self.x;
+                    let tmp0 = self.a;
+                    self.twinkle();
+                    self.a = tmp0;
+                    self.x = self.a;
+                }
             }
             self.x = self.x.wrapping_sub(1);
             if !((self.x as i8) >= 0) {
@@ -758,117 +766,187 @@ impl Cpu {
     }
 
     fn PlaySongX(&mut self) {
-        self.y = self.a;
-        self.a = self.ram[sym::soundon];
-        self.a &= self.ram[sym::musicon];
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.y = self.a;
+                    self.a = self.ram[sym::soundon];
+                    self.a &= self.ram[sym::musicon];
+                    if self.a != 0x00 {
+                        pc = 2;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.a = self.x;
+                    self.play();
+                    return;
+                }
+                2 => {
+                    self.a = self.y;
+                    pc = 3;
+                }
+                3 => {
+                    self.minit();
+                    self.swpage();
+                    pc = 4;
+                }
+                4 => {
+                    self.a = 0x01;
+                    self.strobe();
+                    self.a = self.ram[0xc061];
+                    self.a |= self.ram[0xc062];
+                    self.a |= self.ram[sym::keypress];
+                    if (self.a as i8) < 0 {
+                        pc = 6;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    self.pburn();
+                    self.pstars();
+                    self.pflow();
+                    self.mplay();
+                    let _o: u8 = 0x00;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a != 0x00 {
+                        pc = 4;
+                    } else {
+                        pc = 6;
+                    }
+                }
+                6 => {
+                    self.swpage();
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.a = self.x;
-        self.play();
-        return;
-        // TODO(pass4): lower LabelStmt
-        self.a = self.y;
-        // TODO(pass4): lower LabelStmt
-        self.minit();
-        self.swpage();
-        // TODO(pass4): lower LabelStmt
-        self.a = 0x01;
-        self.strobe();
-        self.a = self.ram[0xc061];
-        self.a |= self.ram[0xc062];
-        self.a |= self.ram[sym::keypress];
-        if (self.a as i8) < 0 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.pburn();
-        self.pstars();
-        self.pflow();
-        self.mplay();
-        let _o: u8 = 0x00;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        self.swpage();
-        return;
     }
 
     fn PlaySong(&mut self) {
-        self.minit();
-        self.swpage();
-        // TODO(pass4): lower LabelStmt
-        self.a = 0x01;
-        self.strobe();
-        self.a = self.ram[0xc061];
-        self.a |= self.ram[0xc062];
-        self.a |= self.ram[sym::keypress];
-        if (self.a as i8) < 0 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.minit();
+                    self.swpage();
+                    pc = 1;
+                }
+                1 => {
+                    self.a = 0x01;
+                    self.strobe();
+                    self.a = self.ram[0xc061];
+                    self.a |= self.ram[0xc062];
+                    self.a |= self.ram[sym::keypress];
+                    if (self.a as i8) < 0 {
+                        pc = 3;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    self.pburn();
+                    self.pstars();
+                    self.pflow();
+                    self.mplay();
+                    let _o: u8 = 0x00;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a != 0x00 {
+                        pc = 1;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    self.swpage();
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.pburn();
-        self.pstars();
-        self.pflow();
-        self.mplay();
-        let _o: u8 = 0x00;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        self.swpage();
-        return;
     }
 
     fn PlaySongI(&mut self) {
-        self.y = self.a;
-        self.a = self.ram[sym::soundon];
-        self.a &= self.ram[sym::musicon];
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.y = self.a;
+                    self.a = self.ram[sym::soundon];
+                    self.a &= self.ram[sym::musicon];
+                    if self.a != 0x00 {
+                        pc = 3;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.a = self.x;
+                    if self.a == 0x00 {
+                        pc = 8;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    self.play();
+                    return;
+                }
+                3 => {
+                    self.a = self.y;
+                    self.minit();
+                    self.swpage();
+                    pc = 4;
+                }
+                4 => {
+                    self.musickeys();
+                    let _o: u8 = 0x80;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a >= 0x80 {
+                        pc = 7;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    self.pburn();
+                    self.pstars();
+                    self.pflow();
+                    self.mplay();
+                    let _o: u8 = 0x00;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a != 0x00 {
+                        pc = 4;
+                    } else {
+                        pc = 6;
+                    }
+                }
+                6 => {
+                    self.swpage();
+                    return;
+                }
+                7 => {
+                    self.dostartgame();
+                    return;
+                }
+                8 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.a = self.x;
-        if self.a == 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.play();
-        return;
-        // TODO(pass4): lower LabelStmt
-        self.a = self.y;
-        self.minit();
-        self.swpage();
-        // TODO(pass4): lower LabelStmt
-        self.musickeys();
-        let _o: u8 = 0x80;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a >= 0x80 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.pburn();
-        self.pstars();
-        self.pflow();
-        self.mplay();
-        let _o: u8 = 0x00;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.swpage();
-        return;
-        // TODO(pass4): lower LabelStmt
-        self.dostartgame();
-        return;
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn swpage(&mut self) {
@@ -899,45 +977,82 @@ impl Cpu {
     }
 
     fn play(&mut self) {
-        self.ram[sym::SceneCount] = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.rnd();
-        self.a = self.ram[sym::SPEED];
-        self.pause();
-        self.strobe();
-        self.a = self.ram[sym::level];
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.ram[sym::SceneCount] = self.a;
+                    pc = 1;
+                }
+                1 => {
+                    self.rnd();
+                    self.a = self.ram[sym::SPEED];
+                    self.pause();
+                    self.strobe();
+                    self.a = self.ram[sym::level];
+                    if self.a != 0x00 {
+                        pc = 4;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    self.demokeys();
+                    if self.n == 0 {
+                        pc = 5;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    self.a = 0x01;
+                    self.dostartgame();
+                    return;
+                }
+                4 => {
+                    self.a = self.ram[0xc061];
+                    self.a |= self.ram[0xc062];
+                    self.a |= self.ram[sym::keypress];
+                    if (self.a as i8) < 0 {
+                        pc = 9;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    self.NextFrame();
+                    self.flashon();
+                    self.FrameAdv();
+                    self.flashoff();
+                    self.a = self.ram[sym::soundon];
+                    if self.a == 0x00 {
+                        pc = 7;
+                    } else {
+                        pc = 6;
+                    }
+                }
+                6 => {
+                    self.playback();
+                    self.zerosound();
+                    pc = 7;
+                }
+                7 => {
+                    self.ram[sym::SceneCount] = self.ram[sym::SceneCount].wrapping_sub(1);
+                    if self.z == 0 {
+                        pc = 1;
+                    } else {
+                        pc = 8;
+                    }
+                }
+                8 => {
+                    return;
+                }
+                9 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.demokeys();
-        // TODO(pass4): lower RawIfStmt
-        self.a = 0x01;
-        self.dostartgame();
-        return;
-        // TODO(pass4): lower LabelStmt
-        self.a = self.ram[0xc061];
-        self.a |= self.ram[0xc062];
-        self.a |= self.ram[sym::keypress];
-        if (self.a as i8) < 0 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        self.NextFrame();
-        self.flashon();
-        self.FrameAdv();
-        self.flashoff();
-        self.a = self.ram[sym::soundon];
-        if self.a == 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.playback();
-        self.zerosound();
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::SceneCount] = self.ram[sym::SceneCount].wrapping_sub(1);
-        // TODO(pass4): lower RawIfStmt
-        return;
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn playloop(&mut self) {
@@ -955,7 +1070,11 @@ impl Cpu {
             }
         } else {
             self.demokeys();
-            // TODO(pass4): lower RawIfStmt
+            if self.n != 0 {
+                self.a = 0x01;
+                self.dostartgame();
+                return;
+            }
         }
         self.NextFrame();
         self.flashon();
@@ -967,7 +1086,10 @@ impl Cpu {
             self.zerosound();
         }
         self.ram[sym::SceneCount] = self.ram[sym::SceneCount].wrapping_sub(1);
-        // TODO(pass4): lower RawIfStmt
+        if self.z == 0 {
+            self.playloop();
+            return;
+        }
         return;
     }
 
@@ -1266,7 +1388,37 @@ impl Cpu {
                     if self.a >= 0x0e {
                         break 'b7;
                     } else {
-                        // TODO(pass4): lower RawIfStmt
+                        if self.c == 0 {
+                            self.a = self.ram[sym::SecLeft];
+                            let _o: u8 = 0x02;
+                            self.c = (self.a >= _o) as u8;
+                            self.z = (self.a == _o) as u8;
+                            self.n = self.a.wrapping_sub(_o) >> 7;
+                            if self.a < 0x02 {
+                                self.a = 0x00;
+                                self.ram[sym::timerequest] = self.a;
+                                self.ram[sym::msgtimer] = self.a;
+                                return;
+                            }
+                            self.a = self.ram[sym::message];
+                            let _o: u8 = 0x03;
+                            self.c = (self.a >= _o) as u8;
+                            self.z = (self.a == _o) as u8;
+                            self.n = self.a.wrapping_sub(_o) >> 7;
+                            if self.a != 0x03 {
+                                self.a = self.ram[sym::msgtimer];
+                                if self.a != 0x00 {
+                                    return;
+                                }
+                                self.a = 0x03;
+                                self.ram[sym::message] = self.a;
+                            }
+                            self.a = 0x01;
+                            self.ram[sym::timerequest] = self.a;
+                            self.a = 0x01;
+                            self.ram[sym::msgtimer] = self.a;
+                            return;
+                        }
                     }
                 }
                 self.a = self.ram[sym::timerequest];
@@ -1302,7 +1454,9 @@ impl Cpu {
     fn ADDLOWERSOUND(&mut self) {
         self.c = self.a & 1;
         self.a = self.a.wrapping_shr(1);
-        // TODO(pass4): lower RawIfStmt
+        if self.c == 0 {
+            return;
+        }
         'b12: {
             self.a = self.ram[sym::level];
             let _o: u8 = 0x03;
@@ -1405,7 +1559,9 @@ impl Cpu {
         loop {
             self.DoScrn();
             self.ram[sym::SCRNUM] = self.ram[sym::SCRNUM].wrapping_sub(1);
-            // TODO(pass4): lower RawIfStmt
+            if self.z != 0 {
+                break;
+            }
         }
         return;
     }
@@ -1416,7 +1572,10 @@ impl Cpu {
         self.y = 0x1d;
         loop {
             self.getinitobj();
-            // TODO(pass4): lower RawIfStmt
+            if self.c == 0 {
+            } else {
+                self.ram[(self.ram[sym::BlueSpec] as usize | (self.ram[sym::BlueSpec + 1] as usize) << 8) + self.y as usize] = self.a;
+            }
             self.y = self.y.wrapping_sub(1);
             if !((self.y as i8) >= 0) {
                 break;
@@ -1560,7 +1719,22 @@ impl Cpu {
             self.n = self.a.wrapping_sub(_o) >> 7;
             if self.a >= 0x04 {
                 self.a = 0x04;
-                // TODO(pass4): lower RawIfStmt
+                if self.c == 0 {
+                    self.ram[sym::CharY] = (self.ram[sym::CharYVel]).wrapping_add(self.ram[sym::CharY]);
+                    self.a = self.ram[sym::CharAction];
+                    let _o: u8 = 0x04;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a != 0x04 {
+                        return;
+                    }
+                    self.a = self.ram[sym::CharXVel];
+                    self.addcharx();
+                    self.ram[sym::CharX] = self.a;
+                    self.rereadblocks();
+                    return;
+                }
             }
         } else {
             self.a = self.ram[sym::CharYVel];

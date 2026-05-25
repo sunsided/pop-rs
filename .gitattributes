@@ -1,0 +1,6 @@
+# The entire `ir/` tree is committed lifter output — IR dumps and the
+# generated Rust source under `ir/raw-rs/` (all carry `@generated` or are
+# pinned byte-for-byte by regen-or-fail tests). Marking them generated
+# tells GitHub Linguist to collapse them in pull-request diffs and exclude
+# them from language stats, so reviews focus on the hand-written sources.
+ir/** linguist-generated=true

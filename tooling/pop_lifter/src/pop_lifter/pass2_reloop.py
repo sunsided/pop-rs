@@ -33,7 +33,8 @@ Loop handling (this slice):
   the continue condition after the body. Covers the classic 6502
   counter loop (`:hdr ... dex ; bpl :hdr`).
 
-Loop handling (out of scope, still pending):
+Loop handling (still emitted as natural loops only for the simple
+do-while above; everything else takes the dispatch fallback below):
 
 * Multiple back-edges to the same header (nested or unstructured).
 * Loops with mid-body exits (`break` not at the bottom).
@@ -41,16 +42,15 @@ Loop handling (out of scope, still pending):
   6502 — usually surfaces as a forward `bcc` over the body plus a
   `jmp` back at the bottom).
 * Irreducible flow (back-edge target doesn't dominate the source).
-  POP's combat / physics code has a few of these; they'll need the
-  `loop { match pc { ... } }` dispatcher fallback from the plan.
+  POP's combat / physics code has a few of these.
 
-When the relooper can't structure a routine (or any loop within it)
-it falls back via `_wrap_unstructured` — see below. The fallback
-walks the IR2 body in order and emits a 1-for-1 IR3 stream
-(`Label`/`Goto`/`Return`/`TailCall`/`Call` map to their IR3
-counterparts; `If`/`Branch` become a structured `IfStmt`/`RawIfStmt`
-whose then-block holds a `GotoStmt` to the original target; atoms
-become `RawStmt`). Correctness preserved, structure not improved.
+When the relooper can't reduce a routine to natural loops/conditionals
+it falls back via `_structure_dispatch` — see below. The fallback
+emits the basic-block CFG as a `loop { match pc { ... } }` dispatcher
+(a `DispatchStmt`): each block is a numbered state, each control-flow
+edge a `pc = next` transition. Correctness is preserved 1-for-1 with
+the CFG, and the result is still valid structured Rust (no unresolved
+`goto`/label) — just less idiomatic than a recognised natural loop.
 * Post-dominator merge. When a conditional's two arms reconverge at a
   block *after* the fall-through (its immediate post-dominator `M`),
   the walker emits each arm only up to `M` and the shared continuation
@@ -82,7 +82,6 @@ from .ir1 import (
     Compare,
     Goto,
     If,
-    Label,
     ModuleIR1,
     Return,
     Routine,
@@ -95,8 +94,11 @@ from .ir3 import (
     BreakStmt,
     CallStmt,
     ContinueStmt,
+    DispatchArm,
+    DispatchStmt,
     DoWhileStmt,
     ForStmt,
+    GotoStateStmt,
     GotoStmt,
     IfStmt,
     LabeledBlock,
@@ -439,54 +441,72 @@ def _structure_acyclic(cfg: CFG) -> Block:
     return Block.of(_simplify_stmts(do_tree(cfg.entry_id, [])))
 
 
+def _has_unresolved_goto(block: Block) -> bool:
+    """True if `block` (a structurer's output) still contains a raw
+    `GotoStmt` / `LabelStmt`. Those don't lower to valid Rust (the
+    emitter drops them and the interpreter rejects them), so a structurer
+    that emits one hasn't actually structured the routine and we fall
+    back to the dispatch loop instead."""
+    for s in block.stmts:
+        if isinstance(s, (GotoStmt, LabelStmt)):
+            return True
+        for child in _child_blocks(s):
+            if _has_unresolved_goto(child):
+                return True
+    return False
+
+
 def reloop_routine(routine: Routine) -> RoutineIR3:
     """Structure `routine` into an IR3 routine. Simple do-while loops
-    are recognised and emitted as `LoopStmt`; anything else with a
-    backward local jump falls back to `_wrap_unstructured`.
+    are recognised and emitted as `LoopStmt`; acyclic routines go through
+    the dominator-tree structurer. Anything the chosen structurer can't
+    fully reduce — leaving a back-edge cycle, an irreducible region, or a
+    forward goto the labeled-block structurer couldn't labelize — falls
+    back to the `loop { match pc { ... } }` dispatcher (`DispatchStmt`),
+    which structures any CFG at the cost of less idiomatic output.
     """
     cfg = build_cfg(routine)
+
+    def wrap(body: Block) -> RoutineIR3:
+        return RoutineIR3(
+            name=routine.name,
+            entry_aliases=list(routine.entry_aliases),
+            body=body,
+        )
 
     # Every cycle in the CFG must belong to a recognised simple loop.
     # We use `find_dfs_back_edges` (not `find_back_edges`) here so the
     # gate catches *irreducible* loops too — those have no dominator
     # back-edge but still represent cycles the linear walker can't
-    # safely traverse. Without this stricter check the walker's
-    # `visiting` escape hatch would fire mid-cycle and emit a
-    # `GotoStmt` referencing a synthesised `BB{n}` label that nothing
-    # downstream can resolve.
+    # safely traverse.
     cycle_edges = find_dfs_back_edges(cfg) if cfg.blocks else []
     loops, loop_blocks = _detect_simple_loops(cfg)
     if cycle_edges and not all(
         src in loop_blocks and dst in loop_blocks for src, dst in cycle_edges
     ):
-        return _wrap_unstructured(routine)
+        return wrap(_structure_dispatch(cfg))
 
     # Acyclic routines (no back-edges) are reducible: the dominator-tree
-    # structurer emits every merge node once via labeled blocks, with no
-    # code duplication. Loop-bearing routines keep the linear walker.
+    # structurer emits every merge node once via labeled blocks. Loop-
+    # bearing routines keep the linear walker. Either may still leave a
+    # forward `GotoStmt` it couldn't labelize — fall back to dispatch
+    # so no unresolved goto reaches the emitter.
     if not cycle_edges:
-        return RoutineIR3(
-            name=routine.name,
-            entry_aliases=list(routine.entry_aliases),
-            body=_structure_acyclic(cfg),
+        body = _structure_acyclic(cfg)
+    else:
+        ipostdoms = _compute_ipostdoms(cfg)
+        body = _emit_block(
+            cfg, cfg.entry_id,
+            exit_id=None,
+            visiting=set(),
+            loops=loops,
+            loop_blocks=loop_blocks,
+            active_loop_tail=None,
+            ipostdoms=ipostdoms,
         )
-
-    ipostdoms = _compute_ipostdoms(cfg)
-    visiting: set[int] = set()
-    body = _emit_block(
-        cfg, cfg.entry_id,
-        exit_id=None,
-        visiting=visiting,
-        loops=loops,
-        loop_blocks=loop_blocks,
-        active_loop_tail=None,
-        ipostdoms=ipostdoms,
-    )
-    return RoutineIR3(
-        name=routine.name,
-        entry_aliases=list(routine.entry_aliases),
-        body=body,
-    )
+    if _has_unresolved_goto(body):
+        body = _structure_dispatch(cfg)
+    return wrap(body)
 
 
 def reloop_module(module: ModuleIR1) -> ModuleIR3:
@@ -498,13 +518,16 @@ def reloop_module(module: ModuleIR1) -> ModuleIR3:
 
 
 def is_unstructured(routine: RoutineIR3) -> bool:
-    """True if `routine` came out of the fallback path — its body
-    contains a `GotoStmt` or a `LabelStmt`. Reported by the CLI so
-    callers can see at a glance how many routines pass 2 had to
-    punt on."""
+    """True if `routine` came out of the fallback path. Such a routine
+    is emitted as a `DispatchStmt` (`loop { match pc { ... } }`) — valid
+    structured Rust, but the relooper couldn't reduce it to natural
+    loops/conditionals. (A stray `GotoStmt`/`LabelStmt` also counts, as
+    a defensive check; the dispatch fallback no longer emits those.)
+    Reported by the CLI so callers see at a glance how many routines
+    needed the dispatch fallback."""
     def walk(stmts) -> bool:
         for s in stmts:
-            if isinstance(s, (GotoStmt, LabelStmt)):
+            if isinstance(s, (DispatchStmt, GotoStmt, LabelStmt)):
                 return True
             inner_then = getattr(s, "then_block", None)
             if inner_then is not None and walk(inner_then.stmts):
@@ -516,78 +539,84 @@ def is_unstructured(routine: RoutineIR3) -> bool:
     return walk(routine.body.stmts)
 
 
-def _wrap_unstructured(routine: Routine) -> RoutineIR3:
-    """Fallback path for routines the relooper can't structure (loops,
-    irreducible flow). Walks the IR2 body in order and emits a 1-for-1
-    IR3 stream. The result preserves semantics — every IR1/IR2 atom
-    has an IR3 representation — but the routine remains a sequence of
-    gotos and labels rather than a tree of structured blocks.
+def _structure_dispatch(cfg: CFG) -> Block:
+    """Universal fallback: emit `cfg` as a `loop { match pc { ... } }`
+    dispatcher (a `DispatchStmt`). Each basic block becomes one numbered
+    state (its block id); every control-flow edge becomes a `pc = next`
+    transition. This replaces the older goto/label escape hatch — a
+    routine the natural-loop structurer can't handle (irreducible flow,
+    multi-back-edge loops, loops with mid-body exits) still emits valid
+    structured Rust.
 
-    Per-item mapping:
+    Each arm's body is the block's straight-line atoms followed by its
+    terminator, lowered as:
 
-    * `Label` → `LabelStmt`.
     * `Return` → `ReturnStmt`.
-    * `Goto(tail_call)` → `TailCallStmt`. `Goto(local)` → `GotoStmt`.
-    * `Call` → `CallStmt`. (Was previously folded into `RawStmt`,
-       which left downstream consumers without a structured handle on
-       the call.)
-    * `If`/`Branch` whose target is **local** (some `Label` in this
-       routine's body) → `IfStmt`/`RawIfStmt` whose then-block holds
-       a `GotoStmt` to that label.
-    * `If`/`Branch` whose target is **not local** → conditional
-       tail-call: `IfStmt`/`RawIfStmt` whose then-block holds a
-       `TailCallStmt`. IR1 executes a non-local branch by switching
-       routines (see `interp_ir1`'s Branch/If handlers), so an
-       unconditional `GotoStmt` here would silently change semantics
-       for routines that take the fallback.
-    * Anything else (loads/stores/arithmetic/cmp/clc/sec/...) →
-       `RawStmt`.
+    * `Goto(tail_call)` → `TailCallStmt`. `Goto(local)` →
+      `GotoStateStmt(target_block)` (or `TailCallStmt` if the target
+      label isn't local — an unresolved cross-module jump).
+    * `Call` → `CallStmt` (a structured handle, not a `RawStmt`).
+    * `If`/`Branch` → `IfStmt`/`RawIfStmt` with *both* arms transitioning:
+      the taken edge to its target state (or a `TailCallStmt` when the
+      target is non-local — IR1 executes a non-local branch by switching
+      routines), the fall-through edge to the next block's state (or
+      `ReturnStmt` when there is no next block).
+    * Anything else (loads/stores/arithmetic/cmp/...) → `RawStmt`.
     """
-    local_labels = {
-        item.name for item in routine.body if isinstance(item, Label)
-    }
-    stmts: list[Stmt] = []
-    for item in routine.body:
-        if isinstance(item, Label):
-            stmts.append(LabelStmt(name=item.name, src=item.src))
-        elif isinstance(item, Return):
-            stmts.append(ReturnStmt(src=item.src))
-        elif isinstance(item, IR1Call):
-            stmts.append(CallStmt(target=item.target, src=item.src))
-        elif isinstance(item, Goto):
-            if item.kind == "tail_call":
-                stmts.append(TailCallStmt(target=item.target, src=item.src))
+    n = len(cfg.blocks)
+    arms: list[DispatchArm] = []
+    for b in cfg.blocks:
+        body_stmts: list[Stmt] = []
+        for item in b.body:
+            if isinstance(item, IR1Call):
+                body_stmts.append(CallStmt(target=item.target, src=item.src))
             else:
-                stmts.append(GotoStmt(target=item.target, src=item.src))
-        elif isinstance(item, (If, Branch)):
-            taken_is_local = item.target in local_labels
-            then_stmt: Stmt = (
-                GotoStmt(target=item.target, src=item.src)
-                if taken_is_local
-                else TailCallStmt(target=item.target, src=item.src)
-            )
-            then_block = Block.of([then_stmt])
-            if isinstance(item, If):
-                stmts.append(IfStmt(
-                    cond=item.cond,
-                    then_block=then_block,
-                    else_block=None,
-                    src=item.src,
-                ))
-            else:
-                stmts.append(RawIfStmt(
-                    cond=item.cond,
-                    then_block=then_block,
-                    else_block=None,
-                    src=item.src,
-                ))
-        else:
-            stmts.append(RawStmt(item=item))
-    return RoutineIR3(
-        name=routine.name,
-        entry_aliases=list(routine.entry_aliases),
-        body=Block.of(stmts),
-    )
+                body_stmts.append(RawStmt(item=item))
+        body_stmts.extend(_dispatch_terminator(cfg, b, n))
+        arms.append(DispatchArm(state=b.id, body=Block.of(body_stmts)))
+
+    # build_cfg always emits at least one block (synthesising a Return
+    # for an empty body), so blocks[0] is safe.
+    src = cfg.blocks[0].terminator.src
+    return Block.of([DispatchStmt(entry=cfg.entry_id, arms=tuple(arms), src=src)])
+
+
+def _dispatch_terminator(cfg: CFG, b, n: int) -> list[Stmt]:
+    """Lower a basic block's terminator into the state transition(s)
+    that end its dispatch arm. See `_structure_dispatch` for the
+    per-terminator mapping."""
+    t = b.terminator
+    if isinstance(t, Return):
+        return [ReturnStmt(src=t.src)]
+    if isinstance(t, Goto):
+        if t.kind == "tail_call":
+            return [TailCallStmt(target=t.target, src=t.src)]
+        tid = cfg.label_to_block.get(t.target)
+        if tid is None:
+            # `kind=local` but the label isn't in this routine — an
+            # unresolved reference; treat it as a cross-module jump.
+            return [TailCallStmt(target=t.target, src=t.src)]
+        return [GotoStateStmt(state=tid, src=t.src)]
+    if isinstance(t, (If, Branch)):
+        tid = cfg.label_to_block.get(t.target)
+        taken: Stmt = (
+            GotoStateStmt(state=tid, src=t.src)
+            if tid is not None
+            else TailCallStmt(target=t.target, src=t.src)
+        )
+        fall: Stmt = (
+            GotoStateStmt(state=b.id + 1, src=t.src)
+            if b.id + 1 < n
+            else ReturnStmt(src=t.src)
+        )
+        cls = IfStmt if isinstance(t, If) else RawIfStmt
+        return [cls(
+            cond=t.cond,
+            then_block=Block.of([taken]),
+            else_block=Block.of([fall]),
+            src=t.src,
+        )]
+    raise ValueError(f"unexpected terminator: {t!r}")
 
 
 _INVERT_BRANCH_COND: dict[str, str] = {

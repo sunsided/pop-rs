@@ -35,175 +35,293 @@ fn CHECKFLOOR {
 }
 
 fn onground {
-  a = *Fcheck@0x0085        ; CTRL.S:314
-  a = a & #fcheckmark              ; CTRL.S:315
-  if a == #0x00 {    ; CTRL.S:316
-    goto ]rts              ; CTRL.S:316
+  dispatch pc = 0 {    ; CTRL.S:316
+    state 0 => {
+      a = *Fcheck@0x0085        ; CTRL.S:314
+      a = a & #fcheckmark              ; CTRL.S:315
+      if a == #0x00 {    ; CTRL.S:316
+        pc = 27                          ; CTRL.S:316
+      } else {
+        pc = 1                          ; CTRL.S:316
+      }
+    }
+    state 1 => {
+      call getunderft                ; CTRL.S:318
+      cmp a, #block              ; CTRL.S:319
+      if a != #block {    ; CTRL.S:320
+        pc = 21                          ; CTRL.S:320
+      } else {
+        pc = 2                          ; CTRL.S:320
+      }
+    }
+    state 2 => {
+      call InsideBlock                ; CTRL.S:321
+      pc = 21                          ; CTRL.S:322
+    }
+    state 3 => {
+      call cmpspace                ; CTRL.S:323
+      if ne {                ; CTRL.S:324
+        pc = 27                          ; CTRL.S:324
+      } else {
+        pc = 4                          ; CTRL.S:324
+      }
+    }
+    state 4 => {
+      a = *level@0x03f4        ; CTRL.S:328
+      cmp a, #0x0c              ; CTRL.S:329
+      if a != #0x0c {    ; CTRL.S:330
+        pc = 12                          ; CTRL.S:330
+      } else {
+        pc = 5                          ; CTRL.S:330
+      }
+    }
+    state 5 => {
+      a = *mergetimer@0x00df        ; CTRL.S:331
+      if a >=0 {    ; CTRL.S:332
+        pc = 12                          ; CTRL.S:332
+      } else {
+        pc = 6                          ; CTRL.S:332
+      }
+    }
+    state 6 => {
+      a = *CharBlockY@0x0045        ; CTRL.S:333
+      if a != #0x00 {    ; CTRL.S:334
+        pc = 12                          ; CTRL.S:334
+      } else {
+        pc = 7                          ; CTRL.S:334
+      }
+    }
+    state 7 => {
+      a = *CharScrn@0x004b        ; CTRL.S:335
+      cmp a, #0x02              ; CTRL.S:336
+      if a == #0x02 {    ; CTRL.S:337
+        pc = 10                          ; CTRL.S:337
+      } else {
+        pc = 8                          ; CTRL.S:337
+      }
+    }
+    state 8 => {
+      cmp a, #0x0d              ; CTRL.S:338
+      if a != #0x0d {    ; CTRL.S:339
+        pc = 12                          ; CTRL.S:339
+      } else {
+        pc = 9                          ; CTRL.S:339
+      }
+    }
+    state 9 => {
+      a = *tempblockx@0x0091        ; CTRL.S:340
+      cmp a, #0x06              ; CTRL.S:341
+      if a < #0x06 {    ; CTRL.S:342
+        pc = 12                          ; CTRL.S:342
+      } else {
+        pc = 10                          ; CTRL.S:342
+      }
+    }
+    state 10 => {
+      a = #floor                  ; CTRL.S:344
+      *(BlueType@0x0024)[y] = a   ; CTRL.S:345
+      call indexblock                ; CTRL.S:346
+      a = #0x02                  ; CTRL.S:347
+      call :sub                ; CTRL.S:348
+      y += 1                         ; CTRL.S:349
+      pc = 11                          ; CTRL.S:350
+    }
+    state 11 => {
+      call markwipe                ; CTRL.S:350
+      tail_call markred           ; CTRL.S:351
+    }
+    state 12 => {
+      pc = 13                          ; CTRL.S:356
+    }
+    state 13 => {
+      a = #0x00                  ; CTRL.S:357
+      *rjumpflag@0x023a = a            ; CTRL.S:358
+      *CharSword@0x004e = a            ; CTRL.S:359
+      *CharBlockY@0x0045 += 1                         ; CTRL.S:361
+      call addslicers                ; CTRL.S:362
+      a = *CharPosn@0x0040        ; CTRL.S:364
+      *rjumpflag@0x023a = a            ; CTRL.S:367
+      cmp a, #0x09              ; CTRL.S:369
+      if a == #0x09 {    ; CTRL.S:370
+        pc = 22                          ; CTRL.S:370
+      } else {
+        pc = 14                          ; CTRL.S:370
+      }
+    }
+    state 14 => {
+      cmp a, #0x0d              ; CTRL.S:371
+      if a == #0x0d {    ; CTRL.S:372
+        pc = 23                          ; CTRL.S:372
+      } else {
+        pc = 15                          ; CTRL.S:372
+      }
+    }
+    state 15 => {
+      cmp a, #0x1a              ; CTRL.S:373
+      if a == #0x1a {    ; CTRL.S:374
+        pc = 24                          ; CTRL.S:374
+      } else {
+        pc = 16                          ; CTRL.S:374
+      }
+    }
+    state 16 => {
+      cmp a, #0x2c              ; CTRL.S:375
+      if a == #0x2c {    ; CTRL.S:376
+        pc = 25                          ; CTRL.S:376
+      } else {
+        pc = 17                          ; CTRL.S:376
+      }
+    }
+    state 17 => {
+      cmp a, #0x51              ; CTRL.S:377
+      if a < #0x51 {    ; CTRL.S:378
+        pc = 19                          ; CTRL.S:378
+      } else {
+        pc = 18                          ; CTRL.S:378
+      }
+    }
+    state 18 => {
+      cmp a, #0x56              ; CTRL.S:379
+      if a < #0x56 {    ; CTRL.S:380
+        pc = 26                          ; CTRL.S:380
+      } else {
+        pc = 19                          ; CTRL.S:380
+      }
+    }
+    state 19 => {
+      cmp a, #0x96              ; CTRL.S:381
+      if a < #0x96 {    ; CTRL.S:382
+        pc = 21                          ; CTRL.S:382
+      } else {
+        pc = 20                          ; CTRL.S:382
+      }
+    }
+    state 20 => {
+      cmp a, #0xb4              ; CTRL.S:383
+      if a < #0xb4 {    ; CTRL.S:384
+        pc = 28                          ; CTRL.S:384
+      } else {
+        pc = 21                          ; CTRL.S:384
+      }
+    }
+    state 21 => {
+      pc = 22                          ; CTRL.S:387
+    }
+    state 22 => {
+      a = #stepfall                  ; CTRL.S:387
+      if a != #0x00 {    ; CTRL.S:388
+        pc = 33                          ; CTRL.S:388
+      } else {
+        pc = 23                          ; CTRL.S:388
+      }
+    }
+    state 23 => {
+      a = #stepfall2                  ; CTRL.S:390
+      if a != #0x00 {    ; CTRL.S:391
+        pc = 33                          ; CTRL.S:391
+      } else {
+        pc = 24                          ; CTRL.S:391
+      }
+    }
+    state 24 => {
+      a = #jumpfall                  ; CTRL.S:393
+      if a != #0x00 {    ; CTRL.S:394
+        pc = 33                          ; CTRL.S:394
+      } else {
+        pc = 25                          ; CTRL.S:394
+      }
+    }
+    state 25 => {
+      a = #rjumpfall                  ; CTRL.S:396
+      if a != #0x00 {    ; CTRL.S:397
+        pc = 33                          ; CTRL.S:397
+      } else {
+        pc = 26                          ; CTRL.S:397
+      }
+    }
+    state 26 => {
+      a = #0x05                  ; CTRL.S:400
+      call addcharx                ; CTRL.S:401
+      *CharX@0x0041 = a            ; CTRL.S:402
+      call rereadblocks                ; CTRL.S:403
+      pc = 23                          ; CTRL.S:404
+    }
+    state 27 => {
+      return                           ; CTRL.S:405
+    }
+    state 28 => {
+      a = *CharID@0x004d        ; CTRL.S:407
+      cmp a, #0x02              ; CTRL.S:408
+      if a < #0x02 {    ; CTRL.S:409
+        pc = 32                          ; CTRL.S:409
+      } else {
+        pc = 29                          ; CTRL.S:409
+      }
+    }
+    state 29 => {
+      a = *CharXVel@0x0047        ; CTRL.S:410
+      if a <0 {    ; CTRL.S:411
+        pc = 31                          ; CTRL.S:411
+      } else {
+        pc = 30                          ; CTRL.S:411
+      }
+    }
+    state 30 => {
+      a = #0x00                  ; CTRL.S:412
+      *droppedout@0x00e7 = a            ; CTRL.S:413
+      a = #efightfallfwd                  ; CTRL.S:414
+      if a != #0x00 {    ; CTRL.S:415
+        pc = 33                          ; CTRL.S:415
+      } else {
+        pc = 31                          ; CTRL.S:415
+      }
+    }
+    state 31 => {
+      a = #efightfall                  ; CTRL.S:416
+      if a != #0x00 {    ; CTRL.S:417
+        pc = 33                          ; CTRL.S:417
+      } else {
+        pc = 32                          ; CTRL.S:417
+      }
+    }
+    state 32 => {
+      a = #0x01                  ; CTRL.S:418
+      *droppedout@0x00e7 = a            ; CTRL.S:419
+      a = #fightfall                  ; CTRL.S:420
+      if a != #0x00 {    ; CTRL.S:421
+        pc = 33                          ; CTRL.S:421
+      } else {
+        pc = 33                          ; CTRL.S:421
+      }
+    }
+    state 33 => {
+      call jumpseq                ; CTRL.S:424
+      call animchar                ; CTRL.S:425
+      call rereadblocks                ; CTRL.S:427
+      call getunderft                ; CTRL.S:428
+      call cmpwall                ; CTRL.S:429
+      if eq {                ; CTRL.S:430
+        pc = 36                          ; CTRL.S:430
+      } else {
+        pc = 34                          ; CTRL.S:430
+      }
+    }
+    state 34 => {
+      call getinfront                ; CTRL.S:431
+      call cmpwall                ; CTRL.S:432
+      if ne {                ; CTRL.S:433
+        pc = 27                          ; CTRL.S:433
+      } else {
+        pc = 35                          ; CTRL.S:433
+      }
+    }
+    state 35 => {
+      tail_call CDpatch           ; CTRL.S:434
+    }
+    state 36 => {
+      tail_call InsideBlock           ; CTRL.S:436
+    }
   }
-  call getunderft                ; CTRL.S:318
-  cmp a, #block              ; CTRL.S:319
-  if a != #block {    ; CTRL.S:320
-    goto :1              ; CTRL.S:320
-  }
-  call InsideBlock                ; CTRL.S:321
-  :1:
-  call cmpspace                ; CTRL.S:323
-  if ne {                ; CTRL.S:324
-    goto ]rts              ; CTRL.S:324
-  }
-  a = *level@0x03f4        ; CTRL.S:328
-  cmp a, #0x0c              ; CTRL.S:329
-  if a != #0x0c {    ; CTRL.S:330
-    goto :no              ; CTRL.S:330
-  }
-  a = *mergetimer@0x00df        ; CTRL.S:331
-  if a >=0 {    ; CTRL.S:332
-    goto :no              ; CTRL.S:332
-  }
-  a = *CharBlockY@0x0045        ; CTRL.S:333
-  if a != #0x00 {    ; CTRL.S:334
-    goto :no              ; CTRL.S:334
-  }
-  a = *CharScrn@0x004b        ; CTRL.S:335
-  cmp a, #0x02              ; CTRL.S:336
-  if a == #0x02 {    ; CTRL.S:337
-    goto :yes              ; CTRL.S:337
-  }
-  cmp a, #0x0d              ; CTRL.S:338
-  if a != #0x0d {    ; CTRL.S:339
-    goto :no              ; CTRL.S:339
-  }
-  a = *tempblockx@0x0091        ; CTRL.S:340
-  cmp a, #0x06              ; CTRL.S:341
-  if a < #0x06 {    ; CTRL.S:342
-    goto :no              ; CTRL.S:342
-  }
-  :yes:
-  a = #floor                  ; CTRL.S:344
-  *(BlueType@0x0024)[y] = a   ; CTRL.S:345
-  call indexblock                ; CTRL.S:346
-  a = #0x02                  ; CTRL.S:347
-  call :sub                ; CTRL.S:348
-  y += 1                         ; CTRL.S:349
-  :sub:
-  call markwipe                ; CTRL.S:350
-  tail_call markred           ; CTRL.S:351
-  :no:
-  startfall:
-  a = #0x00                  ; CTRL.S:357
-  *rjumpflag@0x023a = a            ; CTRL.S:358
-  *CharSword@0x004e = a            ; CTRL.S:359
-  *CharBlockY@0x0045 += 1                         ; CTRL.S:361
-  call addslicers                ; CTRL.S:362
-  a = *CharPosn@0x0040        ; CTRL.S:364
-  *rjumpflag@0x023a = a            ; CTRL.S:367
-  cmp a, #0x09              ; CTRL.S:369
-  if a == #0x09 {    ; CTRL.S:370
-    goto :stepfall              ; CTRL.S:370
-  }
-  cmp a, #0x0d              ; CTRL.S:371
-  if a == #0x0d {    ; CTRL.S:372
-    goto :stepfall2              ; CTRL.S:372
-  }
-  cmp a, #0x1a              ; CTRL.S:373
-  if a == #0x1a {    ; CTRL.S:374
-    goto :jumpfall              ; CTRL.S:374
-  }
-  cmp a, #0x2c              ; CTRL.S:375
-  if a == #0x2c {    ; CTRL.S:376
-    goto :rjumpfall              ; CTRL.S:376
-  }
-  cmp a, #0x51              ; CTRL.S:377
-  if a < #0x51 {    ; CTRL.S:378
-    goto :2              ; CTRL.S:378
-  }
-  cmp a, #0x56              ; CTRL.S:379
-  if a < #0x56 {    ; CTRL.S:380
-    goto :hdropfall              ; CTRL.S:380
-  }
-  :2:
-  cmp a, #0x96              ; CTRL.S:381
-  if a < #0x96 {    ; CTRL.S:382
-    goto :1              ; CTRL.S:382
-  }
-  cmp a, #0xb4              ; CTRL.S:383
-  if a < #0xb4 {    ; CTRL.S:384
-    goto :fightfall              ; CTRL.S:384
-  }
-  :1:
-  :stepfall:
-  a = #stepfall                  ; CTRL.S:387
-  if a != #0x00 {    ; CTRL.S:388
-    goto :doit              ; CTRL.S:388
-  }
-  :stepfall2:
-  a = #stepfall2                  ; CTRL.S:390
-  if a != #0x00 {    ; CTRL.S:391
-    goto :doit              ; CTRL.S:391
-  }
-  :jumpfall:
-  a = #jumpfall                  ; CTRL.S:393
-  if a != #0x00 {    ; CTRL.S:394
-    goto :doit              ; CTRL.S:394
-  }
-  :rjumpfall:
-  a = #rjumpfall                  ; CTRL.S:396
-  if a != #0x00 {    ; CTRL.S:397
-    goto :doit              ; CTRL.S:397
-  }
-  :hdropfall:
-  a = #0x05                  ; CTRL.S:400
-  call addcharx                ; CTRL.S:401
-  *CharX@0x0041 = a            ; CTRL.S:402
-  call rereadblocks                ; CTRL.S:403
-  goto :stepfall2              ; CTRL.S:404
-  ]rts:
-  return                           ; CTRL.S:405
-  :fightfall:
-  a = *CharID@0x004d        ; CTRL.S:407
-  cmp a, #0x02              ; CTRL.S:408
-  if a < #0x02 {    ; CTRL.S:409
-    goto :player              ; CTRL.S:409
-  }
-  a = *CharXVel@0x0047        ; CTRL.S:410
-  if a <0 {    ; CTRL.S:411
-    goto :fb              ; CTRL.S:411
-  }
-  a = #0x00                  ; CTRL.S:412
-  *droppedout@0x00e7 = a            ; CTRL.S:413
-  a = #efightfallfwd                  ; CTRL.S:414
-  if a != #0x00 {    ; CTRL.S:415
-    goto :doit              ; CTRL.S:415
-  }
-  :fb:
-  a = #efightfall                  ; CTRL.S:416
-  if a != #0x00 {    ; CTRL.S:417
-    goto :doit              ; CTRL.S:417
-  }
-  :player:
-  a = #0x01                  ; CTRL.S:418
-  *droppedout@0x00e7 = a            ; CTRL.S:419
-  a = #fightfall                  ; CTRL.S:420
-  if a != #0x00 {    ; CTRL.S:421
-    goto :doit              ; CTRL.S:421
-  }
-  :doit:
-  call jumpseq                ; CTRL.S:424
-  call animchar                ; CTRL.S:425
-  call rereadblocks                ; CTRL.S:427
-  call getunderft                ; CTRL.S:428
-  call cmpwall                ; CTRL.S:429
-  if eq {                ; CTRL.S:430
-    goto :bump              ; CTRL.S:430
-  }
-  call getinfront                ; CTRL.S:431
-  call cmpwall                ; CTRL.S:432
-  if ne {                ; CTRL.S:433
-    goto ]rts              ; CTRL.S:433
-  }
-  tail_call CDpatch           ; CTRL.S:434
-  :bump:
-  tail_call InsideBlock           ; CTRL.S:436
 }
 
 fn fallon {

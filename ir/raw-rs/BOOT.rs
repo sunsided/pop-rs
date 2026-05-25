@@ -3,9 +3,10 @@
 // Pass 4 skeleton slice: module + routine scaffolding with leaf-
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
-// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). SMC, the
-// stack, `RawIfStmt`, and `GotoStmt`/`LabelStmt` are deferred; they
-// appear as `// raw: …` or `// TODO(pass4): …` comments.
+// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
+// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
+// and the stack are deferred; they appear as `// raw: …` /
+// `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -70,7 +71,9 @@ impl Cpu {
                 self.$005c();
             }
             self.ram[sym::sector] = self.ram[sym::sector].wrapping_sub(1);
-            // TODO(pass4): lower RawIfStmt
+            if self.z != 0 {
+                break;
+            }
         }
         self.a = self.ram[sym::SLOT];
         self.$900();
@@ -128,7 +131,10 @@ impl Cpu {
         let _o: u8 = self.ram[0xc017];
         self.z = ((self.a & _o) == 0) as u8;
         self.n = _o >> 7;
-        // TODO(pass4): lower RawIfStmt
+        if self.n != 0 {
+            self.NOT128K();
+            return;
+        }
         // raw: ??? ldx #CHECKEND            ; BOOT.S:156
         loop {
             self.a = self.ram[sym::CHECKER + self.x as usize];
@@ -139,140 +145,216 @@ impl Cpu {
             }
         }
         self.$180();
-        // TODO(pass4): lower RawIfStmt
+        if self.c != 0 {
+            self.NOT128K();
+            return;
+        }
         return;
     }
 
     fn NOT128K(&mut self) {
-        self.x = self.ram[sym::SLOT];
-        self.a = self.ram[0xc088 + self.x as usize];
-        self.text();
-        self.home();
-        self.a = 0x08;
-        self.vtab();
-        self.y = 0x00;
-        // TODO(pass4): lower LabelStmt
-        self.a = self.ram[sym::MEMTEXT + self.y as usize];
-        if self.a == 0x00 {
-            self.*();
-            return;
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.x = self.ram[sym::SLOT];
+                    self.a = self.ram[0xc088 + self.x as usize];
+                    self.text();
+                    self.home();
+                    self.a = 0x08;
+                    self.vtab();
+                    self.y = 0x00;
+                    pc = 1;
+                }
+                1 => {
+                    self.a = self.ram[sym::MEMTEXT + self.y as usize];
+                    if self.a == 0x00 {
+                        self.*();
+                        return;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    self.cout();
+                    let _o: u8 = 0x8d;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a != 0x8d {
+                        pc = 4;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    self.a = 0x04;
+                    self.ram[0x0024] = self.a;
+                    pc = 4;
+                }
+                4 => {
+                    self.y = self.y.wrapping_add(1);
+                    if self.y != 0x00 {
+                        pc = 1;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    let _o: u8 = self.ram[0xc08b];
+                    self.z = ((self.a & _o) == 0) as u8;
+                    self.n = _o >> 7;
+                    let _o: u8 = self.ram[0xc08b];
+                    self.z = ((self.a & _o) == 0) as u8;
+                    self.n = _o >> 7;
+                    self.a = 0xd0;
+                    self.x = 0x30;
+                    self.y = 0x40;
+                    pc = 6;
+                }
+                6 => {
+                    self.ram[sym::dest + 1] = self.a;
+                    self.ram[sym::source + 1] = self.x;
+                    self.ram[sym::endsourc + 1] = self.y;
+                    self.y = 0x00;
+                    self.ram[sym::dest] = self.y;
+                    self.ram[sym::source] = self.y;
+                    self.ram[sym::endsourc] = self.y;
+                    pc = 7;
+                }
+                7 => {
+                    self.a = self.ram[(self.ram[sym::source] as usize | (self.ram[sym::source + 1] as usize) << 8) + self.y as usize];
+                    self.ram[(self.ram[sym::dest] as usize | (self.ram[sym::dest + 1] as usize) << 8) + self.y as usize] = self.a;
+                    self.y = self.y.wrapping_add(1);
+                    if self.y != 0x00 {
+                        pc = 7;
+                    } else {
+                        pc = 8;
+                    }
+                }
+                8 => {
+                    self.ram[sym::source + 1] = self.ram[sym::source + 1].wrapping_add(1);
+                    self.ram[sym::dest + 1] = self.ram[sym::dest + 1].wrapping_add(1);
+                    self.a = self.ram[sym::source + 1];
+                    let _o: u8 = self.ram[sym::endsourc + 1];
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a != self.ram[sym::endsourc + 1] {
+                        pc = 7;
+                    } else {
+                        pc = 9;
+                    }
+                }
+                9 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.cout();
-        let _o: u8 = 0x8d;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a != 0x8d {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.a = 0x04;
-        self.ram[0x0024] = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.y = self.y.wrapping_add(1);
-        if self.y != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        let _o: u8 = self.ram[0xc08b];
-        self.z = ((self.a & _o) == 0) as u8;
-        self.n = _o >> 7;
-        let _o: u8 = self.ram[0xc08b];
-        self.z = ((self.a & _o) == 0) as u8;
-        self.n = _o >> 7;
-        self.a = 0xd0;
-        self.x = 0x30;
-        self.y = 0x40;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::dest + 1] = self.a;
-        self.ram[sym::source + 1] = self.x;
-        self.ram[sym::endsourc + 1] = self.y;
-        self.y = 0x00;
-        self.ram[sym::dest] = self.y;
-        self.ram[sym::source] = self.y;
-        self.ram[sym::endsourc] = self.y;
-        // TODO(pass4): lower LabelStmt
-        self.a = self.ram[(self.ram[sym::source] as usize | (self.ram[sym::source + 1] as usize) << 8) + self.y as usize];
-        self.ram[(self.ram[sym::dest] as usize | (self.ram[sym::dest + 1] as usize) << 8) + self.y as usize] = self.a;
-        self.y = self.y.wrapping_add(1);
-        if self.y != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.ram[sym::source + 1] = self.ram[sym::source + 1].wrapping_add(1);
-        self.ram[sym::dest + 1] = self.ram[sym::dest + 1].wrapping_add(1);
-        self.a = self.ram[sym::source + 1];
-        let _o: u8 = self.ram[sym::endsourc + 1];
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a != self.ram[sym::endsourc + 1] {
-            // TODO(pass4): lower GotoStmt
-        }
-        return;
     }
 
     fn moverw18(&mut self) {
-        let _o: u8 = self.ram[0xc08b];
-        self.z = ((self.a & _o) == 0) as u8;
-        self.n = _o >> 7;
-        let _o: u8 = self.ram[0xc08b];
-        self.z = ((self.a & _o) == 0) as u8;
-        self.n = _o >> 7;
-        self.a = 0xd0;
-        self.x = 0x30;
-        self.y = 0x40;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::dest + 1] = self.a;
-        self.ram[sym::source + 1] = self.x;
-        self.ram[sym::endsourc + 1] = self.y;
-        self.y = 0x00;
-        self.ram[sym::dest] = self.y;
-        self.ram[sym::source] = self.y;
-        self.ram[sym::endsourc] = self.y;
-        // TODO(pass4): lower LabelStmt
-        self.a = self.ram[(self.ram[sym::source] as usize | (self.ram[sym::source + 1] as usize) << 8) + self.y as usize];
-        self.ram[(self.ram[sym::dest] as usize | (self.ram[sym::dest + 1] as usize) << 8) + self.y as usize] = self.a;
-        self.y = self.y.wrapping_add(1);
-        if self.y != 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    let _o: u8 = self.ram[0xc08b];
+                    self.z = ((self.a & _o) == 0) as u8;
+                    self.n = _o >> 7;
+                    let _o: u8 = self.ram[0xc08b];
+                    self.z = ((self.a & _o) == 0) as u8;
+                    self.n = _o >> 7;
+                    self.a = 0xd0;
+                    self.x = 0x30;
+                    self.y = 0x40;
+                    pc = 1;
+                }
+                1 => {
+                    self.ram[sym::dest + 1] = self.a;
+                    self.ram[sym::source + 1] = self.x;
+                    self.ram[sym::endsourc + 1] = self.y;
+                    self.y = 0x00;
+                    self.ram[sym::dest] = self.y;
+                    self.ram[sym::source] = self.y;
+                    self.ram[sym::endsourc] = self.y;
+                    pc = 2;
+                }
+                2 => {
+                    self.a = self.ram[(self.ram[sym::source] as usize | (self.ram[sym::source + 1] as usize) << 8) + self.y as usize];
+                    self.ram[(self.ram[sym::dest] as usize | (self.ram[sym::dest + 1] as usize) << 8) + self.y as usize] = self.a;
+                    self.y = self.y.wrapping_add(1);
+                    if self.y != 0x00 {
+                        pc = 2;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    self.ram[sym::source + 1] = self.ram[sym::source + 1].wrapping_add(1);
+                    self.ram[sym::dest + 1] = self.ram[sym::dest + 1].wrapping_add(1);
+                    self.a = self.ram[sym::source + 1];
+                    let _o: u8 = self.ram[sym::endsourc + 1];
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a != self.ram[sym::endsourc + 1] {
+                        pc = 2;
+                    } else {
+                        pc = 4;
+                    }
+                }
+                4 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.ram[sym::source + 1] = self.ram[sym::source + 1].wrapping_add(1);
-        self.ram[sym::dest + 1] = self.ram[sym::dest + 1].wrapping_add(1);
-        self.a = self.ram[sym::source + 1];
-        let _o: u8 = self.ram[sym::endsourc + 1];
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a != self.ram[sym::endsourc + 1] {
-            // TODO(pass4): lower GotoStmt
-        }
-        return;
     }
 
     fn movemem(&mut self) {
-        self.ram[sym::dest + 1] = self.a;
-        self.ram[sym::source + 1] = self.x;
-        self.ram[sym::endsourc + 1] = self.y;
-        self.y = 0x00;
-        self.ram[sym::dest] = self.y;
-        self.ram[sym::source] = self.y;
-        self.ram[sym::endsourc] = self.y;
-        // TODO(pass4): lower LabelStmt
-        self.a = self.ram[(self.ram[sym::source] as usize | (self.ram[sym::source + 1] as usize) << 8) + self.y as usize];
-        self.ram[(self.ram[sym::dest] as usize | (self.ram[sym::dest + 1] as usize) << 8) + self.y as usize] = self.a;
-        self.y = self.y.wrapping_add(1);
-        if self.y != 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.ram[sym::dest + 1] = self.a;
+                    self.ram[sym::source + 1] = self.x;
+                    self.ram[sym::endsourc + 1] = self.y;
+                    self.y = 0x00;
+                    self.ram[sym::dest] = self.y;
+                    self.ram[sym::source] = self.y;
+                    self.ram[sym::endsourc] = self.y;
+                    pc = 1;
+                }
+                1 => {
+                    self.a = self.ram[(self.ram[sym::source] as usize | (self.ram[sym::source + 1] as usize) << 8) + self.y as usize];
+                    self.ram[(self.ram[sym::dest] as usize | (self.ram[sym::dest + 1] as usize) << 8) + self.y as usize] = self.a;
+                    self.y = self.y.wrapping_add(1);
+                    if self.y != 0x00 {
+                        pc = 1;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    self.ram[sym::source + 1] = self.ram[sym::source + 1].wrapping_add(1);
+                    self.ram[sym::dest + 1] = self.ram[sym::dest + 1].wrapping_add(1);
+                    self.a = self.ram[sym::source + 1];
+                    let _o: u8 = self.ram[sym::endsourc + 1];
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a != self.ram[sym::endsourc + 1] {
+                        pc = 1;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.ram[sym::source + 1] = self.ram[sym::source + 1].wrapping_add(1);
-        self.ram[sym::dest + 1] = self.ram[sym::dest + 1].wrapping_add(1);
-        self.a = self.ram[sym::source + 1];
-        let _o: u8 = self.ram[sym::endsourc + 1];
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a != self.ram[sym::endsourc + 1] {
-            // TODO(pass4): lower GotoStmt
-        }
-        return;
     }
 }

@@ -51,8 +51,10 @@ from .ir3 import (
     BreakStmt,
     CallStmt,
     ContinueStmt,
+    DispatchStmt,
     DoWhileStmt,
     ForStmt,
+    GotoStateStmt,
     GotoStmt,
     IfStmt,
     LabeledBlock,
@@ -104,6 +106,15 @@ class _LabeledBreakSignal(Exception):
 class _ContinueSignal(Exception):
     """Raised by ContinueStmt to jump to the top of the innermost
     enclosing LoopStmt."""
+
+
+class _GotoStateSignal(Exception):
+    """Raised by GotoStateStmt to transition the enclosing DispatchStmt
+    to a new state — the dispatch-loop fallback's CFG edge."""
+
+    def __init__(self, state: int):
+        super().__init__(state)
+        self.state = state
 
 
 def run(
@@ -453,6 +464,29 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
         raise _BreakSignal()
     if isinstance(stmt, ContinueStmt):
         raise _ContinueSignal()
+    if isinstance(stmt, GotoStateStmt):
+        raise _GotoStateSignal(stmt.state)
+    if isinstance(stmt, DispatchStmt):
+        # `loop { match pc { ... } }` fallback. Run the arm for the
+        # current state; a GotoStateStmt inside it transitions `pc`, a
+        # ReturnStmt / TailCallStmt unwinds past this loop entirely.
+        arms = {arm.state: arm.body for arm in stmt.arms}
+        pc = stmt.entry
+        for _ in range(1_000_000):
+            body = arms.get(pc)
+            if body is None:
+                raise InterpError(f"dispatch: no arm for state {pc}")
+            try:
+                _exec_block(body, modules, aliases, trace)
+            except _GotoStateSignal as sig:
+                pc = sig.state
+                continue
+            # Every CFG block ends in a transition / return / tail-call,
+            # so a dispatch arm never falls off its bottom.
+            raise InterpError(
+                f"dispatch arm {pc} fell through without a transition"
+            )
+        raise InterpError("DispatchStmt exceeded 1,000,000 iterations")
     if isinstance(stmt, (GotoStmt, LabelStmt)):
         # The relooper currently emits these only for routines it
         # couldn't structure. Anything reaching the interpreter is a

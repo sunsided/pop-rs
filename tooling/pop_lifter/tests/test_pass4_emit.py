@@ -64,13 +64,17 @@ from pop_lifter.ir3 import (
     BreakStmt,
     CallStmt,
     ContinueStmt,
+    DispatchArm,
+    DispatchStmt,
     DoWhileStmt,
     ForStmt,
+    GotoStateStmt,
     IfStmt,
     LoopStmt,
     MatchArm,
     MatchStmt,
     ModuleIR3,
+    RawIfStmt,
     RawStmt,
     RepeatStmt,
     RestoreTemp,
@@ -230,6 +234,72 @@ def test_call_stmt_lowered():
 def test_tail_call_stmt_lowered():
     lines = _emit_stmt(TailCallStmt(target="jump_target", src=SRC), 0)
     assert lines == ["self.jump_target();", "return;"]
+
+
+def test_raw_if_lowers_flag_condition():
+    # An unfused branch (`RawIfStmt`) lowers its flag suffix to the
+    # provisional flag model. `eq` reads Z; the arms are emitted.
+    stmt = RawIfStmt(
+        cond="eq",
+        then_block=Block.of([ReturnStmt(src=SRC)]),
+        else_block=None,
+        src=SRC,
+    )
+    assert _emit_stmt(stmt, 0) == ["if self.z != 0 {", "    return;", "}"]
+
+
+def test_raw_if_all_tracked_conditions():
+    want = {
+        "eq": "self.z != 0", "ne": "self.z == 0",
+        "cs": "self.c != 0", "cc": "self.c == 0",
+        "mi": "self.n != 0", "pl": "self.n == 0",
+    }
+    for cond, rs in want.items():
+        stmt = RawIfStmt(
+            cond=cond, then_block=Block.of([ReturnStmt(src=SRC)]),
+            else_block=None, src=SRC,
+        )
+        assert _emit_stmt(stmt, 0)[0] == f"if {rs} {{"
+
+
+def test_goto_state_lowers_to_pc_assignment():
+    assert _emit_one(GotoStateStmt(state=7, src=SRC)) == "pc = 7;"
+
+
+def test_dispatch_emits_loop_match():
+    # A two-state dispatcher: state 0 transitions to 1, state 1 returns.
+    dispatch = DispatchStmt(
+        entry=0,
+        arms=(
+            DispatchArm(state=0, body=Block.of([GotoStateStmt(state=1, src=SRC)])),
+            DispatchArm(state=1, body=Block.of([ReturnStmt(src=SRC)])),
+        ),
+        src=SRC,
+    )
+    assert _emit_stmt(dispatch, 0) == [
+        "let mut pc: u32 = 0;",
+        "loop {",
+        "    match pc {",
+        "        0 => {",
+        "            pc = 1;",
+        "        }",
+        "        1 => {",
+        "            return;",
+        "        }",
+        "        _ => unreachable!(),",
+        "    }",
+        "}",
+    ]
+
+
+def test_dispatch_counts_as_lowered():
+    dispatch = DispatchStmt(
+        entry=0,
+        arms=(DispatchArm(state=0, body=Block.of([ReturnStmt(src=SRC)])),),
+        src=SRC,
+    )
+    lowered, deferred = lower_stats(_module([_routine([dispatch])]))
+    assert (lowered, deferred) == (1, 0)
 
 
 def test_indent_is_four_spaces():

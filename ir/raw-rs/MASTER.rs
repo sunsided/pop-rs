@@ -3,9 +3,10 @@
 // Pass 4 skeleton slice: module + routine scaffolding with leaf-
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
-// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). SMC, the
-// stack, `RawIfStmt`, and `GotoStmt`/`LabelStmt` are deferred; they
-// appear as `// raw: …` or `// TODO(pass4): …` comments.
+// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
+// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
+// and the stack are deferred; they appear as `// raw: …` /
+// `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -82,11 +83,20 @@ impl Cpu {
     }
 
     fn loadmusic2(&mut self) {
-        self.setmain();
-        self.a = 0x14;
-        self.ram[sym::track] = self.a;
-        self.rw18();
-        // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.setmain();
+                    self.a = 0x14;
+                    self.ram[sym::track] = self.a;
+                    self.rw18();
+                    self.]mm();
+                    return;
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 
     fn loadmusic3(&mut self) {
@@ -174,20 +184,37 @@ impl Cpu {
     }
 
     fn checkdisk(&mut self) {
-        self.setaux();
-        self.x = 0xad;
-        self.ram[sym::BBundID] = self.x;
-        self.driveon();
-        // TODO(pass4): lower LabelStmt
-        self.setmain();
-        self.a = 0x16;
-        self.ram[sym::track] = self.a;
-        self.rw18();
-        // TODO(pass4): lower RawIfStmt
-        self.error();
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        return;
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.setaux();
+                    self.x = 0xad;
+                    self.ram[sym::BBundID] = self.x;
+                    self.driveon();
+                    pc = 1;
+                }
+                1 => {
+                    self.setmain();
+                    self.a = 0x16;
+                    self.ram[sym::track] = self.a;
+                    self.rw18();
+                    if self.c == 0 {
+                        pc = 3;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    self.error();
+                    pc = 1;
+                }
+                3 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 
     fn SAVEGAME(&mut self) {
@@ -206,7 +233,10 @@ impl Cpu {
         self.a = 0x17;
         self.ram[sym::track] = self.a;
         self.rw18();
-        // TODO(pass4): lower RawIfStmt
+        if self.c == 0 {
+        } else {
+            self.whoop();
+        }
         self.driveoff();
         return;
     }
@@ -356,20 +386,47 @@ impl Cpu {
     }
 
     fn rdbluep(&mut self) {
-        self.setbluep();
-        // TODO(pass4): lower RawIfStmt
-        // TODO(pass4): lower LabelStmt
-        self.rw18();
-        // TODO(pass4): lower RawIfStmt
-        self.error();
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        self.rw18();
-        // TODO(pass4): lower RawIfStmt
-        self.error();
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        return;
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.setbluep();
+                    if self.z == 0 {
+                        pc = 3;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.rw18();
+                    if self.c == 0 {
+                        pc = 5;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    self.error();
+                    pc = 1;
+                }
+                3 => {
+                    self.rw18();
+                    if self.c == 0 {
+                        pc = 5;
+                    } else {
+                        pc = 4;
+                    }
+                }
+                4 => {
+                    self.error();
+                    pc = 3;
+                }
+                5 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 
     fn copy1to2(&mut self) {
@@ -637,30 +694,53 @@ impl Cpu {
 
     // aliases: :loop
     fn pauseNI(&mut self) {
-        self.ram[sym::pausetemp] = self.a;
-        self.y = 0x14;
-        // TODO(pass4): lower LabelStmt
-        self.x = 0x00;
-        // TODO(pass4): lower LabelStmt
-        self.x = self.x.wrapping_sub(1);
-        if self.x != 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.ram[sym::pausetemp] = self.a;
+                    self.y = 0x14;
+                    pc = 1;
+                }
+                1 => {
+                    self.x = 0x00;
+                    pc = 2;
+                }
+                2 => {
+                    self.x = self.x.wrapping_sub(1);
+                    if self.x != 0x00 {
+                        pc = 2;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    self.y = self.y.wrapping_sub(1);
+                    if self.y != 0x00 {
+                        pc = 1;
+                    } else {
+                        pc = 4;
+                    }
+                }
+                4 => {
+                    self.a = self.ram[sym::pausetemp];
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x01_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    if self.a != 0x00 {
+                        self.:loop();
+                        return;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.y = self.y.wrapping_sub(1);
-        if self.y != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.a = self.ram[sym::pausetemp];
-        self.c = 1;
-        let _r = (self.a as u16) + (!0x01_u8) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        if self.a != 0x00 {
-            self.:loop();
-            return;
-        }
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn StartGame?(&mut self) {
@@ -770,167 +850,281 @@ impl Cpu {
     }
 
     fn ReloadStuff(&mut self) {
-        self.driveon();
-        // TODO(pass4): lower LabelStmt
-        self.a = 0x04;
-        self.ram[sym::track] = self.a;
-        self.rw18();
-        // TODO(pass4): lower RawIfStmt
-        self.error();
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        self.a = 0x0f;
-        self.ram[sym::track] = self.a;
-        self.rw18();
-        self.rw18();
-        self.rw18();
-        self.driveoff();
-        return;
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.driveon();
+                    pc = 1;
+                }
+                1 => {
+                    self.a = 0x04;
+                    self.ram[sym::track] = self.a;
+                    self.rw18();
+                    if self.c == 0 {
+                        pc = 3;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    self.error();
+                    pc = 1;
+                }
+                3 => {
+                    self.a = 0x0f;
+                    self.ram[sym::track] = self.a;
+                    self.rw18();
+                    self.rw18();
+                    self.rw18();
+                    self.driveoff();
+                    return;
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 
     fn LoadStage2(&mut self) {
-        self.x = self.ram[sym::BBundID];
-        let _o: u8 = 0xad;
-        self.c = (self.x >= _o) as u8;
-        self.z = (self.x == _o) as u8;
-        self.n = self.x.wrapping_sub(_o) >> 7;
-        if self.x == 0xad {
-            self.LoadStage2B();
-            return;
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.x = self.ram[sym::BBundID];
+                    let _o: u8 = 0xad;
+                    self.c = (self.x >= _o) as u8;
+                    self.z = (self.x == _o) as u8;
+                    self.n = self.x.wrapping_sub(_o) >> 7;
+                    if self.x == 0xad {
+                        self.LoadStage2B();
+                        return;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.driveon();
+                    self.a = 0x00;
+                    self.loadch7();
+                    self.a = 0x1d;
+                    pc = 2;
+                }
+                2 => {
+                    self.ram[sym::track] = self.a;
+                    pc = 3;
+                }
+                3 => {
+                    self.rw18();
+                    if self.c == 0 {
+                        pc = 5;
+                    } else {
+                        pc = 4;
+                    }
+                }
+                4 => {
+                    self.error();
+                    pc = 3;
+                }
+                5 => {
+                    self.rw18();
+                    self.rw18();
+                    self.rw18();
+                    self.a = 0xff;
+                    self.ram[sym::BGset1] = self.a;
+                    self.ram[sym::BGset2] = self.a;
+                    self.ram[sym::CHset] = self.a;
+                    self.driveoff();
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        // TODO(pass4): lower LabelStmt
-        self.driveon();
-        self.a = 0x00;
-        self.loadch7();
-        self.a = 0x1d;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::track] = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.rw18();
-        // TODO(pass4): lower RawIfStmt
-        self.error();
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        self.rw18();
-        self.rw18();
-        self.rw18();
-        self.a = 0xff;
-        self.ram[sym::BGset1] = self.a;
-        self.ram[sym::BGset2] = self.a;
-        self.ram[sym::CHset] = self.a;
-        self.driveoff();
-        return;
     }
 
     fn LoadStage2A(&mut self) {
-        self.driveon();
-        self.a = 0x00;
-        self.loadch7();
-        self.a = 0x1d;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::track] = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.rw18();
-        // TODO(pass4): lower RawIfStmt
-        self.error();
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        self.rw18();
-        self.rw18();
-        self.rw18();
-        self.a = 0xff;
-        self.ram[sym::BGset1] = self.a;
-        self.ram[sym::BGset2] = self.a;
-        self.ram[sym::CHset] = self.a;
-        self.driveoff();
-        return;
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.driveon();
+                    self.a = 0x00;
+                    self.loadch7();
+                    self.a = 0x1d;
+                    pc = 1;
+                }
+                1 => {
+                    self.ram[sym::track] = self.a;
+                    pc = 2;
+                }
+                2 => {
+                    self.rw18();
+                    if self.c == 0 {
+                        pc = 4;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    self.error();
+                    pc = 2;
+                }
+                4 => {
+                    self.rw18();
+                    self.rw18();
+                    self.rw18();
+                    self.a = 0xff;
+                    self.ram[sym::BGset1] = self.a;
+                    self.ram[sym::BGset2] = self.a;
+                    self.ram[sym::CHset] = self.a;
+                    self.driveoff();
+                    return;
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 
     fn loadch7(&mut self) {
-        self.ram[sym::recheck0] = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.a = 0x1c;
-        self.ram[sym::track] = self.a;
-        self.rw18();
-        // TODO(pass4): lower RawIfStmt
-        self.error();
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        // TODO(pass4): lower LabelStmt
-        return;
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.ram[sym::recheck0] = self.a;
+                    pc = 1;
+                }
+                1 => {
+                    self.a = 0x1c;
+                    self.ram[sym::track] = self.a;
+                    self.rw18();
+                    if self.c == 0 {
+                        pc = 3;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    self.error();
+                    pc = 1;
+                }
+                3 => {
+                    pc = 4;
+                }
+                4 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 
     fn LoadStage2B(&mut self) {
-        self.driveon();
-        self.a = 0x18;
-        if self.a != 0x00 {
-            self.]ls2();
-            return;
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.driveon();
+                    self.a = 0x18;
+                    if self.a != 0x00 {
+                        self.]ls2();
+                        return;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.driveon();
+                    self.a = 0x04;
+                    self.ram[sym::track] = self.a;
+                    pc = 2;
+                }
+                2 => {
+                    self.rw18();
+                    if self.c == 0 {
+                        pc = 4;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    self.error();
+                    pc = 2;
+                }
+                4 => {
+                    self.rw18();
+                    self.rw18();
+                    self.setmain();
+                    self.rw18();
+                    self.rw18();
+                    self.setaux();
+                    self.a = 0x0d;
+                    self.ram[sym::track] = self.a;
+                    self.rw18();
+                    self.rw18();
+                    self.rw18();
+                    self.rw18();
+                    self.rw18();
+                    self.rw18();
+                    self.a = 0x00;
+                    self.ram[sym::BGset1] = self.a;
+                    self.ram[sym::BGset2] = self.a;
+                    self.ram[sym::CHset] = self.a;
+                    self.loadmusic2();
+                    self.setaux();
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        // TODO(pass4): lower LabelStmt
-        self.driveon();
-        self.a = 0x04;
-        self.ram[sym::track] = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.rw18();
-        // TODO(pass4): lower RawIfStmt
-        self.error();
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        self.rw18();
-        self.rw18();
-        self.setmain();
-        self.rw18();
-        self.rw18();
-        self.setaux();
-        self.a = 0x0d;
-        self.ram[sym::track] = self.a;
-        self.rw18();
-        self.rw18();
-        self.rw18();
-        self.rw18();
-        self.rw18();
-        self.rw18();
-        self.a = 0x00;
-        self.ram[sym::BGset1] = self.a;
-        self.ram[sym::BGset2] = self.a;
-        self.ram[sym::CHset] = self.a;
-        self.loadmusic2();
-        self.setaux();
-        return;
     }
 
     fn LoadStage3(&mut self) {
-        self.driveon();
-        self.a = 0x04;
-        self.ram[sym::track] = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.rw18();
-        // TODO(pass4): lower RawIfStmt
-        self.error();
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        self.rw18();
-        self.rw18();
-        self.setmain();
-        self.rw18();
-        self.rw18();
-        self.setaux();
-        self.a = 0x0d;
-        self.ram[sym::track] = self.a;
-        self.rw18();
-        self.rw18();
-        self.rw18();
-        self.rw18();
-        self.rw18();
-        self.rw18();
-        self.a = 0x00;
-        self.ram[sym::BGset1] = self.a;
-        self.ram[sym::BGset2] = self.a;
-        self.ram[sym::CHset] = self.a;
-        self.loadmusic2();
-        self.setaux();
-        return;
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.driveon();
+                    self.a = 0x04;
+                    self.ram[sym::track] = self.a;
+                    pc = 1;
+                }
+                1 => {
+                    self.rw18();
+                    if self.c == 0 {
+                        pc = 3;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    self.error();
+                    pc = 1;
+                }
+                3 => {
+                    self.rw18();
+                    self.rw18();
+                    self.setmain();
+                    self.rw18();
+                    self.rw18();
+                    self.setaux();
+                    self.a = 0x0d;
+                    self.ram[sym::track] = self.a;
+                    self.rw18();
+                    self.rw18();
+                    self.rw18();
+                    self.rw18();
+                    self.rw18();
+                    self.rw18();
+                    self.a = 0x00;
+                    self.ram[sym::BGset1] = self.a;
+                    self.ram[sym::BGset2] = self.a;
+                    self.ram[sym::CHset] = self.a;
+                    self.loadmusic2();
+                    self.setaux();
+                    return;
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 
     fn PlaySongNI(&mut self) {
@@ -950,85 +1144,151 @@ impl Cpu {
     }
 
     fn PlaySongI(&mut self) {
-        self.setaux();
-        // TODO(pass4): lower RawIfStmt
-        self.y = self.a;
-        self.a = self.ram[sym::musicon];
-        self.a &= self.ram[sym::soundon];
-        if self.a == 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.setaux();
+                    if self.z != 0 {
+                        pc = 12;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.y = self.a;
+                    self.a = self.ram[sym::musicon];
+                    self.a &= self.ram[sym::soundon];
+                    if self.a == 0x00 {
+                        pc = 5;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    self.a = self.y;
+                    self.xminit();
+                    pc = 7;
+                }
+                3 => {
+                    self.StartGame?();
+                    self.xmplay();
+                    let _o: u8 = 0x00;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a != 0x00 {
+                        pc = 7;
+                    } else {
+                        pc = 4;
+                    }
+                }
+                4 => {
+                    return;
+                }
+                5 => {
+                    self.a = self.x;
+                    pc = 6;
+                }
+                6 => {
+                    pc = 7;
+                }
+                7 => {
+                    self.ram[sym::pausetemp] = self.a;
+                    self.y = 0x02;
+                    pc = 8;
+                }
+                8 => {
+                    self.x = 0x00;
+                    pc = 9;
+                }
+                9 => {
+                    self.StartGame?();
+                    self.x = self.x.wrapping_sub(1);
+                    if self.x != 0x00 {
+                        pc = 9;
+                    } else {
+                        pc = 10;
+                    }
+                }
+                10 => {
+                    self.y = self.y.wrapping_sub(1);
+                    if self.y != 0x00 {
+                        pc = 8;
+                    } else {
+                        pc = 11;
+                    }
+                }
+                11 => {
+                    self.a = self.ram[sym::pausetemp];
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x01_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    if self.a != 0x00 {
+                        pc = 7;
+                    } else {
+                        pc = 12;
+                    }
+                }
+                12 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.a = self.y;
-        self.xminit();
-        // TODO(pass4): lower LabelStmt
-        self.StartGame?();
-        self.xmplay();
-        let _o: u8 = 0x00;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        return;
-        // TODO(pass4): lower LabelStmt
-        self.a = self.x;
-        // TODO(pass4): lower LabelStmt
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::pausetemp] = self.a;
-        self.y = 0x02;
-        // TODO(pass4): lower LabelStmt
-        self.x = 0x00;
-        // TODO(pass4): lower LabelStmt
-        self.StartGame?();
-        self.x = self.x.wrapping_sub(1);
-        if self.x != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.y = self.y.wrapping_sub(1);
-        if self.y != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.a = self.ram[sym::pausetemp];
-        self.c = 1;
-        let _r = (self.a as u16) + (!0x01_u8) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     // aliases: :loop
     fn tpause(&mut self) {
-        self.ram[sym::pausetemp] = self.a;
-        self.y = 0x02;
-        // TODO(pass4): lower LabelStmt
-        self.x = 0x00;
-        // TODO(pass4): lower LabelStmt
-        self.StartGame?();
-        self.x = self.x.wrapping_sub(1);
-        if self.x != 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.ram[sym::pausetemp] = self.a;
+                    self.y = 0x02;
+                    pc = 1;
+                }
+                1 => {
+                    self.x = 0x00;
+                    pc = 2;
+                }
+                2 => {
+                    self.StartGame?();
+                    self.x = self.x.wrapping_sub(1);
+                    if self.x != 0x00 {
+                        pc = 2;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    self.y = self.y.wrapping_sub(1);
+                    if self.y != 0x00 {
+                        pc = 1;
+                    } else {
+                        pc = 4;
+                    }
+                }
+                4 => {
+                    self.a = self.ram[sym::pausetemp];
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x01_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    if self.a != 0x00 {
+                        self.:loop();
+                        return;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.y = self.y.wrapping_sub(1);
-        if self.y != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.a = self.ram[sym::pausetemp];
-        self.c = 1;
-        let _r = (self.a as u16) + (!0x01_u8) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        if self.a != 0x00 {
-            self.:loop();
-            return;
-        }
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn error(&mut self) {
@@ -1039,17 +1299,34 @@ impl Cpu {
     }
 
     fn ]lsub(&mut self) {
-        self.ram[sym::track] = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.rw18();
-        // TODO(pass4): lower RawIfStmt
-        self.error();
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        self.rw18();
-        self.rw18();
-        self.rw18();
-        self.rw18();
-        return;
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.ram[sym::track] = self.a;
+                    pc = 1;
+                }
+                1 => {
+                    self.rw18();
+                    if self.c == 0 {
+                        pc = 3;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    self.error();
+                    pc = 1;
+                }
+                3 => {
+                    self.rw18();
+                    self.rw18();
+                    self.rw18();
+                    self.rw18();
+                    return;
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 }

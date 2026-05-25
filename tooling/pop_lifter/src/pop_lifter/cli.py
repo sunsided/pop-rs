@@ -305,10 +305,11 @@ def _cmd_struct(args: argparse.Namespace) -> int:
 def _cmd_reloop(args: argparse.Namespace) -> int:
     """Run passes 1 + 2 (fusion/elision) + reloop (CFG → structured
     IR3) for the given files / entries. Writes the IR3 dump to `--out`
-    (or stdout). Routines the relooper can't structure (loops,
-    malformed CFGs) fall back to an unstructured wrapping so the
-    routine still appears in the output — flagged by a higher
-    `unstructured` count in the summary line."""
+    (or stdout). Routines the relooper can't reduce to natural
+    loops/conditionals (irreducible flow, multi-back-edge loops) fall
+    back to a `loop { match pc { ... } }` dispatcher — still valid
+    structured IR3, flagged by a higher `unstructured` count in the
+    summary line."""
     src_dir = _resolve_source_dir(args)
     if src_dir is None:
         return 2

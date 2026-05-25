@@ -3,9 +3,10 @@
 // Pass 4 skeleton slice: module + routine scaffolding with leaf-
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
-// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). SMC, the
-// stack, `RawIfStmt`, and `GotoStmt`/`LabelStmt` are deferred; they
-// appear as `// raw: …` or `// TODO(pass4): …` comments.
+// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
+// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
+// and the stack are deferred; they appear as `// raw: …` /
+// `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -238,7 +239,9 @@ impl Cpu {
                         if self.a != 0x00 {
                             self.a = 0x00;
                             self.ram[sym::skipmessage] = self.a;
-                            // TODO(pass4): lower RawIfStmt
+                            if self.z != 0 {
+                                break 'b10;
+                            }
                         }
                     }
                     self.a = 0x01;
@@ -261,7 +264,24 @@ impl Cpu {
         self.ram[sym::ChgOppStr] = self.a;
         self.strobe();
         self.demokeys();
-        // TODO(pass4): lower RawIfStmt
+        if self.n == 0 {
+            self.misctimers();
+            self.NextFrame();
+            self.flashon();
+            self.FrameAdv();
+            self.playback();
+            self.zerosound();
+            self.flashoff();
+            self.songcues();
+            self.a = self.ram[sym::NextLevel];
+            if self.a == self.ram[sym::level] {
+                self.MainLoop();
+                return;
+            }
+            self.yellowcheck();
+            self.LoadNextLevel();
+            return;
+        }
         self.a = 0x01;
         self.START();
         return;
@@ -558,7 +578,10 @@ impl Cpu {
         self.a = self.ram[sym::lightning];
         if self.a != 0x00 {
             self.ram[sym::lightning] = self.ram[sym::lightning].wrapping_sub(1);
-            // TODO(pass4): lower RawIfStmt
+            if self.n == 0 {
+                self.doflashoff();
+                return;
+            }
         }
         self.a = self.ram[sym::ChgKidStr];
         if (self.a as i8) >= 0 {
@@ -638,7 +661,9 @@ impl Cpu {
         }
         self.a = self.ram[sym::CharPosn];
         self.cold?();
-        // TODO(pass4): lower RawIfStmt
+        if self.z == 0 {
+            return;
+        }
         self.a = self.ram[sym::CharLife];
         if self.a == 0x00 {
             self.deathsong();
@@ -760,7 +785,16 @@ impl Cpu {
             self.shakem();
             return;
         }
-        // TODO(pass4): lower RawIfStmt
+        if self.z == 0 {
+            self.ram[sym::jarabove] = 0x00;
+            self.a = self.ram[sym::CharBlockY];
+            self.c = 1;
+            let _r = (self.a as u16) + (!0x01_u8) as u16 + (self.c as u16);
+            self.a = _r as u8;
+            self.c = (_r >> 8) as u8;
+            self.shakem();
+            return;
+        }
         return;
     }
 
@@ -787,7 +821,9 @@ impl Cpu {
                     self.a = self.ram[sym::ChgKidStr];
                     if (self.a as i8) < 0 {
                         self.ram[sym::ChgOppStr] = self.a;
-                        // TODO(pass4): lower RawIfStmt
+                        if self.z == 0 {
+                            break 'b6;
+                        }
                     }
                     self.a = self.ram[sym::ChgOppStr];
                     if (self.a as i8) < 0 {
@@ -807,7 +843,9 @@ impl Cpu {
             self.z = (self.a == _o) as u8;
             self.n = self.a.wrapping_sub(_o) >> 7;
             if self.a != self.ram[sym::MaxKidStr] {
-                // TODO(pass4): lower RawIfStmt
+                if self.c != 0 {
+                    break 'b9;
+                }
             }
             self.ram[sym::KidStrength] = self.a;
         }
@@ -821,7 +859,9 @@ impl Cpu {
         self.z = (self.a == _o) as u8;
         self.n = self.a.wrapping_sub(_o) >> 7;
         if self.a != self.ram[sym::MaxOppStr] {
-            // TODO(pass4): lower RawIfStmt
+            if self.c != 0 {
+                return;
+            }
         }
         self.ram[sym::OppStrength] = self.a;
         return;
@@ -981,7 +1021,12 @@ impl Cpu {
     fn misctimers(&mut self) {
         self.a = self.ram[sym::mergetimer];
         if self.a != 0x00 {
-            // TODO(pass4): lower RawIfStmt
+            if self.n == 0 {
+                self.ram[sym::mergetimer] = self.ram[sym::mergetimer].wrapping_sub(1);
+                if self.z != 0 {
+                    self.ram[sym::mergetimer] = self.ram[sym::mergetimer].wrapping_sub(1);
+                }
+            }
         }
         'b11: {
             self.a = self.ram[sym::level];
@@ -995,7 +1040,11 @@ impl Cpu {
                         self.z = (self.a == _o) as u8;
                         self.n = self.a.wrapping_sub(_o) >> 7;
                         if self.a >= 0x96 {
-                            // TODO(pass4): lower RawIfStmt
+                            if self.z == 0 {
+                                break 'b11;
+                            } else {
+                                self.mouserescue();
+                            }
                         }
                         self.ram[sym::exitopen] = self.ram[sym::exitopen].wrapping_add(1);
                     }
@@ -1016,7 +1065,14 @@ impl Cpu {
         self.a = _r as u8;
         self.c = (_r >> 8) as u8;
         self.ram[sym::weightless] = self.a;
-        // TODO(pass4): lower RawIfStmt
+        if self.z == 0 {
+            self.x = 0xff;
+            if self.a < 0x0f {
+                self.a = self.ram[sym::vibes];
+                self.a ^= 0xff;
+                self.x = self.a;
+            }
+        }
         self.ram[sym::vibes] = self.x;
         return;
     }
