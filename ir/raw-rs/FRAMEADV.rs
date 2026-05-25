@@ -4,9 +4,9 @@
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
-// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
-// and the stack are deferred; they appear as `// raw: …` /
-// `// TODO(pass4): …` comments.
+// routines emit a `loop { match pc { ... } }` dispatch fallback; the
+// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
+// `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -221,9 +221,9 @@ impl Cpu {
                     self.a = 0x00;
                     self.ram[sym::PRECED] = self.a;
                     self.a = self.ram[sym::scrnBelow];
-                    // raw: push a                           ; FRAMEADV.S:128
+                    self.stack.push(self.a);
                     self.a = self.ram[sym::scrnBelowL];
-                    // raw: push a                           ; FRAMEADV.S:130
+                    self.stack.push(self.a);
                     self.a = self.ram[sym::SCRNUM];
                     self.ram[sym::scrnBelow] = self.a;
                     self.a = self.ram[sym::scrnLeft];
@@ -283,9 +283,13 @@ impl Cpu {
                     }
                 }
                 10 => {
-                    // raw: a = pop                          ; FRAMEADV.S:175
+                    self.a = self.stack.pop().expect("pla on empty stack");
+                    self.z = (self.a == 0) as u8;
+                    self.n = self.a >> 7;
                     self.ram[sym::scrnBelowL] = self.a;
-                    // raw: a = pop                          ; FRAMEADV.S:177
+                    self.a = self.stack.pop().expect("pla on empty stack");
+                    self.z = (self.a == 0) as u8;
+                    self.n = self.a >> 7;
                     self.ram[sym::scrnBelow] = self.a;
                     pc = 11;
                 }
@@ -395,9 +399,9 @@ impl Cpu {
                     self.a = 0x00;
                     self.ram[sym::PRECED] = self.a;
                     self.a = self.ram[sym::scrnBelow];
-                    // raw: push a                           ; FRAMEADV.S:281
+                    self.stack.push(self.a);
                     self.a = self.ram[sym::scrnBelowL];
-                    // raw: push a                           ; FRAMEADV.S:283
+                    self.stack.push(self.a);
                     self.a = self.ram[sym::SCRNUM];
                     self.ram[sym::scrnBelow] = self.a;
                     self.a = self.ram[sym::scrnLeft];
@@ -445,9 +449,13 @@ impl Cpu {
                     }
                 }
                 9 => {
-                    // raw: a = pop                          ; FRAMEADV.S:323
+                    self.a = self.stack.pop().expect("pla on empty stack");
+                    self.z = (self.a == 0) as u8;
+                    self.n = self.a >> 7;
                     self.ram[sym::scrnBelowL] = self.a;
-                    // raw: a = pop                          ; FRAMEADV.S:325
+                    self.a = self.stack.pop().expect("pla on empty stack");
+                    self.z = (self.a == 0) as u8;
+                    self.n = self.a >> 7;
                     self.ram[sym::scrnBelow] = self.a;
                     self.a = 0xff;
                     self.ram[sym::yindex] = self.a;
@@ -2431,7 +2439,7 @@ impl Cpu {
                 0 => {
                     self.a = self.ram[(self.ram[sym::BlueType] as usize | (self.ram[sym::BlueType + 1] as usize) << 8) + self.y as usize];
                     self.a &= 0x1f;
-                    // raw: push a                           ; FRAMEADV.S:2120
+                    self.stack.push(self.a);
                     self.getinitobj1();
                     if self.c != 0 {
                         pc = 8;
@@ -2445,7 +2453,9 @@ impl Cpu {
                 }
                 2 => {
                     self.ram[sym::state] = self.a;
-                    // raw: a = pop                          ; FRAMEADV.S:2125
+                    self.a = self.stack.pop().expect("pla on empty stack");
+                    self.z = (self.a == 0) as u8;
+                    self.n = self.a >> 7;
                     return;
                 }
                 3 => {
@@ -2480,10 +2490,12 @@ impl Cpu {
                 }
                 7 => {
                     self.a = self.ram[sym::sortX + self.x as usize];
-                    // raw: push a                           ; FRAMEADV.S:2155
+                    self.stack.push(self.a);
                     self.a = self.ram[sym::sortX - 1 + self.x as usize];
                     self.ram[sym::sortX + self.x as usize] = self.a;
-                    // raw: a = pop                          ; FRAMEADV.S:2158
+                    self.a = self.stack.pop().expect("pla on empty stack");
+                    self.z = (self.a == 0) as u8;
+                    self.n = self.a >> 7;
                     self.ram[sym::sortX - 1 + self.x as usize] = self.a;
                     pc = 8;
                 }
@@ -2545,10 +2557,12 @@ impl Cpu {
                 }
                 3 => {
                     self.a = self.ram[sym::sortX + self.x as usize];
-                    // raw: push a                           ; FRAMEADV.S:2155
+                    self.stack.push(self.a);
                     self.a = self.ram[sym::sortX - 1 + self.x as usize];
                     self.ram[sym::sortX + self.x as usize] = self.a;
-                    // raw: a = pop                          ; FRAMEADV.S:2158
+                    self.a = self.stack.pop().expect("pla on empty stack");
+                    self.z = (self.a == 0) as u8;
+                    self.n = self.a >> 7;
                     self.ram[sym::sortX - 1 + self.x as usize] = self.a;
                     pc = 4;
                 }

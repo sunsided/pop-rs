@@ -4,9 +4,9 @@
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
-// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
-// and the stack are deferred; they appear as `// raw: …` /
-// `// TODO(pass4): …` comments.
+// routines emit a `loop { match pc { ... } }` dispatch fallback; the
+// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
+// `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -2220,7 +2220,7 @@ impl Cpu {
             self.x = 0x09;
             loop {
                 self.a = self.x;
-                // raw: push a                           ; MOVER.S:2133
+                self.stack.push(self.a);
                 self.ram[sym::tempblockx] = self.a;
                 self.rdblock1();
                 let _o: u8 = 0x0b;
@@ -2231,7 +2231,9 @@ impl Cpu {
                 } else {
                     self.shakeit();
                 }
-                // raw: a = pop                          ; MOVER.S:2142
+                self.a = self.stack.pop().expect("pla on empty stack");
+                self.z = (self.a == 0) as u8;
+                self.n = self.a >> 7;
                 self.x = self.a;
                 self.x = self.x.wrapping_sub(1);
                 if !((self.x as i8) >= 0) {
@@ -2246,7 +2248,7 @@ impl Cpu {
         self.x = 0x09;
         loop {
             self.a = self.x;
-            // raw: push a                           ; MOVER.S:2133
+            self.stack.push(self.a);
             self.ram[sym::tempblockx] = self.a;
             self.rdblock1();
             let _o: u8 = 0x0b;
@@ -2257,7 +2259,9 @@ impl Cpu {
             } else {
                 self.shakeit();
             }
-            // raw: a = pop                          ; MOVER.S:2142
+            self.a = self.stack.pop().expect("pla on empty stack");
+            self.z = (self.a == 0) as u8;
+            self.n = self.a >> 7;
             self.x = self.a;
             self.x = self.x.wrapping_sub(1);
             if !((self.x as i8) >= 0) {

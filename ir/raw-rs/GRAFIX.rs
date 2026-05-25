@@ -4,9 +4,9 @@
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
-// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
-// and the stack are deferred; they appear as `// raw: …` /
-// `// TODO(pass4): …` comments.
+// routines emit a `loop { match pc { ... } }` dispatch fallback; the
+// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
+// `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -359,7 +359,7 @@ impl Cpu {
                     pc = 2;
                 }
                 2 => {
-                    // raw: push a                           ; GRAFIX.S:541
+                    self.stack.push(self.a);
                     self.x = self.a;
                     self.a = self.ram[sym::wipeH + self.x as usize];
                     self.ram[sym::IMAGE] = self.a;
@@ -372,7 +372,9 @@ impl Cpu {
                     self.a = self.ram[sym::wipeCOL + self.x as usize];
                     self.ram[sym::OPACITY] = self.a;
                     self.fastblack();
-                    // raw: a = pop                          ; GRAFIX.S:556
+                    self.a = self.stack.pop().expect("pla on empty stack");
+                    self.z = (self.a == 0) as u8;
+                    self.n = self.a >> 7;
                     self.c = 0;
                     let _r = (self.a as u16) + (0x01) as u16 + (self.c as u16);
                     self.a = _r as u8;
@@ -2094,10 +2096,12 @@ impl Cpu {
         self.c = 0;
         // raw: ??? xce             ; GRAFIX.S:2093
         // raw: ??? rep $30            ; GRAFIX.S:2094
-        // raw: push a                           ; GRAFIX.S:2095
+        self.stack.push(self.a);
         // raw: ??? phy             ; GRAFIX.S:2096
         self.x = 0x03;
-        // raw: a = pop                          ; GRAFIX.S:2099
+        self.a = self.stack.pop().expect("pla on empty stack");
+        self.z = (self.a == 0) as u8;
+        self.n = self.a >> 7;
         self.c = 1;
         // raw: ??? xce             ; GRAFIX.S:2101
         self.y = self.a;
@@ -2109,7 +2113,7 @@ impl Cpu {
         // raw: ??? xce             ; GRAFIX.S:2114
         // raw: ??? rep $30            ; GRAFIX.S:2115
         self.a &= 0xff;
-        // raw: push a                           ; GRAFIX.S:2117
+        self.stack.push(self.a);
         // raw: ??? phy             ; GRAFIX.S:2118
         self.x = 0x03;
         self.c = 1;

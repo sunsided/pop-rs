@@ -4,9 +4,9 @@
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
-// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
-// and the stack are deferred; they appear as `// raw: …` /
-// `// TODO(pass4): …` comments.
+// routines emit a `loop { match pc { ... } }` dispatch fallback; the
+// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
+// `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.

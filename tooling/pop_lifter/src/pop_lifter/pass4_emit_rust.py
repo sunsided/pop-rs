@@ -50,13 +50,20 @@ transitions (`GotoStateStmt`). This replaces the old `GotoStmt` /
 `LabelStmt` escape hatch, so those routines now emit valid structured
 Rust instead of unresolved gotos.
 
+This slice also lowers the *stack atoms* — the `pha`/`pla` that pass 3
+couldn't fold into a scoped `SaveTemp`/`RestoreTemp` pair — over a
+provisional `self.stack: Vec<u8>` that mirrors the interpreter's
+`value_stack`:
+
+* `Pha` → `self.stack.push(self.a)`;
+* `Pla` → `self.a = self.stack.pop()…` plus Z/N from the popped byte.
+
 Still deferred:
-* `StoreLocal` / `StoreOpVar`, `LocalRef` inc/dec — self-modifying code;
-* `Pha` / `Pla` — stack.
+* `StoreLocal` / `StoreOpVar`, `LocalRef` inc/dec — self-modifying code.
 
 Memory model and receiver (`Cpu` / `self.ram` / `self.c` / `self.z` /
-`self.n`) remain provisional pending the Game/Renderer/Audio/Input
-design slice.
+`self.n` / `self.stack`) remain provisional pending the
+Game/Renderer/Audio/Input design slice.
 """
 
 from __future__ import annotations
@@ -88,6 +95,8 @@ from .ir1 import (
     LoadIndexed,
     LoadIndirect,
     Lsr,
+    Pha,
+    Pla,
     Reg,
     Rol,
     Ror,
@@ -398,9 +407,9 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
     the caller falls back to a `// raw:` comment.
 
     Covers register/memory moves, carry arithmetic (adc/sbc/shifts),
-    `(ptr),y` indirect loads/stores/bitwise/sbc, and the flag-only
-    comparisons (cmp/cpx/cpy/bit). Self-modifying code and the stack
-    stay deferred."""
+    `(ptr),y` indirect loads/stores/bitwise/sbc, the flag-only
+    comparisons (cmp/cpx/cpy/bit), and the unpaired stack `pha`/`pla`.
+    Self-modifying code stays deferred."""
     if isinstance(item, LoadImm):
         # An opvar immediate is a runtime-patched SMC byte; lowering it
         # to its assembled value would be wrong, so defer the whole load.
@@ -562,6 +571,23 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             f"let _o: u8 = {operand};",
             "self.z = ((self.a & _o) == 0) as u8;",
             "self.n = _o >> 7;",
+        ]
+
+    # ---- stack ----------------------------------------------------------
+    # The `pha`/`pla` pass 3 couldn't pair into a scoped `SaveTemp`/
+    # `RestoreTemp` (unbalanced within the routine, or the pair straddles
+    # a structured boundary). Lower over a provisional value stack —
+    # `self.stack: Vec<u8>` — mirroring the interpreter's `value_stack`.
+    # `pla` sets Z/N from the popped byte, matching the 6502 / interpreter.
+
+    if isinstance(item, Pha):
+        return ["self.stack.push(self.a);"]
+
+    if isinstance(item, Pla):
+        return [
+            "self.a = self.stack.pop().expect(\"pla on empty stack\");",
+            "self.z = (self.a == 0) as u8;",
+            "self.n = self.a >> 7;",
         ]
 
     return None
@@ -776,9 +802,9 @@ _HEADER = [
     "// expression, control-flow, data-movement, carry-arithmetic,",
     "// `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.",
     "// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured",
-    "// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC",
-    "// and the stack are deferred; they appear as `// raw: …` /",
-    "// `// TODO(pass4): …` comments.",
+    "// routines emit a `loop { match pc { ... } }` dispatch fallback; the",
+    "// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as",
+    "// `// raw: …` / `// TODO(pass4): …` comments.",
     "// The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are",
     "// provisional, pending the state/trait design slice. RAM addresses",
     "// keep their source symbol names via the `sym` constants below.",
