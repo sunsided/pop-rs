@@ -58,12 +58,20 @@ provisional `self.stack: Vec<u8>` that mirrors the interpreter's
 * `Pha` → `self.stack.push(self.a)`;
 * `Pla` → `self.a = self.stack.pop()…` plus Z/N from the popped byte.
 
+It also lowers the *recognised SMC immediate-operand patch*. `pass3_smc`
+turns `sta :label+1` (patching the `#imm` byte of `lda/adc/sbc/cmp` at
+`:label`) into a `StoreOpVar` and marks the patched `Imm.opvar`, so:
+
+* `StoreOpVar` → `self.<name> = self.<reg>` (write the operand variable);
+* the patched immediate reads `self.<name>` instead of the placeholder.
+
 Still deferred:
-* `StoreLocal` / `StoreOpVar`, `LocalRef` inc/dec — self-modifying code.
+* the opaque `StoreLocal` (16-bit address / branch patches) and
+  `LocalRef` inc/dec — self-modifying code with no consumer model yet.
 
 Memory model and receiver (`Cpu` / `self.ram` / `self.c` / `self.z` /
-`self.n` / `self.stack`) remain provisional pending the
-Game/Renderer/Audio/Input design slice.
+`self.n` / `self.stack` / SMC operand-variable fields) remain
+provisional pending the Game/Renderer/Audio/Input design slice.
 """
 
 from __future__ import annotations
@@ -109,6 +117,7 @@ from .ir1 import (
     StoreAbs,
     StoreIndexed,
     StoreIndirect,
+    StoreOpVar,
     Transfer,
 )
 from .ir3 import (
@@ -210,10 +219,25 @@ def _addr(addr: int) -> str:
 
 
 def _emit_imm(imm: Imm) -> str:
-    # The opvar (self-modifying-code) form names a runtime-patched byte;
-    # lowering that to a mutable field is a later slice, so emit the
-    # assembled value and leave the opvar intent to the IR3 dump.
+    # An opvar immediate is the runtime-patched operand of a
+    # self-modifying-code instruction (recognised by `pass3_smc`); it
+    # reads the provisional operand-variable field the matching
+    # `StoreOpVar` writes, rather than the placeholder assembled byte.
+    if imm.opvar is not None:
+        return f"self.{_mangle(imm.opvar)}"
     return f"0x{imm.value & 0xff:02x}"
+
+
+def _imm_u8(imm: Imm) -> str:
+    """Render an immediate as a `u8`-typed expression safe to bitwise-
+    complement (`!`). A literal gets an explicit `_u8` suffix so `!`
+    complements at byte width (a bare `!0xNN` would default to `i32` and
+    cast wrong); an opvar immediate is already a `u8` field, so it's
+    returned as-is — appending `_u8` there would mangle the field name
+    into the invalid `self.<opvar>_u8`."""
+    if imm.opvar is not None:
+        return f"self.{_mangle(imm.opvar)}"
+    return f"0x{imm.value & 0xff:02x}_u8"
 
 
 # A symbolic name is a Rust-ident base with an optional `+N` / `-N`
@@ -346,11 +370,14 @@ def _cmp_operand(item, syms: SymTable | None) -> str:
 def _wide_term(operand, syms: SymTable | None, *, complement: bool) -> str:
     """Render one byte operand of a `Wide16Stmt` as a `u16` term. With
     `complement` (the subtract path), emit `!operand` at byte width so it
-    feeds the `src + ~op + carry` identity; an immediate is suffixed
-    `_u8` because a bare `!0xNN` would default to i32 and cast wrong."""
-    v = _emit_value(operand, syms)
+    feeds the `src + ~op + carry` identity. A literal immediate goes
+    through `_imm_u8` for an explicit byte-width complement; every other
+    operand (memory reads, opvar fields) is already `u8`, so a bare `!`
+    is correct."""
     if complement:
-        v = f"!{v}_u8" if isinstance(operand, Imm) else f"!{v}"
+        v = f"!{_imm_u8(operand)}" if isinstance(operand, Imm) else f"!{_emit_value(operand, syms)}"
+    else:
+        v = _emit_value(operand, syms)
     return f"({v} as u16)"
 
 
@@ -459,13 +486,11 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
 
     Covers register/memory moves, carry arithmetic (adc/sbc/shifts),
     `(ptr),y` indirect loads/stores/bitwise/sbc, the flag-only
-    comparisons (cmp/cpx/cpy/bit), and the unpaired stack `pha`/`pla`.
-    Self-modifying code stays deferred."""
+    comparisons (cmp/cpx/cpy/bit), the unpaired stack `pha`/`pla`, and
+    the recognised SMC immediate-operand patch (`StoreOpVar`). The
+    opaque `StoreLocal` (16-bit address / branch patches) stays
+    deferred."""
     if isinstance(item, LoadImm):
-        # An opvar immediate is a runtime-patched SMC byte; lowering it
-        # to its assembled value would be wrong, so defer the whole load.
-        if item.imm.opvar is not None:
-            return None
         return [f"self.{item.reg} = {_emit_imm(item.imm)};"]
 
     if isinstance(item, LoadAbs):
@@ -536,9 +561,10 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         # 6502 SBC uses the A + ~operand + C identity so the borrow
         # convention (C=1 means "no borrow") falls out naturally.
         if isinstance(item, SbcImm):
-            # `_u8` forces the complement to byte width: a bare `!0xbd`
-            # defaults to i32 (`-190`) and casts to the wrong u16.
-            rhs = f"(!{_emit_imm(item.imm)}_u8) as u16"
+            # `_imm_u8` forces a literal complement to byte width (a bare
+            # `!0xbd` defaults to i32 = -190 and casts to the wrong u16);
+            # an opvar immediate is already a u8 field, so no `_u8`.
+            rhs = f"(!{_imm_u8(item.imm)}) as u16"
         elif isinstance(item, SbcAbs):
             rhs = f"(!self.ram[{_abs_index(item.source, syms)}]) as u16"
         elif isinstance(item, SbcIndexed):
@@ -640,6 +666,16 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             "self.z = (self.a == 0) as u8;",
             "self.n = self.a >> 7;",
         ]
+
+    # ---- self-modifying code (recognised immediate-operand patch) -------
+    # `pass3_smc` rewrote `sta :label+1` (patching the `#imm` byte of the
+    # instruction at `:label`) into a `StoreOpVar`, and marked that
+    # instruction's `Imm.opvar` so it reads the same provisional operand
+    # variable (`self.<name>`) written here. The opaque `StoreLocal`
+    # (address/branch patches) has no consumer model yet and stays raw.
+
+    if isinstance(item, StoreOpVar):
+        return [f"self.{_mangle(item.name)} = self.{item.reg};"]
 
     return None
 
@@ -865,8 +901,9 @@ _HEADER = [
     "// `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.",
     "// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured",
     "// routines emit a `loop { match pc { ... } }` dispatch fallback; the",
-    "// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as",
-    "// `// raw: …` / `// TODO(pass4): …` comments.",
+    "// stack rides `self.stack: Vec<u8>` and recognised SMC immediate",
+    "// patches ride `self.<opvar>` fields. Opaque address-patch SMC stays",
+    "// deferred as `// raw: …` / `// TODO(pass4): …` comments.",
     "// The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are",
     "// provisional, pending the state/trait design slice. RAM addresses",
     "// keep their source symbol names via the `sym` constants below.",

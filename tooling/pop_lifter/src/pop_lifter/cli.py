@@ -748,7 +748,8 @@ def _cmd_emit(args: argparse.Namespace) -> int:
         local_entries = [e for e in args.entry if e in defined and e not in handled]
         if not local_entries:
             continue
-        ir3_module = reloop_module(structure_module(lift_file(file_ast, symbols, local_entries).module))
+        ir1_module = recognize_smc(lift_file(file_ast, symbols, local_entries).module)
+        ir3_module = reloop_module(structure_module(ir1_module))
         recovered = recover_temps(recover_loops(recognize_module(fold_module(ir3_module))))
         total_routines += len(recovered.routines)
         lowered, deferred = lower_stats(recovered)
@@ -1026,7 +1027,7 @@ def _emit_all_artifacts(src_dir: Path) -> list[tuple[str, str]]:
     implementation. Deterministic, so the output can be pinned.
 
     The chain mirrors `pop-lifter emit` exactly
-    (`structure → reloop → fold → match → recover_loops →
+    (`smc → structure → reloop → fold → match → recover_loops →
     recover_temps → emit_module`); it is intentionally strict (a
     routine the pipeline can't process raises rather than being
     skipped) so the pinned tree can never silently drop coverage."""
@@ -1051,7 +1052,7 @@ def _emit_all_artifacts(src_dir: Path) -> list[tuple[str, str]]:
         if not entries:
             skipped.append(src_path.name)
             continue
-        module = lift_file(file_ast, symbols, entries).module
+        module = recognize_smc(lift_file(file_ast, symbols, entries).module)
         if not module.routines:
             skipped.append(src_path.name)
             continue

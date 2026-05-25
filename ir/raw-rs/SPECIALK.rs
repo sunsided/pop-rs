@@ -5,8 +5,9 @@
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
 // routines emit a `loop { match pc { ... } }` dispatch fallback; the
-// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
-// `// raw: …` / `// TODO(pass4): …` comments.
+// stack rides `self.stack: Vec<u8>` and recognised SMC immediate
+// patches ride `self.<opvar>` fields. Opaque address-patch SMC stays
+// deferred as `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -1028,9 +1029,9 @@ impl Cpu {
         self.ram[0x00f1] = 0x00;
         self.ram[0x00f2] = 0x00;
         self.a = 0x42;
-        // raw: patch *:sm1+1 = a            ; SPECIALK.S:1179
+        self.sm1 = self.a;
         self.a = 0x04;
-        // raw: patch *:sm2+1 = a            ; SPECIALK.S:1181
+        self.sm2 = self.a;
         self._3asub();
         self.ram[sym::MinLeft] = self.y;
         let _o: u8 = 0x02;
@@ -1043,9 +1044,9 @@ impl Cpu {
         self.ram[0x00f1] = 0x36;
         self.ram[0x00f2] = 0xfb;
         self.a = 0x12;
-        // raw: patch *:sm1+1 = a            ; SPECIALK.S:1195
+        self.sm1 = self.a;
         self.a = 0x00;
-        // raw: patch *:sm2+1 = a            ; SPECIALK.S:1197
+        self.sm2 = self.a;
         self._3asub();
         self.ram[sym::SecLeft] = self.y;
         return;
