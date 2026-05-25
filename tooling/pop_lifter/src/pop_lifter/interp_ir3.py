@@ -55,6 +55,7 @@ from .ir3 import (
     ForStmt,
     GotoStmt,
     IfStmt,
+    LabeledBlock,
     LabelStmt,
     LoopStmt,
     MatchStmt,
@@ -88,6 +89,16 @@ class _TailCallSignal(Exception):
 
 class _BreakSignal(Exception):
     """Raised by BreakStmt to exit the innermost enclosing LoopStmt."""
+
+
+class _LabeledBreakSignal(Exception):
+    """Raised by a labeled BreakStmt to unwind to the matching
+    LabeledBlock (the relooper's structured forward jump to a merge
+    node)."""
+
+    def __init__(self, label: str):
+        super().__init__(label)
+        self.label = label
 
 
 class _ContinueSignal(Exception):
@@ -429,7 +440,16 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
             _exec_block(stmt.body, modules, aliases, trace)
             exec_atom(step_op, trace, trace.ram)
         return
+    if isinstance(stmt, LabeledBlock):
+        try:
+            _exec_block(stmt.body, modules, aliases, trace)
+        except _LabeledBreakSignal as sig:
+            if sig.label != stmt.label:
+                raise  # not ours — keep unwinding to the matching block
+        return
     if isinstance(stmt, BreakStmt):
+        if stmt.label is not None:
+            raise _LabeledBreakSignal(stmt.label)
         raise _BreakSignal()
     if isinstance(stmt, ContinueStmt):
         raise _ContinueSignal()

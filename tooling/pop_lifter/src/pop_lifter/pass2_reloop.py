@@ -51,11 +51,15 @@ walks the IR2 body in order and emits a 1-for-1 IR3 stream
 counterparts; `If`/`Branch` become a structured `IfStmt`/`RawIfStmt`
 whose then-block holds a `GotoStmt` to the original target; atoms
 become `RawStmt`). Correctness preserved, structure not improved.
-* Post-dominator analysis. The current algorithm may emit a small
-  amount of code duplication when a block is reached from both the
-  taken edge of an `if` and the fall-through path of the next block.
-  CHECKFLOOR's `:ong` (`tail_call onground`) is the only such case
-  in the pilot — fine for now; a future pass will collapse it.
+* Post-dominator merge. When a conditional's two arms reconverge at a
+  block *after* the fall-through (its immediate post-dominator `M`),
+  the walker emits each arm only up to `M` and the shared continuation
+  once after the `if/else`. Without this the taken arm re-inlines the
+  whole tail, which compounds exponentially across nested conditionals
+  (one routine ballooned ~560x before this landed). Arms that instead
+  diverge to separate exits with only *partial* joins (a block reached
+  from some but not all paths) still duplicate — collapsing those needs
+  labeled-block / multiple-block structuring, a later pass.
 * `match` / `switch` recognition from chained `if a == K` —
   pass 3's job.
 """
@@ -71,7 +75,7 @@ from .cfg import (
     dominates,
     find_back_edges,
     find_dfs_back_edges,
-    natural_loop_body,
+    reverse_postorder,
 )
 from .ir1 import (
     Branch,
@@ -91,13 +95,18 @@ from .ir3 import (
     BreakStmt,
     CallStmt,
     ContinueStmt,
+    DoWhileStmt,
+    ForStmt,
     GotoStmt,
     IfStmt,
+    LabeledBlock,
     LabelStmt,
     LoopStmt,
+    MatchStmt,
     ModuleIR3,
     RawIfStmt,
     RawStmt,
+    RepeatStmt,
     ReturnStmt,
     RoutineIR3,
     Stmt,
@@ -224,6 +233,212 @@ def _detect_simple_loops(cfg: CFG) -> tuple[dict[int, SimpleLoop], set[int]]:
     return loops, loop_blocks
 
 
+def _child_blocks(s: Stmt):
+    """Sub-`Block`s of a statement, for recursive traversal."""
+    blocks = []
+    for attr in ("then_block", "else_block", "body"):
+        b = getattr(s, attr, None)
+        if b is not None:
+            blocks.append(b)
+    if isinstance(s, MatchStmt):
+        blocks.extend(arm.body for arm in s.arms)
+    return blocks
+
+
+def _contains_break(stmts, label: str) -> bool:
+    for s in stmts:
+        if isinstance(s, BreakStmt) and s.label == label:
+            return True
+        if any(_contains_break(b.stmts, label) for b in _child_blocks(s)):
+            return True
+    return False
+
+
+def _strip_tail_break(stmts: list, label: str) -> list:
+    """Drop a `break <label>` in tail position — where falling through
+    reaches exactly where the break would jump (just after the labeled
+    block), so the break is redundant. Recurses through the tail of
+    if/else arms and nested labeled blocks."""
+    if not stmts:
+        return stmts
+    last = stmts[-1]
+    if isinstance(last, BreakStmt) and last.label == label:
+        return stmts[:-1]
+    if isinstance(last, (IfStmt, RawIfStmt)):
+        then_b = Block.of(_strip_tail_break(list(last.then_block.stmts), label))
+        else_b = (
+            Block.of(_strip_tail_break(list(last.else_block.stmts), label))
+            if last.else_block is not None else None
+        )
+        return stmts[:-1] + [dataclass_replace(last, then_block=then_b, else_block=else_b)]
+    if isinstance(last, LabeledBlock):
+        inner = _strip_tail_break(list(last.body.stmts), label)
+        return stmts[:-1] + [dataclass_replace(last, body=Block.of(inner))]
+    return stmts
+
+
+def _invert_if_cond(s):
+    if isinstance(s, IfStmt):
+        return dataclass_replace(s.cond, op=_INVERT_COMPARE_OP[s.cond.op])
+    return _INVERT_BRANCH_COND[s.cond]
+
+
+def _simplify_stmts(stmts) -> list:
+    """Tidy structured output (bottom-up): unwrap labeled blocks whose
+    breaks have all been elided, drop redundant tail breaks, and turn
+    `if c {} else {X}` into `if !c {X}`."""
+    out: list = []
+    for s in stmts:
+        out.extend(_simplify_stmt(s))
+    return out
+
+
+def _simplify_stmt(s) -> list:
+    if isinstance(s, LabeledBlock):
+        # Strip redundant tail breaks first, then simplify — so the
+        # `if c { break } else { X }` shapes the strip empties out get
+        # inverted to `if !c { X }` by the empty-then rule below.
+        body = _simplify_stmts(_strip_tail_break(list(s.body.stmts), s.label))
+        if not _contains_break(body, s.label):
+            return body  # no break targets this label any more — unwrap it
+        return [dataclass_replace(s, body=Block.of(body))]
+    if isinstance(s, (IfStmt, RawIfStmt)):
+        then_b = Block.of(_simplify_stmts(s.then_block.stmts))
+        else_b = Block.of(_simplify_stmts(s.else_block.stmts)) if s.else_block is not None else None
+        if not then_b.stmts and else_b is not None and else_b.stmts:
+            return [dataclass_replace(s, cond=_invert_if_cond(s), then_block=else_b, else_block=None)]
+        if else_b is not None and not else_b.stmts:
+            else_b = None
+        return [dataclass_replace(s, then_block=then_b, else_block=else_b)]
+    if isinstance(s, (LoopStmt, DoWhileStmt, ForStmt, RepeatStmt)):
+        return [dataclass_replace(s, body=Block.of(_simplify_stmts(s.body.stmts)))]
+    if isinstance(s, MatchStmt):
+        arms = tuple(
+            dataclass_replace(a, body=Block.of(_simplify_stmts(a.body.stmts)))
+            for a in s.arms
+        )
+        return [dataclass_replace(s, arms=arms)]
+    return [s]
+
+
+def _structure_acyclic(cfg: CFG) -> Block:
+    """Structure a *reducible, acyclic* routine with no code duplication.
+
+    Walks the dominator tree (`doTree`/`nodeWithin`, after Ramsey's
+    "Beyond Relooper"). Every block with more than one predecessor is a
+    *merge node*; it is emitted exactly once at its immediate dominator,
+    wrapped so each predecessor reaches it by a structured `break
+    'b<id>` out of a `LabeledBlock`. Non-merge blocks are inlined at
+    their sole predecessor, so straight-line forks stay plain
+    `if`/`else`. Merge children are nested highest-reverse-post-order
+    outermost, so a forward `break` to any of them is always in scope.
+
+    Only valid for acyclic CFGs (no back-edges): every merge node's
+    immediate dominator then dominates all its predecessors, so emitting
+    it at that point is sound. Loop-bearing routines keep the existing
+    `_emit_block` walker."""
+    from collections import defaultdict
+
+    idom = compute_idoms(cfg)
+    rank = {b: i for i, b in enumerate(reverse_postorder(cfg))}
+
+    def _is_trivial_exit(b) -> bool:
+        # A bare `return` / `tail_call` (no body) is cheaper to duplicate
+        # at each predecessor than to hoist behind a label — and avoids
+        # wrapping a whole routine just because it ends in one shared exit.
+        if b.body:
+            return False
+        t = b.terminator
+        return isinstance(t, Return) or (isinstance(t, Goto) and t.kind == "tail_call")
+
+    merge = {
+        b.id for b in cfg.blocks
+        if len(cfg.pred[b.id]) > 1 and not _is_trivial_exit(b)
+    }
+    dom_children: dict[int, list[int]] = defaultdict(list)
+    for b in cfg.blocks:
+        if b.id != cfg.entry_id and b.id in idom:
+            dom_children[idom[b.id]].append(b.id)
+
+    def label_for(m: int) -> str:
+        return f"'b{m}"
+
+    def do_tree(x: int, context: list[int]) -> list[Stmt]:
+        merges = sorted((c for c in dom_children[x] if c in merge), key=lambda c: rank[c])
+        return node_within(x, merges, context)
+
+    def node_within(x: int, merges: list[int], context: list[int]) -> list[Stmt]:
+        if not merges:
+            return emit_node(x, context)
+        y = merges[-1]  # highest RPO → outermost block
+        inner = node_within(x, merges[:-1], context + [y])
+        block = LabeledBlock(label=label_for(y), body=Block.of(inner), src=cfg.blocks[y].terminator.src)
+        return [block, *do_tree(y, context)]
+
+    def succ(target_id: int, context: list[int], src) -> list[Stmt]:
+        # Transfer to a known local block: break to it if it's a shared
+        # merge node (emitted once elsewhere), else inline it here.
+        if target_id in merge:
+            return [BreakStmt(src=src, label=label_for(target_id))]
+        return do_tree(target_id, context)
+
+    def emit_node(x: int, context: list[int]) -> list[Stmt]:
+        block = cfg.blocks[x]
+        stmts: list[Stmt] = []
+        for item in block.body:
+            if isinstance(item, IR1Call):
+                stmts.append(CallStmt(target=item.target, src=item.src))
+            else:
+                stmts.append(RawStmt(item=item))
+
+        t = block.terminator
+        if isinstance(t, Return):
+            stmts.append(ReturnStmt(src=t.src))
+            return stmts
+        if isinstance(t, Goto):
+            if t.kind == "tail_call":
+                stmts.append(TailCallStmt(target=t.target, src=t.src))
+                return stmts
+            target_id = cfg.label_to_block.get(t.target)
+            if target_id is None:
+                stmts.append(GotoStmt(target=t.target, src=t.src))
+                return stmts
+            stmts.extend(succ(target_id, context, t.src))
+            return stmts
+        if isinstance(t, (If, Branch)):
+            taken_id = cfg.label_to_block.get(t.target)
+            ft_id = x + 1 if x + 1 < len(cfg.blocks) else None
+            if taken_id is None:
+                then_stmts: list[Stmt] = [TailCallStmt(target=t.target, src=t.src)]
+            else:
+                then_stmts = succ(taken_id, context, t.src)
+            ft_stmts = succ(ft_id, context, t.src) if ft_id is not None else []
+            node_cls = IfStmt if isinstance(t, If) else RawIfStmt
+            if then_stmts and isinstance(then_stmts[-1], (ReturnStmt, TailCallStmt)):
+                # The taken arm leaves the routine, so the fall-through is
+                # not a join with it: keep it flat as a sibling (guard-
+                # clause / dispatch-chain style) rather than nesting it in
+                # an `else`. This preserves the chained-`if` shape the
+                # `match` recogniser and readers expect.
+                stmts.append(node_cls(
+                    cond=t.cond, then_block=Block.of(then_stmts), else_block=None, src=t.src,
+                ))
+                stmts.extend(ft_stmts)
+            else:
+                # The taken arm rejoins later (a `break` to a merge): the
+                # fall-through is the other arm, so emit a real `else`.
+                stmts.append(node_cls(
+                    cond=t.cond,
+                    then_block=Block.of(then_stmts),
+                    else_block=Block.of(ft_stmts) if ft_stmts else None,
+                    src=t.src,
+                ))
+            return stmts
+        raise AssertionError(f"unexpected terminator: {t!r}")
+
+    return Block.of(_simplify_stmts(do_tree(cfg.entry_id, [])))
+
+
 def reloop_routine(routine: Routine) -> RoutineIR3:
     """Structure `routine` into an IR3 routine. Simple do-while loops
     are recognised and emitted as `LoopStmt`; anything else with a
@@ -246,6 +461,17 @@ def reloop_routine(routine: Routine) -> RoutineIR3:
     ):
         return _wrap_unstructured(routine)
 
+    # Acyclic routines (no back-edges) are reducible: the dominator-tree
+    # structurer emits every merge node once via labeled blocks, with no
+    # code duplication. Loop-bearing routines keep the linear walker.
+    if not cycle_edges:
+        return RoutineIR3(
+            name=routine.name,
+            entry_aliases=list(routine.entry_aliases),
+            body=_structure_acyclic(cfg),
+        )
+
+    ipostdoms = _compute_ipostdoms(cfg)
     visiting: set[int] = set()
     body = _emit_block(
         cfg, cfg.entry_id,
@@ -254,6 +480,7 @@ def reloop_routine(routine: Routine) -> RoutineIR3:
         loops=loops,
         loop_blocks=loop_blocks,
         active_loop_tail=None,
+        ipostdoms=ipostdoms,
     )
     return RoutineIR3(
         name=routine.name,
@@ -389,6 +616,98 @@ def _invert_loop_exit(cond, cond_is_compare: bool):
     return _INVERT_BRANCH_COND[cond]
 
 
+_EXIT = -1  # virtual exit node for post-dominator analysis
+
+
+def _block_leaves_routine(cfg: CFG, b) -> bool:
+    """True if any control-flow edge out of block `b` leaves the routine
+    — a `return`, a tail-call, a goto/branch to a label outside the
+    routine, or a fall-through past the last block. Such blocks connect
+    to the virtual exit in the reverse CFG."""
+    t = b.terminator
+    if isinstance(t, Return):
+        return True
+    if isinstance(t, Goto):
+        if t.kind == "tail_call":
+            return True
+        return cfg.label_to_block.get(t.target) is None
+    if isinstance(t, (If, Branch)):
+        if cfg.label_to_block.get(t.target) is None:
+            return True
+        return b.id + 1 >= len(cfg.blocks)
+    return True
+
+
+def _compute_ipostdoms(cfg: CFG) -> dict[int, int]:
+    """Immediate post-dominators (`block -> ipostdom`), computed as
+    dominators on the reverse CFG from a virtual exit (`_EXIT`) that
+    every routine-leaving block connects to.
+
+    The relooper uses this to find where a conditional's two arms
+    reconverge: emitting the shared continuation once after the
+    `if/else` instead of inlining it into both arms is what keeps a
+    branch-dense routine from blowing up by code duplication. A result
+    of `_EXIT` means the arms diverge to separate exits (no shared
+    continuation); blocks that can't reach an exit are omitted."""
+    if not cfg.blocks:
+        return {}
+    exit_blocks = [b.id for b in cfg.blocks if _block_leaves_routine(cfg, b)]
+    # Reverse CFG: forward edge u->v becomes v->u; `_EXIT` is the entry
+    # and points at every exit block.
+    rsucc: dict[int, list[int]] = {_EXIT: list(exit_blocks)}
+    for b in cfg.blocks:
+        rsucc[b.id] = list(cfg.pred[b.id])
+    rpred: dict[int, list[int]] = {b.id: list(cfg.succ[b.id]) for b in cfg.blocks}
+    for bid in exit_blocks:
+        rpred[bid] = rpred[bid] + [_EXIT]
+
+    # Reverse post-order over the reverse CFG (iterative, to avoid
+    # recursion limits on large routines).
+    order: list[int] = []
+    seen: set[int] = {_EXIT}
+    stack: list[tuple[int, object]] = [(_EXIT, iter(rsucc.get(_EXIT, [])))]
+    while stack:
+        node, it = stack[-1]
+        for nxt in it:  # type: ignore[assignment]
+            if nxt not in seen:
+                seen.add(nxt)
+                stack.append((nxt, iter(rsucc.get(nxt, []))))
+                break
+        else:
+            order.append(node)
+            stack.pop()
+    rpo = list(reversed(order))
+    rank = {n: i for i, n in enumerate(rpo)}
+
+    idom: dict[int, int] = {_EXIT: _EXIT}
+
+    def intersect(a: int, b: int) -> int:
+        while a != b:
+            while rank[a] > rank[b]:
+                a = idom[a]
+            while rank[b] > rank[a]:
+                b = idom[b]
+        return a
+
+    changed = True
+    while changed:
+        changed = False
+        for n in rpo:
+            if n == _EXIT:
+                continue
+            preds = [p for p in rpred.get(n, []) if p in idom]
+            if not preds:
+                continue
+            new = preds[0]
+            for p in preds[1:]:
+                new = intersect(p, new)
+            if idom.get(n) != new:
+                idom[n] = new
+                changed = True
+
+    return {b: d for b, d in idom.items() if b != _EXIT}
+
+
 def _emit_block(
     cfg: CFG,
     bid: int | None,
@@ -398,10 +717,15 @@ def _emit_block(
     loops: dict[int, SimpleLoop],
     loop_blocks: set[int],
     active_loop_tail: int | None,
+    ipostdoms: dict[int, int],
 ) -> Block:
     """Recursively emit IR3 stmts for block `bid` up to (but not
     including) `exit_id`. `exit_id=None` means "emit until the
     routine exits".
+
+    Used for *loop-bearing* routines; fully-acyclic ones go through
+    `_structure_acyclic`, which structures merges with labeled blocks
+    and no duplication.
 
     `loops` / `loop_blocks` carry the pre-computed simple-loop
     layout. When the walker hits a loop header, it switches into
@@ -410,12 +734,12 @@ def _emit_block(
     conditional jump becomes the bottom-of-loop break guard; any
     other back-edge to the same header surfaces as `continue`.
 
-    Code duplication note: when a block is reached from two paths
-    (e.g. CHECKFLOOR's `:ong` from both `B2.taken` and `B3.fall-
-    through`), this algorithm emits its body once per visit. The
-    duplication is structurally innocuous (each emission terminates
-    via tail-call, return, or break) but pass 3 may merge them once
-    it has post-dominator data.
+    Code duplication: when an `if`'s two arms reconverge at their
+    immediate post-dominator `M` (`ipostdoms`), the continuation is
+    emitted once after an `if/else` (see the `If`/`Branch` handling).
+    A merge reached by *more* paths than that — a partial join — is
+    still emitted once per path here; collapsing those needs the
+    labeled-block structurer extended to loop bodies (a later pass).
     """
     stmts: list[Stmt] = []
     while bid is not None and bid != exit_id:
@@ -427,7 +751,7 @@ def _emit_block(
         ):
             loop = loops[bid]
             loop_body = _emit_loop_body(
-                cfg, loop, visiting, loops, loop_blocks,
+                cfg, loop, visiting, loops, loop_blocks, ipostdoms,
             )
             stmts.append(LoopStmt(body=loop_body, src=cfg.blocks[bid].terminator.src))
             bid = loop.exit_block
@@ -475,18 +799,61 @@ def _emit_block(
             taken_label = t.target
             taken_id = cfg.label_to_block.get(taken_label)
             ft_id = bid + 1 if bid + 1 < len(cfg.blocks) else None
+            is_loop_continue = (
+                taken_id is not None
+                and active_loop_tail is not None
+                and taken_id == _loop_for_tail(loops, active_loop_tail).header
+            )
+
+            # Merge optimization: when both arms reconverge at a block
+            # `M` *after* the fall-through (the immediate post-dominator),
+            # emit each arm only up to `M` and the shared continuation
+            # once. Without this, the taken arm re-inlines the whole tail
+            # (exit_id=ft_id is never hit), which compounds exponentially
+            # across nested conditionals. The `M == ft_id` case is the
+            # plain `if cond { taken } <fall-through>` shape handled below.
+            merge = ipostdoms.get(bid)
+            if (
+                taken_id is not None
+                and not is_loop_continue
+                and ft_id is not None
+                and merge is not None
+                and merge != _EXIT
+                and merge != ft_id
+                and merge > bid
+            ):
+                then_stmts = list(_emit_block(
+                    cfg, taken_id, exit_id=merge, visiting=visiting,
+                    loops=loops, loop_blocks=loop_blocks,
+                    active_loop_tail=active_loop_tail, ipostdoms=ipostdoms,
+                ).stmts)
+                else_stmts = list(_emit_block(
+                    cfg, ft_id, exit_id=merge, visiting=visiting,
+                    loops=loops, loop_blocks=loop_blocks,
+                    active_loop_tail=active_loop_tail, ipostdoms=ipostdoms,
+                ).stmts)
+                node_cls = IfStmt if isinstance(t, If) else RawIfStmt
+                stmts.append(node_cls(
+                    cond=t.cond,
+                    then_block=Block.of(then_stmts),
+                    else_block=Block.of(else_stmts) if else_stmts else None,
+                    src=t.src,
+                ))
+                visiting.discard(bid)
+                bid = merge
+                continue
 
             then_stmts: list[Stmt]
             if taken_id is None:
                 then_stmts = [TailCallStmt(target=taken_label, src=t.src)]
-            elif active_loop_tail is not None and taken_id == _loop_for_tail(loops, active_loop_tail).header:
+            elif is_loop_continue:
                 # Conditional back-edge inside a loop body → continue.
                 then_stmts = [ContinueStmt(src=t.src)]
             else:
                 then_stmts = list(_emit_block(
                     cfg, taken_id, exit_id=ft_id, visiting=visiting,
                     loops=loops, loop_blocks=loop_blocks,
-                    active_loop_tail=active_loop_tail,
+                    active_loop_tail=active_loop_tail, ipostdoms=ipostdoms,
                 ).stmts)
 
             if isinstance(t, If):
@@ -529,6 +896,7 @@ def _emit_loop_body(
     visiting: set[int],
     loops: dict[int, SimpleLoop],
     loop_blocks: set[int],
+    ipostdoms: dict[int, int],
 ) -> Block:
     """Emit the body of a `LoopStmt` for the simple do-while `loop`.
 
@@ -556,7 +924,7 @@ def _emit_loop_body(
         exit_id=loop.tail,
         visiting=visiting_inner,
         loops=loops, loop_blocks=loop_blocks,
-        active_loop_tail=loop.tail,
+        active_loop_tail=loop.tail, ipostdoms=ipostdoms,
     )
     body_stmts.extend(head_body.stmts)
 

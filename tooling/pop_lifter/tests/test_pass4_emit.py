@@ -10,8 +10,10 @@ all structured control flow:
 * `CallStmt` / `TailCallStmt`
 * `SaveTemp` / `RestoreTemp`
 
-Still deferred: `RawStmt` (`// raw:`), `Wide16Stmt`, `RawIfStmt`,
-`GotoStmt`/`LabelStmt` (`// TODO(pass4): …`).
+Later slices added `RawStmt` atom lowering (data-movement, carry
+arithmetic, `(ptr),y` indirect, cmp/bit flags) and `Wide16Stmt` 16-bit
+arithmetic. Still deferred: the stack, SMC, `RawIfStmt`, and
+`GotoStmt`/`LabelStmt` (`// raw:` / `// TODO(pass4): …`).
 
 All tests operate on synthetic IR3 (no source tree required).
 """
@@ -45,6 +47,7 @@ from pop_lifter.ir1 import (
     Reg,
     Rol,
     Ror,
+    SbcImm,
     SbcIndirect,
     Sec,
     SourceRef,
@@ -76,6 +79,7 @@ from pop_lifter.ir3 import (
     RoutineIR3,
     SaveTemp,
     TailCallStmt,
+    Wide16Stmt,
 )
 from pop_lifter.pass4_emit_rust import (
     _emit_compare,
@@ -542,6 +546,13 @@ def test_raw_sbc_indirect():
     assert lines[2] == "self.c = (_r >> 8) as u8;"
 
 
+def test_raw_sbc_imm_complement_is_byte_width():
+    # The immediate complement must be `_u8`: a bare `!0xbd` defaults to
+    # i32 (-190) and casts to the wrong u16 (and can overflow-panic).
+    lines = _emit_stmt(RawStmt(item=SbcImm(imm=_imm(0xbd), src=SRC)), 0)
+    assert lines[0] == "let _r = (self.a as u16) + (!0xbd_u8) as u16 + (self.c as u16);"
+
+
 def test_indirect_high_byte_resolves_to_symbol():
     # The `ptr + 1` high byte must reuse the base's `sym::` const when the
     # low byte registers it, matching the `ztemp + 1` store form.
@@ -608,6 +619,61 @@ def test_raw_bit_imm_and_abs():
     ]
     abs_lines = _emit_stmt(RawStmt(item=Bit(source=_abs("sw", 0xC010), src=SRC)), 0)
     assert abs_lines[0] == "let _o: u8 = self.ram[0xc010];"
+
+
+# ---------------------------------------------------------------- 16-bit (Wide16) arithmetic
+
+
+def _wide16(op):
+    # {hi:lo} = {ptr+1:ptr} op {0x33:0x44}  -> dst {dh:dl}
+    return Wide16Stmt(
+        op=op,
+        lo_src=_abs("ptr", 0x20), hi_src=_abs("ptr+1", 0x21),
+        lo_op=_imm(0x44), hi_op=_imm(0x33),
+        lo_dst=_abs("dl", 0x30), hi_dst=_abs("dh", 0x31),
+        src=SRC,
+    )
+
+
+def test_wide16_add():
+    lines = _emit_stmt(_wide16("+"), 0)
+    assert lines == [
+        "let _lo = (self.ram[0x0020] as u16) + (0x44 as u16);",
+        "self.ram[0x0030] = _lo as u8;",
+        "let _hi = (self.ram[0x0021] as u16) + (0x33 as u16) + (_lo >> 8);",
+        "self.ram[0x0031] = _hi as u8;",
+        "self.a = _hi as u8;",
+        "self.c = (_hi >> 8) as u8;",
+    ]
+
+
+def test_wide16_subtract_uses_complement_identity():
+    # Subtract is `src + ~op + 1` (low) / `src + ~op + carry` (high);
+    # the immediate operands complement at byte width (`_u8`).
+    lines = _emit_stmt(_wide16("-"), 0)
+    assert lines[0] == "let _lo = (self.ram[0x0020] as u16) + (!0x44_u8 as u16) + 1;"
+    assert lines[2] == "let _hi = (self.ram[0x0021] as u16) + (!0x33_u8 as u16) + (_lo >> 8);"
+    assert lines[4:] == ["self.a = _hi as u8;", "self.c = (_hi >> 8) as u8;"]
+
+
+def test_wide16_memory_operand_not_u8_suffixed():
+    # A memory op byte is already u8, so subtract emits `!self.ram[..]`
+    # without the `_u8` suffix.
+    stmt = Wide16Stmt(
+        op="-",
+        lo_src=_abs("a", 0x20), hi_src=_abs("a+1", 0x21),
+        lo_op=_abs("b", 0x40), hi_op=_abs("b+1", 0x41),
+        lo_dst=_abs("d", 0x30), hi_dst=_abs("d+1", 0x31),
+        src=SRC,
+    )
+    lines = _emit_stmt(stmt, 0)
+    assert lines[0] == "let _lo = (self.ram[0x0020] as u16) + (!self.ram[0x0040] as u16) + 1;"
+
+
+def test_wide16_counts_as_lowered():
+    stmts = [_wide16("+"), ReturnStmt(src=SRC)]
+    lowered, deferred = lower_stats(_module([_routine(stmts)]))
+    assert (lowered, deferred) == (2, 0)
 
 
 # ---------------------------------------------------------------- symbolic address constants

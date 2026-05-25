@@ -36,10 +36,15 @@ branch — over a provisional `self.z` / `self.n` model (joining
   modeled (the lifter never tracks it: `bvc`/`bvs` surface as
   `Unsupported`), so `bit` writes only Z and N.
 
+It also lowers `Wide16Stmt` — the recognised 16-bit `add`/`subtract`
+idiom — to two chained byte ops over `u16`: the low byte's bit-8 feeds
+the high byte (subtract via the `src + ~op + 1` identity), then `A` and
+`C` take the high-byte result and carry-out, preserving both stores.
+
 Still deferred:
 * `StoreLocal` / `StoreOpVar`, `LocalRef` inc/dec — self-modifying code;
 * `Pha` / `Pla` — stack;
-* `Wide16Stmt`, `RawIfStmt`, `GotoStmt` / `LabelStmt`.
+* `RawIfStmt`, `GotoStmt` / `LabelStmt`.
 
 Memory model and receiver (`Cpu` / `self.ram` / `self.c` / `self.z` /
 `self.n`) remain provisional pending the Game/Renderer/Audio/Input
@@ -98,6 +103,7 @@ from .ir3 import (
     DoWhileStmt,
     ForStmt,
     IfStmt,
+    LabeledBlock,
     LoopStmt,
     MatchStmt,
     ModuleIR3,
@@ -109,6 +115,7 @@ from .ir3 import (
     RoutineIR3,
     SaveTemp,
     TailCallStmt,
+    Wide16Stmt,
 )
 
 INDENT = "    "
@@ -119,7 +126,7 @@ _LOWERED_TYPES = (
     IfStmt, LoopStmt, DoWhileStmt, ForStmt, RepeatStmt,
     BreakStmt, ContinueStmt, MatchStmt,
     CallStmt, TailCallStmt,
-    SaveTemp, RestoreTemp,
+    SaveTemp, RestoreTemp, Wide16Stmt, LabeledBlock,
 )
 
 
@@ -262,6 +269,17 @@ def _cmp_operand(item, syms: SymTable | None) -> str:
     if isinstance(item, CmpIndexed):
         return f"self.ram[{_abs_index(item.base, syms)} + self.{item.index} as usize]"
     return f"self.ram[{_indirect_index(item.source, syms)}]"  # CmpIndirect
+
+
+def _wide_term(operand, syms: SymTable | None, *, complement: bool) -> str:
+    """Render one byte operand of a `Wide16Stmt` as a `u16` term. With
+    `complement` (the subtract path), emit `!operand` at byte width so it
+    feeds the `src + ~op + carry` identity; an immediate is suffixed
+    `_u8` because a bare `!0xNN` would default to i32 and cast wrong."""
+    v = _emit_value(operand, syms)
+    if complement:
+        v = f"!{v}_u8" if isinstance(operand, Imm) else f"!{v}"
+    return f"({v} as u16)"
 
 
 def _emit_value(v, syms: SymTable | None = None) -> str:
@@ -423,7 +441,9 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         # 6502 SBC uses the A + ~operand + C identity so the borrow
         # convention (C=1 means "no borrow") falls out naturally.
         if isinstance(item, SbcImm):
-            rhs = f"(!{_emit_imm(item.imm)}) as u16"
+            # `_u8` forces the complement to byte width: a bare `!0xbd`
+            # defaults to i32 (`-190`) and casts to the wrong u16.
+            rhs = f"(!{_emit_imm(item.imm)}_u8) as u16"
         elif isinstance(item, SbcAbs):
             rhs = f"(!self.ram[{_abs_index(item.source, syms)}]) as u16"
         elif isinstance(item, SbcIndexed):
@@ -512,6 +532,27 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
     return None
 
 
+def _emit_wide16(stmt: Wide16Stmt, syms: SymTable | None) -> list[str]:
+    """Lower a 16-bit add/subtract to two chained byte ops (no
+    indentation). `_lo` carries the low-byte result; its bit-8 is the
+    carry into the high byte. Add uses a 0 carry-in (`clc`); subtract
+    uses the `src + ~op + 1` identity (`sec`), so both reduce to `+`.
+    Preserves the idiom's full effect: both stores, plus A = high byte
+    and C = high carry-out (Z/N are not modelled for add/sbc)."""
+    complement = stmt.op == "-"
+    lo_carry_in = " + 1" if complement else ""
+    return [
+        f"let _lo = {_wide_term(stmt.lo_src, syms, complement=False)}"
+        f" + {_wide_term(stmt.lo_op, syms, complement=complement)}{lo_carry_in};",
+        f"{_emit_target(stmt.lo_dst, syms)} = _lo as u8;",
+        f"let _hi = {_wide_term(stmt.hi_src, syms, complement=False)}"
+        f" + {_wide_term(stmt.hi_op, syms, complement=complement)} + (_lo >> 8);",
+        f"{_emit_target(stmt.hi_dst, syms)} = _hi as u8;",
+        "self.a = _hi as u8;",
+        "self.c = (_hi >> 8) as u8;",
+    ]
+
+
 # ---------------------------------------------------------------- statements
 
 
@@ -524,11 +565,22 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
             return [f"{pad}// TODO(pass4): store via {type(stmt.target).__name__}"]
         return [f"{pad}{place} = {_emit_value(stmt.source, syms)};"]
 
+    if isinstance(stmt, Wide16Stmt):
+        return [f"{pad}{line}" for line in _emit_wide16(stmt, syms)]
+
     if isinstance(stmt, ReturnStmt):
         return [f"{pad}return;"]
 
+    if isinstance(stmt, LabeledBlock):
+        lines = [f"{pad}{stmt.label}: {{"]
+        for s in stmt.body.stmts:
+            lines.extend(_emit_stmt(s, indent + 1, syms))
+        lines.append(f"{pad}}}")
+        return lines
+
     if isinstance(stmt, BreakStmt):
-        return [f"{pad}break;"]
+        target = f" {stmt.label}" if stmt.label else ""
+        return [f"{pad}break{target};"]
 
     if isinstance(stmt, ContinueStmt):
         return [f"{pad}continue;"]
@@ -654,11 +706,10 @@ _HEADER = [
     "//",
     "// Pass 4 skeleton slice: module + routine scaffolding with leaf-",
     "// expression, control-flow, data-movement, carry-arithmetic,",
-    "// `(ptr),y` indirect, and cmp/bit flag lowering. Flags are",
-    "// `self.c`/`self.z`/`self.n: u8` (provisional). SMC, the stack,",
-    "// `Wide16Stmt`, `RawIfStmt`, and `GotoStmt`/`LabelStmt` are",
-    "// deferred; they appear as `// raw: …` or `// TODO(pass4): …`",
-    "// comments.",
+    "// `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.",
+    "// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). SMC, the",
+    "// stack, `RawIfStmt`, and `GotoStmt`/`LabelStmt` are deferred; they",
+    "// appear as `// raw: …` or `// TODO(pass4): …` comments.",
     "// The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are",
     "// provisional, pending the state/trait design slice. RAM addresses",
     "// keep their source symbol names via the `sym` constants below.",

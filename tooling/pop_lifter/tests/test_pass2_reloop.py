@@ -522,3 +522,153 @@ def test_relooper_preserves_every_checkfloor_path(source_dir):
             f"IR3 differs from IR2 for action={action} posn={posn}: "
             f"ir2={touched2} ir3={touched3}"
         )
+
+
+# --------------------------------------------------------------- merge dedup
+
+
+def _flatten(stmts):
+    """Yield every statement in `stmts`, descending into if/loop bodies."""
+    for s in stmts:
+        yield s
+        for attr in ("then_block", "else_block", "body"):
+            blk = getattr(s, attr, None)
+            if blk is not None:
+                yield from _flatten(blk.stmts)
+
+
+def _diamond_module():
+    """A diamond: `if a == 1` taken→A, fall-through→B, both reconverging
+    at a shared tail T. The relooper's post-dominator merge should emit
+    T exactly once (in the continuation after an `if/else`), not inline
+    it into both arms."""
+    from pop_lifter.ir1 import Compare, Goto, Label, LoadAbs
+    from pop_lifter.ir1 import If as IR1If
+
+    src = SourceRef(file="syn", line=0, raw="")
+    M10 = Abs(name="m10", addr=0x10)
+    M11 = Abs(name="m11", addr=0x11)
+    INP = Abs(name="inp", addr=0x12)
+
+    def store(val, target):
+        return [
+            LoadImm(reg=Reg.A, imm=Imm(value=val, text=f"#{val}"), src=src),
+            StoreAbs(reg=Reg.A, target=target, src=src),
+        ]
+
+    body = [
+        # Load the dispatch value from memory so a test can drive both arms.
+        LoadAbs(reg=Reg.A, source=INP, src=src),
+        IR1If(cond=Compare(reg=Reg.A, op="==", rhs=Imm(value=1, text="#1")),
+              target=":taken", src=src),
+        # fall-through arm B
+        *store(0xB1, M10),
+        Goto(target=":merge", kind="local", src=src),
+        Label(name=":taken", src=src),
+        *store(0xA1, M10),
+        # implicit fall-through into :merge
+        Label(name=":merge", src=src),
+        *store(0xCC, M11),       # shared tail — must appear once
+        Return(src=src),
+    ]
+    return ModuleIR1(name="SYN", file="syn", routines=[Routine(name="diamond", body=body)])
+
+
+def test_postdom_merge_emits_shared_tail_once():
+    mod = _diamond_module()
+    ir2 = structure_module(mod)
+    ir3 = reloop_module(ir2)
+    diamond = ir3.find("diamond")
+
+    # The conditional must structure with a real else-block (the merge
+    # optimization fired) rather than inlining the continuation.
+    ifs = [s for s in diamond.body.stmts if isinstance(s, IfStmt)]
+    assert ifs and ifs[0].else_block is not None, (
+        "expected an if/else from the post-dominator merge"
+    )
+
+    # The shared tail store (mem[0x11] = #0xCC) must be emitted exactly
+    # once, not duplicated into both arms.
+    tail = [
+        s for s in _flatten(diamond.body.stmts)
+        if isinstance(s, RawStmt) and isinstance(s.item, StoreAbs)
+        and s.item.target.addr == 0x11
+    ]
+    assert len(tail) == 1, f"shared tail emitted {len(tail)} times, expected 1"
+
+
+def _three_way_merge_module():
+    """A 3-predecessor merge: `a==1`→M, `a==2`→M, else fall→M. M's body
+    must be emitted exactly once (the old walker inlined it per path),
+    here as a clean nested `if/else` since the merge is the tail."""
+    from pop_lifter.ir1 import Compare, Label, LoadAbs
+    from pop_lifter.ir1 import If as IR1If
+
+    src = SourceRef(file="syn", line=0, raw="")
+    SINK, OUT, INP = Abs(name="sink", addr=0x30), Abs(name="out", addr=0x31), Abs(name="inp", addr=0x32)
+
+    def mark(reg_val, target):
+        return [
+            LoadImm(reg=Reg.X, imm=Imm(value=reg_val, text=f"#{reg_val}"), src=src),
+            StoreAbs(reg=Reg.X, target=target, src=src),
+        ]
+
+    body = [
+        LoadAbs(reg=Reg.A, source=INP, src=src),
+        IR1If(cond=Compare(reg=Reg.A, op="==", rhs=Imm(value=1, text="#1")), target=":m", src=src),
+        *mark(0xB1, SINK),
+        IR1If(cond=Compare(reg=Reg.A, op="==", rhs=Imm(value=2, text="#2")), target=":m", src=src),
+        *mark(0xB2, SINK),
+        Label(name=":m", src=src),
+        *mark(0xCC, OUT),
+        Return(src=src),
+    ]
+    return ModuleIR1(name="SYN", file="syn", routines=[Routine(name="tri", body=body)])
+
+
+def test_three_way_merge_emitted_once():
+    mod = _three_way_merge_module()
+    ir3 = reloop_module(structure_module(mod))
+    tri = ir3.find("tri")
+    # M's distinctive store (out = #0xCC) is emitted exactly once — the
+    # dedup the relooper now guarantees (the old walker emitted it ~3x).
+    outs = [
+        s for s in _flatten(tri.body.stmts)
+        if isinstance(s, RawStmt) and isinstance(s.item, StoreAbs)
+        and s.item.target.addr == 0x31
+    ]
+    assert len(outs) == 1, f"merge tail emitted {len(outs)} times"
+
+
+def test_three_way_merge_preserves_behaviour():
+    mod = _three_way_merge_module()
+    ir2 = structure_module(mod)
+    ir3 = reloop_module(ir2)
+    for inp, exp_sink, exp_out in [(1, 0x00, 0xCC), (2, 0xB1, 0xCC), (5, 0xB2, 0xCC)]:
+        ram2 = bytearray(0x10000)
+        ram2[0x32] = inp
+        ir1_run([ir2], "tri", ram=ram2)
+        ram3 = bytearray(0x10000)
+        ram3[0x32] = inp
+        ir3_run([ir3], "tri", ram=ram3)
+        assert (ram3[0x30], ram3[0x31]) == (exp_sink, exp_out), f"ir3 wrong for inp={inp}"
+        assert ram2[0x30:0x32] == ram3[0x30:0x32], f"ir1/ir3 differ for inp={inp}"
+
+
+def test_postdom_merge_preserves_behaviour():
+    mod = _diamond_module()
+    ir2 = structure_module(mod)
+    ir3 = reloop_module(ir2)
+
+    # inp==1 exercises the taken arm (mem[0x10]=0xA1); any other value
+    # exercises the else arm (mem[0x10]=0xB1). Both share the tail
+    # mem[0x11]=0xCC. Check each against IR1 so neither arm regresses.
+    for inp, exp_m10 in [(1, 0xA1), (0, 0xB1), (7, 0xB1)]:
+        ram2 = bytearray(0x10000)
+        ram2[0x12] = inp
+        ir1_run([ir2], "diamond", ram=ram2)
+        ram3 = bytearray(0x10000)
+        ram3[0x12] = inp
+        ir3_run([ir3], "diamond", ram=ram3)
+        assert (ram3[0x10], ram3[0x11]) == (exp_m10, 0xCC), f"ir3 wrong for inp={inp}"
+        assert ram2[0x10:0x12] == ram3[0x10:0x12], f"ir1/ir3 differ for inp={inp}"

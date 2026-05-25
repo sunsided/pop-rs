@@ -32,6 +32,7 @@ IR_PILOT_FASTBLACK_SMC = REPO_ROOT / "ir" / "pilot" / "fastblack.smc.ir1"
 IR_PILOT_CHGSHADPOSN_LOOPS = REPO_ROOT / "ir" / "pilot" / "chgshadposn.loops.ir3"
 IR_PILOT_PAUSE_LOOPS = REPO_ROOT / "ir" / "pilot" / "pause.loops.ir3"
 IR_RAW = REPO_ROOT / "ir" / "raw"
+IR_RAW_RS = REPO_ROOT / "ir" / "raw-rs"
 
 PILOT_ENTRIES = [
     "DoStrike", "DoBlock", "DoTurn",
@@ -465,10 +466,19 @@ def _regen_cmpspace_match(source_dir: Path) -> str:
 
 
 def test_pass3_cmpspace_match_artifact_matches(source_dir):
-    """The CMPSPACE pass-3 pilot pins `match` recognition: four
-    `if a == K { a = 0 ; return }` arms with identical bodies collapse
-    into one `match` arm with four keys, while the trailing non-`==`
-    guard and the default `a = 1 ; return` stay put."""
+    """The CMPSPACE pass-3 pilot. CMPSPACE is a *shared-handler*
+    dispatch — four keys (`cmp K ; beq shared_tail`) all branch to one
+    `a = 0 ; return` tail. The relooper now dedupes that tail (emitting
+    it once), so the routine comes out as a negated `if a != K { … }`
+    chain rather than four `if a == K { a = 0 ; return }` arms.
+
+    `match` recognition keyed on the duplicated arm bodies, so it no
+    longer fires here: rebuilding the `match` requires re-duplicating
+    the shared handler, which is a separate follow-up to `pass3_match`.
+    Distinct-handler jump tables (each key → its own terminating
+    handler) still recognise as `match` — the structurer keeps those
+    flat. This pilot pins the current dedup'd (non-`match`) form until
+    the shared-handler recogniser lands."""
     if not IR_PILOT_CMPSPACE_MATCH.exists():
         raise AssertionError(
             f"missing artifact {IR_PILOT_CMPSPACE_MATCH}. regenerate with:\n"
@@ -671,5 +681,43 @@ def test_pass1_raw_artifacts_match(source_dir):
     stale = sorted(name for name, body in actual.items() if expected[name] != body)
     assert not stale, (
         f"{stale} are stale under {IR_RAW.relative_to(REPO_ROOT)}. "
+        f"regenerate with:\n{regen_cmd}"
+    )
+
+
+def test_pass4_emit_all_artifacts_match(source_dir):
+    """The full per-file pass-4 Rust sweep under `ir/raw-rs/` is the
+    whole-codebase view of what the emitter produces today. Its
+    SUMMARY.md lowered-% is the headline progress signal; every lifting
+    change must regenerate the tree so the diff records the change."""
+    from pop_lifter.cli import _emit_all_artifacts
+
+    if not IR_RAW_RS.is_dir():
+        raise AssertionError(
+            f"missing artifact dir {IR_RAW_RS}. regenerate with:\n"
+            f"  pop-lifter emit-all --out-dir {IR_RAW_RS.relative_to(REPO_ROOT)}"
+        )
+
+    actual = dict(_emit_all_artifacts(source_dir))
+    expected = {
+        p.name: p.read_text(encoding="utf-8")
+        for p in IR_RAW_RS.iterdir()
+        if p.suffix == ".rs" or p.name == "SUMMARY.md"
+    }
+
+    regen_cmd = f"  pop-lifter emit-all --out-dir {IR_RAW_RS.relative_to(REPO_ROOT)}"
+    extra_on_disk = set(expected) - set(actual)
+    missing_on_disk = set(actual) - set(expected)
+    assert not extra_on_disk, (
+        f"{sorted(extra_on_disk)} present in {IR_RAW_RS} but not in regen output. "
+        f"regenerate with:\n{regen_cmd}"
+    )
+    assert not missing_on_disk, (
+        f"{sorted(missing_on_disk)} produced by regen but not in {IR_RAW_RS}. "
+        f"regenerate with:\n{regen_cmd}"
+    )
+    stale = sorted(name for name, body in actual.items() if expected[name] != body)
+    assert not stale, (
+        f"{stale} are stale under {IR_RAW_RS.relative_to(REPO_ROOT)}. "
         f"regenerate with:\n{regen_cmd}"
     )

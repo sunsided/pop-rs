@@ -2,11 +2,10 @@
 //
 // Pass 4 skeleton slice: module + routine scaffolding with leaf-
 // expression, control-flow, data-movement, carry-arithmetic,
-// `(ptr),y` indirect, and cmp/bit flag lowering. Flags are
-// `self.c`/`self.z`/`self.n: u8` (provisional). SMC, the stack,
-// `Wide16Stmt`, `RawIfStmt`, and `GotoStmt`/`LabelStmt` are
-// deferred; they appear as `// raw: …` or `// TODO(pass4): …`
-// comments.
+// `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
+// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). SMC, the
+// stack, `RawIfStmt`, and `GotoStmt`/`LabelStmt` are deferred; they
+// appear as `// raw: …` or `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
