@@ -497,18 +497,72 @@ def test_break_and_continue():
 
 
 def test_do_while_stmt():
+    # A body that can fall through gets the bottom exit-guard.
     dw = DoWhileStmt(
-        body=Block.of([ReturnStmt(src=SRC)]),
+        body=Block.of([Assign(target=_abs("Y", 0x20), source=_imm(1), src=SRC)]),
         cond=Compare(reg=Reg.Y, op=">=0", rhs=None),
         src=SRC,
     )
     lines = _emit_stmt(dw, 0)
     assert lines[0] == "loop {"
-    assert lines[1] == "    return;"
+    assert lines[1] == "    self.mem[0x0020] = 0x01;"
     assert lines[2] == "    if !((self.reg.y as i8) >= 0) {"
     assert lines[3] == "        break;"
     assert lines[4] == "    }"
     assert lines[5] == "}"
+
+
+def test_do_while_diverging_body_drops_dead_guard():
+    # A body that always returns can't reach the bottom guard, so the
+    # guard is omitted (no unreachable code after the return).
+    dw = DoWhileStmt(
+        body=Block.of([ReturnStmt(src=SRC)]),
+        cond=Compare(reg=Reg.Y, op=">=0", rhs=None),
+        src=SRC,
+    )
+    assert _emit_stmt(dw, 0) == ["loop {", "    return;", "}"]
+
+
+def test_unreachable_statements_after_return_are_dropped():
+    # Statements after an unconditional return in a block aren't emitted.
+    body = Block.of([
+        ReturnStmt(src=SRC),
+        Assign(target=_abs("X", 0x20), source=_imm(1), src=SRC),  # dead
+    ])
+    lines = _emit_stmt(IfStmt(
+        cond=Compare(reg=Reg.A, op="==", rhs=_imm(0)),
+        then_block=body, else_block=None, src=SRC,
+    ), 0)
+    assert lines == ["if self.reg.a == 0x00 {", "    return;", "}"]
+
+
+def test_diverging_loop_makes_following_code_unreachable():
+    # A `loop {}` whose body always returns and never breaks diverges, so
+    # a statement after it is unreachable and dropped.
+    diverging_loop = DoWhileStmt(
+        body=Block.of([ReturnStmt(src=SRC)]),
+        cond=Compare(reg=Reg.Y, op=">=0", rhs=None),
+        src=SRC,
+    )
+    r = _routine([diverging_loop, ReturnStmt(src=SRC)], name="t")
+    lines = emit_routine(r)
+    # The trailing `return;` after the loop must not be emitted.
+    assert lines == [
+        "    fn t(&mut self) {",
+        "        loop {",
+        "            return;",
+        "        }",
+        "    }",
+    ]
+
+
+def test_loop_with_break_does_not_diverge():
+    # A loop body that breaks lets control fall through, so following code
+    # stays.
+    loopy = LoopStmt(body=Block.of([BreakStmt(src=SRC)]), src=SRC)
+    r = _routine([loopy, ReturnStmt(src=SRC)], name="t")
+    lines = emit_routine(r)
+    assert "        return;" in lines  # reachable after the breaking loop
 
 
 def test_for_stmt_down_counter():
