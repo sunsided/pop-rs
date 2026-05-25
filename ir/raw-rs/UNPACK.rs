@@ -255,7 +255,7 @@ impl Cpu {
                 }
                 16 => {
                     self.reg.x = 0x00;
-                    // raw: ??? lda (PAC,X)            ; UNPACK.S:184
+                    self.reg.a = self.mem[(self.mem[(sym::PAC + self.reg.x as usize) & 0xff] as usize | (self.mem[(sym::PAC + self.reg.x as usize + 1) & 0xff] as usize) << 8)];
                     self.mem[sym::VB] = self.reg.a;
                     let _o: u8 = self.mem[sym::V8];
                     self.flags.c = self.reg.a >= _o;
@@ -280,7 +280,7 @@ impl Cpu {
                     pc = 19;
                 }
                 19 => {
-                    // raw: ??? lda (PAC,X)            ; UNPACK.S:191
+                    self.reg.a = self.mem[(self.mem[(sym::PAC + self.reg.x as usize) & 0xff] as usize | (self.mem[(sym::PAC + self.reg.x as usize + 1) & 0xff] as usize) << 8)];
                     self.mem[sym::V9] = self.reg.a;
                     self.mem[sym::PAC] = self.mem[sym::PAC].wrapping_add(1);
                     if !self.flags.z {
@@ -294,7 +294,7 @@ impl Cpu {
                     pc = 21;
                 }
                 21 => {
-                    // raw: ??? lda (PAC,X)            ; UNPACK.S:196
+                    self.reg.a = self.mem[(self.mem[(sym::PAC + self.reg.x as usize) & 0xff] as usize | (self.mem[(sym::PAC + self.reg.x as usize + 1) & 0xff] as usize) << 8)];
                     self.mem[sym::VB] = self.reg.a;
                     self.mem[sym::PAC] = self.mem[sym::PAC].wrapping_add(1);
                     if !self.flags.z {

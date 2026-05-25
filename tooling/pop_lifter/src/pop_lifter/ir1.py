@@ -516,6 +516,18 @@ class IndirectY:
 
 
 @dataclass(frozen=True)
+class IndirectX:
+    """`(ptr,x)` pre-indexed indirect addressing. X is added to the
+    zero-page pointer *location* (with zero-page wrap), and the 16-bit
+    pointer fetched from `mem[(ptr+x) & 0xff]` (low) /
+    `mem[(ptr+x+1) & 0xff]` (high) is the effective address — no
+    post-indexing. Contrast `IndirectY`, which adds Y to the *fetched*
+    pointer. POP's UNPACK blitter uses the `lda (PAC,x)` form."""
+
+    ptr: Abs
+
+
+@dataclass(frozen=True)
 class LoadIndirect:
     """`lda (ptr),y` — load A from the post-indexed indirect address.
     Sets Z/N on the loaded byte. The 6502 only has the `lda` form
@@ -523,10 +535,13 @@ class LoadIndirect:
     we record it explicitly so the same `_affected_register` rule
     that handles `LoadAbs`/`LoadImm`/`LoadIndexed` also accepts this
     node — `lda (ptr),y ; beq L` fuses into `if a == 0 goto L`
-    exactly like the other loads."""
+    exactly like the other loads.
+
+    `source` is `IndirectY` for the `(ptr),y` form or `IndirectX` for the
+    pre-indexed `(ptr,x)` form."""
 
     reg: Reg
-    source: IndirectY
+    source: "IndirectY | IndirectX"
     src: SourceRef
 
 
@@ -1085,10 +1100,12 @@ def format_item(item: Item) -> str:
             f"   ; {item.src.short()}"
         )
     if isinstance(item, LoadIndirect):
-        return (
-            f"  {item.reg} = *({_fmt_abs(item.source.ptr)})[y]"
-            f"   ; {item.src.short()}"
+        idx = "x" if isinstance(item.source, IndirectX) else "y"
+        form = (
+            f"*({_fmt_abs(item.source.ptr)},x)" if idx == "x"
+            else f"*({_fmt_abs(item.source.ptr)})[y]"
         )
+        return f"  {item.reg} = {form}   ; {item.src.short()}"
     if isinstance(item, StoreIndirect):
         return (
             f"  *({_fmt_abs(item.target.ptr)})[y] = {item.reg}"

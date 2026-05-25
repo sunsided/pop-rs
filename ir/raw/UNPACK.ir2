@@ -73,7 +73,7 @@ fn SNGEXPAND {
   bit *VA@0x000a                ; UNPACK.S:181
   if mi goto :11       ; UNPACK.S:182
   x = #0x00                  ; UNPACK.S:183
-  ??? lda (PAC,X)            ; UNPACK.S:184
+  a = *(PAC@0x0000,x)   ; UNPACK.S:184
   *VB@0x000b = a            ; UNPACK.S:185
   cmp a, *V8@0x0008    ; UNPACK.S:186
   if a != *V8@0x0008 goto :10  ; UNPACK.S:187
@@ -81,13 +81,13 @@ fn SNGEXPAND {
   if ne goto :7       ; UNPACK.S:189
   *PAC+1@0x0001 += 1                         ; UNPACK.S:190
 :7:
-  ??? lda (PAC,X)            ; UNPACK.S:191
+  a = *(PAC@0x0000,x)   ; UNPACK.S:191
   *V9@0x0009 = a            ; UNPACK.S:192
   *PAC@0x0000 += 1                         ; UNPACK.S:193
   if ne goto :8       ; UNPACK.S:194
   *PAC+1@0x0001 += 1                         ; UNPACK.S:195
 :8:
-  ??? lda (PAC,X)            ; UNPACK.S:196
+  a = *(PAC@0x0000,x)   ; UNPACK.S:196
   *VB@0x000b = a            ; UNPACK.S:197
   *PAC@0x0000 += 1                         ; UNPACK.S:198
   if ne goto :9       ; UNPACK.S:199

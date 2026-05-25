@@ -58,6 +58,7 @@ from .ir1 import (
     Imm,
     IncTarget,
     IndexedAbs,
+    IndirectX,
     IndirectY,
     Label,
     LoadAbs,
@@ -352,6 +353,17 @@ def _resolve_indirect_y(ind: IndirectY, trace: Trace, ram: bytearray) -> int:
     lo = ram[base]
     hi = ram[(base + 1) & 0xffff]
     return (((hi << 8) | lo) + (trace.y & 0xff)) & 0xffff
+
+
+def _resolve_indirect_x(ind: IndirectX, trace: Trace, ram: bytearray) -> int:
+    """Compute the effective address for `(ptr,x)` pre-indexed indirect:
+    add X to the zero-page pointer location (with zero-page wrap), then
+    read the 16-bit pointer there. Both pointer bytes wrap in zero page,
+    matching the NMOS 6502."""
+    loc = (ind.ptr.addr + trace.x) & 0xff
+    lo = ram[loc]
+    hi = ram[(loc + 1) & 0xff]
+    return ((hi << 8) | lo) & 0xffff
 
 
 def _indexed_addr(ix: IndexedAbs, trace: Trace, src) -> int:
@@ -722,7 +734,10 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         _set_zn(trace, trace.a)
         return True
     if isinstance(item, LoadIndirect):
-        addr = _resolve_indirect_y(item.source, trace, ram)
+        if isinstance(item.source, IndirectX):
+            addr = _resolve_indirect_x(item.source, trace, ram)
+        else:
+            addr = _resolve_indirect_y(item.source, trace, ram)
         value = ram[addr]
         trace.a = value
         _set_zn(trace, value)

@@ -108,6 +108,7 @@ from .ir1 import (
     Imm,
     IncTarget,
     IndexedAbs,
+    IndirectX,
     IndirectY,
     LoadAbs,
     LoadImm,
@@ -381,6 +382,17 @@ def _indirect_index(iy: IndirectY, syms: SymTable | None) -> str:
     return f"({lo} as usize | ({hi} as usize) << 8) + self.reg.y as usize"
 
 
+def _indirect_x_index(ix: IndirectX, syms: SymTable | None) -> str:
+    """Render the `self.mem[<index>]` index for a `(ptr,x)` pre-indexed
+    effective address: add X to the zero-page pointer location (with
+    zero-page wrap) and fetch the 16-bit pointer there. No post-indexing
+    — the fetched pointer *is* the effective address."""
+    base = _abs_index(ix.ptr, syms)
+    loc = f"({base} + self.reg.x as usize) & 0xff"
+    loc1 = f"({base} + self.reg.x as usize + 1) & 0xff"
+    return f"(self.mem[{loc}] as usize | (self.mem[{loc1}] as usize) << 8)"
+
+
 def _cmp_operand(item, syms: SymTable | None) -> str:
     """Render the compared byte for a `cmp`/`cpx`/`cpy` atom as a u8
     r-value, across the immediate / absolute / indexed / indirect
@@ -528,7 +540,12 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         return [f"self.reg.{item.reg} = {place};"]
 
     if isinstance(item, LoadIndirect):
-        return [f"self.reg.{item.reg} = self.mem[{_indirect_index(item.source, syms)}];"]
+        idx = (
+            _indirect_x_index(item.source, syms)
+            if isinstance(item.source, IndirectX)
+            else _indirect_index(item.source, syms)
+        )
+        return [f"self.reg.{item.reg} = self.mem[{idx}];"]
 
     if isinstance(item, StoreAbs):
         return [f"self.mem[{_abs_index(item.target, syms)}] = self.reg.{item.reg};"]
