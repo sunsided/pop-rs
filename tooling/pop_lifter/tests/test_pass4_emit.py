@@ -686,6 +686,14 @@ def test_raw_sbc_imm_complement_is_byte_width():
     assert lines[0] == "let _r = (self.a as u16) + (!0xbd_u8) as u16 + (self.c as u16);"
 
 
+def test_raw_sbc_imm_opvar_complement_has_no_u8_suffix():
+    # An SMC opvar immediate is already a u8 field; complementing it must
+    # be `!self.smXCO`, not the invalid `!self.smXCO_u8`.
+    smc = Imm(value=0, text="#smXCO", opvar="smXCO")
+    lines = _emit_stmt(RawStmt(item=SbcImm(imm=smc, src=SRC)), 0)
+    assert lines[0] == "let _r = (self.a as u16) + (!self.smXCO) as u16 + (self.c as u16);"
+
+
 def test_indirect_high_byte_resolves_to_symbol():
     # The `ptr + 1` high byte must reuse the base's `sym::` const when the
     # low byte registers it, matching the `ztemp + 1` store form.
@@ -801,6 +809,21 @@ def test_wide16_memory_operand_not_u8_suffixed():
     )
     lines = _emit_stmt(stmt, 0)
     assert lines[0] == "let _lo = (self.ram[0x0020] as u16) + (!self.ram[0x0040] as u16) + 1;"
+
+
+def test_wide16_opvar_operand_complement_has_no_u8_suffix():
+    # A Wide16 subtract whose operand is an SMC opvar immediate must
+    # complement the u8 field directly (`!self.smXCO`), not `!self.smXCO_u8`.
+    smc = Imm(value=0, text="#smXCO", opvar="smXCO")
+    stmt = Wide16Stmt(
+        op="-",
+        lo_src=_abs("a", 0x20), hi_src=_abs("a+1", 0x21),
+        lo_op=smc, hi_op=_imm(0x33),
+        lo_dst=_abs("d", 0x30), hi_dst=_abs("d+1", 0x31),
+        src=SRC,
+    )
+    lines = _emit_stmt(stmt, 0)
+    assert lines[0] == "let _lo = (self.ram[0x0020] as u16) + (!self.smXCO as u16) + 1;"
 
 
 def test_wide16_counts_as_lowered():

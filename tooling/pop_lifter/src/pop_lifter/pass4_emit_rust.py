@@ -228,6 +228,18 @@ def _emit_imm(imm: Imm) -> str:
     return f"0x{imm.value & 0xff:02x}"
 
 
+def _imm_u8(imm: Imm) -> str:
+    """Render an immediate as a `u8`-typed expression safe to bitwise-
+    complement (`!`). A literal gets an explicit `_u8` suffix so `!`
+    complements at byte width (a bare `!0xNN` would default to `i32` and
+    cast wrong); an opvar immediate is already a `u8` field, so it's
+    returned as-is — appending `_u8` there would mangle the field name
+    into the invalid `self.<opvar>_u8`."""
+    if imm.opvar is not None:
+        return f"self.{_mangle(imm.opvar)}"
+    return f"0x{imm.value & 0xff:02x}_u8"
+
+
 # A symbolic name is a Rust-ident base with an optional `+N` / `-N`
 # offset (Merlin's `ztemp+1` form for a 16-bit pointer's high byte).
 _SYM_NAME_RE = re.compile(r"^(?P<base>[A-Za-z_][A-Za-z0-9_]*)(?P<off>[+-]\d+)?$")
@@ -358,11 +370,14 @@ def _cmp_operand(item, syms: SymTable | None) -> str:
 def _wide_term(operand, syms: SymTable | None, *, complement: bool) -> str:
     """Render one byte operand of a `Wide16Stmt` as a `u16` term. With
     `complement` (the subtract path), emit `!operand` at byte width so it
-    feeds the `src + ~op + carry` identity; an immediate is suffixed
-    `_u8` because a bare `!0xNN` would default to i32 and cast wrong."""
-    v = _emit_value(operand, syms)
+    feeds the `src + ~op + carry` identity. A literal immediate goes
+    through `_imm_u8` for an explicit byte-width complement; every other
+    operand (memory reads, opvar fields) is already `u8`, so a bare `!`
+    is correct."""
     if complement:
-        v = f"!{v}_u8" if isinstance(operand, Imm) else f"!{v}"
+        v = f"!{_imm_u8(operand)}" if isinstance(operand, Imm) else f"!{_emit_value(operand, syms)}"
+    else:
+        v = _emit_value(operand, syms)
     return f"({v} as u16)"
 
 
@@ -546,9 +561,10 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         # 6502 SBC uses the A + ~operand + C identity so the borrow
         # convention (C=1 means "no borrow") falls out naturally.
         if isinstance(item, SbcImm):
-            # `_u8` forces the complement to byte width: a bare `!0xbd`
-            # defaults to i32 (`-190`) and casts to the wrong u16.
-            rhs = f"(!{_emit_imm(item.imm)}_u8) as u16"
+            # `_imm_u8` forces a literal complement to byte width (a bare
+            # `!0xbd` defaults to i32 = -190 and casts to the wrong u16);
+            # an opvar immediate is already a u8 field, so no `_u8`.
+            rhs = f"(!{_imm_u8(item.imm)}) as u16"
         elif isinstance(item, SbcAbs):
             rhs = f"(!self.ram[{_abs_index(item.source, syms)}]) as u16"
         elif isinstance(item, SbcIndexed):
