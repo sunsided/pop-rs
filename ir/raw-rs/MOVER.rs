@@ -4,9 +4,9 @@
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
-// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
-// and the stack are deferred; they appear as `// raw: …` /
-// `// TODO(pass4): …` comments.
+// routines emit a `loop { match pc { ... } }` dispatch fallback; the
+// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
+// `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -280,7 +280,7 @@ impl Cpu {
         self.ram[(self.ram[sym::BlueSpec] as usize | (self.ram[sym::BlueSpec + 1] as usize) << 8) + self.y as usize] = self.a;
         self.x = 0xff;
         if (self.x as i8) < 0 {
-            self.]cont();
+            self._5dcont();
             return;
         }
         self.a = self.ram[(self.ram[sym::BlueSpec] as usize | (self.ram[sym::BlueSpec + 1] as usize) << 8) + self.y as usize];
@@ -580,7 +580,7 @@ impl Cpu {
         self.ram[sym::linkindex] = self.ram[sym::linkindex].wrapping_add(1);
         self.getlastflag();
         if self.z != 0 {
-            self.:loop();
+            self.trigger();
             return;
         }
         return;
@@ -1279,14 +1279,14 @@ impl Cpu {
         self.GETFLASKFRAME();
         self.a |= self.ram[sym::temp1];
         self.ram[sym::state] = self.a;
-        self.redflask();
+        self.redsword();
         return;
     }
 
     fn animsword(&mut self) {
         self.a = self.ram[sym::trscrn];
         if self.a != self.ram[sym::VisScrn] {
-            self.]purge();
+            self._5dpurge();
             return;
         }
         self.ram[sym::state] = self.ram[sym::state].wrapping_sub(1);
@@ -1312,13 +1312,13 @@ impl Cpu {
         }
         self.a = self.ram[sym::trscrn];
         if self.a != self.ram[sym::VisScrn] {
-            self.]purge();
+            self._5dpurge();
             return;
         }
         self.a = self.ram[sym::state];
         self.GETFLAMEFRAME();
         self.ram[sym::state] = self.a;
-        self.redtorch();
+        self.redexit();
         return;
     }
 
@@ -1547,7 +1547,7 @@ impl Cpu {
     fn check(&mut self) {
         self.a = self.ram[sym::trscrn];
         if self.a != self.ram[sym::VisScrn] {
-            self.]above();
+            self._5dabove();
             return;
         }
         self.y = self.ram[sym::trloc];
@@ -1558,7 +1558,7 @@ impl Cpu {
         self.a = self.ram[sym::trscrn];
         if self.a != self.ram[sym::VisScrn] {
             if self.a != self.ram[sym::scrnRight] {
-                self.]above();
+                self._5dabove();
                 return;
             }
             self.y = self.ram[sym::trloc];
@@ -1578,15 +1578,15 @@ impl Cpu {
         }
         match self.y {
             0x00 => {
-                self.]no();
+                self._5dno();
                 return;
             }
             0x0a => {
-                self.]no();
+                self._5dno();
                 return;
             }
             0x14 => {
-                self.]no();
+                self._5dno();
                 return;
             }
             _ => {}
@@ -1600,7 +1600,7 @@ impl Cpu {
             self.a = self.ram[sym::trscrn];
             if self.a != self.ram[sym::VisScrn] {
                 if self.a != self.ram[sym::scrnLeft] {
-                    self.]above();
+                    self._5dabove();
                     return;
                 }
                 self.y = self.ram[sym::trloc];
@@ -1643,7 +1643,7 @@ impl Cpu {
                     }
                     self.y = self.ram[sym::trloc];
                     if self.y != 0x09 {
-                        self.]no();
+                        self._5dno();
                         return;
                     }
                     self.y = 0x14;
@@ -1651,7 +1651,7 @@ impl Cpu {
                 }
                 self.y = self.ram[sym::trloc];
                 if self.y >= 0x09 {
-                    self.]no();
+                    self._5dno();
                     return;
                 }
                 self.a = self.y;
@@ -1669,7 +1669,7 @@ impl Cpu {
             }
             if self.y != 0x13 {
                 if self.y != 0x1d {
-                    self.]no();
+                    self._5dno();
                     return;
                 }
             }
@@ -1688,11 +1688,11 @@ impl Cpu {
         }
         match self.y {
             0x13 => {
-                self.]no();
+                self._5dno();
                 return;
             }
             0x1d => {
-                self.]no();
+                self._5dno();
                 return;
             }
             _ => {}
@@ -2220,7 +2220,7 @@ impl Cpu {
             self.x = 0x09;
             loop {
                 self.a = self.x;
-                // raw: push a                           ; MOVER.S:2133
+                self.stack.push(self.a);
                 self.ram[sym::tempblockx] = self.a;
                 self.rdblock1();
                 let _o: u8 = 0x0b;
@@ -2231,7 +2231,9 @@ impl Cpu {
                 } else {
                     self.shakeit();
                 }
-                // raw: a = pop                          ; MOVER.S:2142
+                self.a = self.stack.pop().expect("pla on empty stack");
+                self.z = (self.a == 0) as u8;
+                self.n = self.a >> 7;
                 self.x = self.a;
                 self.x = self.x.wrapping_sub(1);
                 if !((self.x as i8) >= 0) {
@@ -2246,7 +2248,7 @@ impl Cpu {
         self.x = 0x09;
         loop {
             self.a = self.x;
-            // raw: push a                           ; MOVER.S:2133
+            self.stack.push(self.a);
             self.ram[sym::tempblockx] = self.a;
             self.rdblock1();
             let _o: u8 = 0x0b;
@@ -2257,7 +2259,9 @@ impl Cpu {
             } else {
                 self.shakeit();
             }
-            // raw: a = pop                          ; MOVER.S:2142
+            self.a = self.stack.pop().expect("pla on empty stack");
+            self.z = (self.a == 0) as u8;
+            self.n = self.a >> 7;
             self.x = self.a;
             self.x = self.x.wrapping_sub(1);
             if !((self.x as i8) >= 0) {

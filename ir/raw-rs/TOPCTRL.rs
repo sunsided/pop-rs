@@ -4,9 +4,9 @@
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
-// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
-// and the stack are deferred; they appear as `// raw: …` /
-// `// TODO(pass4): …` comments.
+// routines emit a `loop { match pc { ... } }` dispatch fallback; the
+// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
+// `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -429,9 +429,9 @@ impl Cpu {
     }
 
     fn addchars(&mut self) {
-        self.:reflection();
-        self.:shadowman();
-        self.:kid();
+        self._3areflection();
+        self._3ashadowman();
+        self._3akid();
         self.checkmeters();
         return;
     }
@@ -660,7 +660,7 @@ impl Cpu {
             return;
         }
         self.a = self.ram[sym::CharPosn];
-        self.cold?();
+        self.cold_3f();
         if self.z == 0 {
             return;
         }
@@ -969,7 +969,7 @@ impl Cpu {
         return;
     }
 
-    fn static?(&mut self) {
+    fn static_3f(&mut self) {
         if self.a != 0x00 {
             if self.a != 0x0f {
                 if self.a != 0xe5 {
@@ -994,7 +994,7 @@ impl Cpu {
         return;
     }
 
-    fn cold?(&mut self) {
+    fn cold_3f(&mut self) {
         if self.a != 0xb9 {
             if self.a != 0xb1 {
                 if self.a != 0xb2 {
@@ -1119,12 +1119,12 @@ impl Cpu {
         return;
     }
 
-    fn :reflection(&mut self) {
+    fn _3areflection(&mut self) {
         self.reflection();
         return;
     }
 
-    fn :shadowman(&mut self) {
+    fn _3ashadowman(&mut self) {
         self.a = self.ram[sym::ShadFace];
         if self.a == 0x56 {
             return;
@@ -1144,7 +1144,7 @@ impl Cpu {
         return;
     }
 
-    fn :kid(&mut self) {
+    fn _3akid(&mut self) {
         self.a = self.ram[sym::KidScrn];
         if self.a == 0x00 {
             return;

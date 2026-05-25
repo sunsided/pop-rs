@@ -4,9 +4,9 @@
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
-// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
-// and the stack are deferred; they appear as `// raw: …` /
-// `// TODO(pass4): …` comments.
+// routines emit a `loop { match pc { ... } }` dispatch fallback; the
+// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
+// `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -68,7 +68,7 @@ impl Cpu {
             if self.a == 0x00 {
             } else {
                 self.ram[0x0027] = self.a;
-                self.$005c();
+                self._24005c();
             }
             self.ram[sym::sector] = self.ram[sym::sector].wrapping_sub(1);
             if self.z != 0 {
@@ -76,7 +76,7 @@ impl Cpu {
             }
         }
         self.a = self.ram[sym::SLOT];
-        self.$900();
+        self._24900();
         return;
     }
 
@@ -92,7 +92,7 @@ impl Cpu {
         self.rw18();
         self.rw18();
         self.rw18();
-        self.$ee00();
+        self._24ee00();
         return;
     }
 
@@ -144,7 +144,7 @@ impl Cpu {
                 break;
             }
         }
-        self.$180();
+        self._24180();
         if self.c != 0 {
             self.NOT128K();
             return;
@@ -169,7 +169,7 @@ impl Cpu {
                 1 => {
                     self.a = self.ram[sym::MEMTEXT + self.y as usize];
                     if self.a == 0x00 {
-                        self.*();
+                        self._2a();
                         return;
                     } else {
                         pc = 2;

@@ -4,9 +4,9 @@
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
-// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
-// and the stack are deferred; they appear as `// raw: …` /
-// `// TODO(pass4): …` comments.
+// routines emit a `loop { match pc { ... } }` dispatch fallback; the
+// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
+// `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -538,7 +538,7 @@ impl Cpu {
                             }
                         }
                     }
-                    self.gatebarr?();
+                    self.gatebarr_3f();
                     if self.c != 0 {
                         break 'b13;
                     }
@@ -694,7 +694,7 @@ impl Cpu {
     }
 
     // aliases: BumpSound
-    fn :smackwall(&mut self) {
+    fn _3asmackwall(&mut self) {
         self.ram[sym::alertguard] = 0x01;
         self.a = 0x0d;
         self.addsound();
@@ -801,7 +801,7 @@ impl Cpu {
                             }
                             self.a = 0x2f;
                             self.jumpseq();
-                            self.BumpSound();
+                            self._3asmackwall();
                             self.animchar();
                             return;
                         }
@@ -811,7 +811,7 @@ impl Cpu {
             }
             self.jumpseq();
             self.animchar();
-            self.BumpSound();
+            self._3asmackwall();
             return;
         }
         self.a = 0xfb;
@@ -1011,7 +1011,7 @@ impl Cpu {
                     }
                 }
                 20 => {
-                    self.gatebarr?();
+                    self.gatebarr_3f();
                     if self.c != 0 {
                         pc = 24;
                     } else {
@@ -1104,7 +1104,7 @@ impl Cpu {
             self.z = (self.a == _o) as u8;
             self.n = self.a.wrapping_sub(_o) >> 7;
             if self.a == 0x04 {
-                self.gatebarr?();
+                self.gatebarr_3f();
                 if self.c != 0 {
                     break 'b5;
                 }
@@ -1183,7 +1183,7 @@ impl Cpu {
                     self.getseq();
                     self.addcharx();
                     self.ram[sym::CharX] = self.a;
-                    self.:next();
+                    self.ANIMCHAR();
                     return;
                 }
                 2 => {
@@ -1204,7 +1204,7 @@ impl Cpu {
                     self.a = _r as u8;
                     self.c = (_r >> 8) as u8;
                     self.ram[sym::CharY] = self.a;
-                    self.:next();
+                    self.ANIMCHAR();
                     return;
                 }
                 4 => {
@@ -1222,7 +1222,7 @@ impl Cpu {
                     self.a = self.ram[sym::CharFace];
                     self.a ^= 0xff;
                     self.ram[sym::CharFace] = self.a;
-                    self.:next();
+                    self.ANIMCHAR();
                     return;
                 }
                 6 => {
@@ -1238,12 +1238,14 @@ impl Cpu {
                 }
                 7 => {
                     self.getseq();
-                    // raw: push a                           ; COLL.S:1036
+                    self.stack.push(self.a);
                     self.getseq();
                     self.ram[sym::CharSeq + 1] = self.a;
-                    // raw: a = pop                          ; COLL.S:1041
+                    self.a = self.stack.pop().expect("pla on empty stack");
+                    self.z = (self.a == 0) as u8;
+                    self.n = self.a >> 7;
                     self.ram[sym::CharSeq] = self.a;
-                    self.:next();
+                    self.ANIMCHAR();
                     return;
                 }
                 8 => {
@@ -1260,7 +1262,7 @@ impl Cpu {
                 9 => {
                     self.ram[sym::CharBlockY] = self.ram[sym::CharBlockY].wrapping_sub(1);
                     self.addslicers();
-                    self.:next();
+                    self.ANIMCHAR();
                     return;
                 }
                 10 => {
@@ -1277,7 +1279,7 @@ impl Cpu {
                 11 => {
                     self.ram[sym::CharBlockY] = self.ram[sym::CharBlockY].wrapping_add(1);
                     self.addslicers();
-                    self.:next();
+                    self.ANIMCHAR();
                     return;
                 }
                 12 => {
@@ -1294,7 +1296,7 @@ impl Cpu {
                 13 => {
                     self.getseq();
                     self.ram[sym::CharAction] = self.a;
-                    self.:next();
+                    self.ANIMCHAR();
                     return;
                 }
                 14 => {
@@ -1313,7 +1315,7 @@ impl Cpu {
                     self.ram[sym::CharXVel] = self.a;
                     self.getseq();
                     self.ram[sym::CharYVel] = self.a;
-                    self.:next();
+                    self.ANIMCHAR();
                     return;
                 }
                 16 => {
@@ -1338,7 +1340,7 @@ impl Cpu {
                 18 => {
                     self.getseq();
                     self.getseq();
-                    self.:next();
+                    self.ANIMCHAR();
                     return;
                 }
                 19 => {
@@ -1353,7 +1355,7 @@ impl Cpu {
                     }
                 }
                 20 => {
-                    self.:next();
+                    self.ANIMCHAR();
                     return;
                 }
                 21 => {
@@ -1370,7 +1372,7 @@ impl Cpu {
                 22 => {
                     self.a = 0x01;
                     self.ram[sym::jarabove] = self.a;
-                    self.:next();
+                    self.ANIMCHAR();
                     return;
                 }
                 23 => {
@@ -1387,7 +1389,7 @@ impl Cpu {
                 24 => {
                     self.a = 0xff;
                     self.ram[sym::jarabove] = self.a;
-                    self.:next();
+                    self.ANIMCHAR();
                     return;
                 }
                 25 => {
@@ -1435,7 +1437,7 @@ impl Cpu {
                 30 => {
                     self.a = 0x01;
                     self.ram[sym::alertguard] = self.a;
-                    self.:next();
+                    self.ANIMCHAR();
                     return;
                 }
                 31 => {
@@ -1458,7 +1460,7 @@ impl Cpu {
                     }
                 }
                 33 => {
-                    self.:next();
+                    self.ANIMCHAR();
                     return;
                 }
                 34 => {
@@ -1474,7 +1476,7 @@ impl Cpu {
                 }
                 35 => {
                     self.GoneUpstairs();
-                    self.:next();
+                    self.ANIMCHAR();
                     return;
                 }
                 36 => {
@@ -1505,7 +1507,7 @@ impl Cpu {
                     pc = 39;
                 }
                 39 => {
-                    self.:next();
+                    self.ANIMCHAR();
                     return;
                 }
                 40 => {
@@ -1653,7 +1655,7 @@ impl Cpu {
 
     fn CHECKSLICE2(&mut self) {
         self.getunderft();
-        self.:slice?();
+        self._3aslice_3f();
         if self.c != 0 {
             return;
         }
@@ -1686,7 +1688,7 @@ impl Cpu {
                     if self.a >= self.ram[sym::CDLeftEj] {
                         if self.z == 0 {
                             self.rdblock1();
-                            self.]slice();
+                            self._3aslice();
                             return;
                         }
                     }
@@ -1723,13 +1725,13 @@ impl Cpu {
         if self.a != 0xff {
             return;
         }
-        self.gatebarr?();
+        self.gatebarr_3f();
         if self.c != 0 {
             return;
         }
         'b12: {
             'b11: {
-                self.BumpSound();
+                self._3asmackwall();
                 self.a = self.ram[sym::tempblockx];
                 self.ram[sym::collX] = self.a;
                 self.getunderft();
@@ -1758,7 +1760,7 @@ impl Cpu {
         return;
     }
 
-    fn gatebarr?(&mut self) {
+    fn gatebarr_3f(&mut self) {
         self.a = self.ram[(self.ram[sym::BlueSpec] as usize | (self.ram[sym::BlueSpec + 1] as usize) << 8) + self.y as usize];
         self.c = self.a & 1;
         self.a = self.a.wrapping_shr(1);
@@ -1817,7 +1819,7 @@ impl Cpu {
                     self.z = (self.a == _o) as u8;
                     self.n = self.a.wrapping_sub(_o) >> 7;
                     if self.a == 0x04 {
-                        self.gatebarr?();
+                        self.gatebarr_3f();
                         if self.c == 0 {
                             break 'b13;
                         }
@@ -1840,7 +1842,7 @@ impl Cpu {
                         if self.a != 0x04 {
                             return;
                         }
-                        self.gatebarr?();
+                        self.gatebarr_3f();
                         if self.c != 0 {
                             return;
                         }
@@ -1924,7 +1926,7 @@ impl Cpu {
         return;
     }
 
-    fn :slice?(&mut self) {
+    fn _3aslice_3f(&mut self) {
         if self.a == 0x12 {
             self.a = self.ram[(self.ram[sym::BlueSpec] as usize | (self.ram[sym::BlueSpec + 1] as usize) << 8) + self.y as usize];
             self.a &= 0x7f;
@@ -1952,7 +1954,7 @@ impl Cpu {
                     if self.a >= self.ram[sym::CDLeftEj] {
                         if self.z == 0 {
                             self.rdblock1();
-                            self.]slice();
+                            self._3aslice();
                             self.c = 1;
                             return;
                         }
@@ -1965,7 +1967,7 @@ impl Cpu {
     }
 
     // aliases: ]slice
-    fn :slice(&mut self) {
+    fn _3aslice(&mut self) {
         self.a = self.ram[(self.ram[sym::BlueSpec] as usize | (self.ram[sym::BlueSpec + 1] as usize) << 8) + self.y as usize];
         self.a |= 0x80;
         self.ram[(self.ram[sym::BlueSpec] as usize | (self.ram[sym::BlueSpec + 1] as usize) << 8) + self.y as usize] = self.a;

@@ -4,9 +4,9 @@
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
-// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
-// and the stack are deferred; they appear as `// raw: …` /
-// `// TODO(pass4): …` comments.
+// routines emit a `loop { match pc { ... } }` dispatch fallback; the
+// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
+// `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -358,7 +358,7 @@ impl Cpu {
                 self.z = (self.a == _o) as u8;
                 self.n = self.a.wrapping_sub(_o) >> 7;
                 if self.a != 0x01 {
-                    self.:1b();
+                    self._3a1b();
                     return;
                 }
                 self.restart();
@@ -883,7 +883,7 @@ impl Cpu {
                     pc = 1;
                 }
                 1 => {
-                    self.:sub();
+                    self._3asub();
                     self.x = self.ram[0x00f0];
                     let _o: u8 = 0x08;
                     self.c = (self.x >= _o) as u8;
@@ -933,9 +933,9 @@ impl Cpu {
                     self.a = self.ram[sym::fredbuf + 1 + self.y as usize];
                     self.ram[sym::BOTCUT] = self.a;
                     self.a = self.y;
-                    // raw: push a                           ; SPECIALK.S:1084
+                    self.stack.push(self.a);
                     self.unindex();
-                    // raw: push a                           ; SPECIALK.S:1087
+                    self.stack.push(self.a);
                     self.a = self.x;
                     self.x = self.ram[0x00f0];
                     self.y = self.a;
@@ -947,7 +947,9 @@ impl Cpu {
                     self.ram[sym::torchy + self.x as usize] = self.a;
                     self.a = self.ram[sym::BOTCUT];
                     self.ram[sym::torchclip + self.x as usize] = self.a;
-                    // raw: a = pop                          ; SPECIALK.S:1097
+                    self.a = self.stack.pop().expect("pla on empty stack");
+                    self.z = (self.a == 0) as u8;
+                    self.n = self.a >> 7;
                     self.c = 0;
                     let _r = (self.a as u16) + (0x01) as u16 + (self.c as u16);
                     self.a = _r as u8;
@@ -968,7 +970,9 @@ impl Cpu {
                     self.c = self.a >> 7;
                     self.a = self.a.wrapping_shl(1);
                     self.ram[sym::torchx + self.x as usize] = self.a;
-                    // raw: a = pop                          ; SPECIALK.S:1106
+                    self.a = self.stack.pop().expect("pla on empty stack");
+                    self.z = (self.a == 0) as u8;
+                    self.n = self.a >> 7;
                     self.y = self.a;
                     self.a = self.ram[(self.ram[sym::BlueSpec] as usize | (self.ram[sym::BlueSpec + 1] as usize) << 8) + self.y as usize];
                     self.ram[sym::torchstate + self.x as usize] = self.a;
@@ -1027,7 +1031,7 @@ impl Cpu {
         // raw: patch *:sm1+1 = a            ; SPECIALK.S:1179
         self.a = 0x04;
         // raw: patch *:sm2+1 = a            ; SPECIALK.S:1181
-        self.:sub();
+        self._3asub();
         self.ram[sym::MinLeft] = self.y;
         let _o: u8 = 0x02;
         self.c = (self.y >= _o) as u8;
@@ -1042,7 +1046,7 @@ impl Cpu {
         // raw: patch *:sm1+1 = a            ; SPECIALK.S:1195
         self.a = 0x00;
         // raw: patch *:sm2+1 = a            ; SPECIALK.S:1197
-        self.:sub();
+        self._3asub();
         self.ram[sym::SecLeft] = self.y;
         return;
     }
@@ -1367,7 +1371,7 @@ impl Cpu {
         return;
     }
 
-    fn :sub(&mut self) {
+    fn _3asub(&mut self) {
         let mut pc: u32 = 0;
         loop {
             match pc {

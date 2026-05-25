@@ -4,9 +4,9 @@
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
-// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
-// and the stack are deferred; they appear as `// raw: …` /
-// `// TODO(pass4): …` comments.
+// routines emit a `loop { match pc { ... } }` dispatch fallback; the
+// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
+// `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -531,7 +531,7 @@ impl Cpu {
         }
         self.a = self.ram[sym::YScrPos];
         if self.a < 0xc0 {
-            self.:Loop();
+            self.ExpandClm();
             return;
         }
         return;
@@ -635,7 +635,7 @@ impl Cpu {
             match pc {
                 0 => {
                     self.ram[sym::PAGE2off] = self.a;
-                    self.]DE();
+                    self._5dDE();
                     return;
                 }
                 _ => unreachable!(),
@@ -654,16 +654,20 @@ impl Cpu {
                 }
                 1 => {
                     self.a = self.ram[sym::YLO + self.x as usize];
-                    // raw: push a                           ; UNPACK.S:547
+                    self.stack.push(self.a);
                     self.a = self.ram[sym::YLO + self.y as usize];
                     self.ram[sym::YLO + self.x as usize] = self.a;
-                    // raw: a = pop                          ; UNPACK.S:550
+                    self.a = self.stack.pop().expect("pla on empty stack");
+                    self.z = (self.a == 0) as u8;
+                    self.n = self.a >> 7;
                     self.ram[sym::YLO + self.y as usize] = self.a;
                     self.a = self.ram[sym::YHI + self.x as usize];
-                    // raw: push a                           ; UNPACK.S:554
+                    self.stack.push(self.a);
                     self.a = self.ram[sym::YHI + self.y as usize];
                     self.ram[sym::YHI + self.x as usize] = self.a;
-                    // raw: a = pop                          ; UNPACK.S:557
+                    self.a = self.stack.pop().expect("pla on empty stack");
+                    self.z = (self.a == 0) as u8;
+                    self.n = self.a >> 7;
                     self.ram[sym::YHI + self.y as usize] = self.a;
                     self.x = self.x.wrapping_sub(1);
                     self.y = self.y.wrapping_add(1);

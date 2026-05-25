@@ -4,9 +4,9 @@
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
-// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
-// and the stack are deferred; they appear as `// raw: …` /
-// `// TODO(pass4): …` comments.
+// routines emit a `loop { match pc { ... } }` dispatch fallback; the
+// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
+// `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -1661,12 +1661,14 @@ impl Cpu {
     fn GETSEQ(&mut self) {
         self.y = 0x00;
         self.a = self.ram[(self.ram[sym::CharSeq] as usize | (self.ram[sym::CharSeq + 1] as usize) << 8) + self.y as usize];
-        // raw: push a                           ; CTRLSUBS.S:1632
+        self.stack.push(self.a);
         self.ram[sym::CharSeq] = self.ram[sym::CharSeq].wrapping_add(1);
         if self.z != 0 {
             self.ram[sym::CharSeq + 1] = self.ram[sym::CharSeq + 1].wrapping_add(1);
         }
-        // raw: a = pop                          ; CTRLSUBS.S:1638
+        self.a = self.stack.pop().expect("pla on empty stack");
+        self.z = (self.a == 0) as u8;
+        self.n = self.a >> 7;
         return;
     }
 
@@ -1729,7 +1731,7 @@ impl Cpu {
 
     fn MARKRED(&mut self) {
         if self.c != 0 {
-            self.]os();
+            self._5dos();
             return;
         }
         self.ram[sym::redbuf + self.y as usize] = self.a;
@@ -1749,7 +1751,7 @@ impl Cpu {
             return;
         }
         'b4: {
-            // raw: push a                           ; CTRLSUBS.S:1746
+            self.stack.push(self.a);
             self.a = self.ram[sym::wipebuf + self.y as usize];
             if self.a != 0x00 {
                 self.a = self.ram[sym::height];
@@ -1764,14 +1766,16 @@ impl Cpu {
             self.a = self.ram[sym::height];
             self.ram[sym::whitebuf + self.y as usize] = self.a;
         }
-        // raw: a = pop                          ; CTRLSUBS.S:1754
+        self.a = self.stack.pop().expect("pla on empty stack");
+        self.z = (self.a == 0) as u8;
+        self.n = self.a >> 7;
         self.ram[sym::wipebuf + self.y as usize] = self.a;
         return;
     }
 
     fn MARKMOVE(&mut self) {
         if self.c != 0 {
-            self.]os();
+            self._5dos();
             return;
         }
         self.ram[sym::movebuf + self.y as usize] = self.a;
@@ -1780,7 +1784,7 @@ impl Cpu {
 
     fn MARKFLOOR(&mut self) {
         if self.c != 0 {
-            self.]os();
+            self._5dos();
             return;
         }
         self.ram[sym::floorbuf + self.y as usize] = self.a;
@@ -1789,7 +1793,7 @@ impl Cpu {
 
     fn MARKHALF(&mut self) {
         if self.c != 0 {
-            self.]os();
+            self._5dos();
             return;
         }
         self.ram[sym::halfbuf + self.y as usize] = self.a;

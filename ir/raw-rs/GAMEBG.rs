@@ -4,9 +4,9 @@
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
-// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
-// and the stack are deferred; they appear as `// raw: …` /
-// `// TODO(pass4): …` comments.
+// routines emit a `loop { match pc { ... } }` dispatch fallback; the
+// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
+// `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -480,7 +480,7 @@ impl Cpu {
                 11 => {
                     self.a = 0x88;
                     self.y = 0x01;
-                    self.:draw();
+                    self._3adraw();
                     pc = 12;
                 }
                 12 => {
@@ -488,7 +488,7 @@ impl Cpu {
                 }
                 13 => {
                     self.a = self.ram[sym::bline - 1 + self.y as usize];
-                    self.:draw();
+                    self._3adraw();
                     pc = 2;
                 }
                 14 => {
@@ -530,7 +530,7 @@ impl Cpu {
                     }
                 }
                 18 => {
-                    self.:drawimg();
+                    self._3adrawimg();
                     self.ram[sym::xsave] = self.ram[sym::xsave].wrapping_add(1);
                     if self.z == 0 {
                         pc = 17;
@@ -717,7 +717,7 @@ impl Cpu {
                 }
                 17 => {
                     self.a = self.ram[sym::bline - 1 + self.y as usize];
-                    self.:draw();
+                    self._3adraw();
                     pc = 7;
                 }
                 18 => {
@@ -872,7 +872,7 @@ impl Cpu {
         self.ram[sym::YCO] = self.ram[sym::stary + self.x as usize];
         self.ram[sym::IMAGE] = self.ram[sym::stari + self.x as usize];
         self.ram[sym::OPACITY] = 0x03;
-        self.]setch6();
+        self._5dsetch6();
         self.fastlay();
         self.a = self.ram[sym::PAGE];
         self.a ^= 0x20;
@@ -889,7 +889,7 @@ impl Cpu {
         self.ram[sym::YCO] = 0x98;
         self.ram[sym::IMAGE] = 0x0c;
         self.ram[sym::OPACITY] = 0x01;
-        self.]setch6();
+        self._5dsetch6();
         self.addfore();
         return;
     }
@@ -899,7 +899,7 @@ impl Cpu {
         self.ram[sym::YCO] = 0x97;
         self.ram[sym::IMAGE] = self.ram[sym::glassimg + self.x as usize];
         self.ram[sym::OPACITY] = 0x02;
-        self.]setch6();
+        self._5dsetch6();
         self.addback();
         return;
     }
@@ -971,7 +971,7 @@ impl Cpu {
         self.ram[sym::OFFSET] = 0x00;
         self.ram[sym::YCO] = 0x95;
         self.ram[sym::OPACITY] = 0x02;
-        self.]setch6();
+        self._5dsetch6();
         self.lay();
         return;
     }
@@ -1004,7 +1004,7 @@ impl Cpu {
 
     fn SETUPCOMIX(&mut self) {
         self.saveFChar();
-        self.:sub();
+        self._3asub();
         self.restoreFChar();
         return;
     }
@@ -1093,7 +1093,7 @@ impl Cpu {
         return;
     }
 
-    fn :draw(&mut self) {
+    fn _3adraw(&mut self) {
         self.ram[sym::IMAGE] = self.a;
         self.x = self.ram[sym::xsave];
         self.a = self.y;
@@ -1109,7 +1109,7 @@ impl Cpu {
         return;
     }
 
-    fn :drawimg(&mut self) {
+    fn _3adrawimg(&mut self) {
         self.ram[sym::XCO] = self.ram[sym::OppStrX + self.x as usize];
         self.a = self.ram[sym::OppStrOFF + self.x as usize];
         self.ram[sym::OFFSET] = self.a;
@@ -1117,14 +1117,14 @@ impl Cpu {
         return;
     }
 
-    fn ]setch6(&mut self) {
+    fn _5dsetch6(&mut self) {
         self.ram[sym::TABLE] = 0x00;
         self.a = 0x60;
         self.ram[sym::TABLE + 1] = self.a;
         return;
     }
 
-    fn :sub(&mut self) {
+    fn _3asub(&mut self) {
         'b11: {
             'b10: {
                 'b8: {

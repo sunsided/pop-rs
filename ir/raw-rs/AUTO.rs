@@ -4,9 +4,9 @@
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
-// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
-// and the stack are deferred; they appear as `// raw: …` /
-// `// TODO(pass4): …` comments.
+// routines emit a `loop { match pc { ... } }` dispatch fallback; the
+// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
+// `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -235,8 +235,8 @@ impl Cpu {
         if self.a >= 0x80 {
             return;
         }
-        self.DoPress();
-        self.DoFwd();
+        self.DoStrike();
+        self.DoAdvance();
         return;
     }
 
@@ -284,7 +284,7 @@ impl Cpu {
             self.VanishChar();
             return;
         }
-        self.DoFwd();
+        self.DoAdvance();
         return;
     }
 
@@ -321,7 +321,7 @@ impl Cpu {
                 self.EnGarde();
                 return;
             }
-            self.DoDown();
+            self.DoTurn();
             return;
         }
         self.a = self.ram[sym::OpSword];
@@ -349,12 +349,12 @@ impl Cpu {
                     self.a = self.ram[sym::OpPosn];
                     if self.a >= 0x03 {
                         if self.a < 0x0f {
-                            self.DoFwd();
+                            self.DoAdvance();
                             return;
                         }
                         if self.a >= 0x7f {
                             if self.a < 0x85 {
-                                self.DoFwd();
+                                self.DoAdvance();
                                 return;
                             }
                         }
@@ -379,7 +379,7 @@ impl Cpu {
         if self.n == 0 {
             return;
         }
-        self.DoBack();
+        self.DoRetreat();
         return;
     }
 
@@ -877,20 +877,20 @@ impl Cpu {
 
     fn DoStandup(&mut self) {
         self.ram[sym::clrU] = 0xff;
-        self.DoBack();
+        self.DoRetreat();
         return;
     }
 
     // aliases: DoRunaway
     fn DoDropguard(&mut self) {
         self.ram[sym::clrD] = 0xff;
-        self.DoBack();
+        self.DoRetreat();
         return;
     }
 
     fn DoEngarde(&mut self) {
         self.ram[sym::clrD] = 0xff;
-        self.DoFwd();
+        self.DoAdvance();
         return;
     }
 
@@ -1117,7 +1117,7 @@ impl Cpu {
                 self.z = (self.a == _o) as u8;
                 self.n = self.a.wrapping_sub(_o) >> 7;
                 if self.a == 0x01 {
-                    self.DoFwd();
+                    self.DoAdvance();
                     return;
                 }
                 let _o: u8 = 0x02;
@@ -1125,7 +1125,7 @@ impl Cpu {
                 self.z = (self.a == _o) as u8;
                 self.n = self.a.wrapping_sub(_o) >> 7;
                 if self.a == 0x02 {
-                    self.DoBack();
+                    self.DoRetreat();
                     return;
                 }
                 let _o: u8 = 0x03;
@@ -1143,8 +1143,8 @@ impl Cpu {
                         self.z = (self.a == _o) as u8;
                         self.n = self.a.wrapping_sub(_o) >> 7;
                         if self.a == 0x05 {
-                            self.DoUp();
-                            self.DoFwd();
+                            self.DoBlock();
+                            self.DoAdvance();
                             return;
                         }
                         let _o: u8 = 0x06;
@@ -1152,7 +1152,7 @@ impl Cpu {
                         self.z = (self.a == _o) as u8;
                         self.n = self.a.wrapping_sub(_o) >> 7;
                         if self.a == 0x06 {
-                            self.DoPress();
+                            self.DoStrike();
                             return;
                         }
                         let _o: u8 = 0x07;
@@ -1218,7 +1218,7 @@ impl Cpu {
     }
 
     // aliases: CUTCHECK
-    fn :endpb(&mut self) {
+    fn _3aendpb(&mut self) {
         self.a = self.ram[sym::CUTTIMER];
         if self.a == 0x00 {
             self.LoadKid();
@@ -2055,7 +2055,7 @@ impl Cpu {
     }
 
     // aliases: AddNormalGd
-    fn :not5(&mut self) {
+    fn _3anot5(&mut self) {
         self.x = self.ram[sym::VisScrn];
         self.a = self.ram[sym::GdStartBlock - 1 + self.x as usize];
         if self.a >= 0x1e {

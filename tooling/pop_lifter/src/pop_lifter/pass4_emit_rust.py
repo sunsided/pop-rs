@@ -50,13 +50,20 @@ transitions (`GotoStateStmt`). This replaces the old `GotoStmt` /
 `LabelStmt` escape hatch, so those routines now emit valid structured
 Rust instead of unresolved gotos.
 
+This slice also lowers the *stack atoms* — the `pha`/`pla` that pass 3
+couldn't fold into a scoped `SaveTemp`/`RestoreTemp` pair — over a
+provisional `self.stack: Vec<u8>` that mirrors the interpreter's
+`value_stack`:
+
+* `Pha` → `self.stack.push(self.a)`;
+* `Pla` → `self.a = self.stack.pop()…` plus Z/N from the popped byte.
+
 Still deferred:
-* `StoreLocal` / `StoreOpVar`, `LocalRef` inc/dec — self-modifying code;
-* `Pha` / `Pla` — stack.
+* `StoreLocal` / `StoreOpVar`, `LocalRef` inc/dec — self-modifying code.
 
 Memory model and receiver (`Cpu` / `self.ram` / `self.c` / `self.z` /
-`self.n`) remain provisional pending the Game/Renderer/Audio/Input
-design slice.
+`self.n` / `self.stack`) remain provisional pending the
+Game/Renderer/Audio/Input design slice.
 """
 
 from __future__ import annotations
@@ -88,6 +95,8 @@ from .ir1 import (
     LoadIndexed,
     LoadIndirect,
     Lsr,
+    Pha,
+    Pla,
     Reg,
     Rol,
     Ror,
@@ -140,6 +149,57 @@ _LOWERED_TYPES = (
     SaveTemp, RestoreTemp, Wide16Stmt, LabeledBlock,
     DispatchStmt, GotoStateStmt,
 )
+
+
+# ------------------------------------------------------------- method names
+
+
+_RUST_IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def _mangle(name: str) -> str:
+    """Map a 6502 routine/alias name to a valid Rust method identifier.
+
+    Names that are already valid identifiers pass through unchanged (the
+    common case), so existing output is untouched. Otherwise every
+    non-identifier byte — the Merlin `:local` / `]macro-local` sigils,
+    `$addr` call targets, `*`, `?` — is escaped as `_<hex>`. The escape is
+    injective, so two distinct names never collide, and a leading digit is
+    prefixed with `_`."""
+    if _RUST_IDENT.fullmatch(name):
+        return name
+    out: list[str] = []
+    for ch in name:
+        if ch.isascii() and (ch.isalnum() or ch == "_"):
+            out.append(ch)
+        else:
+            out.append(f"_{ord(ch):02x}")
+    s = "".join(out) or "_"
+    if s[0].isdigit():
+        s = "_" + s
+    return s
+
+
+def _build_name_table(modules: list[ModuleIR3]) -> dict[str, str]:
+    """Map every routine name *and entry alias* to that routine's
+    canonical name, across all modules being emitted together. Call
+    targets resolve through this so a `jsr`/`jmp` to an alias (e.g. the
+    Merlin local `:next`, an alias of `ANIMCHAR`) emits the canonical
+    method instead of an undefined alias method."""
+    table: dict[str, str] = {}
+    for module in modules:
+        for r in module.routines:
+            table.setdefault(r.name, r.name)
+            for alias in r.entry_aliases:
+                table.setdefault(alias, r.name)
+    return table
+
+
+def _method_name(target: str, names: dict[str, str] | None) -> str:
+    """Resolve a call target to its canonical routine name (if known)
+    then mangle it to a valid Rust method identifier."""
+    canonical = names.get(target, target) if names else target
+    return _mangle(canonical)
 
 
 # ---------------------------------------------------------------- values
@@ -398,9 +458,9 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
     the caller falls back to a `// raw:` comment.
 
     Covers register/memory moves, carry arithmetic (adc/sbc/shifts),
-    `(ptr),y` indirect loads/stores/bitwise/sbc, and the flag-only
-    comparisons (cmp/cpx/cpy/bit). Self-modifying code and the stack
-    stay deferred."""
+    `(ptr),y` indirect loads/stores/bitwise/sbc, the flag-only
+    comparisons (cmp/cpx/cpy/bit), and the unpaired stack `pha`/`pla`.
+    Self-modifying code stays deferred."""
     if isinstance(item, LoadImm):
         # An opvar immediate is a runtime-patched SMC byte; lowering it
         # to its assembled value would be wrong, so defer the whole load.
@@ -564,6 +624,23 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             "self.n = _o >> 7;",
         ]
 
+    # ---- stack ----------------------------------------------------------
+    # The `pha`/`pla` pass 3 couldn't pair into a scoped `SaveTemp`/
+    # `RestoreTemp` (unbalanced within the routine, or the pair straddles
+    # a structured boundary). Lower over a provisional value stack —
+    # `self.stack: Vec<u8>` — mirroring the interpreter's `value_stack`.
+    # `pla` sets Z/N from the popped byte, matching the 6502 / interpreter.
+
+    if isinstance(item, Pha):
+        return ["self.stack.push(self.a);"]
+
+    if isinstance(item, Pla):
+        return [
+            "self.a = self.stack.pop().expect(\"pla on empty stack\");",
+            "self.z = (self.a == 0) as u8;",
+            "self.n = self.a >> 7;",
+        ]
+
     return None
 
 
@@ -591,7 +668,12 @@ def _emit_wide16(stmt: Wide16Stmt, syms: SymTable | None) -> list[str]:
 # ---------------------------------------------------------------- statements
 
 
-def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
+def _emit_stmt(
+    stmt,
+    indent: int,
+    syms: SymTable | None = None,
+    names: dict[str, str] | None = None,
+) -> list[str]:
     pad = INDENT * indent
 
     if isinstance(stmt, Assign):
@@ -609,7 +691,7 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
     if isinstance(stmt, LabeledBlock):
         lines = [f"{pad}{stmt.label}: {{"]
         for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms))
+            lines.extend(_emit_stmt(s, indent + 1, syms, names))
         lines.append(f"{pad}}}")
         return lines
 
@@ -621,10 +703,11 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
         return [f"{pad}continue;"]
 
     if isinstance(stmt, CallStmt):
-        return [f"{pad}self.{stmt.target}();"]
+        return [f"{pad}self.{_method_name(stmt.target, names)}();"]
 
     if isinstance(stmt, TailCallStmt):
-        return [f"{pad}self.{stmt.target}();", f"{pad}return;"]
+        method = _method_name(stmt.target, names)
+        return [f"{pad}self.{method}();", f"{pad}return;"]
 
     if isinstance(stmt, SaveTemp):
         return [f"{pad}let tmp{stmt.slot} = self.a;"]
@@ -635,29 +718,29 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
     if isinstance(stmt, IfStmt):
         lines = [f"{pad}if {_emit_compare(stmt.cond, syms)} {{"]
         for s in stmt.then_block.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms))
+            lines.extend(_emit_stmt(s, indent + 1, syms, names))
         if stmt.else_block is not None:
             lines.append(f"{pad}}} else {{")
             for s in stmt.else_block.stmts:
-                lines.extend(_emit_stmt(s, indent + 1, syms))
+                lines.extend(_emit_stmt(s, indent + 1, syms, names))
         lines.append(f"{pad}}}")
         return lines
 
     if isinstance(stmt, RawIfStmt):
         lines = [f"{pad}if {_emit_branch_cond(stmt.cond)} {{"]
         for s in stmt.then_block.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms))
+            lines.extend(_emit_stmt(s, indent + 1, syms, names))
         if stmt.else_block is not None:
             lines.append(f"{pad}}} else {{")
             for s in stmt.else_block.stmts:
-                lines.extend(_emit_stmt(s, indent + 1, syms))
+                lines.extend(_emit_stmt(s, indent + 1, syms, names))
         lines.append(f"{pad}}}")
         return lines
 
     if isinstance(stmt, LoopStmt):
         lines = [f"{pad}loop {{"]
         for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms))
+            lines.extend(_emit_stmt(s, indent + 1, syms, names))
         lines.append(f"{pad}}}")
         return lines
 
@@ -666,7 +749,7 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
         inner = INDENT * (indent + 1)
         lines = [f"{pad}loop {{"]
         for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms))
+            lines.extend(_emit_stmt(s, indent + 1, syms, names))
         lines += [
             f"{inner}if !({cond}) {{",
             f"{inner}    break;",
@@ -685,7 +768,7 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
             f"{pad}loop {{",
         ]
         for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms))
+            lines.extend(_emit_stmt(s, indent + 1, syms, names))
         lines += [
             f"{inner}self.{stmt.var} = self.{stmt.var}.{step_method}({step_lit});",
             f"{inner}if !({cond}) {{",
@@ -704,7 +787,7 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
             f"{pad}for _ in 0..{stmt.count}usize {{",
         ]
         for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms))
+            lines.extend(_emit_stmt(s, indent + 1, syms, names))
         lines += [
             f"{inner}self.{stmt.var} = self.{stmt.var}.{step_method}({step_lit});",
             f"{pad}}}",
@@ -717,7 +800,7 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
             vals = " | ".join(f"0x{v.value & 0xff:02x}" for v in arm.values)
             lines.append(f"{pad}    {vals} => {{")
             for s in arm.body.stmts:
-                lines.extend(_emit_stmt(s, indent + 2, syms))
+                lines.extend(_emit_stmt(s, indent + 2, syms, names))
             lines.append(f"{pad}    }}")
         lines += [f"{pad}    _ => {{}}", f"{pad}}}"]
         return lines
@@ -735,7 +818,7 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
         for arm in stmt.arms:
             lines.append(f"{inner}{INDENT}{arm.state} => {{")
             for s in arm.body.stmts:
-                lines.extend(_emit_stmt(s, indent + 3, syms))
+                lines.extend(_emit_stmt(s, indent + 3, syms, names))
             lines.append(f"{inner}{INDENT}}}")
         lines += [
             f"{inner}{INDENT}_ => unreachable!(),",
@@ -757,14 +840,19 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
 # ---------------------------------------------------------------- routines / module
 
 
-def emit_routine(routine: RoutineIR3, indent: int = 1, syms: SymTable | None = None) -> list[str]:
+def emit_routine(
+    routine: RoutineIR3,
+    indent: int = 1,
+    syms: SymTable | None = None,
+    names: dict[str, str] | None = None,
+) -> list[str]:
     pad = INDENT * indent
     lines: list[str] = []
     if routine.entry_aliases:
         lines.append(f"{pad}// aliases: {', '.join(routine.entry_aliases)}")
-    lines.append(f"{pad}fn {routine.name}(&mut self) {{")
+    lines.append(f"{pad}fn {_mangle(routine.name)}(&mut self) {{")
     for s in routine.body.stmts:
-        lines.extend(_emit_stmt(s, indent + 1, syms))
+        lines.extend(_emit_stmt(s, indent + 1, syms, names))
     lines.append(f"{pad}}}")
     return lines
 
@@ -776,9 +864,9 @@ _HEADER = [
     "// expression, control-flow, data-movement, carry-arithmetic,",
     "// `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.",
     "// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured",
-    "// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC",
-    "// and the stack are deferred; they appear as `// raw: …` /",
-    "// `// TODO(pass4): …` comments.",
+    "// routines emit a `loop { match pc { ... } }` dispatch fallback; the",
+    "// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as",
+    "// `// raw: …` / `// TODO(pass4): …` comments.",
     "// The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are",
     "// provisional, pending the state/trait design slice. RAM addresses",
     "// keep their source symbol names via the `sym` constants below.",
@@ -794,12 +882,14 @@ def _record_syms(module: ModuleIR3, syms: SymTable) -> None:
         emit_routine(routine, indent=1, syms=syms)
 
 
-def _emit_impl_block(module: ModuleIR3, syms: SymTable) -> list[str]:
+def _emit_impl_block(
+    module: ModuleIR3, syms: SymTable, names: dict[str, str] | None = None
+) -> list[str]:
     lines = ["impl Cpu {"]
     for i, routine in enumerate(module.routines):
         if i:
             lines.append("")
-        lines.extend(emit_routine(routine, indent=1, syms=syms))
+        lines.extend(emit_routine(routine, indent=1, syms=syms, names=names))
     lines.append("}")
     return lines
 
@@ -834,6 +924,9 @@ def emit_modules(modules: list[ModuleIR3]) -> str:
         _record_syms(module, syms)
     syms.finalize()
 
+    # Resolve call targets (incl. entry aliases) to canonical method names.
+    names = _build_name_table(modules)
+
     lines = [*_HEADER, "//"]
     for module in modules:
         lines.append(f"// source: {_portable_path(module.file)}")
@@ -847,7 +940,7 @@ def emit_modules(modules: list[ModuleIR3]) -> str:
     for i, module in enumerate(modules):
         if i:
             lines.append("")
-        lines.extend(_emit_impl_block(module, syms))
+        lines.extend(_emit_impl_block(module, syms, names))
     return "\n".join(lines) + "\n"
 
 

@@ -4,9 +4,9 @@
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
-// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
-// and the stack are deferred; they appear as `// raw: …` /
-// `// TODO(pass4): …` comments.
+// routines emit a `loop { match pc { ... } }` dispatch fallback; the
+// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
+// `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -123,7 +123,7 @@ impl Cpu {
                 self.x = 0x07;
                 loop {
                     self.ram[sym::tempblockx] = self.x;
-                    self.:trigloose();
+                    self._3atrigloose();
                     self.x = self.ram[sym::tempblockx];
                     self.x = self.x.wrapping_sub(1);
                     let _o: u8 = 0x02;
@@ -147,7 +147,7 @@ impl Cpu {
                     self.x = 0x07;
                     loop {
                         self.ram[sym::tempblockx] = self.x;
-                        self.:trigloose();
+                        self._3atrigloose();
                         self.x = self.ram[sym::tempblockx];
                         self.x = self.x.wrapping_sub(1);
                         let _o: u8 = 0x02;
@@ -281,18 +281,20 @@ impl Cpu {
 
     // aliases: :outer
     fn PAUSE(&mut self) {
-        // raw: push a                           ; SUBS.S:192
+        self.stack.push(self.a);
         self.x = 0x00;
         for _ in 0..256usize {
             self.x = self.x.wrapping_sub(0x01);
         }
-        // raw: a = pop                          ; SUBS.S:196
+        self.a = self.stack.pop().expect("pla on empty stack");
+        self.z = (self.a == 0) as u8;
+        self.n = self.a >> 7;
         self.c = 1;
         let _r = (self.a as u16) + (!0x01_u8) as u16 + (self.c as u16);
         self.a = _r as u8;
         self.c = (_r >> 8) as u8;
         if self.a != 0x00 {
-            self.:outer();
+            self.PAUSE();
             return;
         }
         return;
@@ -525,7 +527,7 @@ impl Cpu {
         self.a = 0x14;
         self.play();
         self.a = 0x6b;
-        self.mjumpseq();
+        self.kjumpseq();
         self.a = 0x14;
         self.play();
         self.a = 0x6f;
@@ -553,7 +555,7 @@ impl Cpu {
         self.a = 0x09;
         self.play();
         self.a = 0x72;
-        self.mjumpseq();
+        self.kjumpseq();
         self.a = 0x3a;
         self.play();
         return;
@@ -576,7 +578,7 @@ impl Cpu {
         self.a = 0x05;
         self.play();
         self.a = 0x0d;
-        self.vjumpseq();
+        self.kjumpseq();
         self.a = 0x02;
         self.play();
         self.ram[sym::KidPosn] = 0x00;
@@ -589,7 +591,7 @@ impl Cpu {
         self.a = 0x0c;
         self.play();
         self.a = 0x65;
-        self.mjumpseq();
+        self.kjumpseq();
         self.a = 0x1e;
         self.play();
         return;
@@ -688,11 +690,11 @@ impl Cpu {
         self.a = 0x05;
         self.play();
         self.a = 0x60;
-        self.vjumpseq();
+        self.kjumpseq();
         self.a = 0x06;
         self.play();
         self.a = 0x61;
-        self.vjumpseq();
+        self.kjumpseq();
         self.a = 0x04;
         self.play();
         self.a = 0x09;
@@ -701,18 +703,18 @@ impl Cpu {
         self.a = 0x04;
         self.play();
         self.a = 0x60;
-        self.vjumpseq();
+        self.kjumpseq();
         self.a = 0x1e;
         self.play();
         self.a = 0x61;
-        self.vjumpseq();
+        self.kjumpseq();
         self.a = 0x04;
         self.play();
         self.a = 0x0a;
         self.x = 0x19;
         self.PlaySongI();
         self.a = 0x66;
-        self.vjumpseq();
+        self.kjumpseq();
         self.a = 0x01;
         self.play();
         self.a = 0x63;
@@ -732,7 +734,7 @@ impl Cpu {
         self.PlaySongI();
         self.ram[sym::SPEED] = 0x07;
         self.a = 0x64;
-        self.vjumpseq();
+        self.kjumpseq();
         self.a = 0x11;
         self.play();
         self.x = 0x01;
@@ -1837,7 +1839,7 @@ impl Cpu {
         return;
     }
 
-    fn :trigloose(&mut self) {
+    fn _3atrigloose(&mut self) {
         self.rdblock1();
         if self.a != 0x0b {
             return;

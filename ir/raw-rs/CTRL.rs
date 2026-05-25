@@ -4,9 +4,9 @@
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
-// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
-// and the stack are deferred; they appear as `// raw: …` /
-// `// TODO(pass4): …` comments.
+// routines emit a `loop { match pc { ... } }` dispatch fallback; the
+// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
+// `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -407,7 +407,7 @@ impl Cpu {
         self.addcharx();
         self.ram[sym::CharX] = self.a;
         self.rereadblocks();
-        self.:test();
+        self._3atest();
         if self.z == 0 {
             self.getdist();
             self.addcharx();
@@ -534,7 +534,7 @@ impl Cpu {
                     self.ram[(self.ram[sym::BlueType] as usize | (self.ram[sym::BlueType + 1] as usize) << 8) + self.y as usize] = self.a;
                     self.indexblock();
                     self.a = 0x02;
-                    self.:sub();
+                    self._3asub();
                     self.y = self.y.wrapping_add(1);
                     pc = 11;
                 }
@@ -769,7 +769,7 @@ impl Cpu {
     }
 
     // aliases: startfall
-    fn :no(&mut self) {
+    fn _3ano(&mut self) {
         let mut pc: u32 = 0;
         loop {
             match pc {
@@ -2010,14 +2010,14 @@ impl Cpu {
                     return;
                 }
             }
-            self.]clr();
+            self._3aclr();
             self.ram[sym::clrF] = self.a;
             self.a = 0x0d;
             self.jumpseq();
             return;
         }
         if self.n == 0 {
-            self.]clr();
+            self._3aclr();
             self.ram[sym::clrB] = self.a;
             self.a = 0x06;
             self.jumpseq();
@@ -2050,7 +2050,7 @@ impl Cpu {
                 'b22: {
                     'b21: {
                         'b16: {
-                            self.]clr();
+                            self._3aclr();
                             self.ram[sym::clrU] = self.a;
                             self.ram[sym::clrbtn] = self.a;
                             self.getabove();
@@ -2130,7 +2130,7 @@ impl Cpu {
                 return;
             }
         }
-        self.]clr();
+        self._3aclr();
         self.ram[sym::clrD] = self.a;
         self.getbehind();
         self.cmpspace();
@@ -2187,7 +2187,7 @@ impl Cpu {
     }
 
     fn DoTurn(&mut self) {
-        self.]clr();
+        self._3aclr();
         self.ram[sym::clrB] = self.a;
         self.a = self.ram[sym::gotsword];
         if self.a != 0x00 {
@@ -2231,14 +2231,14 @@ impl Cpu {
     fn DoCrouch(&mut self) {
         self.a = 0x32;
         self.jumpseq();
-        self.]clr();
+        self._3aclr();
         self.ram[sym::clrD] = self.a;
         return;
     }
 
     fn DoEngarde(&mut self) {
         'b4: {
-            self.]clr();
+            self._3aclr();
             self.ram[sym::clrF] = self.a;
             self.ram[sym::clrbtn] = self.a;
             self.a = 0x02;
@@ -2264,7 +2264,7 @@ impl Cpu {
     }
 
     fn DoJumpup(&mut self) {
-        self.]clr();
+        self._3aclr();
         self.ram[sym::clrU] = self.a;
         self.getabove();
         self.ram[sym::blockid] = self.a;
@@ -2506,7 +2506,7 @@ impl Cpu {
                     pc = 11;
                 }
                 11 => {
-                    self.]clr();
+                    self._3aclr();
                     self.ram[sym::clrU] = self.a;
                     self.a = 0x04;
                     self.jumpseq();
@@ -2566,7 +2566,7 @@ impl Cpu {
     }
 
     fn DoJumphigh(&mut self) {
-        self.]clr();
+        self._3aclr();
         self.ram[sym::clrU] = self.a;
         self.getfwddist();
         if self.a < 0x04 {
@@ -2890,7 +2890,7 @@ impl Cpu {
         return;
     }
 
-    fn :test(&mut self) {
+    fn _3atest(&mut self) {
         self.getabove();
         self.ram[sym::blockid] = self.a;
         self.getaboveinf();
@@ -2898,13 +2898,13 @@ impl Cpu {
         return;
     }
 
-    fn :sub(&mut self) {
+    fn _3asub(&mut self) {
         self.markwipe();
         self.markred();
         return;
     }
 
-    fn :doit(&mut self) {
+    fn _3adoit(&mut self) {
         self.x = 0x01;
         self.ram[sym::clrF] = self.x;
         self.jumpseq();
@@ -2912,7 +2912,7 @@ impl Cpu {
     }
 
     // aliases: ]clr
-    fn :clr(&mut self) {
+    fn _3aclr(&mut self) {
         self.clrall();
         return;
     }

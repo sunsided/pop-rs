@@ -4,9 +4,9 @@
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
-// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
-// and the stack are deferred; they appear as `// raw: …` /
-// `// TODO(pass4): …` comments.
+// routines emit a `loop { match pc { ... } }` dispatch fallback; the
+// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
+// `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -137,7 +137,7 @@ impl Cpu {
             match pc {
                 0 => {
                     self.auxmem();
-                    self.]copyscrn();
+                    self._5dcopyscrn();
                     return;
                 }
                 _ => unreachable!(),
@@ -152,7 +152,7 @@ impl Cpu {
                 0 => {
                     self.ram[0xc002] = self.a;
                     self.ram[0xc005] = self.a;
-                    self.]copyscrn();
+                    self._5dcopyscrn();
                     return;
                 }
                 _ => unreachable!(),
@@ -167,7 +167,7 @@ impl Cpu {
                 0 => {
                     self.ram[0xc003] = self.a;
                     self.ram[0xc004] = self.a;
-                    self.]copyscrn();
+                    self._5dcopyscrn();
                     return;
                 }
                 _ => unreachable!(),
@@ -1389,7 +1389,7 @@ impl Cpu {
                     self.PREPREP();
                     self.CROP();
                     if self.n != 0 {
-                        self.]done();
+                        self._5ddone();
                         return;
                     } else {
                         pc = 1;
@@ -3022,7 +3022,7 @@ impl Cpu {
                 0 => {
                     self.a = 0x03;
                     if self.a != 0x00 {
-                        self.]setfast();
+                        self._5dsetfast();
                         return;
                     } else {
                         pc = 1;

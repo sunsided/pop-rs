@@ -44,6 +44,7 @@ from pop_lifter.ir1 import (
     LoadIndirect,
     LocalRef,
     Pha,
+    Pla,
     Reg,
     Rol,
     Ror,
@@ -54,6 +55,7 @@ from pop_lifter.ir1 import (
     StoreAbs,
     StoreIndexed,
     StoreIndirect,
+    StoreLocal,
     Transfer,
 )
 from pop_lifter.ir1 import Compare
@@ -89,6 +91,7 @@ from pop_lifter.pass4_emit_rust import (
     _emit_compare,
     _emit_stmt,
     _emit_value,
+    _mangle,
     emit_module,
     emit_modules,
     emit_routine,
@@ -220,10 +223,28 @@ def test_raw_load_abs_is_lowered():
     assert _emit_one(raw) == "self.a = self.ram[0x0010];"
 
 
+def test_raw_pha_pushes_value_stack():
+    # An unpaired `pha` (pass 3 couldn't fold it into a SaveTemp) lowers
+    # over the provisional value stack.
+    assert _emit_one(RawStmt(item=Pha(src=SRC))) == "self.stack.push(self.a);"
+
+
+def test_raw_pla_pops_and_sets_flags():
+    # `pla` pops into A and sets Z/N from the byte, matching the 6502.
+    lines = _emit_stmt(RawStmt(item=Pla(src=SRC)), 0)
+    assert lines == [
+        'self.a = self.stack.pop().expect("pla on empty stack");',
+        "self.z = (self.a == 0) as u8;",
+        "self.n = self.a >> 7;",
+    ]
+
+
 def test_raw_deferred_atom_is_comment():
-    # `pha` needs a stack model that isn't lowered yet, so it stays as a
-    # `// raw:` comment rather than emitting wrong code.
-    out = _emit_one(RawStmt(item=Pha(src=SRC)))
+    # An SMC operand patch needs a consumer model that isn't lowered yet,
+    # so it stays as a `// raw:` comment rather than emitting wrong code.
+    out = _emit_one(RawStmt(item=StoreLocal(
+        reg=Reg.A, target_label="smXCO", offset=1, src=SRC,
+    )))
     assert out.startswith("// raw: ")
 
 
@@ -234,6 +255,40 @@ def test_call_stmt_lowered():
 def test_tail_call_stmt_lowered():
     lines = _emit_stmt(TailCallStmt(target="jump_target", src=SRC), 0)
     assert lines == ["self.jump_target();", "return;"]
+
+
+def test_mangle_passes_valid_idents_through():
+    assert _mangle("ANIMCHAR") == "ANIMCHAR"
+    assert _mangle("getseq") == "getseq"
+
+
+def test_mangle_escapes_non_identifier_names():
+    # Merlin sigils / raw-address / `*` targets aren't valid Rust idents;
+    # each non-ident byte is escaped as `_<hex>` (`:`=3a, `]`=5d, `$`=24).
+    assert _mangle(":next") == "_3anext"
+    assert _mangle("]clr") == "_5dclr"
+    assert _mangle("$c00") == "_24c00"
+    assert _mangle(":slice?") == "_3aslice_3f"
+
+
+def test_call_target_resolves_alias_to_canonical():
+    # A call to an entry alias (`:next`, an alias of ANIMCHAR) must emit
+    # the canonical method, not an undefined alias method.
+    names = {"ANIMCHAR": "ANIMCHAR", ":next": "ANIMCHAR"}
+    out = _emit_stmt(CallStmt(target=":next", src=SRC), 0, None, names)
+    assert out == ["self.ANIMCHAR();"]
+
+
+def test_call_target_unresolved_is_escaped():
+    # A target with no known routine (raw address / cross-module) keeps
+    # its name but is escaped to a valid identifier.
+    out = _emit_stmt(CallStmt(target="$c00", src=SRC), 0, None, {})
+    assert out == ["self._24c00();"]
+
+
+def test_routine_fn_name_is_mangled():
+    r = _routine([ReturnStmt(src=SRC)], name=":clr")
+    assert emit_routine(r)[0] == "    fn _3aclr(&mut self) {"
 
 
 def test_raw_if_lowers_flag_condition():
@@ -351,12 +406,14 @@ def test_lower_stats_counts_top_level():
         RawStmt(item=StoreAbs(reg=Reg.A, target=_abs("Z", 0x30), src=SRC)),  # lowered (data-movement)
         RawStmt(item=Clc(src=SRC)),  # lowered (carry op)
         RawStmt(item=CmpImm(reg=Reg.A, imm=_imm(0), src=SRC)),  # lowered (cmp flags)
-        RawStmt(item=Pha(src=SRC)),  # deferred (stack)
+        RawStmt(item=Pha(src=SRC)),  # lowered (stack)
+        RawStmt(item=StoreLocal(  # deferred (SMC operand patch)
+            reg=Reg.A, target_label="smXCO", offset=1, src=SRC)),
         CallStmt(target="sub", src=SRC),  # lowered
         ReturnStmt(src=SRC),  # lowered
     ]
     lowered, deferred = lower_stats(_module([_routine(stmts)]))
-    assert (lowered, deferred) == (6, 1)
+    assert (lowered, deferred) == (7, 1)
 
 
 # ---------------------------------------------------------------- compare expressions
