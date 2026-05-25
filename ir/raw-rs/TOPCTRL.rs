@@ -1016,8 +1016,6 @@ impl Cpu {
         }
         self.reg.a = 0x01;
         return;
-        self.reg.a = 0x00;
-        return;
     }
 
     fn cold_3f(&mut self) {
@@ -1029,8 +1027,6 @@ impl Cpu {
             _ => {}
         }
         self.reg.a = 0x01;
-        return;
-        self.reg.a = 0x00;
         return;
     }
 

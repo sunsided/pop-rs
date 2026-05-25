@@ -1724,13 +1724,6 @@ impl Cpu {
             }
             self._5dno();
             return;
-            self.reg.a = self.reg.y;
-            self.flags.c = true;
-            let _r = (self.reg.a as u16) + (!0x13_u8) as u16 + (self.flags.c as u16);
-            self.reg.a = _r as u8;
-            self.flags.c = (_r >> 8) != 0;
-            self.reg.y = self.reg.a;
-            return;
         }
         self.reg.y = self.mem[sym::trloc];
         if self.reg.y < 0x0a {

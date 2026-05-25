@@ -1295,9 +1295,6 @@ impl Cpu {
             _ => {}
         }
         return;
-        self.reg.a = 0x47;
-        self.jumpseq();
-        return;
     }
 
     fn GuardCtrl(&mut self) {
@@ -1448,28 +1445,6 @@ impl Cpu {
             }
             _ => {}
         }
-        return;
-        self.mem[sym::clrD] = 0x01;
-        self.mem[sym::CharSword] = 0x00;
-        self.reg.a = self.mem[sym::CharID];
-        match self.reg.a {
-            0x00 => {
-                self.mem[sym::offguard] = 0x01;
-                self.mem[sym::refract] = 0x09;
-                self.mem[sym::heroic] = 0x00;
-                self.reg.a = 0x5d;
-                self.jumpseq();
-                return;
-            }
-            0x01 => {
-                self.reg.a = 0x5c;
-                self.jumpseq();
-                return;
-            }
-            _ => {}
-        }
-        self.reg.a = 0x57;
-        self.jumpseq();
         return;
     }
 
@@ -1659,11 +1634,6 @@ impl Cpu {
             _ => {}
         }
         return;
-        self.reg.a = 0x39;
-        self.reg.x = 0x01;
-        self.mem[sym::clrB] = self.reg.x;
-        self.jumpseq();
-        return;
     }
 
     fn DoAdvance(&mut self) {
@@ -1687,20 +1657,6 @@ impl Cpu {
             }
             _ => {}
         }
-        return;
-        'b7: {
-            self.reg.a = self.mem[sym::CharID];
-            if self.reg.a == 0x00 {
-                self.reg.a = 0x56;
-                if self.reg.a != 0x00 {
-                    break 'b7;
-                }
-            }
-            self.reg.a = 0x38;
-        }
-        self.reg.x = 0x01;
-        self.mem[sym::clrF] = self.reg.x;
-        self.jumpseq();
         return;
     }
 

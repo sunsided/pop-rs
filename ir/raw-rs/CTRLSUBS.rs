@@ -1641,10 +1641,6 @@ impl Cpu {
         }
         self.reg.a = 0x04;
         return;
-        self.reg.a = 0x03;
-        return;
-        self.reg.a = 0x01;
-        return;
     }
 
     fn CMPWALL(&mut self) {

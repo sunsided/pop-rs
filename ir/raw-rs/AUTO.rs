@@ -718,7 +718,6 @@ impl Cpu {
         self.mem[sym::droppedout] = 0x00;
         self.DoRetreat();
         return;
-        return;
     }
 
     fn InRange(&mut self) {
@@ -864,16 +863,6 @@ impl Cpu {
         self.flags.z = self.reg.a == _o;
         self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
         if self.reg.a >= self.mem[sym::strikeprob + self.reg.x as usize] {
-            return;
-        }
-        self.DoStrike();
-        return;
-        self.rndp();
-        let _o: u8 = self.mem[sym::restrikeprob + self.reg.x as usize];
-        self.flags.c = self.reg.a >= _o;
-        self.flags.z = self.reg.a == _o;
-        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-        if self.reg.a >= self.mem[sym::restrikeprob + self.reg.x as usize] {
             return;
         }
         self.DoStrike();
@@ -1048,56 +1037,6 @@ impl Cpu {
             }
             _ => {}
         }
-        return;
-        'b12: {
-            self.getopdist();
-            if self.reg.a >= 0x00 {
-                if self.reg.a < 0x1d {
-                    self.reg.a = self.mem[sym::OpPosn];
-                    if self.reg.a != 0xa1 {
-                        if self.reg.a != 0x96 {
-                            break 'b12;
-                        } else {
-                            self.reg.a = 0xa1;
-                            self.mem[sym::OpPosn] = self.reg.a;
-                        }
-                    }
-                    self.reg.a = self.mem[sym::CharID];
-                    if self.reg.a != 0x00 {
-                        self.reg.a = 0x04;
-                        self.mem[sym::justblocked] = self.reg.a;
-                    }
-                    self.reg.a = 0x45;
-                    self.jumpseq();
-                    self.animchar();
-                    return;
-                }
-            }
-        }
-        self.reg.a = self.mem[sym::CharPosn];
-        if self.reg.a != 0x9a {
-            return;
-        }
-        self.getopdist();
-        self.reg.x = self.mem[sym::OpSword];
-        if self.reg.x >= 0x02 {
-            if self.reg.a < 0x0c {
-                return;
-            }
-        } else {
-            if self.reg.a < 0x08 {
-                return;
-            }
-        }
-        let _o: u8 = 0x1d;
-        self.flags.c = self.reg.a >= _o;
-        self.flags.z = self.reg.a == _o;
-        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-        if self.reg.a >= 0x1d {
-            return;
-        }
-        // raw: ??? lda #99 "stabbed"            ; AUTO.S:1002
-        self.mem[sym::OpAction] = self.reg.a;
         return;
     }
 

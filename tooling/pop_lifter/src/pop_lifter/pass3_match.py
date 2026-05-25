@@ -215,8 +215,13 @@ def recognize_block(block: Block) -> Block:
                 src=rec[i].src,
             ))
             # Default (no key matched): the innermost `rest`, then `T`
-            # re-appended. Re-recognise so nested dispatches still fold.
-            out.extend(recognize_block(Block.of(rest + tail)).stmts)
+            # re-appended — but only if `rest` can fall through. When
+            # `rest` already terminates unconditionally, the original
+            # never reached `T` either, so re-appending it would just be
+            # dead code after a `return` (an `unreachable_code` warning).
+            # Re-recognise so nested dispatches still fold.
+            default = rest if _terminates(Block.of(rest)) else rest + tail
+            out.extend(recognize_block(Block.of(default)).stmts)
             i = n
             continue
 
