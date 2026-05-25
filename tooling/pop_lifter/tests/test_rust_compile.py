@@ -33,9 +33,11 @@ _ALLOWS = (
 
 
 def _harness(src: str) -> str:
-    """Wrap one emitted module file so it type-checks standalone: deny
-    warnings via crate-level allows, and stub the cross-module routine
-    methods it calls but doesn't define."""
+    """Wrap one emitted module file so it type-checks standalone: allow
+    the known-noisy style lints the lifted code trips (via crate-level
+    `#![allow(...)]`), let `rustc -D warnings` deny every remaining
+    warning, and stub the cross-module routine methods it calls but
+    doesn't define."""
     defined = set(re.findall(r"fn (\w+)\(&mut self\)", src))
     called = set(re.findall(r"self\.(\w+)\(\)", src))
     stubs = sorted(called - defined)
