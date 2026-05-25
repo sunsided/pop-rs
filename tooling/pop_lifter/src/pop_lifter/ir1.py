@@ -429,6 +429,25 @@ class ShiftMem:
 
 
 @dataclass(frozen=True)
+class MemBitOp:
+    """`tsb addr` / `trb addr` — 65C02 test-and-set / test-and-reset bits.
+
+    Both first test A's bits against the memory byte non-destructively
+    (`Z = (A & mem) == 0`), then update memory: `tsb` *sets* the bits A
+    selects (`mem |= A`), `trb` *resets* them (`mem &= ~A`). Only Z is
+    written — N/V/C are untouched (unlike `Bit`, which also writes N/V).
+
+    POP uses these solely on the IIgs system-speed register `$C036`
+    (`FASTSPEED`/`NORMSPEED`), gated behind `lda IIGS`. Like `ShiftMem`,
+    the memory write is the headline side effect, so this is never elided
+    even when Z is dead."""
+
+    op: str  # "tsb" | "trb"
+    target: Abs
+    src: SourceRef
+
+
+@dataclass(frozen=True)
 class Bit:
     """`bit operand` — bit-test. Sets:
 
@@ -484,6 +503,17 @@ class Pha:
 class Pla:
     """`pla` — pop the top of the stack into A. Sets Z/N on the
     popped value. Same two-stack caveat as `Pha`."""
+
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class Phy:
+    """`phy` — push Y onto the stack (65C02). The Y-register analogue of
+    `Pha`: it rides the same `Trace.value_stack` byte stack with the same
+    balanced-push/pop caveats. POP uses it only in the IIgs control-panel
+    toolbox calls (`getparam`/`setparam`), to stack the parameter for the
+    `jsl $E10000` firmware call. No flag effects."""
 
     src: SourceRef
 
@@ -878,7 +908,7 @@ Instr = (
     | IncTarget | DecTarget | Transfer | Bitwise
     | LoadIndirect | StoreIndirect | CmpIndirect
     | SbcImm | SbcAbs | Lsr | Bit
-    | Pha | Pla
+    | Pha | Pla | Phy | MemBitOp
     | CmpIndexed | AdcIndexed | SbcIndexed
     | Rol | Ror | ShiftMem
     | StoreLocal | StoreOpVar | StoreOpAddr | SbcIndirect
@@ -1051,6 +1081,11 @@ def format_item(item: Item) -> str:
         return f"  push a                           ; {item.src.short()}"
     if isinstance(item, Pla):
         return f"  a = pop                          ; {item.src.short()}"
+    if isinstance(item, Phy):
+        return f"  push y                           ; {item.src.short()}"
+    if isinstance(item, MemBitOp):
+        sym = "|= a" if item.op == "tsb" else "&= ~a"
+        return f"  *{_fmt_abs(item.target)} {sym}                 ; {item.src.short()}"
     if isinstance(item, LoadIndexed):
         return (
             f"  {item.reg} = *({_fmt_abs(item.base)} + {item.index})"

@@ -1495,7 +1495,7 @@ fn FASTSPEED {
   a = *IIGS@0x0211        ; GRAFIX.S:2048
   if a == #0x00 goto ]rts  ; GRAFIX.S:2049
   a = #0x80                  ; GRAFIX.S:2051
-  ??? tsb $C036            ; GRAFIX.S:2052
+  *$C036@0xc036 |= a                 ; GRAFIX.S:2052
 ]rts:
   return                           ; GRAFIX.S:2053
 }
@@ -1509,7 +1509,7 @@ fn NORMSPEED {
   a = #0xf0                  ; GRAFIX.S:2069
   *$c022@0xc022 = a            ; GRAFIX.S:2070
   a = #0x80                  ; GRAFIX.S:2072
-  ??? trb $c036            ; GRAFIX.S:2073
+  *$c036@0xc036 &= ~a                 ; GRAFIX.S:2073
   return                           ; GRAFIX.S:2076
 getparam:
   a = *IIGS@0x0211        ; GRAFIX.S:2089
@@ -1518,7 +1518,7 @@ getparam:
   xce             ; 65816/IIgs op (not modeled) — GRAFIX.S:2093
   rep $30            ; 65816/IIgs op (not modeled) — GRAFIX.S:2094
   push a                           ; GRAFIX.S:2095
-  ??? phy             ; GRAFIX.S:2096
+  push y                           ; GRAFIX.S:2096
   x = #0x03                  ; GRAFIX.S:2097
   a = pop                          ; GRAFIX.S:2099
   c = 1                            ; GRAFIX.S:2100
@@ -1536,7 +1536,7 @@ fn getparam {
   xce             ; 65816/IIgs op (not modeled) — GRAFIX.S:2093
   rep $30            ; 65816/IIgs op (not modeled) — GRAFIX.S:2094
   push a                           ; GRAFIX.S:2095
-  ??? phy             ; GRAFIX.S:2096
+  push y                           ; GRAFIX.S:2096
   x = #0x03                  ; GRAFIX.S:2097
   a = pop                          ; GRAFIX.S:2099
   c = 1                            ; GRAFIX.S:2100
@@ -1553,7 +1553,7 @@ fn setparam {
   rep $30            ; 65816/IIgs op (not modeled) — GRAFIX.S:2115
   a = a & #0xff              ; GRAFIX.S:2116
   push a                           ; GRAFIX.S:2117
-  ??? phy             ; GRAFIX.S:2118
+  push y                           ; GRAFIX.S:2118
   x = #0x03                  ; GRAFIX.S:2119
   c = 1                            ; GRAFIX.S:2121
   xce             ; 65816/IIgs op (not modeled) — GRAFIX.S:2122

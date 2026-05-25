@@ -67,10 +67,12 @@ from .ir1 import (
     LoadIndirect,
     LocalRef,
     Lsr,
+    MemBitOp,
     ModuleIR1,
     Nop,
     OpVarRef,
     Pha,
+    Phy,
     Pla,
     Reg,
     Return,
@@ -602,6 +604,21 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
             )
         trace.a = trace.value_stack.pop()
         _set_zn(trace, trace.a)
+        return True
+    if isinstance(item, Phy):
+        trace.value_stack.append(trace.y & 0xff)
+        if len(trace.value_stack) > trace.max_value_stack_depth:
+            trace.max_value_stack_depth = len(trace.value_stack)
+        return True
+    if isinstance(item, MemBitOp):
+        # 65C02 tsb/trb: test A's bits against memory (Z only), then set
+        # (tsb) or reset (trb) those bits. N/V/C untouched.
+        addr = _real_addr(item.target.addr, item.src)
+        old = ram[addr]
+        trace.z = 1 if (trace.a & old) == 0 else 0
+        new = (old | trace.a) & 0xff if item.op == "tsb" else old & (~trace.a & 0xff)
+        ram[addr] = new
+        trace.writes[addr] = new
         return True
     if isinstance(item, (CmpImm, CmpAbs)):
         reg_val = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
