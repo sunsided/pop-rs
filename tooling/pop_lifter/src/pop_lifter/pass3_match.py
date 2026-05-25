@@ -32,6 +32,27 @@ behaviour-preserving:
 Arms with structurally identical bodies are merged into one arm with
 several keys (`K1 | K2 => ...`) — common because the asm shares one
 handler label across keys, which the relooper tail-duplicates.
+
+**Shared-handler dispatches.** A second shape: several keys branch to
+*one* handler via a forward branch (`cmp Ki ; beq shared`), which the
+relooper dedups into a nested negated chain followed by the shared tail
+emitted once:
+
+    if a != space { if a != block { if a < archtop1 { a = 1 ; return } } }
+    a = 0 ; return                       ; shared tail T
+    ⇒
+    match a {
+      #space | #block => { a = 0 ; return }    ; T, re-duplicated
+    }
+    if a < archtop1 { a = 1 ; return }   ; the innermost `rest`
+    a = 0 ; return                       ; T re-appended (the implicit default)
+
+Recognised when a run of ≥2 nested `if reg != Ki { ... }` (same reg,
+distinct immediate keys, no else) wraps an innermost `rest`, and the
+statements after the chain (the tail `T`) terminate — so the `match`
+arm, which gets a copy of `T`, can't fall through. This *re-duplicates*
+`T`, so it's restricted to terminating tails (small `return`/`tail_call`
+bodies), not the exponential subtrees the relooper dedup removed.
 """
 
 from __future__ import annotations
@@ -80,6 +101,49 @@ def _dispatch_if(stmt: Stmt):
     if not _terminates(stmt.then_block):
         return None
     return (cond.reg, cond.rhs)
+
+
+def _negated_if(stmt: Stmt):
+    """If `stmt` is a `reg != #imm` chain link — an `IfStmt` with `!=`, an
+    immediate rhs, and no else — return `(reg, imm)`; else None. (Unlike
+    `_dispatch_if`, the body needn't terminate: it holds the next chain
+    link or the innermost `rest`.)"""
+    if not isinstance(stmt, IfStmt):
+        return None
+    cond = stmt.cond
+    if cond.op != "!=" or not isinstance(cond.rhs, Imm) or stmt.else_block is not None:
+        return None
+    return (cond.reg, cond.rhs)
+
+
+def _shared_handler_chain(head: IfStmt, tail: list[Stmt]):
+    """Recognise a shared-handler dispatch headed by `head` (a `reg != K`
+    chain) whose enclosing-block tail is `tail`. Returns
+    `(reg, keys, rest)` — the dispatch register, the distinct keys, and
+    the innermost body — or None if `head`/`tail` don't form the shape.
+
+    `tail` is the shared handler `T`; it must terminate so the rewritten
+    `match` arm (a copy of `T`) can't fall through into the default."""
+    first = _negated_if(head)
+    if first is None or not tail or not _terminates(Block.of(tail)):
+        return None
+    reg, k0 = first
+    keys = [k0]
+    seen = {k0.value}
+    cur = head
+    while True:
+        body = cur.then_block.stmts
+        if len(body) == 1:
+            link = _negated_if(body[0])
+            if link is not None and link[0] is reg and link[1].value not in seen:
+                cur = body[0]
+                keys.append(link[1])
+                seen.add(link[1].value)
+                continue
+        break
+    if len(keys) < 2:
+        return None
+    return reg, keys, list(cur.then_block.stmts)
 
 
 def _recurse(stmt: Stmt) -> Stmt:
@@ -138,6 +202,24 @@ def recognize_block(block: Block) -> Block:
                 out.append(_build_match(reg, run))
                 i = j
                 continue
+
+        # Shared-handler dispatch: a `reg != Ki` chain at `i` whose tail
+        # (the rest of this block) is the shared terminating handler `T`.
+        chain = _shared_handler_chain(rec[i], rec[i + 1:])
+        if chain is not None:
+            reg, keys, rest = chain
+            tail = rec[i + 1:]
+            out.append(MatchStmt(
+                reg=reg,
+                arms=(MatchArm(values=tuple(keys), body=Block.of(tail)),),
+                src=rec[i].src,
+            ))
+            # Default (no key matched): the innermost `rest`, then `T`
+            # re-appended. Re-recognise so nested dispatches still fold.
+            out.extend(recognize_block(Block.of(rest + tail)).stmts)
+            i = n
+            continue
+
         out.append(rec[i])
         i += 1
     return Block.of(out)

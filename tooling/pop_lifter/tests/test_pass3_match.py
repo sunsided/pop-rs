@@ -181,3 +181,79 @@ def test_match_recognition_is_behaviour_preserving():
         ir3_run([post], "disp", ram=r2)
         assert r1 == r2, f"match diverged for input {inp}"
         assert r2[0x301] == expected_out
+
+
+# ----------------------------------------------------- shared-handler chain
+
+
+def test_shared_handler_chain_becomes_match():
+    """A nested `if a != Ki { … }` chain over a shared terminating tail
+    folds into one `match` arm holding the tail, followed by the
+    innermost `rest` and the tail re-appended (CMPSPACE's shape)."""
+    rest = [_eq_if(Reg.A, 9, [_R(LoadImm(reg=Reg.A, imm=_imm(1), src=SRC)),
+                              ReturnStmt(src=SRC)], op="<")]
+    chain = _eq_if(Reg.A, 1, [_eq_if(Reg.A, 2, rest, op="!=")], op="!=")
+    tail = [_R(LoadImm(reg=Reg.A, imm=_imm(0), src=SRC)), ReturnStmt(src=SRC)]
+    out = _recognize([chain, *tail])
+
+    assert isinstance(out[0], MatchStmt)
+    assert tuple(v.value for v in out[0].arms[0].values) == (1, 2)
+    # Arm body is a copy of the shared tail (terminates).
+    assert isinstance(out[0].arms[0].body.stmts[-1], ReturnStmt)
+    # Default: the innermost `rest` (the `a < 9` if) then the tail re-appended.
+    assert any(isinstance(s, IfStmt) and s.cond.op == "<" for s in out[1:])
+    assert isinstance(out[-1], ReturnStmt)
+
+
+def test_shared_handler_needs_terminating_tail():
+    """If the tail doesn't terminate, the `match` arm would fall through,
+    so the chain is left as-is."""
+    rest = _tail("inner")
+    chain = _eq_if(Reg.A, 1, [_eq_if(Reg.A, 2, rest, op="!=")], op="!=")
+    out = _recognize([chain, _R(LoadImm(reg=Reg.A, imm=_imm(0), src=SRC))])  # no return
+    assert not any(isinstance(s, MatchStmt) for s in out)
+
+
+def test_single_negated_if_is_not_a_chain():
+    out = _recognize([
+        _eq_if(Reg.A, 1, [_R(LoadImm(reg=Reg.A, imm=_imm(7), src=SRC))], op="!="),
+        ReturnStmt(src=SRC),
+    ])
+    assert not any(isinstance(s, MatchStmt) for s in out)
+
+
+def _shared_handler_routine() -> RoutineIR3:
+    """`a = *INPUT ; if a!=1 { if a!=2 { if a<9 {*OUT=0x11;ret} } } ;
+    *OUT=0x00 ; ret` — a 2-key shared-handler dispatch."""
+    rest = [
+        _eq_if(Reg.A, 9, [
+            _R(LoadImm(reg=Reg.A, imm=_imm(0x11), src=SRC)),
+            _R(StoreAbs(reg=Reg.A, target=Abs(name="OUT", addr=0x301), src=SRC)),
+            ReturnStmt(src=SRC),
+        ], op="<"),
+    ]
+    chain = _eq_if(Reg.A, 1, [_eq_if(Reg.A, 2, rest, op="!=")], op="!=")
+    return RoutineIR3(name="sh", body=Block.of([
+        _R(LoadAbs(reg=Reg.A, source=Abs(name="INPUT", addr=0x300), src=SRC)),
+        chain,
+        _R(LoadImm(reg=Reg.A, imm=_imm(0x00), src=SRC)),
+        _R(StoreAbs(reg=Reg.A, target=Abs(name="OUT", addr=0x301), src=SRC)),
+        ReturnStmt(src=SRC),
+    ]))
+
+
+def test_shared_handler_is_behaviour_preserving():
+    routine = _shared_handler_routine()
+    matched = recognize_routine(routine)
+    assert match_stats(ModuleIR3("M", "syn", [matched])) == 1
+
+    pre = ModuleIR3("M", "syn", [routine])
+    post = ModuleIR3("M", "syn", [matched])
+    # keys {1,2} -> 0x00; a<9 (and not a key) -> 0x11; else -> 0x00.
+    for inp, expected in [(1, 0x00), (2, 0x00), (5, 0x11), (9, 0x00), (200, 0x00)]:
+        r1 = bytearray(0x10000); r1[0x300] = inp
+        r2 = bytearray(0x10000); r2[0x300] = inp
+        ir3_run([pre], "sh", ram=r1)
+        ir3_run([post], "sh", ram=r2)
+        assert r1 == r2, f"shared-handler match diverged for input {inp}"
+        assert r2[0x301] == expected

@@ -606,16 +606,62 @@ impl Cpu {
             return;
         }
         self.reg.a = self.mem[sym::KidBlockX];
-        if self.reg.a != 0x02 {
-            if self.reg.a != 0x03 {
+        match self.reg.a {
+            0x02 | 0x03 => {
+                self.reg.a = self.mem[sym::VisScrn];
+                self.reg.x = 0x05;
+                self.reg.y = 0x01;
+                self.rdblock();
+                let tmp0 = self.reg.a;
+                self.mem[(self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize] = 0x01;
+                self.mem[sym::height] = 0x18;
+                self.reg.a = 0x02;
+                self.markred();
+                self.markwipe();
+                self.reg.y = self.reg.y.wrapping_add(1);
+                self.markred();
+                self.markwipe();
+                self.reg.a = tmp0;
+                if self.reg.a != 0x15 {
+                    return;
+                }
+                self.mem[sym::CharScrn] = self.mem[sym::VisScrn];
+                self.reg.x = 0x01;
+                self.mem[sym::CharBlockY] = self.reg.x;
+                self.mem[sym::CharY] = self.mem[sym::FloorY + 1 + self.reg.x as usize];
+                self.reg.a = 0x05;
+                self.mem[sym::CharBlockX] = self.reg.a;
+                self.getblockej();
+                self.flags.c = false;
+                let _r = (self.reg.a as u16) + (0x0e) as u16 + (self.flags.c as u16);
+                self.reg.a = _r as u8;
+                self.flags.c = (_r >> 8) != 0;
+                self.mem[sym::CharX] = self.reg.a;
+                self.mem[sym::CharFace] = 0xff;
+                self.reg.a = 0x58;
+                self.jumpseq();
+                self.animchar();
+                self.mem[sym::guardprog] = 0x02;
+                self.mem[sym::CharLife] = 0xff;
+                self.mem[sym::OppStrength] = 0x03;
+                self.mem[sym::alertguard] = 0x00;
+                self.mem[sym::refract] = 0x00;
+                self.mem[sym::CharXVel] = 0x00;
+                self.mem[sym::CharYVel] = 0x00;
+                self.mem[sym::CharSword] = 0x02;
+                self.reg.a = 0x04;
+                self.mem[sym::CharID] = self.reg.a;
+                self.SaveShad();
                 return;
             }
+            _ => {}
         }
+        return;
         self.reg.a = self.mem[sym::VisScrn];
         self.reg.x = 0x05;
         self.reg.y = 0x01;
         self.rdblock();
-        let tmp0 = self.reg.a;
+        let tmp1 = self.reg.a;
         self.mem[(self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize] = 0x01;
         self.mem[sym::height] = 0x18;
         self.reg.a = 0x02;
@@ -624,7 +670,7 @@ impl Cpu {
         self.reg.y = self.reg.y.wrapping_add(1);
         self.markred();
         self.markwipe();
-        self.reg.a = tmp0;
+        self.reg.a = tmp1;
         if self.reg.a != 0x15 {
             return;
         }

@@ -673,49 +673,51 @@ impl Cpu {
 
     fn FollowKid(&mut self) {
         self.reg.a = self.mem[sym::OpAction];
-        if self.reg.a != 0x02 {
-            if self.reg.a != 0x06 {
+        match self.reg.a {
+            0x02 | 0x06 => {
+                return;
+            }
+            _ => {}
+        }
+        self.getinfront();
+        self.mem[sym::ztemp] = self.reg.a;
+        self.cmpbarr();
+        if self.flags.z {
+            self.reg.a = self.mem[sym::ztemp];
+            self.cmpspace();
+            if self.flags.z {
                 self.getinfront();
+                self.mem[sym::tempblocky] = self.mem[sym::tempblocky].wrapping_add(1);
+                self.rdblock1();
                 self.mem[sym::ztemp] = self.reg.a;
-                self.cmpbarr();
-                if self.flags.z {
-                    self.reg.a = self.mem[sym::ztemp];
-                    self.cmpspace();
-                    if self.flags.z {
-                        self.getinfront();
-                        self.mem[sym::tempblocky] = self.mem[sym::tempblocky].wrapping_add(1);
-                        self.rdblock1();
-                        self.mem[sym::ztemp] = self.reg.a;
-                        if self.reg.a != 0x02 {
-                            if self.reg.a != 0x0b {
-                                self.cmpbarr();
-                                if self.flags.z {
-                                    self.reg.a = self.mem[sym::ztemp];
-                                    self.cmpspace();
-                                    if !self.flags.z {
-                                        self.reg.a = self.mem[sym::CharBlockY];
-                                        self.flags.c = false;
-                                        let _r = (self.reg.a as u16) + (0x01) as u16 + (self.flags.c as u16);
-                                        self.reg.a = _r as u8;
-                                        self.flags.c = (_r >> 8) != 0;
-                                        if self.reg.a == self.mem[sym::OpBlockY] {
-                                            self.DoAdvance();
-                                            return;
-                                        }
-                                    }
+                if self.reg.a != 0x02 {
+                    if self.reg.a != 0x0b {
+                        self.cmpbarr();
+                        if self.flags.z {
+                            self.reg.a = self.mem[sym::ztemp];
+                            self.cmpspace();
+                            if !self.flags.z {
+                                self.reg.a = self.mem[sym::CharBlockY];
+                                self.flags.c = false;
+                                let _r = (self.reg.a as u16) + (0x01) as u16 + (self.flags.c as u16);
+                                self.reg.a = _r as u8;
+                                self.flags.c = (_r >> 8) != 0;
+                                if self.reg.a == self.mem[sym::OpBlockY] {
+                                    self.DoAdvance();
+                                    return;
                                 }
                             }
                         }
-                    } else {
-                        self.DoAdvance();
-                        return;
                     }
                 }
-                self.mem[sym::droppedout] = 0x00;
-                self.DoRetreat();
+            } else {
+                self.DoAdvance();
                 return;
             }
         }
+        self.mem[sym::droppedout] = 0x00;
+        self.DoRetreat();
+        return;
         return;
     }
 
@@ -841,20 +843,31 @@ impl Cpu {
             _ => {}
         }
         self.reg.x = self.mem[sym::CharPosn];
-        if self.reg.x != 0xa1 {
-            if self.reg.x != 0x96 {
+        match self.reg.x {
+            0xa1 | 0x96 => {
                 self.rndp();
-                let _o: u8 = self.mem[sym::strikeprob + self.reg.x as usize];
+                let _o: u8 = self.mem[sym::restrikeprob + self.reg.x as usize];
                 self.flags.c = self.reg.a >= _o;
                 self.flags.z = self.reg.a == _o;
                 self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                if self.reg.a >= self.mem[sym::strikeprob + self.reg.x as usize] {
+                if self.reg.a >= self.mem[sym::restrikeprob + self.reg.x as usize] {
                     return;
                 }
                 self.DoStrike();
                 return;
             }
+            _ => {}
         }
+        self.rndp();
+        let _o: u8 = self.mem[sym::strikeprob + self.reg.x as usize];
+        self.flags.c = self.reg.a >= _o;
+        self.flags.z = self.reg.a == _o;
+        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+        if self.reg.a >= self.mem[sym::strikeprob + self.reg.x as usize] {
+            return;
+        }
+        self.DoStrike();
+        return;
         self.rndp();
         let _o: u8 = self.mem[sym::restrikeprob + self.reg.x as usize];
         self.flags.c = self.reg.a >= _o;
@@ -980,11 +993,62 @@ impl Cpu {
             return;
         }
         self.reg.a = self.mem[sym::CharPosn];
-        if self.reg.a != 0x99 {
-            if self.reg.a != 0x9a {
+        match self.reg.a {
+            0x99 | 0x9a => {
+                'b12: {
+                    self.getopdist();
+                    if self.reg.a >= 0x00 {
+                        if self.reg.a < 0x1d {
+                            self.reg.a = self.mem[sym::OpPosn];
+                            if self.reg.a != 0xa1 {
+                                if self.reg.a != 0x96 {
+                                    break 'b12;
+                                } else {
+                                    self.reg.a = 0xa1;
+                                    self.mem[sym::OpPosn] = self.reg.a;
+                                }
+                            }
+                            self.reg.a = self.mem[sym::CharID];
+                            if self.reg.a != 0x00 {
+                                self.reg.a = 0x04;
+                                self.mem[sym::justblocked] = self.reg.a;
+                            }
+                            self.reg.a = 0x45;
+                            self.jumpseq();
+                            self.animchar();
+                            return;
+                        }
+                    }
+                }
+                self.reg.a = self.mem[sym::CharPosn];
+                if self.reg.a != 0x9a {
+                    return;
+                }
+                self.getopdist();
+                self.reg.x = self.mem[sym::OpSword];
+                if self.reg.x >= 0x02 {
+                    if self.reg.a < 0x0c {
+                        return;
+                    }
+                } else {
+                    if self.reg.a < 0x08 {
+                        return;
+                    }
+                }
+                let _o: u8 = 0x1d;
+                self.flags.c = self.reg.a >= _o;
+                self.flags.z = self.reg.a == _o;
+                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                if self.reg.a >= 0x1d {
+                    return;
+                }
+                // raw: ??? lda #99 "stabbed"            ; AUTO.S:1002
+                self.mem[sym::OpAction] = self.reg.a;
                 return;
             }
+            _ => {}
         }
+        return;
         'b12: {
             self.getopdist();
             if self.reg.a >= 0x00 {
@@ -1778,21 +1842,23 @@ impl Cpu {
 
     fn mirrmusic(&mut self) {
         self.reg.a = self.mem[sym::exitopen];
-        if self.reg.a != 0x00 {
-            if self.reg.a != 0x4d {
-                self.reg.a = self.mem[sym::level];
-                if self.reg.a == 0x04 {
-                    self.reg.a = self.mem[sym::CharBlockY];
-                    if self.reg.a == 0x00 {
-                        self.reg.a = self.mem[sym::CharScrn];
-                        if self.reg.a == 0x0b {
-                            self.reg.a = 0x03;
-                            self.reg.x = 0x32;
-                            self.cuesong();
-                            self.reg.a = 0x4d;
-                            self.mem[sym::exitopen] = self.reg.a;
-                        }
-                    }
+        match self.reg.a {
+            0x00 | 0x4d => {
+                return;
+            }
+            _ => {}
+        }
+        self.reg.a = self.mem[sym::level];
+        if self.reg.a == 0x04 {
+            self.reg.a = self.mem[sym::CharBlockY];
+            if self.reg.a == 0x00 {
+                self.reg.a = self.mem[sym::CharScrn];
+                if self.reg.a == 0x0b {
+                    self.reg.a = 0x03;
+                    self.reg.x = 0x32;
+                    self.cuesong();
+                    self.reg.a = 0x4d;
+                    self.mem[sym::exitopen] = self.reg.a;
                 }
             }
         }
