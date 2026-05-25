@@ -542,12 +542,13 @@ def _diamond_module():
     at a shared tail T. The relooper's post-dominator merge should emit
     T exactly once (in the continuation after an `if/else`), not inline
     it into both arms."""
-    from pop_lifter.ir1 import Compare, Goto, Label
+    from pop_lifter.ir1 import Compare, Goto, Label, LoadAbs
     from pop_lifter.ir1 import If as IR1If
 
     src = SourceRef(file="syn", line=0, raw="")
     M10 = Abs(name="m10", addr=0x10)
     M11 = Abs(name="m11", addr=0x11)
+    INP = Abs(name="inp", addr=0x12)
 
     def store(val, target):
         return [
@@ -556,7 +557,8 @@ def _diamond_module():
         ]
 
     body = [
-        LoadImm(reg=Reg.A, imm=Imm(value=1, text="#1"), src=src),
+        # Load the dispatch value from memory so a test can drive both arms.
+        LoadAbs(reg=Reg.A, source=INP, src=src),
         IR1If(cond=Compare(reg=Reg.A, op="==", rhs=Imm(value=1, text="#1")),
               target=":taken", src=src),
         # fall-through arm B
@@ -658,11 +660,15 @@ def test_postdom_merge_preserves_behaviour():
     ir2 = structure_module(mod)
     ir3 = reloop_module(ir2)
 
-    ram2 = bytearray(0x10000)
-    ir1_run([ir2], "diamond", ram=ram2)
-    ram3 = bytearray(0x10000)
-    ir3_run([ir3], "diamond", ram=ram3)
-
-    # a == 1, so the taken arm runs: mem[0x10]=0xA1; shared tail mem[0x11]=0xCC.
-    assert (ram3[0x10], ram3[0x11]) == (0xA1, 0xCC)
-    assert ram2[0x10:0x12] == ram3[0x10:0x12]
+    # inp==1 exercises the taken arm (mem[0x10]=0xA1); any other value
+    # exercises the else arm (mem[0x10]=0xB1). Both share the tail
+    # mem[0x11]=0xCC. Check each against IR1 so neither arm regresses.
+    for inp, exp_m10 in [(1, 0xA1), (0, 0xB1), (7, 0xB1)]:
+        ram2 = bytearray(0x10000)
+        ram2[0x12] = inp
+        ir1_run([ir2], "diamond", ram=ram2)
+        ram3 = bytearray(0x10000)
+        ram3[0x12] = inp
+        ir3_run([ir3], "diamond", ram=ram3)
+        assert (ram3[0x10], ram3[0x11]) == (exp_m10, 0xCC), f"ir3 wrong for inp={inp}"
+        assert ram2[0x10:0x12] == ram3[0x10:0x12], f"ir1/ir3 differ for inp={inp}"

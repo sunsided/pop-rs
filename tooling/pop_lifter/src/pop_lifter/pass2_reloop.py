@@ -723,6 +723,10 @@ def _emit_block(
     including) `exit_id`. `exit_id=None` means "emit until the
     routine exits".
 
+    Used for *loop-bearing* routines; fully-acyclic ones go through
+    `_structure_acyclic`, which structures merges with labeled blocks
+    and no duplication.
+
     `loops` / `loop_blocks` carry the pre-computed simple-loop
     layout. When the walker hits a loop header, it switches into
     loop-body mode (`active_loop_tail` set) and emits the contained
@@ -730,12 +734,12 @@ def _emit_block(
     conditional jump becomes the bottom-of-loop break guard; any
     other back-edge to the same header surfaces as `continue`.
 
-    Code duplication note: when a block is reached from two paths
-    (e.g. CHECKFLOOR's `:ong` from both `B2.taken` and `B3.fall-
-    through`), this algorithm emits its body once per visit. The
-    duplication is structurally innocuous (each emission terminates
-    via tail-call, return, or break) but pass 3 may merge them once
-    it has post-dominator data.
+    Code duplication: when an `if`'s two arms reconverge at their
+    immediate post-dominator `M` (`ipostdoms`), the continuation is
+    emitted once after an `if/else` (see the `If`/`Branch` handling).
+    A merge reached by *more* paths than that — a partial join — is
+    still emitted once per path here; collapsing those needs the
+    labeled-block structurer extended to loop bodies (a later pass).
     """
     stmts: list[Stmt] = []
     while bid is not None and bid != exit_id:
