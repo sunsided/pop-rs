@@ -2132,8 +2132,8 @@ impl Cpu {
             return;
         }
         self.flags.c = false;
-        // 65816 (IIgs-only, not modeled): xce
-        // 65816 (IIgs-only, not modeled): rep $30
+        // 65816 (IIgs-only, not modeled): xce  ; GRAFIX.S:2093
+        // 65816 (IIgs-only, not modeled): rep $30  ; GRAFIX.S:2094
         self.stack.push(self.reg.a);
         // raw: ??? phy             ; GRAFIX.S:2096
         self.reg.x = 0x03;
@@ -2141,21 +2141,21 @@ impl Cpu {
         self.flags.z = self.reg.a == 0;
         self.flags.n = (self.reg.a >> 7) != 0;
         self.flags.c = true;
-        // 65816 (IIgs-only, not modeled): xce
+        // 65816 (IIgs-only, not modeled): xce  ; GRAFIX.S:2101
         self.reg.y = self.reg.a;
         return;
     }
 
     fn setparam(&mut self) {
         self.flags.c = false;
-        // 65816 (IIgs-only, not modeled): xce
-        // 65816 (IIgs-only, not modeled): rep $30
+        // 65816 (IIgs-only, not modeled): xce  ; GRAFIX.S:2114
+        // 65816 (IIgs-only, not modeled): rep $30  ; GRAFIX.S:2115
         self.reg.a &= 0xff;
         self.stack.push(self.reg.a);
         // raw: ??? phy             ; GRAFIX.S:2118
         self.reg.x = 0x03;
         self.flags.c = true;
-        // 65816 (IIgs-only, not modeled): xce
+        // 65816 (IIgs-only, not modeled): xce  ; GRAFIX.S:2122
         return;
     }
 

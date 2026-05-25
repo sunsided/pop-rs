@@ -18,8 +18,9 @@ def test_is_65816_covers_native_ops_only():
     for m in ("xce", "rep", "sep", "mvn", "phb", "plb"):
         assert is_65816(m), m
     # 65C02 ops (present on enhanced IIe/IIc, modellable later) are NOT
-    # treated as out-of-scope IIgs platform ops.
-    for m in ("phy", "tsb", "trb", "lda", "sta"):
+    # treated as out-of-scope IIgs platform ops — including stp/wai, which
+    # are WDC-65C02 instructions, not 65816-exclusive.
+    for m in ("phy", "tsb", "trb", "stp", "wai", "lda", "sta"):
         assert not is_65816(m), m
     assert OPS_65816 >= {"xce", "rep", "sep", "mvn", "mvp", "phb", "plb"}
 
@@ -33,12 +34,17 @@ def test_ir1_dump_labels_65816_not_as_unknown():
 
 
 def test_pass4_emits_65816_platform_stub():
+    # The stub keeps the source ref so readers can jump back to the .S line.
     out = _emit_stmt(RawStmt(item=_unsup("mvn", "$E1,1")), 0)
-    assert out == ["// 65816 (IIgs-only, not modeled): mvn $E1,1"]
+    assert out == ["// 65816 (IIgs-only, not modeled): mvn $E1,1  ; syn:1"]
     # No operand → just the mnemonic.
     assert _emit_stmt(RawStmt(item=_unsup("xce")), 0) == [
-        "// 65816 (IIgs-only, not modeled): xce"
+        "// 65816 (IIgs-only, not modeled): xce  ; syn:1"
     ]
+
+
+def test_ir1_dump_keeps_source_ref_for_65816():
+    assert format_item(_unsup("xce")).strip().endswith("(not modeled) — syn:1")
 
 
 def test_pass4_unknown_opcode_still_raw_comment():

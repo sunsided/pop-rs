@@ -929,12 +929,12 @@ impl Cpu {
         // raw: patch *:sm1+2 = a            ; UNPACK.S:683
         // raw: patch *:sm2+2 = a            ; UNPACK.S:684
         self.flags.c = false;
-        // 65816 (IIgs-only, not modeled): xce
-        // 65816 (IIgs-only, not modeled): sep $30
+        // 65816 (IIgs-only, not modeled): xce  ; UNPACK.S:687
+        // 65816 (IIgs-only, not modeled): sep $30  ; UNPACK.S:689
         self.mem[0xc035] = 0x1e;
         self.reg.a = 0x41;
         self.mem[0xc029] = self.reg.a;
-        // 65816 (IIgs-only, not modeled): rep $30
+        // 65816 (IIgs-only, not modeled): rep $30  ; UNPACK.S:696
         self.reg.a = 0x00;
         self.reg.x = 0x1e;
         loop {
@@ -948,19 +948,19 @@ impl Cpu {
         self.reg.x = 0x00;
         self.reg.y = 0x00;
         self.reg.a = 0xff;
-        // 65816 (IIgs-only, not modeled): phb
-        // 65816 (IIgs-only, not modeled): mvn $E1,1
-        // 65816 (IIgs-only, not modeled): plb
-        // 65816 (IIgs-only, not modeled): sep $20
+        // 65816 (IIgs-only, not modeled): phb  ; UNPACK.S:713
+        // 65816 (IIgs-only, not modeled): mvn $E1,1  ; UNPACK.S:714
+        // 65816 (IIgs-only, not modeled): plb  ; UNPACK.S:715
+        // 65816 (IIgs-only, not modeled): sep $20  ; UNPACK.S:719
         self.reg.a = 0xc1;
         self.mem[0xc029] = self.reg.a;
-        // 65816 (IIgs-only, not modeled): rep $20
+        // 65816 (IIgs-only, not modeled): rep $20  ; UNPACK.S:722
         self.reg.x = 0x00;
         self.reg.y = 0xca;
         self.reg.a = 0x1f;
-        // 65816 (IIgs-only, not modeled): phb
-        // 65816 (IIgs-only, not modeled): mvn 0,1
-        // 65816 (IIgs-only, not modeled): plb
+        // 65816 (IIgs-only, not modeled): phb  ; UNPACK.S:729
+        // 65816 (IIgs-only, not modeled): mvn 0,1  ; UNPACK.S:730
+        // 65816 (IIgs-only, not modeled): plb  ; UNPACK.S:731
         self.PalFade();
         return;
     }

@@ -860,7 +860,7 @@ class Unsupported:
 OPS_65816 = frozenset({
     "xce", "rep", "sep", "mvn", "mvp", "phb", "plb", "phk", "phd", "pld",
     "tcd", "tdc", "tcs", "tsc", "txy", "tyx", "jml", "jsl", "rtl", "brl",
-    "cop", "per", "wdm", "stp", "wai", "xba", "pei", "pea",
+    "cop", "per", "wdm", "xba", "pei", "pea",
 })
 
 
@@ -1139,7 +1139,10 @@ def format_item(item: Item) -> str:
     if isinstance(item, Unsupported):
         op = item.operand if item.operand else ""
         if is_65816(item.mnemonic):
-            return f"  {item.mnemonic} {op}            ; 65816/IIgs op (not modeled)"
+            return (
+                f"  {item.mnemonic} {op}            "
+                f"; 65816/IIgs op (not modeled) — {item.src.short()}"
+            )
         return f"  ??? {item.mnemonic} {op}            ; {item.src.short()}"
     raise TypeError(f"unknown IR1 item: {type(item)}")
 

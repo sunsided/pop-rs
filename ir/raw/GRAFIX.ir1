@@ -1529,14 +1529,14 @@ getparam:
   a = *IIGS@0x0211        ; GRAFIX.S:2089
   if eq goto ]rts       ; GRAFIX.S:2090
   c = 0                            ; GRAFIX.S:2092
-  xce             ; 65816/IIgs op (not modeled)
-  rep $30            ; 65816/IIgs op (not modeled)
+  xce             ; 65816/IIgs op (not modeled) — GRAFIX.S:2093
+  rep $30            ; 65816/IIgs op (not modeled) — GRAFIX.S:2094
   push a                           ; GRAFIX.S:2095
   ??? phy             ; GRAFIX.S:2096
   x = #0x03                  ; GRAFIX.S:2097
   a = pop                          ; GRAFIX.S:2099
   c = 1                            ; GRAFIX.S:2100
-  xce             ; 65816/IIgs op (not modeled)
+  xce             ; 65816/IIgs op (not modeled) — GRAFIX.S:2101
   y = a                            ; GRAFIX.S:2102
   return                           ; GRAFIX.S:2103
 ]rts:
@@ -1547,14 +1547,14 @@ fn getparam {
   a = *IIGS@0x0211        ; GRAFIX.S:2089
   if eq goto ]rts       ; GRAFIX.S:2090
   c = 0                            ; GRAFIX.S:2092
-  xce             ; 65816/IIgs op (not modeled)
-  rep $30            ; 65816/IIgs op (not modeled)
+  xce             ; 65816/IIgs op (not modeled) — GRAFIX.S:2093
+  rep $30            ; 65816/IIgs op (not modeled) — GRAFIX.S:2094
   push a                           ; GRAFIX.S:2095
   ??? phy             ; GRAFIX.S:2096
   x = #0x03                  ; GRAFIX.S:2097
   a = pop                          ; GRAFIX.S:2099
   c = 1                            ; GRAFIX.S:2100
-  xce             ; 65816/IIgs op (not modeled)
+  xce             ; 65816/IIgs op (not modeled) — GRAFIX.S:2101
   y = a                            ; GRAFIX.S:2102
   return                           ; GRAFIX.S:2103
 ]rts:
@@ -1563,14 +1563,14 @@ fn getparam {
 
 fn setparam {
   c = 0                            ; GRAFIX.S:2113
-  xce             ; 65816/IIgs op (not modeled)
-  rep $30            ; 65816/IIgs op (not modeled)
+  xce             ; 65816/IIgs op (not modeled) — GRAFIX.S:2114
+  rep $30            ; 65816/IIgs op (not modeled) — GRAFIX.S:2115
   a = a & #0xff              ; GRAFIX.S:2116
   push a                           ; GRAFIX.S:2117
   ??? phy             ; GRAFIX.S:2118
   x = #0x03                  ; GRAFIX.S:2119
   c = 1                            ; GRAFIX.S:2121
-  xce             ; 65816/IIgs op (not modeled)
+  xce             ; 65816/IIgs op (not modeled) — GRAFIX.S:2122
   return                           ; GRAFIX.S:2123
   ??? usr $a9,4,$0000,*-org            ; GRAFIX.S:2130
 }
