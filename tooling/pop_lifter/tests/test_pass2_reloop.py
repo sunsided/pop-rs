@@ -595,6 +595,64 @@ def test_postdom_merge_emits_shared_tail_once():
     assert len(tail) == 1, f"shared tail emitted {len(tail)} times, expected 1"
 
 
+def _three_way_merge_module():
+    """A 3-predecessor merge: `a==1`→M, `a==2`→M, else fall→M. M's body
+    must be emitted exactly once (the old walker inlined it per path),
+    here as a clean nested `if/else` since the merge is the tail."""
+    from pop_lifter.ir1 import Compare, Label, LoadAbs
+    from pop_lifter.ir1 import If as IR1If
+
+    src = SourceRef(file="syn", line=0, raw="")
+    SINK, OUT, INP = Abs(name="sink", addr=0x30), Abs(name="out", addr=0x31), Abs(name="inp", addr=0x32)
+
+    def mark(reg_val, target):
+        return [
+            LoadImm(reg=Reg.X, imm=Imm(value=reg_val, text=f"#{reg_val}"), src=src),
+            StoreAbs(reg=Reg.X, target=target, src=src),
+        ]
+
+    body = [
+        LoadAbs(reg=Reg.A, source=INP, src=src),
+        IR1If(cond=Compare(reg=Reg.A, op="==", rhs=Imm(value=1, text="#1")), target=":m", src=src),
+        *mark(0xB1, SINK),
+        IR1If(cond=Compare(reg=Reg.A, op="==", rhs=Imm(value=2, text="#2")), target=":m", src=src),
+        *mark(0xB2, SINK),
+        Label(name=":m", src=src),
+        *mark(0xCC, OUT),
+        Return(src=src),
+    ]
+    return ModuleIR1(name="SYN", file="syn", routines=[Routine(name="tri", body=body)])
+
+
+def test_three_way_merge_emitted_once():
+    mod = _three_way_merge_module()
+    ir3 = reloop_module(structure_module(mod))
+    tri = ir3.find("tri")
+    # M's distinctive store (out = #0xCC) is emitted exactly once — the
+    # dedup the relooper now guarantees (the old walker emitted it ~3x).
+    outs = [
+        s for s in _flatten(tri.body.stmts)
+        if isinstance(s, RawStmt) and isinstance(s.item, StoreAbs)
+        and s.item.target.addr == 0x31
+    ]
+    assert len(outs) == 1, f"merge tail emitted {len(outs)} times"
+
+
+def test_three_way_merge_preserves_behaviour():
+    mod = _three_way_merge_module()
+    ir2 = structure_module(mod)
+    ir3 = reloop_module(ir2)
+    for inp, exp_sink, exp_out in [(1, 0x00, 0xCC), (2, 0xB1, 0xCC), (5, 0xB2, 0xCC)]:
+        ram2 = bytearray(0x10000)
+        ram2[0x32] = inp
+        ir1_run([ir2], "tri", ram=ram2)
+        ram3 = bytearray(0x10000)
+        ram3[0x32] = inp
+        ir3_run([ir3], "tri", ram=ram3)
+        assert (ram3[0x30], ram3[0x31]) == (exp_sink, exp_out), f"ir3 wrong for inp={inp}"
+        assert ram2[0x30:0x32] == ram3[0x30:0x32], f"ir1/ir3 differ for inp={inp}"
+
+
 def test_postdom_merge_preserves_behaviour():
     mod = _diamond_module()
     ir2 = structure_module(mod)

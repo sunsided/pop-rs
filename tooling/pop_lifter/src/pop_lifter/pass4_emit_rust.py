@@ -103,6 +103,7 @@ from .ir3 import (
     DoWhileStmt,
     ForStmt,
     IfStmt,
+    LabeledBlock,
     LoopStmt,
     MatchStmt,
     ModuleIR3,
@@ -125,7 +126,7 @@ _LOWERED_TYPES = (
     IfStmt, LoopStmt, DoWhileStmt, ForStmt, RepeatStmt,
     BreakStmt, ContinueStmt, MatchStmt,
     CallStmt, TailCallStmt,
-    SaveTemp, RestoreTemp, Wide16Stmt,
+    SaveTemp, RestoreTemp, Wide16Stmt, LabeledBlock,
 )
 
 
@@ -570,8 +571,16 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
     if isinstance(stmt, ReturnStmt):
         return [f"{pad}return;"]
 
+    if isinstance(stmt, LabeledBlock):
+        lines = [f"{pad}{stmt.label}: {{"]
+        for s in stmt.body.stmts:
+            lines.extend(_emit_stmt(s, indent + 1, syms))
+        lines.append(f"{pad}}}")
+        return lines
+
     if isinstance(stmt, BreakStmt):
-        return [f"{pad}break;"]
+        target = f" {stmt.label}" if stmt.label else ""
+        return [f"{pad}break{target};"]
 
     if isinstance(stmt, ContinueStmt):
         return [f"{pad}continue;"]

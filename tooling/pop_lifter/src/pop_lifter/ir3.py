@@ -323,8 +323,24 @@ class RepeatStmt:
 
 @dataclass(frozen=True)
 class BreakStmt:
-    """Exit the innermost enclosing loop statement (`LoopStmt` or, after
-    loop recovery, `DoWhileStmt`)."""
+    """Exit an enclosing block. With `label=None` it exits the innermost
+    loop (`LoopStmt` / `DoWhileStmt`); with a `label` it exits the named
+    `LabeledBlock` — the relooper's structured forward jump to a merge
+    node (Rust `break 'label`)."""
+    src: SourceRef
+    label: str | None = None
+
+
+@dataclass(frozen=True)
+class LabeledBlock:
+    """A named, single-entry scope the relooper wraps around a region so
+    that a forward edge to the region's merge node becomes a structured
+    `break 'label` to just after the block, letting the merge node be
+    emitted exactly once (instead of duplicated into every predecessor).
+    Lowers to a Rust labeled block: `'label: { <body> }`."""
+
+    label: str
+    body: "Block"
     src: SourceRef
 
 
@@ -403,7 +419,7 @@ Stmt = (
     RawStmt | Wide16Stmt | Assign | SaveTemp | RestoreTemp | CallStmt
     | TailCallStmt | ReturnStmt | IfStmt | RawIfStmt | LoopStmt | DoWhileStmt
     | ForStmt | RepeatStmt | MatchStmt | BreakStmt | ContinueStmt | GotoStmt
-    | LabelStmt
+    | LabelStmt | LabeledBlock
 )
 
 
@@ -576,8 +592,15 @@ def _fmt_stmt(stmt: Stmt, indent: int) -> list[str]:
             lines.append(f"{pad}  }}")
         lines.append(f"{pad}}}")
         return lines
+    if isinstance(stmt, LabeledBlock):
+        lines = [f"{pad}{stmt.label}: {{"]
+        for s in stmt.body.stmts:
+            lines.extend(_fmt_stmt(s, indent + 1))
+        lines.append(f"{pad}}}")
+        return lines
     if isinstance(stmt, BreakStmt):
-        return [f"{pad}break                            ; {stmt.src.short()}"]
+        target = f" {stmt.label}" if stmt.label else ""
+        return [f"{pad}break{target}                            ; {stmt.src.short()}"]
     if isinstance(stmt, ContinueStmt):
         return [f"{pad}continue                         ; {stmt.src.short()}"]
     if isinstance(stmt, GotoStmt):

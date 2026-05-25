@@ -465,10 +465,19 @@ def _regen_cmpspace_match(source_dir: Path) -> str:
 
 
 def test_pass3_cmpspace_match_artifact_matches(source_dir):
-    """The CMPSPACE pass-3 pilot pins `match` recognition: four
-    `if a == K { a = 0 ; return }` arms with identical bodies collapse
-    into one `match` arm with four keys, while the trailing non-`==`
-    guard and the default `a = 1 ; return` stay put."""
+    """The CMPSPACE pass-3 pilot. CMPSPACE is a *shared-handler*
+    dispatch — four keys (`cmp K ; beq shared_tail`) all branch to one
+    `a = 0 ; return` tail. The relooper now dedupes that tail (emitting
+    it once), so the routine comes out as a negated `if a != K { … }`
+    chain rather than four `if a == K { a = 0 ; return }` arms.
+
+    `match` recognition keyed on the duplicated arm bodies, so it no
+    longer fires here: rebuilding the `match` requires re-duplicating
+    the shared handler, which is a separate follow-up to `pass3_match`.
+    Distinct-handler jump tables (each key → its own terminating
+    handler) still recognise as `match` — the structurer keeps those
+    flat. This pilot pins the current dedup'd (non-`match`) form until
+    the shared-handler recogniser lands."""
     if not IR_PILOT_CMPSPACE_MATCH.exists():
         raise AssertionError(
             f"missing artifact {IR_PILOT_CMPSPACE_MATCH}. regenerate with:\n"
