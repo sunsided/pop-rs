@@ -760,6 +760,71 @@ def _emit_wide16(stmt: Wide16Stmt, syms: SymTable | None) -> list[str]:
 # ---------------------------------------------------------------- statements
 
 
+def _child_blocks(stmt):
+    """The sub-`Block`s of `stmt` (for control-flow walks)."""
+    blocks = []
+    for attr in ("then_block", "else_block", "body"):
+        b = getattr(stmt, attr, None)
+        if b is not None:
+            blocks.append(b)
+    if isinstance(stmt, (MatchStmt, DispatchStmt)):
+        blocks.extend(arm.body for arm in stmt.arms)
+    return blocks
+
+
+def _has_unlabeled_break(block) -> bool:
+    """True if `block` contains an unlabeled `break` that exits the nearest
+    enclosing loop — i.e. not inside a *nested* loop (whose breaks bind to
+    it) and not a labeled `break 'b` (which targets a `LabeledBlock`)."""
+    for s in block.stmts:
+        if isinstance(s, BreakStmt):
+            if s.label is None:
+                return True
+            continue
+        if isinstance(s, (LoopStmt, DoWhileStmt, ForStmt, RepeatStmt)):
+            continue  # a nested loop captures its own breaks
+        if any(_has_unlabeled_break(b) for b in _child_blocks(s)):
+            return True
+    return False
+
+
+def _diverges(stmt) -> bool:
+    """True if control can't fall out the bottom of `stmt` — it always
+    returns / tail-calls / breaks / continues, so a following statement is
+    unreachable. Handles `loop {}` (a `LoopStmt`/`DoWhile`/`for` emitted as
+    Rust `loop` that never breaks diverges), `if`/`else` where both arms
+    diverge, and the dispatch loop. (`RepeatStmt` emits a bounded Rust
+    `for`, which Rust never treats as diverging, so it's excluded.)"""
+    if isinstance(stmt, (ReturnStmt, TailCallStmt, BreakStmt, ContinueStmt, DispatchStmt)):
+        return True
+    if isinstance(stmt, (LoopStmt, DoWhileStmt, ForStmt)):
+        return _block_diverges(stmt.body) and not _has_unlabeled_break(stmt.body)
+    if isinstance(stmt, (IfStmt, RawIfStmt)):
+        return (
+            stmt.else_block is not None
+            and _block_diverges(stmt.then_block)
+            and _block_diverges(stmt.else_block)
+        )
+    return False
+
+
+def _block_diverges(block) -> bool:
+    return any(_diverges(s) for s in block.stmts)
+
+
+def _emit_block_lines(stmts, indent, syms, names) -> tuple[list[str], bool]:
+    """Emit a block's statements, stopping after the first that diverges
+    (`_diverges`) — statements past it are unreachable and would trip
+    `-D warnings`. Returns `(lines, diverged)`; `diverged` lets a loop drop
+    its trailing step + exit-guard when the body can't fall through."""
+    lines: list[str] = []
+    for s in stmts:
+        lines.extend(_emit_stmt(s, indent, syms, names))
+        if _diverges(s):
+            return lines, True
+    return lines, False
+
+
 def _emit_stmt(
     stmt,
     indent: int,
@@ -782,8 +847,7 @@ def _emit_stmt(
 
     if isinstance(stmt, LabeledBlock):
         lines = [f"{pad}{stmt.label}: {{"]
-        for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms, names))
+        lines += _emit_block_lines(stmt.body.stmts, indent + 1, syms, names)[0]
         lines.append(f"{pad}}}")
         return lines
 
@@ -809,30 +873,25 @@ def _emit_stmt(
 
     if isinstance(stmt, IfStmt):
         lines = [f"{pad}if {_emit_compare(stmt.cond, syms)} {{"]
-        for s in stmt.then_block.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms, names))
+        lines += _emit_block_lines(stmt.then_block.stmts, indent + 1, syms, names)[0]
         if stmt.else_block is not None:
             lines.append(f"{pad}}} else {{")
-            for s in stmt.else_block.stmts:
-                lines.extend(_emit_stmt(s, indent + 1, syms, names))
+            lines += _emit_block_lines(stmt.else_block.stmts, indent + 1, syms, names)[0]
         lines.append(f"{pad}}}")
         return lines
 
     if isinstance(stmt, RawIfStmt):
         lines = [f"{pad}if {_emit_branch_cond(stmt.cond)} {{"]
-        for s in stmt.then_block.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms, names))
+        lines += _emit_block_lines(stmt.then_block.stmts, indent + 1, syms, names)[0]
         if stmt.else_block is not None:
             lines.append(f"{pad}}} else {{")
-            for s in stmt.else_block.stmts:
-                lines.extend(_emit_stmt(s, indent + 1, syms, names))
+            lines += _emit_block_lines(stmt.else_block.stmts, indent + 1, syms, names)[0]
         lines.append(f"{pad}}}")
         return lines
 
     if isinstance(stmt, LoopStmt):
         lines = [f"{pad}loop {{"]
-        for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms, names))
+        lines += _emit_block_lines(stmt.body.stmts, indent + 1, syms, names)[0]
         lines.append(f"{pad}}}")
         return lines
 
@@ -840,14 +899,17 @@ def _emit_stmt(
         cond = _emit_compare(stmt.cond, syms)
         inner = INDENT * (indent + 1)
         lines = [f"{pad}loop {{"]
-        for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms, names))
-        lines += [
-            f"{inner}if !({cond}) {{",
-            f"{inner}    break;",
-            f"{inner}}}",
-            f"{pad}}}",
-        ]
+        body, diverged = _emit_block_lines(stmt.body.stmts, indent + 1, syms, names)
+        lines += body
+        # When the body can't fall through to the bottom guard (it always
+        # returns / breaks / continues), the guard is unreachable.
+        if not diverged:
+            lines += [
+                f"{inner}if !({cond}) {{",
+                f"{inner}    break;",
+                f"{inner}}}",
+            ]
+        lines.append(f"{pad}}}")
         return lines
 
     if isinstance(stmt, ForStmt):
@@ -859,15 +921,16 @@ def _emit_stmt(
             f"{pad}self.reg.{stmt.var} = {_emit_imm(stmt.start)};",
             f"{pad}loop {{",
         ]
-        for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms, names))
-        lines += [
-            f"{inner}self.reg.{stmt.var} = self.reg.{stmt.var}.{step_method}({step_lit});",
-            f"{inner}if !({cond}) {{",
-            f"{inner}    break;",
-            f"{inner}}}",
-            f"{pad}}}",
-        ]
+        body, diverged = _emit_block_lines(stmt.body.stmts, indent + 1, syms, names)
+        lines += body
+        if not diverged:
+            lines += [
+                f"{inner}self.reg.{stmt.var} = self.reg.{stmt.var}.{step_method}({step_lit});",
+                f"{inner}if !({cond}) {{",
+                f"{inner}    break;",
+                f"{inner}}}",
+            ]
+        lines.append(f"{pad}}}")
         return lines
 
     if isinstance(stmt, RepeatStmt):
@@ -878,12 +941,12 @@ def _emit_stmt(
             f"{pad}self.reg.{stmt.var} = {_emit_imm(stmt.start)};",
             f"{pad}for _ in 0..{stmt.count}usize {{",
         ]
-        for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms, names))
-        lines += [
-            f"{inner}self.reg.{stmt.var} = self.reg.{stmt.var}.{step_method}({step_lit});",
-            f"{pad}}}",
-        ]
+        body, diverged = _emit_block_lines(stmt.body.stmts, indent + 1, syms, names)
+        lines += body
+        if not diverged:
+            lines.append(
+                f"{inner}self.reg.{stmt.var} = self.reg.{stmt.var}.{step_method}({step_lit});")
+        lines.append(f"{pad}}}")
         return lines
 
     if isinstance(stmt, MatchStmt):
@@ -891,8 +954,7 @@ def _emit_stmt(
         for arm in stmt.arms:
             vals = " | ".join(f"0x{v.value & 0xff:02x}" for v in arm.values)
             lines.append(f"{pad}    {vals} => {{")
-            for s in arm.body.stmts:
-                lines.extend(_emit_stmt(s, indent + 2, syms, names))
+            lines += _emit_block_lines(arm.body.stmts, indent + 2, syms, names)[0]
             lines.append(f"{pad}    }}")
         lines += [f"{pad}    _ => {{}}", f"{pad}}}"]
         return lines
@@ -909,8 +971,7 @@ def _emit_stmt(
         ]
         for arm in stmt.arms:
             lines.append(f"{inner}{INDENT}{arm.state} => {{")
-            for s in arm.body.stmts:
-                lines.extend(_emit_stmt(s, indent + 3, syms, names))
+            lines += _emit_block_lines(arm.body.stmts, indent + 3, syms, names)[0]
             lines.append(f"{inner}{INDENT}}}")
         lines += [
             f"{inner}{INDENT}_ => unreachable!(),",
@@ -949,8 +1010,7 @@ def emit_routine(
     if routine.entry_aliases:
         lines.append(f"{pad}// aliases: {', '.join(routine.entry_aliases)}")
     lines.append(f"{pad}fn {_mangle(routine.name)}(&mut self) {{")
-    for s in routine.body.stmts:
-        lines.extend(_emit_stmt(s, indent + 1, syms, names))
+    lines += _emit_block_lines(routine.body.stmts, indent + 1, syms, names)[0]
     lines.append(f"{pad}}}")
     return lines
 

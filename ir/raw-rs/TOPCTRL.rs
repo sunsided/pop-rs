@@ -925,12 +925,7 @@ impl Cpu {
             self.reg.a = self.mem[sym::KidScrn];
             self.closeexit();
             return;
-            self.reg.y = self.reg.y.wrapping_sub(1);
-            if !((self.reg.y as i8) >= 0) {
-                break;
-            }
         }
-        return;
     }
 
     fn addsfx(&mut self) {
