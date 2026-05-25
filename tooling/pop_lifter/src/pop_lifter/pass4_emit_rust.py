@@ -88,6 +88,7 @@ separate later concern.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 
 from .ir1 import (
     Abs,
@@ -160,6 +161,7 @@ from .ir3 import (
     TailCallStmt,
     Wide16Stmt,
 )
+from .pass4_crate import CallDisposition, build_name_map, resolve_call
 
 INDENT = "    "
 
@@ -822,14 +824,19 @@ def _block_diverges(block) -> bool:
     return any(_diverges(s) for s in block.stmts)
 
 
-def _emit_block_lines(stmts, indent, syms, names) -> tuple[list[str], bool]:
+def _emit_block_lines(stmts, indent, syms, names, call_render=None) -> tuple[list[str], bool]:
     """Emit a block's statements, stopping after the first that diverges
     (`_diverges`) — statements past it are unreachable and would trip
     `-D warnings`. Returns `(lines, diverged)`; `diverged` lets a loop drop
-    its trailing step + exit-guard when the body can't fall through."""
+    its trailing step + exit-guard when the body can't fall through.
+
+    `call_render`, when given, renders a `jsr`/`jmp` target as the full
+    Rust call expression (e.g. `crate::auto::DoAdvance(cpu)` for the crate
+    layout); when `None`, calls fall back to the per-file method form
+    `self.<method>()`."""
     lines: list[str] = []
     for s in stmts:
-        lines.extend(_emit_stmt(s, indent, syms, names))
+        lines.extend(_emit_stmt(s, indent, syms, names, call_render))
         if _diverges(s):
             return lines, True
     return lines, False
@@ -840,6 +847,7 @@ def _emit_stmt(
     indent: int,
     syms: SymTable | None = None,
     names: dict[str, str] | None = None,
+    call_render: "Callable[[str], str] | None" = None,
 ) -> list[str]:
     pad = INDENT * indent
 
@@ -857,7 +865,7 @@ def _emit_stmt(
 
     if isinstance(stmt, LabeledBlock):
         lines = [f"{pad}{stmt.label}: {{"]
-        lines += _emit_block_lines(stmt.body.stmts, indent + 1, syms, names)[0]
+        lines += _emit_block_lines(stmt.body.stmts, indent + 1, syms, names, call_render)[0]
         lines.append(f"{pad}}}")
         return lines
 
@@ -869,9 +877,13 @@ def _emit_stmt(
         return [f"{pad}continue;"]
 
     if isinstance(stmt, CallStmt):
+        if call_render is not None:
+            return [f"{pad}{call_render(stmt.target)};"]
         return [f"{pad}self.{_method_name(stmt.target, names)}();"]
 
     if isinstance(stmt, TailCallStmt):
+        if call_render is not None:
+            return [f"{pad}{call_render(stmt.target)};", f"{pad}return;"]
         method = _method_name(stmt.target, names)
         return [f"{pad}self.{method}();", f"{pad}return;"]
 
@@ -883,25 +895,25 @@ def _emit_stmt(
 
     if isinstance(stmt, IfStmt):
         lines = [f"{pad}if {_emit_compare(stmt.cond, syms)} {{"]
-        lines += _emit_block_lines(stmt.then_block.stmts, indent + 1, syms, names)[0]
+        lines += _emit_block_lines(stmt.then_block.stmts, indent + 1, syms, names, call_render)[0]
         if stmt.else_block is not None:
             lines.append(f"{pad}}} else {{")
-            lines += _emit_block_lines(stmt.else_block.stmts, indent + 1, syms, names)[0]
+            lines += _emit_block_lines(stmt.else_block.stmts, indent + 1, syms, names, call_render)[0]
         lines.append(f"{pad}}}")
         return lines
 
     if isinstance(stmt, RawIfStmt):
         lines = [f"{pad}if {_emit_branch_cond(stmt.cond)} {{"]
-        lines += _emit_block_lines(stmt.then_block.stmts, indent + 1, syms, names)[0]
+        lines += _emit_block_lines(stmt.then_block.stmts, indent + 1, syms, names, call_render)[0]
         if stmt.else_block is not None:
             lines.append(f"{pad}}} else {{")
-            lines += _emit_block_lines(stmt.else_block.stmts, indent + 1, syms, names)[0]
+            lines += _emit_block_lines(stmt.else_block.stmts, indent + 1, syms, names, call_render)[0]
         lines.append(f"{pad}}}")
         return lines
 
     if isinstance(stmt, LoopStmt):
         lines = [f"{pad}loop {{"]
-        lines += _emit_block_lines(stmt.body.stmts, indent + 1, syms, names)[0]
+        lines += _emit_block_lines(stmt.body.stmts, indent + 1, syms, names, call_render)[0]
         lines.append(f"{pad}}}")
         return lines
 
@@ -909,7 +921,7 @@ def _emit_stmt(
         cond = _emit_compare(stmt.cond, syms)
         inner = INDENT * (indent + 1)
         lines = [f"{pad}loop {{"]
-        body, diverged = _emit_block_lines(stmt.body.stmts, indent + 1, syms, names)
+        body, diverged = _emit_block_lines(stmt.body.stmts, indent + 1, syms, names, call_render)
         lines += body
         # When the body can't fall through to the bottom guard (it always
         # returns / breaks / continues), the guard is unreachable.
@@ -931,7 +943,7 @@ def _emit_stmt(
             f"{pad}self.reg.{stmt.var} = {_emit_imm(stmt.start)};",
             f"{pad}loop {{",
         ]
-        body, diverged = _emit_block_lines(stmt.body.stmts, indent + 1, syms, names)
+        body, diverged = _emit_block_lines(stmt.body.stmts, indent + 1, syms, names, call_render)
         lines += body
         if not diverged:
             lines += [
@@ -951,7 +963,7 @@ def _emit_stmt(
             f"{pad}self.reg.{stmt.var} = {_emit_imm(stmt.start)};",
             f"{pad}for _ in 0..{stmt.count}usize {{",
         ]
-        body, diverged = _emit_block_lines(stmt.body.stmts, indent + 1, syms, names)
+        body, diverged = _emit_block_lines(stmt.body.stmts, indent + 1, syms, names, call_render)
         lines += body
         if not diverged:
             lines.append(
@@ -964,7 +976,7 @@ def _emit_stmt(
         for arm in stmt.arms:
             vals = " | ".join(f"0x{v.value & 0xff:02x}" for v in arm.values)
             lines.append(f"{pad}    {vals} => {{")
-            lines += _emit_block_lines(arm.body.stmts, indent + 2, syms, names)[0]
+            lines += _emit_block_lines(arm.body.stmts, indent + 2, syms, names, call_render)[0]
             lines.append(f"{pad}    }}")
         lines += [f"{pad}    _ => {{}}", f"{pad}}}"]
         return lines
@@ -981,7 +993,7 @@ def _emit_stmt(
         ]
         for arm in stmt.arms:
             lines.append(f"{inner}{INDENT}{arm.state} => {{")
-            lines += _emit_block_lines(arm.body.stmts, indent + 3, syms, names)[0]
+            lines += _emit_block_lines(arm.body.stmts, indent + 3, syms, names, call_render)[0]
             lines.append(f"{inner}{INDENT}}}")
         lines += [
             f"{inner}{INDENT}_ => unreachable!(),",
@@ -1237,16 +1249,17 @@ def _render_cargo_toml() -> str:
 def _render_lib_rs(modules: list[ModuleIR3]) -> str:
     lines = [
         "// @generated by pop_lifter — DO NOT EDIT.",
-        "// Crate scaffold (issue #47): the shared `Cpu` state (`cpu`),",
-        "// the address-symbol constants (`sym`), and one module per POP",
-        "// source segment. The segment modules are empty in this slice —",
-        "// routine bodies move into them next; the crate exists so the",
-        "// assembled tree builds as they land, instead of 17 self-contained",
-        "// per-file `Cpu` definitions.",
+        "// Assembled crate (issue #47): the shared `Cpu` state (`cpu`), the",
+        "// address-symbol constants (`sym`), external-call stubs (`ext`), and",
+        "// one module per POP source segment whose routines are free",
+        "// functions over `&mut Cpu`. A `jsr`/`jmp` binds to the segment that",
+        "// owns the target (overlay name reuse is resolved per calling",
+        "// module); calls to ROM / firmware / unlifted targets go to `ext`.",
         f"#![allow({', '.join(_CRATE_ALLOWS)})]",
         "",
         "pub mod cpu;",
         "pub mod sym;",
+        "pub mod ext;",
         "",
     ]
     lines += [f"pub mod {_module_mod_name(m)};" for m in modules]
@@ -1278,25 +1291,125 @@ def _render_sym_rs(syms: SymTable) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _render_segment_stub(module: ModuleIR3) -> str:
-    return "\n".join([
+def _to_cpu_receiver(lines: list[str]) -> list[str]:
+    """Retarget the `self.` state receiver to `cpu.` in emitted body lines.
+    The free-function layout takes a `&mut Cpu` named `cpu`, but the shared
+    statement emitter writes `self.` (its method-receiver form). Calls are
+    already rendered as `…(cpu)` paths carrying no `self.`, so this only
+    rewrites register / flag / memory / stack / smc accesses."""
+    return [re.sub(r"\bself\.", "cpu.", line) for line in lines]
+
+
+def _canonical_by_module(modules: list[ModuleIR3]) -> dict[str, dict[str, str]]:
+    """Per-module `{entry-name → canonical routine name}` so a call resolved
+    to a module binds to that module's `pub fn` — an entry alias maps to the
+    routine it names."""
+    out: dict[str, dict[str, str]] = {}
+    for module in modules:
+        table: dict[str, str] = {}
+        for r in module.routines:
+            table[r.name] = r.name
+            for alias in r.entry_aliases:
+                table.setdefault(alias, r.name)
+        out[module.name] = table
+    return out
+
+
+def _make_call_render(
+    caller: str,
+    name_map: dict[str, list[str]],
+    canon: dict[str, dict[str, str]],
+    mod_of: dict[str, str],
+    ext_sink: set[str],
+):
+    """Build the `call_render` for routines in `caller`: bind a `jsr`/`jmp`
+    target to `<fn>(cpu)` (intra-module), `crate::<owner>::<fn>(cpu)`
+    (unique cross-module owner), or `crate::ext::<stub>(cpu)` (external or
+    no unique owner). External / ambiguous targets accumulate in `ext_sink`
+    so `ext.rs` can stub them."""
+    def render(target: str) -> str:
+        res = resolve_call(name_map, caller, target)
+        if res.disposition is CallDisposition.INTRA_MODULE:
+            return f"{_mangle(canon[caller].get(target, target))}(cpu)"
+        if res.disposition is CallDisposition.CROSS_MODULE:
+            owner = res.owner
+            return f"crate::{mod_of[owner]}::{_mangle(canon[owner].get(target, target))}(cpu)"
+        stub = _mangle(target)
+        ext_sink.add(stub)
+        return f"crate::ext::{stub}(cpu)"
+    return render
+
+
+def _emit_crate_segment(
+    module: ModuleIR3,
+    syms: SymTable,
+    name_map: dict[str, list[str]],
+    canon: dict[str, dict[str, str]],
+    mod_of: dict[str, str],
+    ext_sink: set[str],
+) -> str:
+    """Render one segment module: each routine as a `pub fn Name(cpu: &mut
+    Cpu)` free function over the shared state, with calls bound per the
+    resolution policy. Imports `sym` only when the bodies reference it."""
+    call_render = _make_call_render(module.name, name_map, canon, mod_of, ext_sink)
+    fn_blocks: list[list[str]] = []
+    for r in module.routines:
+        block: list[str] = []
+        if r.entry_aliases:
+            block.append(f"// aliases: {', '.join(r.entry_aliases)}")
+        block.append(f"pub fn {_mangle(r.name)}(cpu: &mut Cpu) {{")
+        body = _emit_block_lines(r.body.stmts, 1, syms, None, call_render)[0]
+        block += _to_cpu_receiver(body)
+        block.append("}")
+        fn_blocks.append(block)
+
+    uses_sym = any("sym::" in line for block in fn_blocks for line in block)
+    header = [
         "// @generated by pop_lifter — DO NOT EDIT.",
-        f"// POP source segment `{module.name}` ({len(module.routines)} routines).",
-        "// Routine bodies are emitted in a later slice (issue #47); this",
-        "// module is intentionally empty for now.",
-    ]) + "\n"
+        f"// POP source segment `{module.name}` ({len(module.routines)} routines),",
+        "// lifted to free functions over the shared `Cpu`.",
+        "",
+        "use crate::cpu::Cpu;",
+    ]
+    if uses_sym:
+        header.append("use crate::sym;")
+    lines = [*header, ""]
+    for i, block in enumerate(fn_blocks):
+        if i:
+            lines.append("")
+        lines += block
+    return "\n".join(lines) + "\n"
+
+
+def _render_ext_rs(ext_names: set[str]) -> str:
+    lines = [
+        "// @generated by pop_lifter — DO NOT EDIT.",
+        "// Stubs for `jsr`/`jmp` targets no lifted segment defines — ROM /",
+        "// firmware / monitor entry points and not-yet-lifted labels. Empty",
+        "// bodies for now; a faithful model is later work.",
+        "",
+    ]
+    if ext_names:
+        lines.append("use crate::cpu::Cpu;")
+        lines.append("")
+        lines += [f"pub fn {name}(cpu: &mut Cpu) {{}}" for name in sorted(ext_names)]
+    return "\n".join(lines) + "\n"
 
 
 def emit_crate(modules: list[ModuleIR3]) -> dict[str, str]:
-    """Emit the crate scaffold for the whole lifted program as
+    """Assemble the whole lifted program into one crate as
     `{relative_path: content}`: `Cargo.toml`, `src/lib.rs`, the shared
-    `src/cpu.rs` / `src/sym.rs`, and one empty `src/<segment>.rs` per
-    module. Pure (no writes) and deterministic so the tree can be pinned.
+    `src/cpu.rs` / `src/sym.rs`, `src/ext.rs` (external-call stubs), and one
+    `src/<segment>.rs` per module holding its routines as free functions
+    over `&mut Cpu`. Pure (no writes) and deterministic so the tree can be
+    pinned.
 
     The shared `sym` table is built across *all* modules so the global
     address-conflict rule holds crate-wide, and the `Smc` field set is the
-    union every module references — both ready for the routine bodies that
-    land in the next slice."""
+    union every module references. Calls bind through the per-module
+    resolution policy (`pass4_crate`): intra-module overlay calls stay
+    local, unique cross-module calls reach the owning segment, and
+    everything else stubs into `ext`."""
     syms = SymTable()
     for module in modules:
         _record_syms(module, syms)
@@ -1304,14 +1417,26 @@ def emit_crate(modules: list[ModuleIR3]) -> dict[str, str]:
     names = _build_name_table(modules)
     smc_fields = _smc_fields(modules, syms, names)
 
+    name_map = build_name_map(modules)
+    canon = _canonical_by_module(modules)
+    mod_of = {m.name: _module_mod_name(m) for m in modules}
+
+    ext_names: set[str] = set()
+    segment_files = {
+        f"src/{_module_mod_name(module)}.rs": _emit_crate_segment(
+            module, syms, name_map, canon, mod_of, ext_names
+        )
+        for module in modules
+    }
+
     files = {
         "Cargo.toml": _render_cargo_toml(),
         "src/lib.rs": _render_lib_rs(modules),
         "src/cpu.rs": _render_cpu_rs(smc_fields),
         "src/sym.rs": _render_sym_rs(syms),
+        "src/ext.rs": _render_ext_rs(ext_names),
     }
-    for module in modules:
-        files[f"src/{_module_mod_name(module)}.rs"] = _render_segment_stub(module)
+    files.update(segment_files)
     return files
 
 

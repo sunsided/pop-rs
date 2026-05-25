@@ -1,16 +1,18 @@
-"""Regen + compile tests for the committed crate scaffold under
-`ir/crate/` (issue #47, "shared state scaffold" slice).
+"""Regen + compile tests for the committed assembled crate under
+`ir/crate/` (issue #47).
 
 `emit-crate` assembles the whole lifted program into one coherent crate:
 a shared `cpu` module (the single `Cpu` state), a shared `sym` module
-(address constants), and one module per POP source segment (empty for
-now — routine bodies land in a later slice), plus `Cargo.toml`.
+(address constants), an `ext` module of external-call stubs, and one
+module per POP source segment holding its routines as free functions
+over `&mut Cpu`, plus `Cargo.toml`. Overlay name reuse is resolved per
+calling module, so cross-segment same-named routines coexist.
 
 * The regen test pins the tree byte-for-byte, like the other `ir/`
   artifacts.
 * The compile test type-checks the whole crate through `src/lib.rs`
-  under `rustc -D warnings` (skipped when rustc is absent), so the
-  scaffold stays buildable as the routine bodies move in.
+  under `rustc -D warnings` (skipped when rustc is absent) — not just
+  each file, but the assembled crate with its cross-module call paths.
 """
 
 from __future__ import annotations
@@ -37,7 +39,7 @@ def _disk_tree(root: Path) -> dict[str, str]:
     return out
 
 
-def test_emit_crate_scaffold_matches(source_dir):
+def test_emit_crate_matches(source_dir):
     from pop_lifter.cli import _emit_crate_artifacts
 
     if not IR_CRATE.is_dir():
@@ -68,11 +70,11 @@ def test_emit_crate_scaffold_matches(source_dir):
 
 
 @pytest.mark.skipif(shutil.which("rustc") is None, reason="rustc not on PATH")
-def test_emit_crate_scaffold_compiles_under_deny_warnings(source_dir):
+def test_emit_crate_compiles_under_deny_warnings(source_dir):
     """Type-check the whole assembled crate via `src/lib.rs` (rustc
     resolves the `mod` declarations to the sibling files). Denies all
-    warnings, so the shared `Cpu`/`Smc`/`sym` defs and the module layout
-    must be clean — not just individually but as one crate."""
+    warnings, so the shared `Cpu`/`Smc`/`sym` defs, the free-function
+    bodies, and every cross-module call path must be clean as one crate."""
     from pop_lifter.cli import _emit_crate_artifacts
 
     artifacts = _emit_crate_artifacts(source_dir)

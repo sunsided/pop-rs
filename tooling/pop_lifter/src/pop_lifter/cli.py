@@ -1146,18 +1146,18 @@ def _render_emit_all_summary(
 
 
 def _emit_crate_artifacts(src_dir: Path) -> dict[str, str]:
-    """Pure crate-scaffold build shared by `_cmd_emit_crate` and the regen
-    test: lift the whole program and lay it out as one coherent crate."""
+    """Pure crate build shared by `_cmd_emit_crate` and the regen test:
+    lift the whole program and assemble it into one coherent crate."""
     return emit_crate(lift_all_modules(src_dir))
 
 
 def _cmd_emit_crate(args: argparse.Namespace) -> int:
-    """Assemble the lifted program into one crate scaffold under
-    `--out-dir` (default `ir/crate/`): a shared `cpu` module (the single
-    `Cpu` state), a shared `sym` module (address constants), and one
-    empty module per POP source segment, plus `Cargo.toml`. Routine
-    bodies move into the segment modules in a later slice (#47); the
-    scaffold exists so the assembled tree `cargo build`s as they land."""
+    """Assemble the lifted program into one crate under `--out-dir`
+    (default `ir/crate/`): a shared `cpu` module (the single `Cpu`
+    state), a shared `sym` module (address constants), an `ext` module of
+    external-call stubs, and one module per POP source segment holding its
+    routines as free functions over `&mut Cpu`, plus `Cargo.toml`. Unlike
+    the per-file `emit-all` tree, this `cargo build`s as one crate (#47)."""
     src_dir = _resolve_source_dir(args)
     if src_dir is None:
         return 2
@@ -1169,11 +1169,9 @@ def _cmd_emit_crate(args: argparse.Namespace) -> int:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
 
-    n_seg = sum(
-        1 for rel in files
-        if rel.startswith("src/") and rel not in ("src/lib.rs", "src/cpu.rs", "src/sym.rs")
-    )
-    print(f"wrote crate scaffold ({len(files)} files, {n_seg} segment modules) under {out_dir}")
+    shared = ("src/lib.rs", "src/cpu.rs", "src/sym.rs", "src/ext.rs")
+    n_seg = sum(1 for rel in files if rel.startswith("src/") and rel not in shared)
+    print(f"wrote crate ({len(files)} files, {n_seg} segment modules) under {out_dir}")
     return 0
 
 
@@ -1433,13 +1431,13 @@ def main(argv: list[str] | None = None) -> int:
 
     p_emit_crate = sub.add_parser(
         "emit-crate",
-        help="Pass 4: assemble the whole lifted program into one crate "
-             "scaffold — shared cpu/sym modules + one (empty) module per "
+        help="Pass 4: assemble the whole lifted program into one crate — "
+             "shared cpu/sym/ext modules + one module of free functions per "
              "source segment + Cargo.toml (issue #47).",
     )
     p_emit_crate.add_argument(
         "--out-dir", default="ir/crate",
-        help="Directory to write the crate scaffold into.",
+        help="Directory to write the crate into.",
     )
     p_emit_crate.set_defaults(func=_cmd_emit_crate)
 
