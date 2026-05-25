@@ -701,13 +701,12 @@ def _cmd_temps(args: argparse.Namespace) -> int:
 
 
 def _cmd_emit(args: argparse.Namespace) -> int:
-    """Run the full pass-3 chain (reloop + fold + loop + temp recovery)
-    then emit Rust source from the structured IR3. This first slice lays
-    down module / routine scaffolding and lowers leaf expressions
-    (folded `Assign`s and `return`s); statements not yet lowered appear
-    as `// TODO(pass4)` / `// raw:` comments. Writes the `.rs` text to
-    `--out` (or stdout); the summary reports lowered vs. deferred
-    top-level statements."""
+    """Run the full pass-3 chain (reloop + fold + match recognition +
+    loop + temp recovery) then emit Rust source from the structured
+    IR3. Recognised jump-table dispatches emit as `match`; remaining
+    statements not yet lowered appear as `// TODO(pass4)` / `// raw:`
+    comments. Writes the `.rs` text to `--out` (or stdout); the summary
+    reports lowered vs. deferred top-level statements."""
     src_dir = _resolve_source_dir(args)
     if src_dir is None:
         return 2
@@ -1317,9 +1316,9 @@ def main(argv: list[str] | None = None) -> int:
 
     p_emit = sub.add_parser(
         "emit",
-        help="Pass 4 (skeleton slice): run the full pass-3 chain, then emit "
-             "Rust source — module / routine scaffolding plus leaf-expression "
-             "lowering of folded assigns.",
+        help="Pass 4: run the full pass-3 chain (incl. match recognition), "
+             "then emit Rust source — structured control flow, raw-atom "
+             "lowering, and `match` for recognised dispatches.",
     )
     p_emit.add_argument(
         "file", nargs="+",
