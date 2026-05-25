@@ -1116,17 +1116,25 @@ impl Cpu {
 
     fn drawmc(&mut self) {
         self.reg.a = self.mem[sym::objid];
-        if self.reg.a != 0x00 {
-            if self.reg.a != 0x0c {
-                let _o: u8 = 0x09;
-                self.flags.c = self.reg.a >= _o;
-                self.flags.z = self.reg.a == _o;
-                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                if self.reg.a != 0x09 {
-                    if !self.flags.z {
-                        return;
-                    }
+        match self.reg.a {
+            0x00 | 0x0c => {
+                self.reg.x = self.mem[sym::colno];
+                self.reg.a = self.mem[sym::BELOW + self.reg.x as usize];
+                if self.reg.a != 0x04 {
+                    return;
                 }
+                self.drawgatec();
+                return;
+            }
+            _ => {}
+        }
+        let _o: u8 = 0x09;
+        self.flags.c = self.reg.a >= _o;
+        self.flags.z = self.reg.a == _o;
+        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+        if self.reg.a != 0x09 {
+            if !self.flags.z {
+                return;
             }
         }
         self.reg.x = self.mem[sym::colno];
@@ -1150,19 +1158,20 @@ impl Cpu {
 
     fn checkc(&mut self) {
         self.reg.a = self.mem[sym::objid];
-        if self.reg.a != 0x00 {
-            if self.reg.a != 0x09 {
-                if self.reg.a != 0x0c {
-                    let _o: u8 = 0x1a;
-                    self.flags.c = self.reg.a >= _o;
-                    self.flags.z = self.reg.a == _o;
-                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                    if self.reg.a < 0x1a {
-                        if !self.flags.c {
-                            return;
-                        }
-                    }
-                }
+        match self.reg.a {
+            0x00 | 0x09 | 0x0c => {
+                self.flags.c = true;
+                return;
+            }
+            _ => {}
+        }
+        let _o: u8 = 0x1a;
+        self.flags.c = self.reg.a >= _o;
+        self.flags.z = self.reg.a == _o;
+        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+        if self.reg.a < 0x1a {
+            if !self.flags.c {
+                return;
             }
         }
         self.flags.c = true;

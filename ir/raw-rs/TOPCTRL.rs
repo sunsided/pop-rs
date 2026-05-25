@@ -1007,40 +1007,26 @@ impl Cpu {
     }
 
     fn static_3f(&mut self) {
-        if self.reg.a != 0x00 {
-            if self.reg.a != 0x0f {
-                if self.reg.a != 0xe5 {
-                    if self.reg.a != 0x6d {
-                        if self.reg.a != 0xab {
-                            if self.reg.a != 0xa6 {
-                                if self.reg.a != 0xb9 {
-                                    if self.reg.a != 0xb1 {
-                                        if self.reg.a != 0xb2 {
-                                            self.reg.a = 0x01;
-                                            return;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+        match self.reg.a {
+            0x00 | 0x0f | 0xe5 | 0x6d | 0xab | 0xa6 | 0xb9 | 0xb1 | 0xb2 => {
+                self.reg.a = 0x00;
+                return;
             }
+            _ => {}
         }
-        self.reg.a = 0x00;
+        self.reg.a = 0x01;
         return;
     }
 
     fn cold_3f(&mut self) {
-        if self.reg.a != 0xb9 {
-            if self.reg.a != 0xb1 {
-                if self.reg.a != 0xb2 {
-                    self.reg.a = 0x01;
-                    return;
-                }
+        match self.reg.a {
+            0xb9 | 0xb1 | 0xb2 => {
+                self.reg.a = 0x00;
+                return;
             }
+            _ => {}
         }
-        self.reg.a = 0x00;
+        self.reg.a = 0x01;
         return;
     }
 

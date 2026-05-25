@@ -1605,42 +1605,41 @@ impl Cpu {
     }
 
     fn CMPSPACE(&mut self) {
-        if self.reg.a != 0x00 {
-            if self.reg.a != 0x09 {
-                if self.reg.a != 0x0c {
-                    if self.reg.a != 0x14 {
-                        if self.reg.a < 0x1a {
-                            self.reg.a = 0x01;
-                            return;
-                        }
-                    }
-                }
+        match self.reg.a {
+            0x00 | 0x09 | 0x0c | 0x14 => {
+                self.reg.a = 0x00;
+                return;
             }
+            _ => {}
+        }
+        if self.reg.a < 0x1a {
+            self.reg.a = 0x01;
+            return;
         }
         self.reg.a = 0x00;
         return;
     }
 
     fn CMPBARR(&mut self) {
-        if self.reg.a != 0x07 {
-            if self.reg.a != 0x0c {
-                if self.reg.a != 0x04 {
-                    if self.reg.a != 0x0d {
-                        if self.reg.a != 0x12 {
-                            if self.reg.a != 0x14 {
-                                self.reg.a = 0x00;
-                                return;
-                            }
-                            self.reg.a = 0x04;
-                            return;
-                        }
-                    }
-                    self.reg.a = 0x03;
-                    return;
-                }
+        match self.reg.a {
+            0x07 | 0x0c | 0x04 => {
+                self.reg.a = 0x01;
+                return;
             }
+            _ => {}
         }
-        self.reg.a = 0x01;
+        match self.reg.a {
+            0x0d | 0x12 => {
+                self.reg.a = 0x03;
+                return;
+            }
+            _ => {}
+        }
+        if self.reg.a != 0x14 {
+            self.reg.a = 0x00;
+            return;
+        }
+        self.reg.a = 0x04;
         return;
     }
 

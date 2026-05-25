@@ -1599,11 +1599,17 @@ impl Cpu {
                 return;
             }
             self.reg.y = self.mem[sym::trloc];
-            if self.reg.y != 0x00 {
-                if self.reg.y != 0x0a {
-                    if self.reg.y != 0x14 {
-                    }
+            match self.reg.y {
+                0x00 | 0x0a | 0x14 => {
+                    self.reg.a = self.reg.y;
+                    self.flags.c = false;
+                    let _r = (self.reg.a as u16) + (0x09) as u16 + (self.flags.c as u16);
+                    self.reg.a = _r as u8;
+                    self.flags.c = (_r >> 8) != 0;
+                    self.reg.y = self.reg.a;
+                    return;
                 }
+                _ => {}
             }
             self.reg.a = self.reg.y;
             self.flags.c = false;
@@ -1704,18 +1710,19 @@ impl Cpu {
                 self.reg.y = 0x00;
                 return;
             }
-            if self.reg.y != 0x13 {
-                if self.reg.y != 0x1d {
-                    self._5dno();
+            match self.reg.y {
+                0x13 | 0x1d => {
+                    self.reg.a = self.reg.y;
+                    self.flags.c = true;
+                    let _r = (self.reg.a as u16) + (!0x13_u8) as u16 + (self.flags.c as u16);
+                    self.reg.a = _r as u8;
+                    self.flags.c = (_r >> 8) != 0;
+                    self.reg.y = self.reg.a;
                     return;
                 }
+                _ => {}
             }
-            self.reg.a = self.reg.y;
-            self.flags.c = true;
-            let _r = (self.reg.a as u16) + (!0x13_u8) as u16 + (self.flags.c as u16);
-            self.reg.a = _r as u8;
-            self.flags.c = (_r >> 8) != 0;
-            self.reg.y = self.reg.a;
+            self._5dno();
             return;
         }
         self.reg.y = self.mem[sym::trloc];
