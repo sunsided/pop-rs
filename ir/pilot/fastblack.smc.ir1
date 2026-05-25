@@ -20,18 +20,18 @@ fn FASTBLACK {
   c = 0                            ; HIRES.S:2027
 :smXCO:
   a = a + #{smXCO} + c              ; HIRES.S:2028
-  patch *:smod+1 = a            ; HIRES.S:2029
+  opaddr smod.lo = a            ; HIRES.S:2029
   a = *(YHI@0xe0c0 + x)   ; HIRES.S:2031
 :smPAGE:
   a = a + #{smPAGE} + c              ; HIRES.S:2032
-  patch *:smod+2 = a            ; HIRES.S:2033
+  opaddr smod.hi = a            ; HIRES.S:2033
 :smCOLOR:
   a = #{smCOLOR}                  ; HIRES.S:2035
 :smSTART:
   y = #{smSTART}                  ; HIRES.S:2037
 :inloop:
 :smod:
-  *($2000@0x2000 + y) = a   ; HIRES.S:2040
+  *({smod}@0x2000 + y) = a   ; HIRES.S:2040
   y -= 1                         ; HIRES.S:2041
   if pl goto :inloop       ; HIRES.S:2042
   x -= 1                         ; HIRES.S:2044

@@ -58,16 +58,22 @@ provisional `self.stack: Vec<u8>` that mirrors the interpreter's
 * `Pha` → `self.stack.push(self.a)`;
 * `Pla` → `self.a = self.stack.pop()…` plus Z/N from the popped byte.
 
-It also lowers the *recognised SMC immediate-operand patch*. `pass3_smc`
-turns `sta :label+1` (patching the `#imm` byte of `lda/adc/sbc/cmp` at
-`:label`) into a `StoreOpVar` and marks the patched `Imm.opvar`, so:
+It also lowers the *recognised SMC operand patches*. `pass3_smc` rewrites
+runtime instruction-operand patches into a faithful model:
 
-* `StoreOpVar` → `self.<name> = self.<reg>` (write the operand variable);
-* the patched immediate reads `self.<name>` instead of the placeholder.
+* immediate operand — `sta :label+1` patching the `#imm` of
+  `lda/adc/sbc/cmp` → `StoreOpVar` + `Imm.opvar`: `self.<name> =
+  self.<reg>` writes the operand variable, and the patched immediate
+  reads `self.<name>`.
+* 16-bit address operand — `sta :label+1`/`+2` patching the absolute
+  operand of `lda/sta abs[,x/y]` → `StoreOpAddr` + `Abs.opvar`:
+  `self.<name>_lo`/`_hi = self.<reg>` write the byte halves, and the
+  patched access composes `((hi << 8) | lo)` as its base.
 
 Still deferred:
-* the opaque `StoreLocal` (16-bit address / branch patches) and
-  `LocalRef` inc/dec — self-modifying code with no consumer model yet.
+* the opaque `StoreLocal` (opcode patches at offset 0, branch / jump
+  target patches) and `LocalRef` inc/dec — self-modifying code with no
+  consumer model yet.
 
 Memory model and receiver (`Cpu` / `self.ram` / `self.c` / `self.z` /
 `self.n` / `self.stack` / SMC operand-variable fields) remain
@@ -117,6 +123,7 @@ from .ir1 import (
     StoreAbs,
     StoreIndexed,
     StoreIndirect,
+    StoreOpAddr,
     StoreOpVar,
     Transfer,
 )
@@ -318,7 +325,21 @@ class SymTable:
 def _abs_index(a: Abs, syms: SymTable | None) -> str:
     """Render the index of `self.ram[<index>]` for an absolute address —
     a `sym::` reference when a symbol table resolves it, else the
-    `0x..` literal."""
+    `0x..` literal.
+
+    An SMC address operand (`a.opvar` set) instead composes its runtime
+    16-bit base from the low / high byte fields the matching `StoreOpAddr`
+    writes — but only for the halves actually patched (`a.opvar_halves`);
+    an un-patched half bakes the assembled `addr` byte, matching the
+    interpreter's per-byte fallback instead of reading an uninitialised
+    field."""
+    if a.opvar is not None:
+        name = _mangle(a.opvar)
+        hi = (f"self.{name}_hi as usize" if "hi" in a.opvar_halves
+              else f"0x{(a.addr >> 8) & 0xff:02x}")
+        lo = (f"self.{name}_lo as usize" if "lo" in a.opvar_halves
+              else f"0x{a.addr & 0xff:02x}")
+        return f"(({hi}) << 8 | ({lo}))"
     if syms is None:
         return _addr(a.addr)
     return syms.index(a)
@@ -487,9 +508,9 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
     Covers register/memory moves, carry arithmetic (adc/sbc/shifts),
     `(ptr),y` indirect loads/stores/bitwise/sbc, the flag-only
     comparisons (cmp/cpx/cpy/bit), the unpaired stack `pha`/`pla`, and
-    the recognised SMC immediate-operand patch (`StoreOpVar`). The
-    opaque `StoreLocal` (16-bit address / branch patches) stays
-    deferred."""
+    the recognised SMC operand patches (`StoreOpVar` immediate +
+    `StoreOpAddr` 16-bit address). The opaque `StoreLocal` (offset-0
+    opcode patches, branch / jump-target patches) stays deferred."""
     if isinstance(item, LoadImm):
         return [f"self.{item.reg} = {_emit_imm(item.imm)};"]
 
@@ -676,6 +697,11 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
 
     if isinstance(item, StoreOpVar):
         return [f"self.{_mangle(item.name)} = self.{item.reg};"]
+
+    if isinstance(item, StoreOpAddr):
+        # Patch the low / high byte of a recognised SMC address operand;
+        # the marked `Abs` reads `self.<name>_lo`/`_hi` back via `_abs_index`.
+        return [f"self.{_mangle(item.name)}_{item.half} = self.{item.reg};"]
 
     return None
 
@@ -901,9 +927,9 @@ _HEADER = [
     "// `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.",
     "// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured",
     "// routines emit a `loop { match pc { ... } }` dispatch fallback; the",
-    "// stack rides `self.stack: Vec<u8>` and recognised SMC immediate",
-    "// patches ride `self.<opvar>` fields. Opaque address-patch SMC stays",
-    "// deferred as `// raw: …` / `// TODO(pass4): …` comments.",
+    "// stack rides `self.stack: Vec<u8>` and recognised SMC operand",
+    "// patches ride `self.<opvar>` / `self.<opvar>_lo`/`_hi` fields.",
+    "// Opcode / branch-target SMC stays deferred as `// raw: …` comments.",
     "// The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are",
     "// provisional, pending the state/trait design slice. RAM addresses",
     "// keep their source symbol names via the `sym` constants below.",

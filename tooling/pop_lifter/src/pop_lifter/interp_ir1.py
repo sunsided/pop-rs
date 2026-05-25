@@ -85,6 +85,7 @@ from .ir1 import (
     StoreIndexed,
     StoreIndirect,
     StoreLocal,
+    StoreOpAddr,
     StoreOpVar,
     Transfer,
     Unsupported,
@@ -150,6 +151,13 @@ class Trace:
     # rewritten operand. Distinct from `code_patches`, which stays the
     # opaque sink for unrecognised `StoreLocal` patches.
     operand_vars: dict[str, int] = field(default_factory=dict)
+    # Self-modifying-code *address* operand variables (`StoreOpAddr`). The
+    # low / high byte of a patched 16-bit absolute operand live in these
+    # two maps, keyed by name; an `Abs` carrying that `opvar` composes its
+    # effective base from them (see `_abs_base`), falling back to the
+    # assembled `Abs.addr` byte for any half never patched.
+    operand_addr_lo: dict[str, int] = field(default_factory=dict)
+    operand_addr_hi: dict[str, int] = field(default_factory=dict)
 
     def diff_against(self, initial: bytes) -> dict[int, int]:
         """Return only the addresses whose byte differs from `initial`.
@@ -193,6 +201,20 @@ def _real_addr(addr: int, src) -> int:
             f"never resolved to a real assembled location."
         )
     return addr & 0xffff
+
+
+def _abs_base(operand, trace: Trace, src) -> int:
+    """Resolve the base address of an `Abs` operand. For a self-modifying-
+    code address operand (`opvar` set) compose the 16-bit base from the
+    patched low / high bytes (`Trace.operand_addr_lo`/`_hi`), each falling
+    back to the corresponding byte of the assembled `addr` when that half
+    was never patched. Otherwise validate the assembled address through
+    `_real_addr`."""
+    if operand.opvar is not None:
+        lo = trace.operand_addr_lo.get(operand.opvar, operand.addr & 0xff)
+        hi = trace.operand_addr_hi.get(operand.opvar, (operand.addr >> 8) & 0xff)
+        return ((hi << 8) | lo) & 0xffff
+    return _real_addr(operand.addr, src)
 
 
 def _set_zn(trace: Trace, value: int) -> None:
@@ -366,7 +388,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         _set_zn(trace, value)
         return True
     if isinstance(item, LoadAbs):
-        value = ram[_real_addr(item.source.addr, item.src)]
+        value = ram[_abs_base(item.source, trace, item.src)]
         if item.reg is Reg.A:
             trace.a = value
         elif item.reg is Reg.X:
@@ -377,7 +399,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         return True
     if isinstance(item, LoadIndexed):
         idx_val = trace.x if item.index is Reg.X else trace.y
-        addr = ((_real_addr(item.base.addr, item.src) + (idx_val & 0xff)) & 0xffff)
+        addr = ((_abs_base(item.base, trace, item.src) + (idx_val & 0xff)) & 0xffff)
         value = ram[addr]
         if item.reg is Reg.A:
             trace.a = value
@@ -389,7 +411,7 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         return True
     if isinstance(item, StoreAbs):
         value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
-        addr = _real_addr(item.target.addr, item.src)
+        addr = _abs_base(item.target, trace, item.src)
         ram[addr] = value
         trace.writes[addr] = value
         return True
@@ -406,10 +428,24 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
         trace.operand_vars[item.name] = value
         return True
+    if isinstance(item, StoreOpAddr):
+        # Recognised SMC address patch — write the low / high byte of the
+        # patched 16-bit operand, which the marked `Abs` reads via
+        # `_abs_base`.
+        value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
+        if item.half == "lo":
+            trace.operand_addr_lo[item.name] = value
+        elif item.half == "hi":
+            trace.operand_addr_hi[item.name] = value
+        else:
+            raise InterpError(
+                f"StoreOpAddr.half must be 'lo' or 'hi', got {item.half!r}"
+            )
+        return True
     if isinstance(item, StoreIndexed):
         value = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
         idx_val = trace.x if item.index is Reg.X else trace.y
-        addr = ((_real_addr(item.base.addr, item.src) + (idx_val & 0xff)) & 0xffff)
+        addr = ((_abs_base(item.base, trace, item.src) + (idx_val & 0xff)) & 0xffff)
         ram[addr] = value
         trace.writes[addr] = value
         return True
@@ -766,7 +802,7 @@ def run(
             continue
 
         if isinstance(item, LoadAbs):
-            value = ram[_real_addr(item.source.addr, item.src)]
+            value = ram[_abs_base(item.source, trace, item.src)]
             if item.reg is Reg.A:
                 trace.a = value
             elif item.reg is Reg.X:
@@ -779,7 +815,7 @@ def run(
 
         if isinstance(item, LoadIndexed):
             idx_val = trace.x if item.index is Reg.X else trace.y
-            addr = ((_real_addr(item.base.addr, item.src) + (idx_val & 0xff)) & 0xffff)
+            addr = ((_abs_base(item.base, trace, item.src) + (idx_val & 0xff)) & 0xffff)
             value = ram[addr]
             if item.reg is Reg.A:
                 trace.a = value
@@ -797,7 +833,7 @@ def run(
                 Reg.X: trace.x,
                 Reg.Y: trace.y,
             }[item.reg]
-            addr = _real_addr(item.target.addr, item.src)
+            addr = _abs_base(item.target, trace, item.src)
             ram[addr] = value
             trace.writes[addr] = value
             idx += 1
@@ -810,7 +846,7 @@ def run(
                 Reg.Y: trace.y,
             }[item.reg]
             idx_val = trace.x if item.index is Reg.X else trace.y
-            addr = ((_real_addr(item.base.addr, item.src) + (idx_val & 0xff)) & 0xffff)
+            addr = ((_abs_base(item.base, trace, item.src) + (idx_val & 0xff)) & 0xffff)
             ram[addr] = value
             trace.writes[addr] = value
             idx += 1

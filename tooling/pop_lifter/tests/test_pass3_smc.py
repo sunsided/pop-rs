@@ -1,13 +1,14 @@
 """Pass 3 — self-modifying-code operand-variable recognition.
 
 * **Faithful interpretation** is the headline check: a synthetic routine
-  patches an immediate at runtime, and after recognition the patched
-  instruction actually reads the rewritten value (the opaque pre-pass
-  model uses the stale placeholder instead).
+  patches an instruction operand at runtime, and after recognition the
+  patched instruction actually reads the rewritten value (the opaque
+  pre-pass model uses the stale placeholder instead). Covered for both
+  the immediate-operand and the 16-bit address-operand forms.
 * **Structural unit tests** pin what is and isn't recognised: an
-  immediate `offset == 1` patch is rewritten; an `offset == 2` patch, a
-  patch of a non-immediate instruction, and an unknown label stay
-  opaque `StoreLocal`s.
+  immediate `offset == 1` patch becomes a `StoreOpVar`; `offset == 1`/`2`
+  patches of an absolute memory op become `StoreOpAddr`s; an offset-0
+  (opcode) patch and an unknown label stay opaque `StoreLocal`s.
 """
 
 from __future__ import annotations
@@ -21,14 +22,15 @@ from pop_lifter.ir1 import (
     Label,
     LoadAbs,
     LoadImm,
+    LoadIndexed,
     ModuleIR1,
     Reg,
     Return,
     Routine,
     SourceRef,
     StoreAbs,
-    StoreIndexed,
     StoreLocal,
+    StoreOpAddr,
     StoreOpVar,
 )
 from pop_lifter.pass3_smc import (
@@ -95,33 +97,69 @@ def test_recognition_rewrites_store_and_marks_immediate():
 # --------------------------------------------------------------- not recognised
 
 
-def test_offset_two_patch_stays_opaque():
-    """`offset == 2` patches the high byte of a 16-bit address operand —
-    out of scope; left as an opaque StoreLocal."""
+def test_address_patch_recognized_as_store_op_addr():
+    """`offset == 1`/`2` patches of an absolute memory op patch the low /
+    high byte of its 16-bit operand — recognised as `StoreOpAddr`s, with
+    the operand's `Abs.opvar` marked."""
     routine = Routine(name="t", body=[
+        StoreLocal(reg=Reg.A, target_label=":smL", offset=1, src=SRC),
         StoreLocal(reg=Reg.A, target_label=":smL", offset=2, src=SRC),
         Label(name=":smL", src=SRC),
-        # lda $1234,y — a 3-byte address operand, not an immediate.
-        StoreIndexed(reg=Reg.A, base=Abs(name="scr", addr=0x2000), index=Reg.Y, src=SRC),
+        # lda $2000,y — a 16-bit address operand.
+        LoadIndexed(reg=Reg.A, base=Abs(name="$2000", addr=0x2000), index=Reg.Y, src=SRC),
         Return(src=SRC),
     ])
     rec = recognize_routine(routine)
-    assert any(isinstance(it, StoreLocal) for it in rec.body)
-    assert smc_store_count(ModuleIR1("M", "syn", [rec])) == 0
+    assert not any(isinstance(it, StoreLocal) for it in rec.body)
+    halves = {it.half for it in rec.body if isinstance(it, StoreOpAddr) and it.name == "smL"}
+    assert halves == {"lo", "hi"}
+    ld = next(it for it in rec.body if isinstance(it, LoadIndexed))
+    assert ld.base.opvar == "smL"
+    assert ld.base.addr == 0x2000  # assembled fallback preserved
 
 
-def test_patch_of_non_immediate_instruction_stays_opaque():
-    """An `offset == 1` patch whose labelled instruction is a memory
-    op (`lda abs`), not an immediate, isn't an operand-variable site."""
+def test_address_patch_takes_effect_after_recognition():
+    """Faithful interpretation for the address form: patch `:smL`'s operand
+    to point at 0x0305, load through it, and confirm the patched address
+    (not the placeholder `$0000`) is read."""
     routine = Routine(name="t", body=[
+        LoadImm(reg=Reg.A, imm=_imm(0x05), src=SRC),          # lo = 0x05
         StoreLocal(reg=Reg.A, target_label=":smL", offset=1, src=SRC),
+        LoadImm(reg=Reg.A, imm=_imm(0x03), src=SRC),          # hi = 0x03
+        StoreLocal(reg=Reg.A, target_label=":smL", offset=2, src=SRC),
+        LoadImm(reg=Reg.Y, imm=_imm(0x00), src=SRC),
+        Label(name=":smL", src=SRC),
+        LoadAbs(reg=Reg.A, source=Abs(name="$0000", addr=0x0000), src=SRC),  # lda $0000 -> patched 0x0305
+        StoreAbs(reg=Reg.A, target=Abs(name="out", addr=0x80), src=SRC),
+        Return(src=SRC),
+    ])
+    mod = ModuleIR1(name="M", file="syn", routines=[routine])
+
+    raw = bytearray(0x10000)
+    raw[0x305] = 0x42
+    before = ir1_run(mod, "t", ram=raw)
+    assert before.ram[0x80] == 0x00  # opaque: reads placeholder $0000
+
+    rec = bytearray(0x10000)
+    rec[0x305] = 0x42
+    out = ir1_run(recognize_smc(mod), "t", ram=rec)
+    assert out.ram[0x80] == 0x42     # faithful: reads patched 0x0305
+    assert out.operand_addr_lo["smL"] == 0x05
+    assert out.operand_addr_hi["smL"] == 0x03
+
+
+def test_offset_zero_patch_stays_opaque():
+    """An `offset == 0` patch rewrites the opcode byte itself, not an
+    operand — out of scope; left as an opaque StoreLocal."""
+    routine = Routine(name="t", body=[
+        StoreLocal(reg=Reg.A, target_label=":smL", offset=0, src=SRC),
         Label(name=":smL", src=SRC),
         LoadAbs(reg=Reg.A, source=Abs(name="src", addr=0x1234), src=SRC),
         Return(src=SRC),
     ])
     rec = recognize_routine(routine)
     assert any(isinstance(it, StoreLocal) for it in rec.body)
-    assert not any(isinstance(it, StoreOpVar) for it in rec.body)
+    assert not any(isinstance(it, (StoreOpVar, StoreOpAddr)) for it in rec.body)
 
 
 def test_unknown_label_stays_opaque():

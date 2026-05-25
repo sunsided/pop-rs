@@ -56,6 +56,7 @@ from pop_lifter.ir1 import (
     StoreIndexed,
     StoreIndirect,
     StoreLocal,
+    StoreOpAddr,
     StoreOpVar,
     Transfer,
 )
@@ -600,6 +601,33 @@ def test_raw_load_imm_opvar_reads_operand_var():
 def test_raw_store_opvar_writes_operand_var():
     out = _raw(StoreOpVar(reg=Reg.A, name="smXCO", src=SRC))
     assert out == "self.smXCO = self.a;"
+
+
+def test_raw_store_op_addr_writes_byte_halves():
+    # The SMC address patch writes the low / high byte of the operand var.
+    assert _raw(StoreOpAddr(reg=Reg.A, name="smBASE", half="lo", src=SRC)) == \
+        "self.smBASE_lo = self.a;"
+    assert _raw(StoreOpAddr(reg=Reg.X, name="smBASE", half="hi", src=SRC)) == \
+        "self.smBASE_hi = self.x;"
+
+
+def test_address_opvar_operand_composes_runtime_base():
+    # A fully-patched address opvar reads both byte halves from fields.
+    base = Abs(name="$2000", addr=0x2000, opvar="smBASE", opvar_halves=("lo", "hi"))
+    item = LoadIndexed(reg=Reg.A, base=base, index=Reg.Y, src=SRC)
+    assert _raw(item) == (
+        "self.a = self.ram[((self.smBASE_hi as usize) << 8 "
+        "| (self.smBASE_lo as usize)) + self.y as usize];"
+    )
+
+
+def test_address_opvar_partial_patch_bakes_assembled_byte():
+    # A low-byte-only patch reads `_lo` from a field but bakes the
+    # assembled high byte (matching the interpreter's per-byte fallback),
+    # rather than reading an uninitialised `_hi` field.
+    base = Abs(name="$12ab", addr=0x12ab, opvar="smodCD", opvar_halves=("lo",))
+    item = LoadAbs(reg=Reg.A, source=base, src=SRC)
+    assert _raw(item) == "self.a = self.ram[((0x12) << 8 | (self.smodCD_lo as usize))];"
 
 
 def test_raw_load_indexed():

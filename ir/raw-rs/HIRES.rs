@@ -5,9 +5,9 @@
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
 // routines emit a `loop { match pc { ... } }` dispatch fallback; the
-// stack rides `self.stack: Vec<u8>` and recognised SMC immediate
-// patches ride `self.<opvar>` fields. Opaque address-patch SMC stays
-// deferred as `// raw: …` / `// TODO(pass4): …` comments.
+// stack rides `self.stack: Vec<u8>` and recognised SMC operand
+// patches ride `self.<opvar>` / `self.<opvar>_lo`/`_hi` fields.
+// Opcode / branch-target SMC stays deferred as `// raw: …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -198,22 +198,22 @@ impl Cpu {
                     let _r = (self.a as u16) + (0x20) as u16 + (self.c as u16);
                     self.a = _r as u8;
                     self.c = (_r >> 8) as u8;
-                    // raw: patch *:loop+2 = a            ; HIRES.S:209
+                    self.loop_hi = self.a;
                     let _r = (self.a as u16) + (0x10) as u16 + (self.c as u16);
                     self.a = _r as u8;
                     self.c = (_r >> 8) as u8;
-                    // raw: patch *:smod+2 = a            ; HIRES.S:211
+                    self.smod_hi = self.a;
                     self.a = 0x80;
                     self.x = 0x10;
                     self.y = 0x00;
                     pc = 1;
                 }
                 1 => {
-                    self.ram[0x2000 + self.y as usize] = self.a;
+                    self.ram[((self.loop_hi as usize) << 8 | (0x00)) + self.y as usize] = self.a;
                     pc = 2;
                 }
                 2 => {
-                    self.ram[0x3000 + self.y as usize] = self.a;
+                    self.ram[((self.smod_hi as usize) << 8 | (0x00)) + self.y as usize] = self.a;
                     self.y = self.y.wrapping_add(1);
                     if self.y != 0x00 {
                         pc = 1;
@@ -284,8 +284,8 @@ impl Cpu {
 
     fn GETWIDTH(&mut self) {
         self.a = self.ram[sym::BANK];
-        // raw: patch *:RAMRD+1 = a            ; HIRES.S:289
-        self.ram[0xc003] = self.a;
+        self.RAMRD_lo = self.a;
+        self.ram[((0xc0) << 8 | (self.RAMRD_lo as usize))] = self.a;
         self.setimage();
         self.y = 0x01;
         self.a = self.ram[(self.ram[sym::IMAGE] as usize | (self.ram[sym::IMAGE + 1] as usize) << 8) + self.y as usize];
@@ -300,8 +300,8 @@ impl Cpu {
         self.ram[sym::XSAVE] = self.ram[sym::XCO];
         self.ram[sym::YSAVE] = self.ram[sym::YCO];
         self.a = self.ram[sym::BANK];
-        // raw: patch *:RAMRD+1 = a            ; HIRES.S:325
-        self.ram[0xc003] = self.a;
+        self.RAMRD_lo = self.a;
+        self.ram[((0xc0) << 8 | (self.RAMRD_lo as usize))] = self.a;
         self.setimage();
         self.y = 0x00;
         self.ram[sym::WIDTH] = self.ram[(self.ram[sym::IMAGE] as usize | (self.ram[sym::IMAGE + 1] as usize) << 8) + self.y as usize];
@@ -1057,7 +1057,7 @@ impl Cpu {
                     let _r = (self.a as u16) + (self.smXCO) as u16 + (self.c as u16);
                     self.a = _r as u8;
                     self.c = (_r >> 8) as u8;
-                    // raw: patch *:smBASE+1 = a            ; HIRES.S:609
+                    self.smBASE_lo = self.a;
                     self.a = self.ram[sym::YHI + self.x as usize];
                     pc = 10;
                 }
@@ -1065,7 +1065,7 @@ impl Cpu {
                     let _r = (self.a as u16) + (self.smPAGE) as u16 + (self.c as u16);
                     self.a = _r as u8;
                     self.c = (_r >> 8) as u8;
-                    // raw: patch *:smBASE+2 = a            ; HIRES.S:613
+                    self.smBASE_hi = self.a;
                     pc = 11;
                 }
                 11 => {
@@ -1076,7 +1076,7 @@ impl Cpu {
                     pc = 13;
                 }
                 13 => {
-                    self.a = self.ram[0x2000 + self.y as usize];
+                    self.a = self.ram[((self.smBASE_hi as usize) << 8 | (self.smBASE_lo as usize)) + self.y as usize];
                     self.ram[(self.ram[sym::PEELBUF] as usize | (self.ram[sym::PEELBUF + 1] as usize) << 8) + self.y as usize] = self.a;
                     self.y = self.y.wrapping_sub(1);
                     if (self.y as i8) >= 0 {
@@ -1167,19 +1167,19 @@ impl Cpu {
                 }
                 2 => {
                     self.a = self.ram[sym::BANK];
-                    // raw: patch *:RAMRD1+1 = a            ; HIRES.S:689
-                    // raw: patch *:RAMRD2+1 = a            ; HIRES.S:690
+                    self.RAMRD1_lo = self.a;
+                    self.RAMRD2_lo = self.a;
                     self.x = self.ram[sym::OFFSET];
                     self.a = self.ram[sym::SHIFTL + self.x as usize];
-                    // raw: patch *:91+1 = a            ; HIRES.S:695
+                    self._91_lo = self.a;
                     self.a = self.ram[sym::SHIFTH + self.x as usize];
-                    // raw: patch *:91+2 = a            ; HIRES.S:697
+                    self._91_hi = self.a;
                     self.a = self.ram[sym::CARRYL + self.x as usize];
-                    // raw: patch *:90+1 = a            ; HIRES.S:700
-                    // raw: patch *:92+1 = a            ; HIRES.S:701
+                    self._90_lo = self.a;
+                    self._92_lo = self.a;
                     self.a = self.ram[sym::CARRYH + self.x as usize];
-                    // raw: patch *:90+2 = a            ; HIRES.S:703
-                    // raw: patch *:92+2 = a            ; HIRES.S:704
+                    self._90_hi = self.a;
+                    self._92_hi = self.a;
                     self.a = self.ram[sym::AMASKS + self.x as usize];
                     // raw: patch *:AMASK+1 = a            ; HIRES.S:707
                     self.a = self.ram[sym::BMASKS + self.x as usize];
@@ -1215,14 +1215,14 @@ impl Cpu {
                     pc = 5;
                 }
                 5 => {
-                    self.ram[0xc003] = self.a;
+                    self.ram[((0xc0) << 8 | (self.RAMRD1_lo as usize))] = self.a;
                     self.a = self.ram[(self.ram[sym::IMAGE] as usize | (self.ram[sym::IMAGE + 1] as usize) << 8) + self.y as usize];
                     self.ram[0xc002] = self.a;
                     self.x = self.a;
                     pc = 6;
                 }
                 6 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._90_hi as usize) << 8 | (self._90_lo as usize)) + self.x as usize];
                     self.ram[sym::CARRY] = self.a;
                     self.a = self.ram[sym::IMAGE];
                     self.c = 0;
@@ -1270,14 +1270,14 @@ impl Cpu {
                     pc = 13;
                 }
                 13 => {
-                    self.ram[0xc003] = self.a;
+                    self.ram[((0xc0) << 8 | (self.RAMRD2_lo as usize))] = self.a;
                     self.a = self.ram[(self.ram[sym::IMAGE] as usize | (self.ram[sym::IMAGE + 1] as usize) << 8) + self.y as usize];
                     self.ram[0xc002] = self.a;
                     self.x = self.a;
                     pc = 14;
                 }
                 14 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._91_hi as usize) << 8 | (self._91_lo as usize)) + self.x as usize];
                     self.a |= self.ram[sym::CARRY];
                     pc = 15;
                 }
@@ -1287,7 +1287,7 @@ impl Cpu {
                     pc = 16;
                 }
                 16 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._92_hi as usize) << 8 | (self._92_lo as usize)) + self.x as usize];
                     self.ram[sym::CARRY] = self.a;
                     self.y = self.y.wrapping_add(1);
                     let _o: u8 = self.ram[sym::VISWIDTH];
@@ -1398,25 +1398,25 @@ impl Cpu {
                 }
                 1 => {
                     self.a = self.ram[sym::BANK];
-                    // raw: patch *:RAMRD1+1 = a            ; HIRES.S:845
-                    // raw: patch *:RAMRD2+1 = a            ; HIRES.S:846
+                    self.RAMRD1_lo = self.a;
+                    self.RAMRD2_lo = self.a;
                     self.x = self.ram[sym::OFFSET];
                     self.a = self.ram[sym::SHIFTL + self.x as usize];
-                    // raw: patch *:91+1 = a            ; HIRES.S:851
-                    // raw: patch *:93+1 = a            ; HIRES.S:852
+                    self._91_lo = self.a;
+                    self._93_lo = self.a;
                     self.a = self.ram[sym::SHIFTH + self.x as usize];
-                    // raw: patch *:91+2 = a            ; HIRES.S:855
-                    // raw: patch *:93+2 = a            ; HIRES.S:856
+                    self._91_hi = self.a;
+                    self._93_hi = self.a;
                     self.a = self.ram[sym::CARRYL + self.x as usize];
-                    // raw: patch *:90+1 = a            ; HIRES.S:859
-                    // raw: patch *:92+1 = a            ; HIRES.S:860
-                    // raw: patch *:94+1 = a            ; HIRES.S:861
-                    // raw: patch *:96+1 = a            ; HIRES.S:862
+                    self._90_lo = self.a;
+                    self._92_lo = self.a;
+                    self._94_lo = self.a;
+                    self._96_lo = self.a;
                     self.a = self.ram[sym::CARRYH + self.x as usize];
-                    // raw: patch *:90+2 = a            ; HIRES.S:865
-                    // raw: patch *:92+2 = a            ; HIRES.S:866
-                    // raw: patch *:94+2 = a            ; HIRES.S:867
-                    // raw: patch *:96+2 = a            ; HIRES.S:868
+                    self._90_hi = self.a;
+                    self._92_hi = self.a;
+                    self._94_hi = self.a;
+                    self._96_hi = self.a;
                     self.a = self.ram[sym::AMASKS + self.x as usize];
                     self.AMASK = self.a;
                     self.a = self.ram[sym::BMASKS + self.x as usize];
@@ -1448,21 +1448,21 @@ impl Cpu {
                     pc = 4;
                 }
                 4 => {
-                    self.ram[0xc003] = self.a;
+                    self.ram[((0xc0) << 8 | (self.RAMRD1_lo as usize))] = self.a;
                     self.a = self.ram[(self.ram[sym::IMAGE] as usize | (self.ram[sym::IMAGE + 1] as usize) << 8) + self.y as usize];
                     self.ram[0xc002] = self.a;
                     self.x = self.a;
                     pc = 5;
                 }
                 5 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._96_hi as usize) << 8 | (self._96_lo as usize)) + self.x as usize];
                     self.ram[sym::carryim] = self.a;
                     self.a = self.ram[0xe880 + self.x as usize];
                     self.x = self.a;
                     pc = 6;
                 }
                 6 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._90_hi as usize) << 8 | (self._90_lo as usize)) + self.x as usize];
                     self.ram[sym::CARRY] = self.a;
                     self.a = self.ram[sym::IMAGE];
                     self.c = 0;
@@ -1511,27 +1511,27 @@ impl Cpu {
                     pc = 13;
                 }
                 13 => {
-                    self.ram[0xc003] = self.a;
+                    self.ram[((0xc0) << 8 | (self.RAMRD2_lo as usize))] = self.a;
                     self.a = self.ram[(self.ram[sym::IMAGE] as usize | (self.ram[sym::IMAGE + 1] as usize) << 8) + self.y as usize];
                     self.ram[0xc002] = self.a;
                     self.x = self.a;
                     pc = 14;
                 }
                 14 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._93_hi as usize) << 8 | (self._93_lo as usize)) + self.x as usize];
                     self.a |= self.ram[sym::carryim];
                     self.ram[sym::imbyte] = self.a;
                     pc = 15;
                 }
                 15 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._94_hi as usize) << 8 | (self._94_lo as usize)) + self.x as usize];
                     self.ram[sym::carryim] = self.a;
                     self.a = self.ram[0xe880 + self.x as usize];
                     self.x = self.a;
                     pc = 16;
                 }
                 16 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._91_hi as usize) << 8 | (self._91_lo as usize)) + self.x as usize];
                     self.a |= self.ram[sym::CARRY];
                     pc = 17;
                 }
@@ -1542,7 +1542,7 @@ impl Cpu {
                     pc = 18;
                 }
                 18 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._92_hi as usize) << 8 | (self._92_lo as usize)) + self.x as usize];
                     self.ram[sym::CARRY] = self.a;
                     self.y = self.y.wrapping_add(1);
                     let _o: u8 = self.ram[sym::VISWIDTH];
@@ -1638,30 +1638,30 @@ impl Cpu {
                 }
                 2 => {
                     self.a = self.ram[sym::BANK];
-                    // raw: patch *:RAMRD1+1 = a            ; HIRES.S:1016
-                    // raw: patch *:RAMRD2+1 = a            ; HIRES.S:1017
+                    self.RAMRD1_lo = self.a;
+                    self.RAMRD2_lo = self.a;
                     self.x = self.ram[sym::OFFSET];
                     self.a = self.ram[sym::SHIFTL + self.x as usize];
-                    // raw: patch *:91+1 = a            ; HIRES.S:1022
+                    self._91_lo = self.a;
                     self.a = self.ram[sym::SHIFTH + self.x as usize];
-                    // raw: patch *:91+2 = a            ; HIRES.S:1024
+                    self._91_hi = self.a;
                     self.a = self.ram[sym::CARRYL + self.x as usize];
-                    // raw: patch *:90+1 = a            ; HIRES.S:1027
-                    // raw: patch *:92+1 = a            ; HIRES.S:1028
+                    self._90_lo = self.a;
+                    self._92_lo = self.a;
                     self.a = self.ram[sym::CARRYH + self.x as usize];
-                    // raw: patch *:90+2 = a            ; HIRES.S:1030
-                    // raw: patch *:92+2 = a            ; HIRES.S:1031
+                    self._90_hi = self.a;
+                    self._92_hi = self.a;
                     self.shiftoffset();
                     self.a = self.ram[sym::SHIFTL + self.x as usize];
-                    // raw: patch *:s1+1 = a            ; HIRES.S:1036
+                    self.s1_lo = self.a;
                     self.a = self.ram[sym::SHIFTH + self.x as usize];
-                    // raw: patch *:s1+2 = a            ; HIRES.S:1038
+                    self.s1_hi = self.a;
                     self.a = self.ram[sym::CARRYL + self.x as usize];
-                    // raw: patch *:c1+1 = a            ; HIRES.S:1041
-                    // raw: patch *:c2+1 = a            ; HIRES.S:1042
+                    self.c1_lo = self.a;
+                    self.c2_lo = self.a;
                     self.a = self.ram[sym::CARRYH + self.x as usize];
-                    // raw: patch *:c1+2 = a            ; HIRES.S:1044
-                    // raw: patch *:c2+2 = a            ; HIRES.S:1045
+                    self.c1_hi = self.a;
+                    self.c2_hi = self.a;
                     self.a = self.ram[sym::AMASKS + self.x as usize];
                     // raw: patch *:AMASK+1 = a            ; HIRES.S:1048
                     self.y = self.ram[sym::YCO];
@@ -1691,19 +1691,19 @@ impl Cpu {
                     pc = 5;
                 }
                 5 => {
-                    self.ram[0xc003] = self.a;
+                    self.ram[((0xc0) << 8 | (self.RAMRD1_lo as usize))] = self.a;
                     self.a = self.ram[(self.ram[sym::IMAGE] as usize | (self.ram[sym::IMAGE + 1] as usize) << 8) + self.y as usize];
                     self.ram[0xc002] = self.a;
                     self.x = self.a;
                     pc = 6;
                 }
                 6 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self.c2_hi as usize) << 8 | (self.c2_lo as usize)) + self.x as usize];
                     self.ram[sym::carryim] = self.a;
                     pc = 7;
                 }
                 7 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._90_hi as usize) << 8 | (self._90_lo as usize)) + self.x as usize];
                     self.ram[sym::CARRY] = self.a;
                     self.a = self.ram[sym::IMAGE];
                     self.c = 0;
@@ -1753,25 +1753,25 @@ impl Cpu {
                     pc = 14;
                 }
                 14 => {
-                    self.ram[0xc003] = self.a;
+                    self.ram[((0xc0) << 8 | (self.RAMRD2_lo as usize))] = self.a;
                     self.a = self.ram[(self.ram[sym::IMAGE] as usize | (self.ram[sym::IMAGE + 1] as usize) << 8) + self.y as usize];
                     self.ram[0xc002] = self.a;
                     self.x = self.a;
                     pc = 15;
                 }
                 15 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self.s1_hi as usize) << 8 | (self.s1_lo as usize)) + self.x as usize];
                     self.a |= self.ram[sym::carryim];
                     self.ram[sym::imbyte] = self.a;
                     pc = 16;
                 }
                 16 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self.c1_hi as usize) << 8 | (self.c1_lo as usize)) + self.x as usize];
                     self.ram[sym::carryim] = self.a;
                     pc = 17;
                 }
                 17 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._91_hi as usize) << 8 | (self._91_lo as usize)) + self.x as usize];
                     self.a |= self.ram[sym::CARRY];
                     self.a |= self.ram[(self.ram[sym::BASE] as usize | (self.ram[sym::BASE + 1] as usize) << 8) + self.y as usize];
                     self.a ^= self.ram[sym::imbyte];
@@ -1780,7 +1780,7 @@ impl Cpu {
                     pc = 18;
                 }
                 18 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._92_hi as usize) << 8 | (self._92_lo as usize)) + self.x as usize];
                     self.ram[sym::CARRY] = self.a;
                     self.y = self.y.wrapping_add(1);
                     let _o: u8 = self.ram[sym::VISWIDTH];
@@ -1889,19 +1889,19 @@ impl Cpu {
                 }
                 2 => {
                     self.a = self.ram[sym::BANK];
-                    // raw: patch *:RAMRD1+1 = a            ; HIRES.S:1215
-                    // raw: patch *:RAMRD2+1 = a            ; HIRES.S:1216
+                    self.RAMRD1_lo = self.a;
+                    self.RAMRD2_lo = self.a;
                     self.x = self.ram[sym::OFFSET];
                     self.a = self.ram[sym::SHIFTL + self.x as usize];
-                    // raw: patch *:91+1 = a            ; HIRES.S:1221
+                    self._91_lo = self.a;
                     self.a = self.ram[sym::SHIFTH + self.x as usize];
-                    // raw: patch *:91+2 = a            ; HIRES.S:1223
+                    self._91_hi = self.a;
                     self.a = self.ram[sym::CARRYL + self.x as usize];
-                    // raw: patch *:90+1 = a            ; HIRES.S:1226
-                    // raw: patch *:92+1 = a            ; HIRES.S:1227
+                    self._90_lo = self.a;
+                    self._92_lo = self.a;
                     self.a = self.ram[sym::CARRYH + self.x as usize];
-                    // raw: patch *:90+2 = a            ; HIRES.S:1229
-                    // raw: patch *:92+2 = a            ; HIRES.S:1230
+                    self._90_hi = self.a;
+                    self._92_hi = self.a;
                     self.a = self.ram[sym::AMASKS + self.x as usize];
                     self.ram[sym::AMASK] = self.a;
                     self.a = self.ram[sym::BMASKS + self.x as usize];
@@ -1934,7 +1934,7 @@ impl Cpu {
                     pc = 5;
                 }
                 5 => {
-                    self.ram[0xc003] = self.a;
+                    self.ram[((0xc0) << 8 | (self.RAMRD1_lo as usize))] = self.a;
                     self.a = self.ram[(self.ram[sym::IMAGE] as usize | (self.ram[sym::IMAGE + 1] as usize) << 8) + self.y as usize];
                     self.ram[0xc002] = self.a;
                     self.x = self.a;
@@ -1943,7 +1943,7 @@ impl Cpu {
                     pc = 6;
                 }
                 6 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._90_hi as usize) << 8 | (self._90_lo as usize)) + self.x as usize];
                     self.ram[sym::CARRY] = self.a;
                     pc = 7;
                 }
@@ -1976,7 +1976,7 @@ impl Cpu {
                     pc = 11;
                 }
                 11 => {
-                    self.ram[0xc003] = self.a;
+                    self.ram[((0xc0) << 8 | (self.RAMRD2_lo as usize))] = self.a;
                     self.a = self.ram[(self.ram[sym::IMAGE] as usize | (self.ram[sym::IMAGE + 1] as usize) << 8) + self.y as usize];
                     self.ram[0xc002] = self.a;
                     self.x = self.a;
@@ -1985,7 +1985,7 @@ impl Cpu {
                     pc = 12;
                 }
                 12 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._91_hi as usize) << 8 | (self._91_lo as usize)) + self.x as usize];
                     self.a |= self.ram[sym::CARRY];
                     self.y = self.ram[sym::XCO];
                     pc = 13;
@@ -1996,7 +1996,7 @@ impl Cpu {
                     pc = 14;
                 }
                 14 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._92_hi as usize) << 8 | (self._92_lo as usize)) + self.x as usize];
                     self.ram[sym::CARRY] = self.a;
                     self.ram[sym::BASE] = self.ram[sym::BASE].wrapping_add(1);
                     self.y = self.ram[sym::YREG];
@@ -2109,25 +2109,25 @@ impl Cpu {
                 }
                 2 => {
                     self.a = self.ram[sym::BANK];
-                    // raw: patch *:RAMRD1+1 = a            ; HIRES.S:1374
-                    // raw: patch *:RAMRD2+1 = a            ; HIRES.S:1375
+                    self.RAMRD1_lo = self.a;
+                    self.RAMRD2_lo = self.a;
                     self.x = self.ram[sym::OFFSET];
                     self.a = self.ram[sym::SHIFTL + self.x as usize];
-                    // raw: patch *:91+1 = a            ; HIRES.S:1380
-                    // raw: patch *:93+1 = a            ; HIRES.S:1381
+                    self._91_lo = self.a;
+                    self._93_lo = self.a;
                     self.a = self.ram[sym::SHIFTH + self.x as usize];
-                    // raw: patch *:91+2 = a            ; HIRES.S:1384
-                    // raw: patch *:93+2 = a            ; HIRES.S:1385
+                    self._91_hi = self.a;
+                    self._93_hi = self.a;
                     self.a = self.ram[sym::CARRYL + self.x as usize];
-                    // raw: patch *:90+1 = a            ; HIRES.S:1388
-                    // raw: patch *:92+1 = a            ; HIRES.S:1389
-                    // raw: patch *:94+1 = a            ; HIRES.S:1390
-                    // raw: patch *:96+1 = a            ; HIRES.S:1391
+                    self._90_lo = self.a;
+                    self._92_lo = self.a;
+                    self._94_lo = self.a;
+                    self._96_lo = self.a;
                     self.a = self.ram[sym::CARRYH + self.x as usize];
-                    // raw: patch *:90+2 = a            ; HIRES.S:1394
-                    // raw: patch *:92+2 = a            ; HIRES.S:1395
-                    // raw: patch *:94+2 = a            ; HIRES.S:1396
-                    // raw: patch *:96+2 = a            ; HIRES.S:1397
+                    self._90_hi = self.a;
+                    self._92_hi = self.a;
+                    self._94_hi = self.a;
+                    self._96_hi = self.a;
                     self.a = self.ram[sym::AMASKS + self.x as usize];
                     self.AMASK = self.a;
                     self.a = self.ram[sym::BMASKS + self.x as usize];
@@ -2156,7 +2156,7 @@ impl Cpu {
                     pc = 5;
                 }
                 5 => {
-                    self.ram[0xc003] = self.a;
+                    self.ram[((0xc0) << 8 | (self.RAMRD1_lo as usize))] = self.a;
                     self.a = self.ram[(self.ram[sym::IMAGE] as usize | (self.ram[sym::IMAGE + 1] as usize) << 8) + self.y as usize];
                     self.ram[0xc002] = self.a;
                     self.x = self.a;
@@ -2165,14 +2165,14 @@ impl Cpu {
                     pc = 6;
                 }
                 6 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._96_hi as usize) << 8 | (self._96_lo as usize)) + self.x as usize];
                     self.ram[sym::carryim] = self.a;
                     self.a = self.ram[0xe880 + self.x as usize];
                     self.x = self.a;
                     pc = 7;
                 }
                 7 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._90_hi as usize) << 8 | (self._90_lo as usize)) + self.x as usize];
                     self.ram[sym::CARRY] = self.a;
                     pc = 8;
                 }
@@ -2209,7 +2209,7 @@ impl Cpu {
                     pc = 13;
                 }
                 13 => {
-                    self.ram[0xc003] = self.a;
+                    self.ram[((0xc0) << 8 | (self.RAMRD2_lo as usize))] = self.a;
                     self.a = self.ram[(self.ram[sym::IMAGE] as usize | (self.ram[sym::IMAGE + 1] as usize) << 8) + self.y as usize];
                     self.ram[0xc002] = self.a;
                     self.x = self.a;
@@ -2218,20 +2218,20 @@ impl Cpu {
                     pc = 14;
                 }
                 14 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._93_hi as usize) << 8 | (self._93_lo as usize)) + self.x as usize];
                     self.a |= self.ram[sym::carryim];
                     self.ram[sym::imbyte] = self.a;
                     pc = 15;
                 }
                 15 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._94_hi as usize) << 8 | (self._94_lo as usize)) + self.x as usize];
                     self.ram[sym::carryim] = self.a;
                     self.a = self.ram[0xe880 + self.x as usize];
                     self.x = self.a;
                     pc = 16;
                 }
                 16 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._91_hi as usize) << 8 | (self._91_lo as usize)) + self.x as usize];
                     self.a |= self.ram[sym::CARRY];
                     self.y = self.ram[sym::XCO];
                     pc = 17;
@@ -2243,7 +2243,7 @@ impl Cpu {
                     pc = 18;
                 }
                 18 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._92_hi as usize) << 8 | (self._92_lo as usize)) + self.x as usize];
                     self.ram[sym::CARRY] = self.a;
                     self.ram[sym::BASE] = self.ram[sym::BASE].wrapping_add(1);
                     self.y = self.ram[sym::YREG];
@@ -2356,30 +2356,30 @@ impl Cpu {
                 }
                 2 => {
                     self.a = self.ram[sym::BANK];
-                    // raw: patch *:RAMRD1+1 = a            ; HIRES.S:1554
-                    // raw: patch *:RAMRD2+1 = a            ; HIRES.S:1555
+                    self.RAMRD1_lo = self.a;
+                    self.RAMRD2_lo = self.a;
                     self.x = self.ram[sym::OFFSET];
                     self.a = self.ram[sym::SHIFTL + self.x as usize];
-                    // raw: patch *:91+1 = a            ; HIRES.S:1560
+                    self._91_lo = self.a;
                     self.a = self.ram[sym::SHIFTH + self.x as usize];
-                    // raw: patch *:91+2 = a            ; HIRES.S:1562
+                    self._91_hi = self.a;
                     self.a = self.ram[sym::CARRYL + self.x as usize];
-                    // raw: patch *:90+1 = a            ; HIRES.S:1565
-                    // raw: patch *:92+1 = a            ; HIRES.S:1566
+                    self._90_lo = self.a;
+                    self._92_lo = self.a;
                     self.a = self.ram[sym::CARRYH + self.x as usize];
-                    // raw: patch *:90+2 = a            ; HIRES.S:1568
-                    // raw: patch *:92+2 = a            ; HIRES.S:1569
+                    self._90_hi = self.a;
+                    self._92_hi = self.a;
                     self.shiftoffset();
                     self.a = self.ram[sym::SHIFTL + self.x as usize];
-                    // raw: patch *:s1+1 = a            ; HIRES.S:1574
+                    self.s1_lo = self.a;
                     self.a = self.ram[sym::SHIFTH + self.x as usize];
-                    // raw: patch *:s1+2 = a            ; HIRES.S:1576
+                    self.s1_hi = self.a;
                     self.a = self.ram[sym::CARRYL + self.x as usize];
-                    // raw: patch *:c1+1 = a            ; HIRES.S:1579
-                    // raw: patch *:c2+1 = a            ; HIRES.S:1580
+                    self.c1_lo = self.a;
+                    self.c2_lo = self.a;
                     self.a = self.ram[sym::CARRYH + self.x as usize];
-                    // raw: patch *:c1+2 = a            ; HIRES.S:1582
-                    // raw: patch *:c2+2 = a            ; HIRES.S:1583
+                    self.c1_hi = self.a;
+                    self.c2_hi = self.a;
                     self.a = self.ram[sym::AMASKS + self.x as usize];
                     self.AMASK = self.a;
                     self.y = self.ram[sym::YCO];
@@ -2406,7 +2406,7 @@ impl Cpu {
                     pc = 5;
                 }
                 5 => {
-                    self.ram[0xc003] = self.a;
+                    self.ram[((0xc0) << 8 | (self.RAMRD1_lo as usize))] = self.a;
                     self.a = self.ram[(self.ram[sym::IMAGE] as usize | (self.ram[sym::IMAGE + 1] as usize) << 8) + self.y as usize];
                     self.ram[0xc002] = self.a;
                     self.x = self.a;
@@ -2415,12 +2415,12 @@ impl Cpu {
                     pc = 6;
                 }
                 6 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self.c2_hi as usize) << 8 | (self.c2_lo as usize)) + self.x as usize];
                     self.ram[sym::carryim] = self.a;
                     pc = 7;
                 }
                 7 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._90_hi as usize) << 8 | (self._90_lo as usize)) + self.x as usize];
                     self.ram[sym::CARRY] = self.a;
                     pc = 8;
                 }
@@ -2458,7 +2458,7 @@ impl Cpu {
                     pc = 13;
                 }
                 13 => {
-                    self.ram[0xc003] = self.a;
+                    self.ram[((0xc0) << 8 | (self.RAMRD2_lo as usize))] = self.a;
                     self.a = self.ram[(self.ram[sym::IMAGE] as usize | (self.ram[sym::IMAGE + 1] as usize) << 8) + self.y as usize];
                     self.ram[0xc002] = self.a;
                     self.x = self.a;
@@ -2467,18 +2467,18 @@ impl Cpu {
                     pc = 14;
                 }
                 14 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self.s1_hi as usize) << 8 | (self.s1_lo as usize)) + self.x as usize];
                     self.a |= self.ram[sym::carryim];
                     self.ram[sym::imbyte] = self.a;
                     pc = 15;
                 }
                 15 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self.c1_hi as usize) << 8 | (self.c1_lo as usize)) + self.x as usize];
                     self.ram[sym::carryim] = self.a;
                     pc = 16;
                 }
                 16 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._91_hi as usize) << 8 | (self._91_lo as usize)) + self.x as usize];
                     self.a |= self.ram[sym::CARRY];
                     self.y = self.ram[sym::XCO];
                     self.a |= self.ram[(self.ram[sym::BASE] as usize | (self.ram[sym::BASE + 1] as usize) << 8) + self.y as usize];
@@ -2488,7 +2488,7 @@ impl Cpu {
                     pc = 17;
                 }
                 17 => {
-                    self.a = self.ram[0xffff + self.x as usize];
+                    self.a = self.ram[((self._92_hi as usize) << 8 | (self._92_lo as usize)) + self.x as usize];
                     self.ram[sym::CARRY] = self.a;
                     self.ram[sym::BASE] = self.ram[sym::BASE].wrapping_add(1);
                     self.y = self.ram[sym::YREG];
@@ -2796,7 +2796,7 @@ impl Cpu {
                     let _r = (self.a as u16) + (self.smXCO) as u16 + (self.c as u16);
                     self.a = _r as u8;
                     self.c = (_r >> 8) as u8;
-                    // raw: patch *:smod+1 = a            ; HIRES.S:1860
+                    self.smod_lo = self.a;
                     self.a = self.ram[sym::YHI + self.x as usize];
                     pc = 7;
                 }
@@ -2804,7 +2804,7 @@ impl Cpu {
                     let _r = (self.a as u16) + (self.smPAGE) as u16 + (self.c as u16);
                     self.a = _r as u8;
                     self.c = (_r >> 8) as u8;
-                    // raw: patch *:smod+2 = a            ; HIRES.S:1864
+                    self.smod_hi = self.a;
                     pc = 8;
                 }
                 8 => {
@@ -2816,7 +2816,7 @@ impl Cpu {
                     pc = 10;
                 }
                 10 => {
-                    self.ram[0x2000 + self.y as usize] = self.a;
+                    self.ram[((self.smod_hi as usize) << 8 | (self.smod_lo as usize)) + self.y as usize] = self.a;
                     self.y = self.y.wrapping_sub(1);
                     if (self.y as i8) >= 0 {
                         pc = 9;
@@ -3059,7 +3059,7 @@ impl Cpu {
                     let _r = (self.a as u16) + (self.smXCO) as u16 + (self.c as u16);
                     self.a = _r as u8;
                     self.c = (_r >> 8) as u8;
-                    // raw: patch *:smod+1 = a            ; HIRES.S:2029
+                    self.smod_lo = self.a;
                     self.a = self.ram[sym::YHI + self.x as usize];
                     pc = 4;
                 }
@@ -3067,7 +3067,7 @@ impl Cpu {
                     let _r = (self.a as u16) + (self.smPAGE) as u16 + (self.c as u16);
                     self.a = _r as u8;
                     self.c = (_r >> 8) as u8;
-                    // raw: patch *:smod+2 = a            ; HIRES.S:2033
+                    self.smod_hi = self.a;
                     pc = 5;
                 }
                 5 => {
@@ -3082,7 +3082,7 @@ impl Cpu {
                     pc = 8;
                 }
                 8 => {
-                    self.ram[0x2000 + self.y as usize] = self.a;
+                    self.ram[((self.smod_hi as usize) << 8 | (self.smod_lo as usize)) + self.y as usize] = self.a;
                     self.y = self.y.wrapping_sub(1);
                     if (self.y as i8) >= 0 {
                         pc = 7;
@@ -3147,7 +3147,7 @@ impl Cpu {
                     let _r = (self.a as u16) + (self.smXCO) as u16 + (self.c as u16);
                     self.a = _r as u8;
                     self.c = (_r >> 8) as u8;
-                    // raw: patch *:smod+1 = a            ; HIRES.S:2029
+                    self.smod_lo = self.a;
                     self.a = self.ram[sym::YHI + self.x as usize];
                     pc = 3;
                 }
@@ -3155,7 +3155,7 @@ impl Cpu {
                     let _r = (self.a as u16) + (self.smPAGE) as u16 + (self.c as u16);
                     self.a = _r as u8;
                     self.c = (_r >> 8) as u8;
-                    // raw: patch *:smod+2 = a            ; HIRES.S:2033
+                    self.smod_hi = self.a;
                     pc = 4;
                 }
                 4 => {
@@ -3170,7 +3170,7 @@ impl Cpu {
                     pc = 7;
                 }
                 7 => {
-                    self.ram[0x2000 + self.y as usize] = self.a;
+                    self.ram[((self.smod_hi as usize) << 8 | (self.smod_lo as usize)) + self.y as usize] = self.a;
                     self.y = self.y.wrapping_sub(1);
                     if (self.y as i8) >= 0 {
                         pc = 6;
@@ -3207,18 +3207,18 @@ impl Cpu {
             match pc {
                 0 => {
                     self.a = self.ram[sym::IMAGE + 1];
-                    // raw: patch *:dst1+2 = a            ; HIRES.S:2062
+                    self.dst1_hi = self.a;
                     self.c = 0;
                     let _r = (self.a as u16) + (0x10) as u16 + (self.c as u16);
                     self.a = _r as u8;
                     self.c = (_r >> 8) as u8;
-                    // raw: patch *:dst2+2 = a            ; HIRES.S:2065
+                    self.dst2_hi = self.a;
                     self.a = self.ram[sym::IMAGE];
-                    // raw: patch *:org1+2 = a            ; HIRES.S:2068
+                    self.org1_hi = self.a;
                     let _r = (self.a as u16) + (0x10) as u16 + (self.c as u16);
                     self.a = _r as u8;
                     self.c = (_r >> 8) as u8;
-                    // raw: patch *:org2+2 = a            ; HIRES.S:2070
+                    self.org2_hi = self.a;
                     self.x = 0x10;
                     self.y = 0x00;
                     pc = 1;
@@ -3227,19 +3227,19 @@ impl Cpu {
                     pc = 2;
                 }
                 2 => {
-                    self.a = self.ram[0x2000 + self.y as usize];
+                    self.a = self.ram[((self.org1_hi as usize) << 8 | (0x00)) + self.y as usize];
                     pc = 3;
                 }
                 3 => {
-                    self.ram[0x4000 + self.y as usize] = self.a;
+                    self.ram[((self.dst1_hi as usize) << 8 | (0x00)) + self.y as usize] = self.a;
                     pc = 4;
                 }
                 4 => {
-                    self.a = self.ram[0x3000 + self.y as usize];
+                    self.a = self.ram[((self.org2_hi as usize) << 8 | (0x00)) + self.y as usize];
                     pc = 5;
                 }
                 5 => {
-                    self.ram[0x5000 + self.y as usize] = self.a;
+                    self.ram[((self.dst2_hi as usize) << 8 | (0x00)) + self.y as usize] = self.a;
                     self.y = self.y.wrapping_add(1);
                     if self.y != 0x00 {
                         pc = 1;
