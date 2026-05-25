@@ -9,8 +9,8 @@ shifts, over `self.c: u8`).
 This slice adds *post-indexed indirect addressing* — the `(ptr),y`
 form. The effective address is a 16-bit zero-page pointer fetch plus Y:
 
-    self.ram[(self.ram[ptr] as usize
-              | (self.ram[ptr + 1] as usize) << 8) + self.y as usize]
+    self.mem[(self.mem[ptr] as usize
+              | (self.mem[ptr + 1] as usize) << 8) + self.reg.y as usize]
 
 lowered through one `_indirect_index` helper and reused by every site
 that can carry an `IndirectY`:
@@ -55,8 +55,8 @@ couldn't fold into a scoped `SaveTemp`/`RestoreTemp` pair — over a
 provisional `self.stack: Vec<u8>` that mirrors the interpreter's
 `value_stack`:
 
-* `Pha` → `self.stack.push(self.a)`;
-* `Pla` → `self.a = self.stack.pop()…` plus Z/N from the popped byte.
+* `Pha` → `self.stack.push(self.reg.a)`;
+* `Pla` → `self.reg.a = self.stack.pop()…` plus Z/N from the popped byte.
 
 It also lowers the *recognised SMC operand patches*. `pass3_smc` rewrites
 runtime instruction-operand patches into a faithful model:
@@ -75,9 +75,14 @@ Still deferred:
   target patches) and `LocalRef` inc/dec — self-modifying code with no
   consumer model yet.
 
-Memory model and receiver (`Cpu` / `self.ram` / `self.c` / `self.z` /
-`self.n` / `self.stack` / SMC operand-variable fields) remain
-provisional pending the Game/Renderer/Audio/Input design slice.
+State model: this slice emits a decomposed `Cpu` receiver and its
+sub-structs (see `_emit_state_defs`) — registers `self.reg.{a,x,y}: u8`,
+status flags `self.flags.{c,z,n,i,d}: bool` (V untracked), 64 KiB memory
+`self.mem: Box<[u8; 0x10000]>`, the `pha`/`pla` value stack
+`self.stack: Vec<u8>`, and recognised SMC operand variables under
+`self.smc`. Each emitted file defines these types so it is self-contained
+for state; resolving cross-module routine *calls* into one crate is a
+separate later concern.
 """
 
 from __future__ import annotations
@@ -231,7 +236,7 @@ def _emit_imm(imm: Imm) -> str:
     # reads the provisional operand-variable field the matching
     # `StoreOpVar` writes, rather than the placeholder assembled byte.
     if imm.opvar is not None:
-        return f"self.{_mangle(imm.opvar)}"
+        return f"self.smc.{_mangle(imm.opvar)}"
     return f"0x{imm.value & 0xff:02x}"
 
 
@@ -243,7 +248,7 @@ def _imm_u8(imm: Imm) -> str:
     returned as-is — appending `_u8` there would mangle the field name
     into the invalid `self.<opvar>_u8`."""
     if imm.opvar is not None:
-        return f"self.{_mangle(imm.opvar)}"
+        return f"self.smc.{_mangle(imm.opvar)}"
     return f"0x{imm.value & 0xff:02x}_u8"
 
 
@@ -254,8 +259,8 @@ _SYM_NAME_RE = re.compile(r"^(?P<base>[A-Za-z_][A-Za-z0-9_]*)(?P<off>[+-]\d+)?$"
 
 class SymTable:
     """Recovers symbolic RAM-address constants from the `Abs` operands a
-    module references, so `self.ram[0x00a0]` can render as
-    `self.ram[sym::PlayCount]` and keep the source's intent.
+    module references, so `self.mem[0x00a0]` can render as
+    `self.mem[sym::PlayCount]` and keep the source's intent.
 
     Built in two phases because emission is the only place that knows
     which addresses are actually rendered as an index:
@@ -281,7 +286,7 @@ class SymTable:
         return m.group("base"), int(m.group("off") or 0)
 
     def index(self, a: Abs) -> str:
-        """Render `a` as the `self.ram[...]` index expression."""
+        """Render `a` as the `self.mem[...]` index expression."""
         if not self._final:
             self._seen.append((a.name, a.addr))
             return _addr(a.addr)
@@ -323,7 +328,7 @@ class SymTable:
 
 
 def _abs_index(a: Abs, syms: SymTable | None) -> str:
-    """Render the index of `self.ram[<index>]` for an absolute address —
+    """Render the index of `self.mem[<index>]` for an absolute address —
     a `sym::` reference when a symbol table resolves it, else the
     `0x..` literal.
 
@@ -335,9 +340,9 @@ def _abs_index(a: Abs, syms: SymTable | None) -> str:
     field."""
     if a.opvar is not None:
         name = _mangle(a.opvar)
-        hi = (f"self.{name}_hi as usize" if "hi" in a.opvar_halves
+        hi = (f"self.smc.{name}_hi as usize" if "hi" in a.opvar_halves
               else f"0x{(a.addr >> 8) & 0xff:02x}")
-        lo = (f"self.{name}_lo as usize" if "lo" in a.opvar_halves
+        lo = (f"self.smc.{name}_lo as usize" if "lo" in a.opvar_halves
               else f"0x{a.addr & 0xff:02x}")
         return f"(({hi}) << 8 | ({lo}))"
     if syms is None:
@@ -363,16 +368,16 @@ def _offset_abs(a: Abs, delta: int) -> Abs:
 
 
 def _indirect_index(iy: IndirectY, syms: SymTable | None) -> str:
-    """Render the `self.ram[<index>]` index for a `(ptr),y` effective
+    """Render the `self.mem[<index>]` index for a `(ptr),y` effective
     address: fetch the 16-bit pointer from the zero-page bytes at `ptr`
     (low) and `ptr + 1` (high), then add Y. The high byte is rendered via
     `_offset_abs(ptr, 1)` so it resolves to `sym::<base> + <off+1>` even
     when `ptr` itself carries an offset (`(ztemp+1),y`). Matches the
     interpreter's permissive rule (no page wrap on the pointer, no 16-bit
     wrap on `+ Y`) and the unmasked `IndexedAbs` form."""
-    lo = f"self.ram[{_abs_index(iy.ptr, syms)}]"
-    hi = f"self.ram[{_abs_index(_offset_abs(iy.ptr, 1), syms)}]"
-    return f"({lo} as usize | ({hi} as usize) << 8) + self.y as usize"
+    lo = f"self.mem[{_abs_index(iy.ptr, syms)}]"
+    hi = f"self.mem[{_abs_index(_offset_abs(iy.ptr, 1), syms)}]"
+    return f"({lo} as usize | ({hi} as usize) << 8) + self.reg.y as usize"
 
 
 def _cmp_operand(item, syms: SymTable | None) -> str:
@@ -382,10 +387,10 @@ def _cmp_operand(item, syms: SymTable | None) -> str:
     if isinstance(item, CmpImm):
         return _emit_imm(item.imm)
     if isinstance(item, CmpAbs):
-        return f"self.ram[{_abs_index(item.source, syms)}]"
+        return f"self.mem[{_abs_index(item.source, syms)}]"
     if isinstance(item, CmpIndexed):
-        return f"self.ram[{_abs_index(item.base, syms)} + self.{item.index} as usize]"
-    return f"self.ram[{_indirect_index(item.source, syms)}]"  # CmpIndirect
+        return f"self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize]"
+    return f"self.mem[{_indirect_index(item.source, syms)}]"  # CmpIndirect
 
 
 def _wide_term(operand, syms: SymTable | None, *, complement: bool) -> str:
@@ -407,11 +412,11 @@ def _emit_value(v, syms: SymTable | None = None) -> str:
     if isinstance(v, Imm):
         return _emit_imm(v)
     if isinstance(v, Abs):
-        return f"self.ram[{_abs_index(v, syms)}]"
+        return f"self.mem[{_abs_index(v, syms)}]"
     if isinstance(v, IndexedAbs):
-        return f"self.ram[{_abs_index(v.base, syms)} + self.{v.index} as usize]"
+        return f"self.mem[{_abs_index(v.base, syms)} + self.reg.{v.index} as usize]"
     if isinstance(v, IndirectY):
-        return f"self.ram[{_indirect_index(v, syms)}]"
+        return f"self.mem[{_indirect_index(v, syms)}]"
     if isinstance(v, BinExpr):
         return _emit_binexpr(v, syms)
     if isinstance(v, RotateExpr):
@@ -438,11 +443,11 @@ def _emit_target(target, syms: SymTable | None = None) -> str | None:
     """Render an `Assign` target as a Rust assignable place, or `None`
     when the destination form isn't lowered yet."""
     if isinstance(target, Abs):
-        return f"self.ram[{_abs_index(target, syms)}]"
+        return f"self.mem[{_abs_index(target, syms)}]"
     if isinstance(target, IndexedAbs):
-        return f"self.ram[{_abs_index(target.base, syms)} + self.{target.index} as usize]"
+        return f"self.mem[{_abs_index(target.base, syms)} + self.reg.{target.index} as usize]"
     if isinstance(target, IndirectY):
-        return f"self.ram[{_indirect_index(target, syms)}]"
+        return f"self.mem[{_indirect_index(target, syms)}]"
     return None  # anything else: deferred
 
 
@@ -455,7 +460,7 @@ def _emit_compare(c: Compare, syms: SymTable | None = None) -> str:
     * `rhs=Imm` with `<`/`>=` comes from `cmp; bcc/bcs` — unsigned,
       so plain u8 comparison is correct.
     * `rhs=Abs` / `rhs=IndexedAbs`: compare against a memory byte."""
-    reg = f"self.{c.reg}"
+    reg = f"self.reg.{c.reg}"
     if c.rhs is None:
         # Sign test (N-flag): op is ">=0" (bpl) or "<0" (bmi). Validate
         # explicitly so an unexpected op surfaces rather than silently
@@ -472,17 +477,17 @@ def _emit_compare(c: Compare, syms: SymTable | None = None) -> str:
 
 
 # A `RawIfStmt.cond` is a raw 6502 branch suffix — the flag test pass 2
-# couldn't fuse into a `Compare`. Map each to the provisional flag model
-# (`self.z`/`self.c`/`self.n`), mirroring `interp_ir1._branch_taken`.
+# couldn't fuse into a `Compare`. Map each to the `bool` flag model
+# (`self.flags.z`/`.c`/`.n`), mirroring `interp_ir1._branch_taken`.
 # The overflow flag (`vs`/`vc`) isn't tracked anywhere in the lifter, so
 # it has no entry; `_emit_branch_cond` flags it rather than guessing.
 _BRANCH_COND_RS = {
-    "eq": "self.z != 0",
-    "ne": "self.z == 0",
-    "cs": "self.c != 0",
-    "cc": "self.c == 0",
-    "mi": "self.n != 0",
-    "pl": "self.n == 0",
+    "eq": "self.flags.z",
+    "ne": "!self.flags.z",
+    "cs": "self.flags.c",
+    "cc": "!self.flags.c",
+    "mi": "self.flags.n",
+    "pl": "!self.flags.n",
 }
 
 
@@ -512,70 +517,70 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
     `StoreOpAddr` 16-bit address). The opaque `StoreLocal` (offset-0
     opcode patches, branch / jump-target patches) stays deferred."""
     if isinstance(item, LoadImm):
-        return [f"self.{item.reg} = {_emit_imm(item.imm)};"]
+        return [f"self.reg.{item.reg} = {_emit_imm(item.imm)};"]
 
     if isinstance(item, LoadAbs):
-        return [f"self.{item.reg} = self.ram[{_abs_index(item.source, syms)}];"]
+        return [f"self.reg.{item.reg} = self.mem[{_abs_index(item.source, syms)}];"]
 
     if isinstance(item, LoadIndexed):
-        place = f"self.ram[{_abs_index(item.base, syms)} + self.{item.index} as usize]"
-        return [f"self.{item.reg} = {place};"]
+        place = f"self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize]"
+        return [f"self.reg.{item.reg} = {place};"]
 
     if isinstance(item, LoadIndirect):
-        return [f"self.{item.reg} = self.ram[{_indirect_index(item.source, syms)}];"]
+        return [f"self.reg.{item.reg} = self.mem[{_indirect_index(item.source, syms)}];"]
 
     if isinstance(item, StoreAbs):
-        return [f"self.ram[{_abs_index(item.target, syms)}] = self.{item.reg};"]
+        return [f"self.mem[{_abs_index(item.target, syms)}] = self.reg.{item.reg};"]
 
     if isinstance(item, StoreIndexed):
-        place = f"self.ram[{_abs_index(item.base, syms)} + self.{item.index} as usize]"
-        return [f"{place} = self.{item.reg};"]
+        place = f"self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize]"
+        return [f"{place} = self.reg.{item.reg};"]
 
     if isinstance(item, StoreIndirect):
-        return [f"self.ram[{_indirect_index(item.target, syms)}] = self.{item.reg};"]
+        return [f"self.mem[{_indirect_index(item.target, syms)}] = self.reg.{item.reg};"]
 
     if isinstance(item, Transfer):
-        return [f"self.{item.dst_reg} = self.{item.src_reg};"]
+        return [f"self.reg.{item.dst_reg} = self.reg.{item.src_reg};"]
 
     if isinstance(item, Bitwise):
         op = _BITWISE_OPS.get(item.op)
         if op is None or not isinstance(item.source, (Imm, Abs, IndexedAbs, IndirectY)):
             return None
-        return [f"self.a {op}= {_emit_value(item.source, syms)};"]
+        return [f"self.reg.a {op}= {_emit_value(item.source, syms)};"]
 
     if isinstance(item, (IncTarget, DecTarget)):
         method = "wrapping_add" if isinstance(item, IncTarget) else "wrapping_sub"
         target = item.target
         if isinstance(target, Reg):
-            return [f"self.{target} = self.{target}.{method}(1);"]
+            return [f"self.reg.{target} = self.reg.{target}.{method}(1);"]
         if isinstance(target, Abs):
-            place = f"self.ram[{_abs_index(target, syms)}]"
+            place = f"self.mem[{_abs_index(target, syms)}]"
             return [f"{place} = {place}.{method}(1);"]
         return None  # LocalRef: self-modifying-code operand bump — deferred
 
     # ---- carry / flag operations ----------------------------------------
 
     if isinstance(item, Clc):
-        return ["self.c = 0;"]
+        return ["self.flags.c = false;"]
 
     if isinstance(item, Sec):
-        return ["self.c = 1;"]
+        return ["self.flags.c = true;"]
 
     if isinstance(item, FlagOp):
         flag = item.flag.lower()
-        return [f"self.{flag} = {item.value};"]
+        return [f"self.flags.{flag} = {'true' if item.value else 'false'};"]
 
     if isinstance(item, (AdcImm, AdcAbs, AdcIndexed)):
         if isinstance(item, AdcImm):
             rhs = f"({_emit_imm(item.imm)}) as u16"
         elif isinstance(item, AdcAbs):
-            rhs = f"self.ram[{_abs_index(item.source, syms)}] as u16"
+            rhs = f"self.mem[{_abs_index(item.source, syms)}] as u16"
         else:
-            rhs = f"self.ram[{_abs_index(item.base, syms)} + self.{item.index} as usize] as u16"
+            rhs = f"self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize] as u16"
         return [
-            f"let _r = (self.a as u16) + {rhs} + (self.c as u16);",
-            "self.a = _r as u8;",
-            "self.c = (_r >> 8) as u8;",
+            f"let _r = (self.reg.a as u16) + {rhs} + (self.flags.c as u16);",
+            "self.reg.a = _r as u8;",
+            "self.flags.c = (_r >> 8) != 0;",
         ]
 
     if isinstance(item, (SbcImm, SbcAbs, SbcIndexed, SbcIndirect)):
@@ -587,88 +592,88 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             # an opvar immediate is already a u8 field, so no `_u8`.
             rhs = f"(!{_imm_u8(item.imm)}) as u16"
         elif isinstance(item, SbcAbs):
-            rhs = f"(!self.ram[{_abs_index(item.source, syms)}]) as u16"
+            rhs = f"(!self.mem[{_abs_index(item.source, syms)}]) as u16"
         elif isinstance(item, SbcIndexed):
-            rhs = f"(!self.ram[{_abs_index(item.base, syms)} + self.{item.index} as usize]) as u16"
+            rhs = f"(!self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize]) as u16"
         else:
-            rhs = f"(!self.ram[{_indirect_index(item.source, syms)}]) as u16"
+            rhs = f"(!self.mem[{_indirect_index(item.source, syms)}]) as u16"
         return [
-            f"let _r = (self.a as u16) + {rhs} + (self.c as u16);",
-            "self.a = _r as u8;",
-            "self.c = (_r >> 8) as u8;",
+            f"let _r = (self.reg.a as u16) + {rhs} + (self.flags.c as u16);",
+            "self.reg.a = _r as u8;",
+            "self.flags.c = (_r >> 8) != 0;",
         ]
 
     if isinstance(item, Asl):
         return [
-            "self.c = self.a >> 7;",
-            "self.a = self.a.wrapping_shl(1);",
+            "self.flags.c = (self.reg.a >> 7) != 0;",
+            "self.reg.a = self.reg.a.wrapping_shl(1);",
         ]
 
     if isinstance(item, Lsr):
         return [
-            "self.c = self.a & 1;",
-            "self.a = self.a.wrapping_shr(1);",
+            "self.flags.c = (self.reg.a & 1) != 0;",
+            "self.reg.a = self.reg.a.wrapping_shr(1);",
         ]
 
     if isinstance(item, Rol):
         return [
-            "let _c = self.a >> 7;",
-            "self.a = self.a.wrapping_shl(1) | self.c;",
-            "self.c = _c;",
+            "let _c = self.reg.a >> 7;",
+            "self.reg.a = self.reg.a.wrapping_shl(1) | (self.flags.c as u8);",
+            "self.flags.c = _c != 0;",
         ]
 
     if isinstance(item, Ror):
         return [
-            "let _c = self.a & 1;",
-            "self.a = self.a.wrapping_shr(1) | (self.c << 7);",
-            "self.c = _c;",
+            "let _c = self.reg.a & 1;",
+            "self.reg.a = self.reg.a.wrapping_shr(1) | ((self.flags.c as u8) << 7);",
+            "self.flags.c = _c != 0;",
         ]
 
     if isinstance(item, ShiftMem):
-        place = f"self.ram[{_abs_index(item.target, syms)}]"
+        place = f"self.mem[{_abs_index(item.target, syms)}]"
         if item.op == "asl":
             return [
-                f"self.c = {place} >> 7;",
+                f"self.flags.c = ({place} >> 7) != 0;",
                 f"{place} = {place}.wrapping_shl(1);",
             ]
         if item.op == "lsr":
             return [
-                f"self.c = {place} & 1;",
+                f"self.flags.c = ({place} & 1) != 0;",
                 f"{place} = {place}.wrapping_shr(1);",
             ]
         if item.op == "rol":
             return [
                 f"let _c = {place} >> 7;",
-                f"{place} = {place}.wrapping_shl(1) | self.c;",
-                "self.c = _c;",
+                f"{place} = {place}.wrapping_shl(1) | (self.flags.c as u8);",
+                "self.flags.c = _c != 0;",
             ]
         if item.op == "ror":
             return [
                 f"let _c = {place} & 1;",
-                f"{place} = {place}.wrapping_shr(1) | (self.c << 7);",
-                "self.c = _c;",
+                f"{place} = {place}.wrapping_shr(1) | ((self.flags.c as u8) << 7);",
+                "self.flags.c = _c != 0;",
             ]
 
     # ---- flag-only comparisons ------------------------------------------
 
     if isinstance(item, (CmpImm, CmpAbs, CmpIndexed, CmpIndirect)):
-        reg = f"self.{item.reg}"
+        reg = f"self.reg.{item.reg}"
         return [
             f"let _o: u8 = {_cmp_operand(item, syms)};",
-            f"self.c = ({reg} >= _o) as u8;",
-            f"self.z = ({reg} == _o) as u8;",
-            f"self.n = {reg}.wrapping_sub(_o) >> 7;",
+            f"self.flags.c = {reg} >= _o;",
+            f"self.flags.z = {reg} == _o;",
+            f"self.flags.n = ({reg}.wrapping_sub(_o) >> 7) != 0;",
         ]
 
     if isinstance(item, Bit):
         if isinstance(item.source, Imm):
             operand = _emit_imm(item.source)
         else:
-            operand = f"self.ram[{_abs_index(item.source, syms)}]"
+            operand = f"self.mem[{_abs_index(item.source, syms)}]"
         return [
             f"let _o: u8 = {operand};",
-            "self.z = ((self.a & _o) == 0) as u8;",
-            "self.n = _o >> 7;",
+            "self.flags.z = (self.reg.a & _o) == 0;",
+            "self.flags.n = (_o >> 7) != 0;",
         ]
 
     # ---- stack ----------------------------------------------------------
@@ -679,13 +684,13 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
     # `pla` sets Z/N from the popped byte, matching the 6502 / interpreter.
 
     if isinstance(item, Pha):
-        return ["self.stack.push(self.a);"]
+        return ["self.stack.push(self.reg.a);"]
 
     if isinstance(item, Pla):
         return [
-            "self.a = self.stack.pop().expect(\"pla on empty stack\");",
-            "self.z = (self.a == 0) as u8;",
-            "self.n = self.a >> 7;",
+            "self.reg.a = self.stack.pop().expect(\"pla on empty stack\");",
+            "self.flags.z = self.reg.a == 0;",
+            "self.flags.n = (self.reg.a >> 7) != 0;",
         ]
 
     # ---- self-modifying code (recognised immediate-operand patch) -------
@@ -696,12 +701,12 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
     # (address/branch patches) has no consumer model yet and stays raw.
 
     if isinstance(item, StoreOpVar):
-        return [f"self.{_mangle(item.name)} = self.{item.reg};"]
+        return [f"self.smc.{_mangle(item.name)} = self.reg.{item.reg};"]
 
     if isinstance(item, StoreOpAddr):
         # Patch the low / high byte of a recognised SMC address operand;
         # the marked `Abs` reads `self.<name>_lo`/`_hi` back via `_abs_index`.
-        return [f"self.{_mangle(item.name)}_{item.half} = self.{item.reg};"]
+        return [f"self.smc.{_mangle(item.name)}_{item.half} = self.reg.{item.reg};"]
 
     return None
 
@@ -722,8 +727,8 @@ def _emit_wide16(stmt: Wide16Stmt, syms: SymTable | None) -> list[str]:
         f"let _hi = {_wide_term(stmt.hi_src, syms, complement=False)}"
         f" + {_wide_term(stmt.hi_op, syms, complement=complement)} + (_lo >> 8);",
         f"{_emit_target(stmt.hi_dst, syms)} = _hi as u8;",
-        "self.a = _hi as u8;",
-        "self.c = (_hi >> 8) as u8;",
+        "self.reg.a = _hi as u8;",
+        "self.flags.c = (_hi >> 8) != 0;",
     ]
 
 
@@ -772,10 +777,10 @@ def _emit_stmt(
         return [f"{pad}self.{method}();", f"{pad}return;"]
 
     if isinstance(stmt, SaveTemp):
-        return [f"{pad}let tmp{stmt.slot} = self.a;"]
+        return [f"{pad}let tmp{stmt.slot} = self.reg.a;"]
 
     if isinstance(stmt, RestoreTemp):
-        return [f"{pad}self.a = tmp{stmt.slot};"]
+        return [f"{pad}self.reg.a = tmp{stmt.slot};"]
 
     if isinstance(stmt, IfStmt):
         lines = [f"{pad}if {_emit_compare(stmt.cond, syms)} {{"]
@@ -826,13 +831,13 @@ def _emit_stmt(
         cond = _emit_compare(stmt.cond, syms)
         inner = INDENT * (indent + 1)
         lines = [
-            f"{pad}self.{stmt.var} = {_emit_imm(stmt.start)};",
+            f"{pad}self.reg.{stmt.var} = {_emit_imm(stmt.start)};",
             f"{pad}loop {{",
         ]
         for s in stmt.body.stmts:
             lines.extend(_emit_stmt(s, indent + 1, syms, names))
         lines += [
-            f"{inner}self.{stmt.var} = self.{stmt.var}.{step_method}({step_lit});",
+            f"{inner}self.reg.{stmt.var} = self.reg.{stmt.var}.{step_method}({step_lit});",
             f"{inner}if !({cond}) {{",
             f"{inner}    break;",
             f"{inner}}}",
@@ -845,19 +850,19 @@ def _emit_stmt(
         step_lit = f"0x{abs(stmt.step) & 0xff:02x}"
         inner = INDENT * (indent + 1)
         lines = [
-            f"{pad}self.{stmt.var} = {_emit_imm(stmt.start)};",
+            f"{pad}self.reg.{stmt.var} = {_emit_imm(stmt.start)};",
             f"{pad}for _ in 0..{stmt.count}usize {{",
         ]
         for s in stmt.body.stmts:
             lines.extend(_emit_stmt(s, indent + 1, syms, names))
         lines += [
-            f"{inner}self.{stmt.var} = self.{stmt.var}.{step_method}({step_lit});",
+            f"{inner}self.reg.{stmt.var} = self.reg.{stmt.var}.{step_method}({step_lit});",
             f"{pad}}}",
         ]
         return lines
 
     if isinstance(stmt, MatchStmt):
-        lines = [f"{pad}match self.{stmt.reg} {{"]
+        lines = [f"{pad}match self.reg.{stmt.reg} {{"]
         for arm in stmt.arms:
             vals = " | ".join(f"0x{v.value & 0xff:02x}" for v in arm.values)
             lines.append(f"{pad}    {vals} => {{")
@@ -922,18 +927,73 @@ def emit_routine(
 _HEADER = [
     "// @generated by pop_lifter — DO NOT EDIT.",
     "//",
-    "// Pass 4 skeleton slice: module + routine scaffolding with leaf-",
-    "// expression, control-flow, data-movement, carry-arithmetic,",
-    "// `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.",
-    "// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured",
-    "// routines emit a `loop { match pc { ... } }` dispatch fallback; the",
-    "// stack rides `self.stack: Vec<u8>` and recognised SMC operand",
-    "// patches ride `self.<opvar>` / `self.<opvar>_lo`/`_hi` fields.",
-    "// Opcode / branch-target SMC stays deferred as `// raw: …` comments.",
-    "// The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are",
-    "// provisional, pending the state/trait design slice. RAM addresses",
-    "// keep their source symbol names via the `sym` constants below.",
+    "// Pass 4: module + routine scaffolding with leaf-expression,",
+    "// control-flow, data-movement, carry-arithmetic, `(ptr),y` indirect,",
+    "// cmp/bit flag, 16-bit (`Wide16`), dispatch-fallback, stack, and SMC",
+    "// operand-patch lowering.",
+    "//",
+    "// State is decomposed into `Cpu { reg, flags, mem, stack, smc }`:",
+    "// registers `self.reg.{a,x,y}: u8`, flags `self.flags.{c,z,n,i,d}:",
+    "// bool`, memory `self.mem[addr]` (64 KiB), the `pha`/`pla` value",
+    "// stack `self.stack: Vec<u8>`, and recognised SMC operand variables",
+    "// `self.smc.<name>` (immediate) / `self.smc.<name>_lo`/`_hi`",
+    "// (address). RAM addresses keep their source symbol names via the",
+    "// `sym` constants below. Cross-module routine calls resolve once the",
+    "// modules are compiled together; opcode / branch-target SMC stays",
+    "// deferred as `// raw: …` comments.",
 ]
+
+
+_REG_FIELDS = ("a", "x", "y")
+_FLAG_FIELDS = ("c", "z", "n", "i", "d")
+
+
+def _emit_state_defs(smc_fields: list[str]) -> list[str]:
+    """Emit the decomposed CPU state types: `Cpu` and its `Regs` / `Flags`
+    / `Smc` sub-structs. `smc_fields` are the recognised SMC operand-
+    variable field names referenced by this file's routines (immediate
+    `<name>` and address `<name>_lo`/`_hi`)."""
+    regs = ", ".join(f"pub {r}: u8" for r in _REG_FIELDS)
+    flags = ", ".join(f"pub {f}: bool" for f in _FLAG_FIELDS)
+    lines = [
+        "#[derive(Default)]",
+        f"pub struct Regs {{ {regs} }}",
+        "",
+        "// 6502 status flags, modelled as booleans (V is not tracked).",
+        "#[derive(Default)]",
+        f"pub struct Flags {{ {flags} }}",
+        "",
+        "// Self-modifying-code operand variables: instruction operands the",
+        "// routine patches at runtime, recovered by pass-3 SMC recognition.",
+        "#[derive(Default)]",
+        "pub struct Smc {",
+    ]
+    for f in smc_fields:
+        lines.append(f"    pub {f}: u8,")
+    lines += [
+        "}",
+        "",
+        "pub struct Cpu {",
+        "    pub reg: Regs,",
+        "    pub flags: Flags,",
+        "    pub mem: Box<[u8; 0x10000]>,",
+        "    pub stack: Vec<u8>,",
+        "    pub smc: Smc,",
+        "}",
+        "",
+        "impl Cpu {",
+        "    pub fn new() -> Self {",
+        "        Cpu {",
+        "            reg: Regs::default(),",
+        "            flags: Flags::default(),",
+        "            mem: Box::new([0u8; 0x10000]),",
+        "            stack: Vec::new(),",
+        "            smc: Smc::default(),",
+        "        }",
+        "    }",
+        "}",
+    ]
+    return lines
 
 
 def _record_syms(module: ModuleIR3, syms: SymTable) -> None:
@@ -990,9 +1050,21 @@ def emit_modules(modules: list[ModuleIR3]) -> str:
     # Resolve call targets (incl. entry aliases) to canonical method names.
     names = _build_name_table(modules)
 
+    # Phase 2: emit the `impl Cpu` blocks, then scan them for the SMC
+    # operand-variable fields they reference so the `Smc` struct declares
+    # exactly those.
+    impl_lines: list[str] = []
+    for i, module in enumerate(modules):
+        if i:
+            impl_lines.append("")
+        impl_lines.extend(_emit_impl_block(module, syms, names))
+    smc_fields = sorted(set(re.findall(r"self\.smc\.(\w+)", "\n".join(impl_lines))))
+
     lines = [*_HEADER, "//"]
     for module in modules:
         lines.append(f"// source: {_portable_path(module.file)}")
+    lines.append("")
+    lines.extend(_emit_state_defs(smc_fields))
     lines.append("")
 
     sym_block = syms.render_block("")
@@ -1000,10 +1072,7 @@ def emit_modules(modules: list[ModuleIR3]) -> str:
         lines.extend(sym_block)
         lines.append("")
 
-    for i, module in enumerate(modules):
-        if i:
-            lines.append("")
-        lines.extend(_emit_impl_block(module, syms, names))
+    lines.extend(impl_lines)
     return "\n".join(lines) + "\n"
 
 
