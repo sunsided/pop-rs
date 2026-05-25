@@ -1023,20 +1023,23 @@ def emit_module(module: ModuleIR3) -> str:
 
 
 def emit_modules(modules: list[ModuleIR3]) -> str:
-    """Emit one or more IR3 modules into a single Rust source file.
+    """Emit one or more IR3 modules into a single, self-contained Rust
+    source file: the decomposed `Cpu` state definitions, one shared
+    `mod sym { ... }`, and one `impl Cpu { ... }` block per module.
 
-    All modules share one `mod sym { ... }` block: a Rust file may hold
-    only one module item of a given name, so emitting a `mod sym` per
-    source (as `emit_module` did when its outputs were concatenated)
-    produced a duplicate-module compile error. Symbols are recorded
-    across every module before a single `finalize()`, so the global
-    conflict rule (a base resolving to two addresses falls back to a
-    literal everywhere) holds across files too. Each module keeps its own
-    `// source:` line and `impl Cpu { ... }` block — several inherent
-    `impl` blocks for one type are valid Rust.
+    Emission runs in two passes. Pass 1 records every rendered `Abs`
+    across all modules into one `SymTable`, then `finalize()`s it — so the
+    global conflict rule (a base resolving to two addresses falls back to
+    a literal everywhere) holds across files. Pass 2 emits the `impl Cpu`
+    blocks, then scans them for the `self.smc.*` operand-variable fields
+    they reference so `_emit_state_defs` can declare exactly those on the
+    `Smc` struct. The state definitions and the single `mod sym` are
+    emitted ahead of the impl blocks.
 
-    For a single module the output is byte-identical to the previous
-    standalone form."""
+    `mod sym` is shared (not per-module) because a Rust file may hold only
+    one module item of a given name; several inherent `impl Cpu` blocks
+    are fine. For a single module the output is byte-identical to the
+    previous standalone form."""
     from .ir1 import _portable_path
 
     # Phase 1: record every rendered `Abs` across all modules into one
