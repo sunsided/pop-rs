@@ -65,6 +65,7 @@ from .ir1 import (
     Goto,
     Imm,
     IncTarget,
+    IndirectX,
     IndirectY,
     Label,
     LoadAbs,
@@ -287,6 +288,29 @@ def _parse_indirect_y(
     return IndirectY(ptr=Abs(name=inner, addr=addr & 0xffff))
 
 
+def _parse_indirect_x(
+    operand: str,
+    equates: dict[str, int],
+) -> IndirectX | None:
+    """Parse `(name,x)` — the 6502 pre-indexed indirect form, where the
+    `,x` sits *inside* the parentheses (contrast `(name),y`). Returns the
+    resolved `IndirectX` or `None`. The pointer's zero-page address is
+    recorded on `IndirectX.ptr` as a normal `Abs` so dumps and downstream
+    passes see the symbolic name."""
+    s = operand.strip()
+    if not s.startswith("(") or not s.endswith(")"):
+        return None
+    inner = s[1:-1]
+    if inner.replace(" ", "").replace("\t", "").lower()[-2:] != ",x":
+        return None
+    name = inner[:inner.rfind(",")].strip()
+    try:
+        addr = eval_expr(name, equates)
+    except ValueError:
+        return None
+    return IndirectX(ptr=Abs(name=name, addr=addr & 0xffff))
+
+
 def _reg_of_load(mnemonic: str) -> Reg:
     return {"lda": Reg.A, "ldx": Reg.X, "ldy": Reg.Y}[mnemonic]
 
@@ -352,6 +376,9 @@ def _lift_instr(
             ind = _parse_indirect_y(line.operand, equates)
             if ind is not None:
                 return LoadIndirect(reg=Reg.A, source=ind, src=src)
+            indx = _parse_indirect_x(line.operand, equates)
+            if indx is not None:
+                return LoadIndirect(reg=Reg.A, source=indx, src=src)
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return LoadAbs(reg=_reg_of_load(mnemonic), source=addr, src=src)

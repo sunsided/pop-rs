@@ -37,6 +37,7 @@ from pop_lifter.ir1 import (
     Imm,
     IncTarget,
     IndexedAbs,
+    IndirectX,
     IndirectY,
     LoadAbs,
     LoadImm,
@@ -699,6 +700,17 @@ def _indirect(name: str, addr: int) -> str:
 def test_raw_load_indirect():
     item = LoadIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
     assert _raw(item) == f"self.reg.a = {_indirect('ptr', 0x20)};"
+
+
+def test_raw_load_indirect_x_pre_indexed():
+    # `(ptr,x)`: X indexes the zero-page pointer location (with zp wrap);
+    # the fetched 16-bit pointer is the effective address (no post-index).
+    item = LoadIndirect(reg=Reg.A, source=IndirectX(ptr=_abs("PAC", 0x00)), src=SRC)
+    assert _raw(item) == (
+        "self.reg.a = self.mem[(self.mem[(0x0000 + self.reg.x as usize) & 0xff] "
+        "as usize | (self.mem[(0x0000 + self.reg.x as usize + 1) & 0xff] "
+        "as usize) << 8)];"
+    )
 
 
 def test_raw_store_indirect():
