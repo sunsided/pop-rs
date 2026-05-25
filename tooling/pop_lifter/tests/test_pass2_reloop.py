@@ -146,31 +146,66 @@ def _two_back_edges_routine(extra=None):
     return Routine(name="loopy", body=body)
 
 
-def test_relooper_fallback_for_unstructurable_loops():
-    """Two back-edges to the same header — outside the simple-
-    do-while shape the relooper recognises. The routine must take
-    the unstructured fallback path and emit `LabelStmt` +
-    `RawIfStmt`-with-`GotoStmt`."""
+def _dispatch_of(routine):
+    """Return the single `DispatchStmt` that is a fallback routine's
+    whole body, asserting that's the shape."""
+    from pop_lifter.ir3 import DispatchStmt
+    stmts = routine.body.stmts
+    assert len(stmts) == 1 and isinstance(stmts[0], DispatchStmt), (
+        f"fallback routine body should be one DispatchStmt, got {stmts!r}"
+    )
+    return stmts[0]
+
+
+def _walk_arm_stmts(dispatch):
+    """Yield every statement nested anywhere inside a DispatchStmt's
+    arms (recursing through if/else/loop blocks)."""
+    def walk(stmts):
+        for s in stmts:
+            yield s
+            for attr in ("then_block", "else_block", "body"):
+                b = getattr(s, attr, None)
+                if b is not None:
+                    yield from walk(b.stmts)
+    for arm in dispatch.arms:
+        yield from walk(arm.body.stmts)
+
+
+def test_relooper_fallback_emits_dispatch():
+    """Two back-edges to the same header — outside the simple-do-while
+    shape the relooper recognises. The routine must take the dispatch
+    fallback: its body is a single `DispatchStmt` (no `GotoStmt` /
+    `LabelStmt`), and the back-edge branch is a `RawIfStmt` whose arms
+    transition via `GotoStateStmt`."""
+    from pop_lifter.ir3 import GotoStateStmt
     out = reloop_routine(_two_back_edges_routine())
-    stmts = out.body.stmts
-    assert any(isinstance(s, LabelStmt) for s in stmts), (
-        "expected LabelStmt in the fallback shape"
+    dispatch = _dispatch_of(out)
+    # No unresolved goto/label anywhere.
+    for s in _walk_arm_stmts(dispatch):
+        assert not isinstance(s, (GotoStmt, LabelStmt)), (
+            "dispatch fallback must not emit GotoStmt / LabelStmt"
+        )
+    raw_if = next(
+        (s for s in _walk_arm_stmts(dispatch) if isinstance(s, RawIfStmt)), None
     )
-    raw_if = next((s for s in stmts if isinstance(s, RawIfStmt)), None)
-    assert raw_if is not None
+    assert raw_if is not None, "expected a RawIfStmt for the back-edge branch"
     assert any(
-        isinstance(t, GotoStmt) for t in raw_if.then_block.stmts
-    )
+        isinstance(t, GotoStateStmt) for t in raw_if.then_block.stmts
+    ), "branch's taken edge must transition via GotoStateStmt"
+    assert raw_if.else_block is not None and any(
+        isinstance(t, GotoStateStmt) for t in raw_if.else_block.stmts
+    ), "branch's fall-through edge must transition via GotoStateStmt"
 
 
 def test_fallback_cross_module_branch_becomes_tail_call():
-    """In the unstructured fallback, an `If` whose target isn't any
-    local label is a conditional tail call into another routine —
-    IR1 executes it by switching routines. Emitting `GotoStmt` here
-    would silently change semantics; the fallback must produce a
-    `TailCallStmt` in the then-block instead. Uses the two-back-edge
-    shape to force the fallback path."""
+    """In the dispatch fallback, an `If` whose target isn't any local
+    label is a conditional tail call into another routine — IR1 executes
+    it by switching routines. Emitting a state transition here would
+    silently change semantics; the fallback must produce a `TailCallStmt`
+    in the then-block instead. Uses the two-back-edge shape to force the
+    fallback path."""
     from pop_lifter.ir1 import Compare, If as IR1If, Imm, Reg
+    from pop_lifter.ir3 import GotoStateStmt
 
     src = SourceRef(file="syn", line=0, raw="")
     cross_module_if = IR1If(
@@ -179,42 +214,43 @@ def test_fallback_cross_module_branch_becomes_tail_call():
         src=src,
     )
     out = reloop_routine(_two_back_edges_routine(extra=cross_module_if))
-    # Among the IfStmts in the fallback, find the one whose then-block
+    dispatch = _dispatch_of(out)
+    # Among the IfStmts in the arms, find the one whose then-block
     # references external_fn — its then-block must hold a TailCallStmt.
     matched = False
-    for s in out.body.stmts:
+    for s in _walk_arm_stmts(dispatch):
         if isinstance(s, IfStmt):
             for t in s.then_block.stmts:
                 if isinstance(t, TailCallStmt) and t.target == "external_fn":
                     matched = True
-                    break
-                if isinstance(t, GotoStmt) and t.target == "external_fn":
-                    raise AssertionError(
-                        "cross-module If target lowered to GotoStmt instead "
-                        "of TailCallStmt — fallback semantics regression"
-                    )
     assert matched, (
-        "cross-module If target must lower to TailCallStmt in the fallback"
+        "cross-module If target must lower to TailCallStmt in the dispatch arm"
     )
+    # No state transition should be named after the external routine.
+    for s in _walk_arm_stmts(dispatch):
+        if isinstance(s, TailCallStmt):
+            continue
+        assert not (isinstance(s, GotoStateStmt) and s.state == "external_fn")
 
 
 def test_fallback_ir1_call_becomes_callstmt():
-    """In the fallback path, an IR1 `Call` must be emitted as a
+    """In the dispatch fallback, an IR1 `Call` must be emitted as a
     structured `CallStmt`, not folded into a `RawStmt`. Uses the
     two-back-edge shape to force the fallback path."""
     from pop_lifter.ir1 import Call as IR1Call
     from pop_lifter.ir3 import CallStmt
+    from pop_lifter.ir3 import RawStmt as IR3RawStmt
 
     src = SourceRef(file="syn", line=0, raw="")
     out = reloop_routine(_two_back_edges_routine(
         extra=IR1Call(target="helper", src=src),
     ))
+    dispatch = _dispatch_of(out)
+    arm_stmts = list(_walk_arm_stmts(dispatch))
     assert any(
-        isinstance(s, CallStmt) and s.target == "helper"
-        for s in out.body.stmts
-    ), "IR1 Call must lower to IR3 CallStmt in the fallback"
-    from pop_lifter.ir3 import RawStmt as IR3RawStmt
-    for s in out.body.stmts:
+        isinstance(s, CallStmt) and s.target == "helper" for s in arm_stmts
+    ), "IR1 Call must lower to IR3 CallStmt in a dispatch arm"
+    for s in arm_stmts:
         if isinstance(s, IR3RawStmt):
             assert not isinstance(s.item, IR1Call), (
                 "IR1 Call slipped through as a RawStmt"
@@ -476,6 +512,87 @@ def test_synthetic_counter_loop_runs_correctly():
     assert ram[0x80] == 5, (
         f"final counter value should be 5, got {ram[0x80]}"
     )
+
+
+def test_dispatch_fallback_preserves_behaviour():
+    """Behavioural gate for the dispatch fallback. Build a loop the
+    simple-do-while detector rejects (the back-edge is an *unconditional*
+    `jmp`, so the tail isn't a conditional) — it structures as a
+    `DispatchStmt` — then execute it through both the IR1 and IR3
+    interpreters and assert identical memory + register state.
+
+        a = 0 ; x = 0
+        :loop
+          store a -> out[x]
+          clc ; a = a + 1 ; inx
+          cmp a, #5
+          if a == 5 goto :done     (forward branch)
+          jmp :loop                (unconditional back-edge → fallback)
+        :done
+          return
+
+    Post-state: out[0..5) == 0,1,2,3,4; a == 5.
+    """
+    from pop_lifter.ir1 import (
+        Abs,
+        AdcImm,
+        Clc,
+        CmpImm,
+        Compare,
+        Goto,
+        If as IR1If,
+        Imm,
+        IncTarget,
+        Label,
+        LoadImm,
+        Reg,
+        Routine,
+        StoreIndexed,
+    )
+    from pop_lifter.ir3 import DispatchStmt
+    from pop_lifter.interp_ir1 import run as ir1_run
+
+    src = SourceRef(file="syn", line=0, raw="")
+    OUT = Abs(name="out", addr=0x100)
+    body = [
+        LoadImm(reg=Reg.A, imm=Imm(value=0, text="#0"), src=src),
+        LoadImm(reg=Reg.X, imm=Imm(value=0, text="#0"), src=src),
+        Label(name=":loop", src=src),
+        StoreIndexed(reg=Reg.A, base=OUT, index=Reg.X, src=src),
+        Clc(src=src),
+        AdcImm(imm=Imm(value=1, text="#1"), src=src),
+        IncTarget(target=Reg.X, src=src),
+        CmpImm(reg=Reg.A, imm=Imm(value=5, text="#5"), src=src),
+        IR1If(
+            cond=Compare(reg=Reg.A, op="==", rhs=Imm(value=5, text="#5")),
+            target=":done",
+            src=src,
+        ),
+        Goto(target=":loop", kind="local", src=src),
+        Label(name=":done", src=src),
+        Return(src=src),
+    ]
+    routine = Routine(name="dispatchy", body=body)
+    mod = ModuleIR1(name="SYN", file="syn", routines=[routine])
+    ir3_mod = reloop_module(structure_module(mod))
+
+    d = ir3_mod.find("dispatchy")
+    assert len(d.body.stmts) == 1 and isinstance(d.body.stmts[0], DispatchStmt), (
+        "unconditional back-edge loop should structure as a DispatchStmt"
+    )
+
+    ram1 = bytearray(0x10000)
+    ram3 = bytearray(0x10000)
+    t1 = ir1_run([mod], "dispatchy", ram=ram1)
+    t3 = ir3_run([ir3_mod], "dispatchy", ram=ram3)
+
+    assert list(ram3[0x100:0x105]) == [0, 1, 2, 3, 4], (
+        f"dispatch loop didn't iterate correctly; got {list(ram3[0x100:0x105])}"
+    )
+    assert ram1 == ram3, "IR1 vs IR3 memory diverged for the dispatch routine"
+    assert (t1.a, t1.x, t1.y, t1.c, t1.z, t1.n) == (
+        t3.a, t3.x, t3.y, t3.c, t3.z, t3.n
+    ), "IR1 vs IR3 register/flag state diverged for the dispatch routine"
 
 
 def test_relooper_preserves_every_checkfloor_path(source_dir):

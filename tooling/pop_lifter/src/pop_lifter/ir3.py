@@ -354,10 +354,13 @@ class ContinueStmt:
 
 @dataclass(frozen=True)
 class GotoStmt:
-    """Escape hatch: the relooper couldn't structure this transfer
-    (typically a loop back-edge or an irreducible CFG fragment). Pass
-    3 will either restructure or fall back to a `loop { match pc {
-    ... } }` dispatcher. For CHECKFLOOR this should never appear."""
+    """Intermediate escape hatch for a transfer a structurer couldn't
+    place (a loop back-edge or irreducible fragment). It never survives
+    to a finished routine: `reloop_routine` rescans each structurer's
+    output and, if any `GotoStmt`/`LabelStmt` remains, re-emits the
+    whole routine as a `DispatchStmt` (`loop { match pc { ... } }`). The
+    emitter and interpreter therefore reject it — reaching either is a
+    structurer bug."""
 
     target: str
     src: SourceRef
@@ -368,6 +371,49 @@ class LabelStmt:
     """Companion to `GotoStmt`. Same caveats."""
 
     name: str
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class GotoStateStmt:
+    """Set the enclosing `DispatchStmt`'s state variable to `state` and
+    re-enter its `match`. Models one CFG edge as a state transition in
+    the dispatch-loop fallback. Lowers to `pc = <state>;` (control then
+    falls off the match arm, so the surrounding `loop` re-dispatches).
+    Only ever appears inside a `DispatchStmt` arm."""
+
+    state: int
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class DispatchArm:
+    """One state of a `DispatchStmt`: `state => { body }`. `body` runs
+    the basic block's atoms then ends in a transition — a
+    `GotoStateStmt`, an `IfStmt`/`RawIfStmt` whose arms transition, a
+    `ReturnStmt`, or a `TailCallStmt`."""
+
+    state: int
+    body: "Block"
+
+
+@dataclass(frozen=True)
+class DispatchStmt:
+    """`loop { match pc { state => {...} } }` — the relooper's universal
+    fallback for routines whose control flow can't be reduced to natural
+    loops/conditionals (irreducible CFGs, multi-back-edge loops, loops
+    with mid-body exits). Each CFG basic block becomes one numbered
+    state (its block id); every control-flow edge becomes a `pc = next`
+    transition (`GotoStateStmt`). Replaces the older `GotoStmt` /
+    `LabelStmt` escape hatch, so a fallback routine still emits valid
+    structured Rust rather than unresolved gotos.
+
+    `entry` is the starting state (the CFG entry block id). Behaviour is
+    preserved 1-for-1 with the IR2 CFG: the dispatch visits blocks in
+    exactly the order the original gotos/branches would have."""
+
+    entry: int
+    arms: "tuple[DispatchArm, ...]"
     src: SourceRef
 
 
@@ -419,7 +465,7 @@ Stmt = (
     RawStmt | Wide16Stmt | Assign | SaveTemp | RestoreTemp | CallStmt
     | TailCallStmt | ReturnStmt | IfStmt | RawIfStmt | LoopStmt | DoWhileStmt
     | ForStmt | RepeatStmt | MatchStmt | BreakStmt | ContinueStmt | GotoStmt
-    | LabelStmt | LabeledBlock
+    | LabelStmt | LabeledBlock | GotoStateStmt | DispatchStmt
 )
 
 
@@ -607,6 +653,17 @@ def _fmt_stmt(stmt: Stmt, indent: int) -> list[str]:
         return [f"{pad}goto {stmt.target}              ; {stmt.src.short()}"]
     if isinstance(stmt, LabelStmt):
         return [f"{pad}{stmt.name}:"]
+    if isinstance(stmt, GotoStateStmt):
+        return [f"{pad}pc = {stmt.state}                          ; {stmt.src.short()}"]
+    if isinstance(stmt, DispatchStmt):
+        lines = [f"{pad}dispatch pc = {stmt.entry} {{    ; {stmt.src.short()}"]
+        for arm in stmt.arms:
+            lines.append(f"{pad}  state {arm.state} => {{")
+            for s in arm.body.stmts:
+                lines.extend(_fmt_stmt(s, indent + 2))
+            lines.append(f"{pad}  }}")
+        lines.append(f"{pad}}}")
+        return lines
     raise ValueError(f"unknown IR3 stmt: {stmt!r}")
 
 

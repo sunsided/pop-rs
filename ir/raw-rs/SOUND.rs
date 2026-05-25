@@ -3,9 +3,10 @@
 // Pass 4 skeleton slice: module + routine scaffolding with leaf-
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
-// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). SMC, the
-// stack, `RawIfStmt`, and `GotoStmt`/`LabelStmt` are deferred; they
-// appear as `// raw: …` or `// TODO(pass4): …` comments.
+// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
+// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
+// and the stack are deferred; they appear as `// raw: …` /
+// `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -67,7 +68,9 @@ impl Cpu {
         self.c = self.a >> 7;
         self.a = self.a.wrapping_shl(1);
         // raw: ??? cmp #maxaddr            ; SOUND.S:129
-        // TODO(pass4): lower RawIfStmt
+        if self.c != 0 {
+            return;
+        }
         self.x = self.a;
         self.a = self.ram[sym::lookup + self.x as usize];
         // raw: patch *:sm+1 = a            ; SOUND.S:134
@@ -220,30 +223,63 @@ impl Cpu {
     }
 
     fn tone(&mut self) {
-        // raw: patch *:pitch = y            ; SOUND.S:332
-        // raw: patch *:pitch+1 = x            ; SOUND.S:333
-        // TODO(pass4): lower LabelStmt
-        let _o: u8 = self.ram[sym::spkr];
-        self.z = ((self.a & _o) == 0) as u8;
-        self.n = _o >> 7;
-        self.x = 0x00;
-        // TODO(pass4): lower LabelStmt
-        self.y = 0x00;
-        // TODO(pass4): lower LabelStmt
-        self.y = self.y.wrapping_add(1);
-        // raw: ??? cpy :pitch            ; SOUND.S:341
-        // TODO(pass4): lower RawIfStmt
-        self.x = self.x.wrapping_add(1);
-        // raw: ??? cpx :pitch+1            ; SOUND.S:345
-        // TODO(pass4): lower RawIfStmt
-        self.c = 1;
-        let _r = (self.a as u16) + (!0x01_u8) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    // raw: patch *:pitch = y            ; SOUND.S:332
+                    // raw: patch *:pitch+1 = x            ; SOUND.S:333
+                    pc = 1;
+                }
+                1 => {
+                    let _o: u8 = self.ram[sym::spkr];
+                    self.z = ((self.a & _o) == 0) as u8;
+                    self.n = _o >> 7;
+                    self.x = 0x00;
+                    pc = 2;
+                }
+                2 => {
+                    self.y = 0x00;
+                    pc = 3;
+                }
+                3 => {
+                    self.y = self.y.wrapping_add(1);
+                    // raw: ??? cpy :pitch            ; SOUND.S:341
+                    if self.c == 0 {
+                        pc = 3;
+                    } else {
+                        pc = 4;
+                    }
+                }
+                4 => {
+                    self.x = self.x.wrapping_add(1);
+                    // raw: ??? cpx :pitch+1            ; SOUND.S:345
+                    if self.c == 0 {
+                        pc = 2;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x01_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    if self.a != 0x00 {
+                        pc = 1;
+                    } else {
+                        pc = 6;
+                    }
+                }
+                6 => {
+                    return;
+                }
+                7 => {
+                    // raw: ??? usr $a9,20,$e00,*-org            ; SOUND.S:359
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        return;
-        // raw: ??? usr $a9,20,$e00,*-org            ; SOUND.S:359
     }
 }

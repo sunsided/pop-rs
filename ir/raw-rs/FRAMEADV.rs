@@ -3,9 +3,10 @@
 // Pass 4 skeleton slice: module + routine scaffolding with leaf-
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
-// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). SMC, the
-// stack, `RawIfStmt`, and `GotoStmt`/`LabelStmt` are deferred; they
-// appear as `// raw: …` or `// TODO(pass4): …` comments.
+// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
+// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
+// and the stack are deferred; they appear as `// raw: …` /
+// `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -135,243 +136,339 @@ mod sym {
 
 impl Cpu {
     fn SURE(&mut self) {
-        self.ram[sym::genCLS] = 0x01;
-        self.setback();
-        self.getprev();
-        self.a = self.ram[sym::SCRNUM];
-        self.calcblue();
-        self.y = 0x02;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::rowno] = self.y;
-        self.a = self.ram[sym::BlockBot + 1 + self.y as usize];
-        self.ram[sym::Dy] = self.a;
-        self.c = 1;
-        let _r = (self.a as u16) + (!0x03_u8) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        self.ram[sym::Ay] = self.a;
-        self.ram[sym::yindex] = self.ram[sym::Mult10 + self.y as usize];
-        self.ram[sym::PRECED] = self.ram[sym::PREV + self.y as usize];
-        self.a = self.ram[sym::sprev + self.y as usize];
-        self.ram[sym::spreced] = self.a;
-        self.getbelow();
-        self.a = 0x00;
-        self.ram[sym::colno] = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.c = self.a >> 7;
-        self.a = self.a.wrapping_shl(1);
-        self.c = self.a >> 7;
-        self.a = self.a.wrapping_shl(1);
-        self.ram[sym::XCO] = self.a;
-        self.ram[sym::blockxco] = self.a;
-        self.y = self.ram[sym::yindex];
-        self.getobjid();
-        self.ram[sym::objid] = self.a;
-        self.RedBlockSure();
-        self.ram[sym::PRECED] = self.ram[sym::objid];
-        self.ram[sym::spreced] = self.ram[sym::state];
-        self.ram[sym::yindex] = self.ram[sym::yindex].wrapping_add(1);
-        self.ram[sym::colno] = self.ram[sym::colno].wrapping_add(1);
-        self.a = self.ram[sym::colno];
-        let _o: u8 = 0x0a;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a < 0x0a {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.a = 0x01;
+                    self.ram[sym::genCLS] = self.a;
+                    self.setback();
+                    self.getprev();
+                    self.a = self.ram[sym::SCRNUM];
+                    self.calcblue();
+                    self.y = 0x02;
+                    pc = 1;
+                }
+                1 => {
+                    self.ram[sym::rowno] = self.y;
+                    self.a = self.ram[sym::BlockBot + 1 + self.y as usize];
+                    self.ram[sym::Dy] = self.a;
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x03_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    self.ram[sym::Ay] = self.a;
+                    self.a = self.ram[sym::Mult10 + self.y as usize];
+                    self.ram[sym::yindex] = self.a;
+                    self.a = self.ram[sym::PREV + self.y as usize];
+                    self.ram[sym::PRECED] = self.a;
+                    self.a = self.ram[sym::sprev + self.y as usize];
+                    self.ram[sym::spreced] = self.a;
+                    self.getbelow();
+                    self.a = 0x00;
+                    self.ram[sym::colno] = self.a;
+                    pc = 2;
+                }
+                2 => {
+                    self.c = self.a >> 7;
+                    self.a = self.a.wrapping_shl(1);
+                    self.c = self.a >> 7;
+                    self.a = self.a.wrapping_shl(1);
+                    self.ram[sym::XCO] = self.a;
+                    self.ram[sym::blockxco] = self.a;
+                    self.y = self.ram[sym::yindex];
+                    self.getobjid();
+                    self.ram[sym::objid] = self.a;
+                    self.RedBlockSure();
+                    self.a = self.ram[sym::objid];
+                    self.ram[sym::PRECED] = self.a;
+                    self.a = self.ram[sym::state];
+                    self.ram[sym::spreced] = self.a;
+                    self.ram[sym::yindex] = self.ram[sym::yindex].wrapping_add(1);
+                    self.ram[sym::colno] = self.ram[sym::colno].wrapping_add(1);
+                    self.a = self.ram[sym::colno];
+                    let _o: u8 = 0x0a;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a < 0x0a {
+                        pc = 2;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    self.y = self.ram[sym::rowno];
+                    if self.y == 0x00 {
+                        pc = 5;
+                    } else {
+                        pc = 4;
+                    }
+                }
+                4 => {
+                    self.y = self.y.wrapping_sub(1);
+                    pc = 1;
+                }
+                5 => {
+                    self.y = 0x02;
+                    self.ram[sym::rowno] = self.y;
+                    self.a = 0x02;
+                    self.ram[sym::Dy] = self.a;
+                    self.a = 0xff;
+                    self.ram[sym::Ay] = self.a;
+                    self.a = self.ram[sym::Mult10 + self.y as usize];
+                    self.ram[sym::yindex] = self.a;
+                    self.a = 0x00;
+                    self.ram[sym::PRECED] = self.a;
+                    self.a = self.ram[sym::scrnBelow];
+                    // raw: push a                           ; FRAMEADV.S:128
+                    self.a = self.ram[sym::scrnBelowL];
+                    // raw: push a                           ; FRAMEADV.S:130
+                    self.a = self.ram[sym::SCRNUM];
+                    self.ram[sym::scrnBelow] = self.a;
+                    self.a = self.ram[sym::scrnLeft];
+                    self.ram[sym::scrnBelowL] = self.a;
+                    self.getbelow();
+                    self.a = self.ram[sym::scrnAbove];
+                    self.calcblue();
+                    self.a = 0x00;
+                    self.ram[sym::colno] = self.a;
+                    pc = 6;
+                }
+                6 => {
+                    self.c = self.a >> 7;
+                    self.a = self.a.wrapping_shl(1);
+                    self.c = self.a >> 7;
+                    self.a = self.a.wrapping_shl(1);
+                    self.ram[sym::XCO] = self.a;
+                    self.ram[sym::blockxco] = self.a;
+                    self.a = self.ram[sym::scrnAbove];
+                    if self.a != 0x00 {
+                        pc = 8;
+                    } else {
+                        pc = 7;
+                    }
+                }
+                7 => {
+                    self.a = 0x01;
+                    if self.a != 0x00 {
+                        pc = 9;
+                    } else {
+                        pc = 8;
+                    }
+                }
+                8 => {
+                    self.y = self.ram[sym::yindex];
+                    self.getobjid1();
+                    pc = 9;
+                }
+                9 => {
+                    self.ram[sym::objid] = self.a;
+                    self.RedDSure();
+                    self.a = self.ram[sym::objid];
+                    self.ram[sym::PRECED] = self.a;
+                    self.a = self.ram[sym::state];
+                    self.ram[sym::spreced] = self.a;
+                    self.ram[sym::yindex] = self.ram[sym::yindex].wrapping_add(1);
+                    self.ram[sym::colno] = self.ram[sym::colno].wrapping_add(1);
+                    self.a = self.ram[sym::colno];
+                    let _o: u8 = 0x0a;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a < 0x0a {
+                        pc = 6;
+                    } else {
+                        pc = 10;
+                    }
+                }
+                10 => {
+                    // raw: a = pop                          ; FRAMEADV.S:175
+                    self.ram[sym::scrnBelowL] = self.a;
+                    // raw: a = pop                          ; FRAMEADV.S:177
+                    self.ram[sym::scrnBelow] = self.a;
+                    pc = 11;
+                }
+                11 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        // TODO(pass4): lower LabelStmt
-        self.y = self.ram[sym::rowno];
-        if self.y == 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.y = self.y.wrapping_sub(1);
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        self.y = 0x02;
-        self.ram[sym::rowno] = self.y;
-        self.ram[sym::Dy] = 0x02;
-        self.ram[sym::Ay] = 0xff;
-        self.ram[sym::yindex] = self.ram[sym::Mult10 + self.y as usize];
-        self.ram[sym::PRECED] = 0x00;
-        self.a = self.ram[sym::scrnBelow];
-        // raw: push a                           ; FRAMEADV.S:128
-        self.a = self.ram[sym::scrnBelowL];
-        // raw: push a                           ; FRAMEADV.S:130
-        self.ram[sym::scrnBelow] = self.ram[sym::SCRNUM];
-        self.a = self.ram[sym::scrnLeft];
-        self.ram[sym::scrnBelowL] = self.a;
-        self.getbelow();
-        self.a = self.ram[sym::scrnAbove];
-        self.calcblue();
-        self.a = 0x00;
-        self.ram[sym::colno] = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.c = self.a >> 7;
-        self.a = self.a.wrapping_shl(1);
-        self.c = self.a >> 7;
-        self.a = self.a.wrapping_shl(1);
-        self.ram[sym::XCO] = self.a;
-        self.ram[sym::blockxco] = self.a;
-        self.a = self.ram[sym::scrnAbove];
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.a = 0x01;
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        self.y = self.ram[sym::yindex];
-        self.getobjid1();
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::objid] = self.a;
-        self.RedDSure();
-        self.ram[sym::PRECED] = self.ram[sym::objid];
-        self.ram[sym::spreced] = self.ram[sym::state];
-        self.ram[sym::yindex] = self.ram[sym::yindex].wrapping_add(1);
-        self.ram[sym::colno] = self.ram[sym::colno].wrapping_add(1);
-        self.a = self.ram[sym::colno];
-        let _o: u8 = 0x0a;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a < 0x0a {
-            // TODO(pass4): lower GotoStmt
-        }
-        // raw: a = pop                          ; FRAMEADV.S:175
-        self.ram[sym::scrnBelowL] = self.a;
-        // raw: a = pop                          ; FRAMEADV.S:177
-        self.ram[sym::scrnBelow] = self.a;
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn FAST(&mut self) {
-        self.getprev();
-        self.a = self.ram[sym::SCRNUM];
-        self.calcblue();
-        self.a = 0x00;
-        self.y = 0x14;
-        self.metbufs3();
-        self.ram[sym::redkidmeter] = self.a;
-        self.a = 0x00;
-        self.y = 0x1c;
-        self.metbufs2();
-        self.ram[sym::redoppmeter] = self.a;
-        self.a = 0x1e;
-        self.ram[sym::yindex] = self.a;
-        self.drawobjs();
-        self.y = 0x02;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::rowno] = self.y;
-        self.a = self.ram[sym::BlockBot + 1 + self.y as usize];
-        self.ram[sym::Dy] = self.a;
-        self.c = 1;
-        let _r = (self.a as u16) + (!0x03_u8) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        self.ram[sym::Ay] = self.a;
-        self.ram[sym::yindex] = self.ram[sym::Mult10 + self.y as usize];
-        self.ram[sym::PRECED] = self.ram[sym::PREV + self.y as usize];
-        self.a = self.ram[sym::sprev + self.y as usize];
-        self.ram[sym::spreced] = self.a;
-        self.getbelow();
-        self.a = 0x00;
-        self.ram[sym::colno] = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.c = self.a >> 7;
-        self.a = self.a.wrapping_shl(1);
-        self.c = self.a >> 7;
-        self.a = self.a.wrapping_shl(1);
-        self.ram[sym::XCO] = self.a;
-        self.ram[sym::blockxco] = self.a;
-        self.y = self.ram[sym::yindex];
-        self.getobjid();
-        self.ram[sym::objid] = self.a;
-        self.RedBlockFast();
-        self.ram[sym::PRECED] = self.ram[sym::objid];
-        self.ram[sym::spreced] = self.ram[sym::state];
-        self.ram[sym::yindex] = self.ram[sym::yindex].wrapping_add(1);
-        self.ram[sym::colno] = self.ram[sym::colno].wrapping_add(1);
-        self.a = self.ram[sym::colno];
-        let _o: u8 = 0x0a;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a >= 0x0a {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.getprev();
+                    self.a = self.ram[sym::SCRNUM];
+                    self.calcblue();
+                    self.a = 0x00;
+                    self.y = 0x14;
+                    self.metbufs3();
+                    self.ram[sym::redkidmeter] = self.a;
+                    self.a = 0x00;
+                    self.y = 0x1c;
+                    self.metbufs2();
+                    self.ram[sym::redoppmeter] = self.a;
+                    self.a = 0x1e;
+                    self.ram[sym::yindex] = self.a;
+                    self.drawobjs();
+                    self.y = 0x02;
+                    pc = 1;
+                }
+                1 => {
+                    self.ram[sym::rowno] = self.y;
+                    self.a = self.ram[sym::BlockBot + 1 + self.y as usize];
+                    self.ram[sym::Dy] = self.a;
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x03_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    self.ram[sym::Ay] = self.a;
+                    self.a = self.ram[sym::Mult10 + self.y as usize];
+                    self.ram[sym::yindex] = self.a;
+                    self.a = self.ram[sym::PREV + self.y as usize];
+                    self.ram[sym::PRECED] = self.a;
+                    self.a = self.ram[sym::sprev + self.y as usize];
+                    self.ram[sym::spreced] = self.a;
+                    self.getbelow();
+                    self.a = 0x00;
+                    self.ram[sym::colno] = self.a;
+                    pc = 2;
+                }
+                2 => {
+                    self.c = self.a >> 7;
+                    self.a = self.a.wrapping_shl(1);
+                    self.c = self.a >> 7;
+                    self.a = self.a.wrapping_shl(1);
+                    self.ram[sym::XCO] = self.a;
+                    self.ram[sym::blockxco] = self.a;
+                    self.y = self.ram[sym::yindex];
+                    self.getobjid();
+                    self.ram[sym::objid] = self.a;
+                    self.RedBlockFast();
+                    self.a = self.ram[sym::objid];
+                    self.ram[sym::PRECED] = self.a;
+                    self.a = self.ram[sym::state];
+                    self.ram[sym::spreced] = self.a;
+                    self.ram[sym::yindex] = self.ram[sym::yindex].wrapping_add(1);
+                    self.ram[sym::colno] = self.ram[sym::colno].wrapping_add(1);
+                    self.a = self.ram[sym::colno];
+                    let _o: u8 = 0x0a;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a >= 0x0a {
+                        pc = 4;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    pc = 2;
+                }
+                4 => {
+                    self.y = self.ram[sym::rowno];
+                    if self.y == 0x00 {
+                        pc = 6;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    self.y = self.y.wrapping_sub(1);
+                    pc = 1;
+                }
+                6 => {
+                    self.setback();
+                    self.y = 0x02;
+                    self.ram[sym::rowno] = self.y;
+                    self.a = 0x02;
+                    self.ram[sym::Dy] = self.a;
+                    self.a = 0xff;
+                    self.ram[sym::Ay] = self.a;
+                    self.a = self.ram[sym::Mult10 + self.y as usize];
+                    self.ram[sym::yindex] = self.a;
+                    self.a = 0x00;
+                    self.ram[sym::PRECED] = self.a;
+                    self.a = self.ram[sym::scrnBelow];
+                    // raw: push a                           ; FRAMEADV.S:281
+                    self.a = self.ram[sym::scrnBelowL];
+                    // raw: push a                           ; FRAMEADV.S:283
+                    self.a = self.ram[sym::SCRNUM];
+                    self.ram[sym::scrnBelow] = self.a;
+                    self.a = self.ram[sym::scrnLeft];
+                    self.ram[sym::scrnBelowL] = self.a;
+                    self.getbelow();
+                    self.a = self.ram[sym::scrnAbove];
+                    if self.a == 0x00 {
+                        pc = 9;
+                    } else {
+                        pc = 7;
+                    }
+                }
+                7 => {
+                    self.calcblue();
+                    self.a = 0x00;
+                    self.ram[sym::colno] = self.a;
+                    pc = 8;
+                }
+                8 => {
+                    self.c = self.a >> 7;
+                    self.a = self.a.wrapping_shl(1);
+                    self.c = self.a >> 7;
+                    self.a = self.a.wrapping_shl(1);
+                    self.ram[sym::blockxco] = self.a;
+                    self.ram[sym::XCO] = self.a;
+                    self.y = self.ram[sym::yindex];
+                    self.getobjid1();
+                    self.ram[sym::objid] = self.a;
+                    self.RedDFast();
+                    self.a = self.ram[sym::objid];
+                    self.ram[sym::PRECED] = self.a;
+                    self.a = self.ram[sym::state];
+                    self.ram[sym::spreced] = self.a;
+                    self.ram[sym::yindex] = self.ram[sym::yindex].wrapping_add(1);
+                    self.ram[sym::colno] = self.ram[sym::colno].wrapping_add(1);
+                    self.a = self.ram[sym::colno];
+                    let _o: u8 = 0x0a;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a < 0x0a {
+                        pc = 8;
+                    } else {
+                        pc = 9;
+                    }
+                }
+                9 => {
+                    // raw: a = pop                          ; FRAMEADV.S:323
+                    self.ram[sym::scrnBelowL] = self.a;
+                    // raw: a = pop                          ; FRAMEADV.S:325
+                    self.ram[sym::scrnBelow] = self.a;
+                    self.a = 0xff;
+                    self.ram[sym::yindex] = self.a;
+                    self.drawobjs();
+                    self.a = self.ram[sym::inbuilder];
+                    if self.a != 0x00 {
+                        pc = 11;
+                    } else {
+                        pc = 10;
+                    }
+                }
+                10 => {
+                    self.updatemeters();
+                    return;
+                }
+                11 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        self.y = self.ram[sym::rowno];
-        if self.y == 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.y = self.y.wrapping_sub(1);
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        self.setback();
-        self.y = 0x02;
-        self.ram[sym::rowno] = self.y;
-        self.ram[sym::Dy] = 0x02;
-        self.ram[sym::Ay] = 0xff;
-        self.ram[sym::yindex] = self.ram[sym::Mult10 + self.y as usize];
-        self.ram[sym::PRECED] = 0x00;
-        self.a = self.ram[sym::scrnBelow];
-        // raw: push a                           ; FRAMEADV.S:281
-        self.a = self.ram[sym::scrnBelowL];
-        // raw: push a                           ; FRAMEADV.S:283
-        self.ram[sym::scrnBelow] = self.ram[sym::SCRNUM];
-        self.a = self.ram[sym::scrnLeft];
-        self.ram[sym::scrnBelowL] = self.a;
-        self.getbelow();
-        self.a = self.ram[sym::scrnAbove];
-        if self.a == 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.calcblue();
-        self.a = 0x00;
-        self.ram[sym::colno] = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.c = self.a >> 7;
-        self.a = self.a.wrapping_shl(1);
-        self.c = self.a >> 7;
-        self.a = self.a.wrapping_shl(1);
-        self.ram[sym::blockxco] = self.a;
-        self.ram[sym::XCO] = self.a;
-        self.y = self.ram[sym::yindex];
-        self.getobjid1();
-        self.ram[sym::objid] = self.a;
-        self.RedDFast();
-        self.ram[sym::PRECED] = self.ram[sym::objid];
-        self.ram[sym::spreced] = self.ram[sym::state];
-        self.ram[sym::yindex] = self.ram[sym::yindex].wrapping_add(1);
-        self.ram[sym::colno] = self.ram[sym::colno].wrapping_add(1);
-        self.a = self.ram[sym::colno];
-        let _o: u8 = 0x0a;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a < 0x0a {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        // raw: a = pop                          ; FRAMEADV.S:323
-        self.ram[sym::scrnBelowL] = self.a;
-        // raw: a = pop                          ; FRAMEADV.S:325
-        self.ram[sym::scrnBelow] = self.a;
-        self.a = 0xff;
-        self.ram[sym::yindex] = self.a;
-        self.drawobjs();
-        self.a = self.ram[sym::inbuilder];
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.updatemeters();
-        return;
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn RedBlockSure(&mut self) {
@@ -507,61 +604,106 @@ impl Cpu {
     }
 
     fn drawobjs(&mut self) {
-        self.a = self.ram[sym::objX];
-        if self.a == 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.a = self.ram[sym::objX];
+                    if self.a == 0x00 {
+                        pc = 10;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.y = 0x00;
+                    self.x = 0x01;
+                    pc = 2;
+                }
+                2 => {
+                    self.a = self.ram[sym::objINDX + self.x as usize];
+                    let _o: u8 = self.ram[sym::yindex];
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a != self.ram[sym::yindex] {
+                        pc = 4;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    self.a = self.x;
+                    self.y = self.y.wrapping_add(1);
+                    self.ram[sym::sortX + self.y as usize] = self.a;
+                    pc = 4;
+                }
+                4 => {
+                    self.x = self.x.wrapping_add(1);
+                    let _o: u8 = self.ram[sym::objX];
+                    self.c = (self.x >= _o) as u8;
+                    self.z = (self.x == _o) as u8;
+                    self.n = self.x.wrapping_sub(_o) >> 7;
+                    if self.x < self.ram[sym::objX] {
+                        pc = 2;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    if self.z != 0 {
+                        pc = 2;
+                    } else {
+                        pc = 6;
+                    }
+                }
+                6 => {
+                    let _o: u8 = 0x00;
+                    self.c = (self.y >= _o) as u8;
+                    self.z = (self.y == _o) as u8;
+                    self.n = self.y.wrapping_sub(_o) >> 7;
+                    if self.y == 0x00 {
+                        pc = 10;
+                    } else {
+                        pc = 7;
+                    }
+                }
+                7 => {
+                    self.ram[sym::sortX] = self.y;
+                    self.sortlist();
+                    self.x = 0x01;
+                    pc = 8;
+                }
+                8 => {
+                    self.ram[sym::xsave] = self.x;
+                    self.a = self.ram[sym::sortX + self.x as usize];
+                    self.x = self.a;
+                    self.drawobjx();
+                    self.x = self.ram[sym::xsave];
+                    self.x = self.x.wrapping_add(1);
+                    let _o: u8 = self.ram[sym::sortX];
+                    self.c = (self.x >= _o) as u8;
+                    self.z = (self.x == _o) as u8;
+                    self.n = self.x.wrapping_sub(_o) >> 7;
+                    if self.x < self.ram[sym::sortX] {
+                        pc = 8;
+                    } else {
+                        pc = 9;
+                    }
+                }
+                9 => {
+                    if self.z != 0 {
+                        pc = 8;
+                    } else {
+                        pc = 10;
+                    }
+                }
+                10 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.y = 0x00;
-        self.x = 0x01;
-        // TODO(pass4): lower LabelStmt
-        self.a = self.ram[sym::objINDX + self.x as usize];
-        let _o: u8 = self.ram[sym::yindex];
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a != self.ram[sym::yindex] {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.a = self.x;
-        self.y = self.y.wrapping_add(1);
-        self.ram[sym::sortX + self.y as usize] = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.x = self.x.wrapping_add(1);
-        let _o: u8 = self.ram[sym::objX];
-        self.c = (self.x >= _o) as u8;
-        self.z = (self.x == _o) as u8;
-        self.n = self.x.wrapping_sub(_o) >> 7;
-        if self.x < self.ram[sym::objX] {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower RawIfStmt
-        let _o: u8 = 0x00;
-        self.c = (self.y >= _o) as u8;
-        self.z = (self.y == _o) as u8;
-        self.n = self.y.wrapping_sub(_o) >> 7;
-        if self.y == 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.ram[sym::sortX] = self.y;
-        self.sortlist();
-        self.x = 0x01;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::xsave] = self.x;
-        self.a = self.ram[sym::sortX + self.x as usize];
-        self.x = self.a;
-        self.drawobjx();
-        self.x = self.ram[sym::xsave];
-        self.x = self.x.wrapping_add(1);
-        let _o: u8 = self.ram[sym::sortX];
-        self.c = (self.x >= _o) as u8;
-        self.z = (self.x == _o) as u8;
-        self.n = self.x.wrapping_sub(_o) >> 7;
-        if self.x < self.ram[sym::sortX] {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower RawIfStmt
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn getprev(&mut self) {
@@ -606,119 +748,193 @@ impl Cpu {
     }
 
     fn getbelow(&mut self) {
-        self.x = self.ram[sym::rowno];
-        let _o: u8 = 0x02;
-        self.c = (self.x >= _o) as u8;
-        self.z = (self.x == _o) as u8;
-        self.n = self.x.wrapping_sub(_o) >> 7;
-        if self.x < 0x02 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.x = self.ram[sym::rowno];
+                    let _o: u8 = 0x02;
+                    self.c = (self.x >= _o) as u8;
+                    self.z = (self.x == _o) as u8;
+                    self.n = self.x.wrapping_sub(_o) >> 7;
+                    if self.x < 0x02 {
+                        pc = 7;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.a = self.ram[sym::scrnBelow];
+                    if self.a == 0x00 {
+                        pc = 10;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    self.calcblue();
+                    self.y = 0x08;
+                    pc = 3;
+                }
+                3 => {
+                    self.getobjid();
+                    self.ram[sym::BELOW + 1 + self.y as usize] = self.a;
+                    self.a = self.ram[sym::state];
+                    self.ram[sym::SBELOW + 1 + self.y as usize] = self.a;
+                    self.y = self.y.wrapping_sub(1);
+                    if (self.y as i8) >= 0 {
+                        pc = 3;
+                    } else {
+                        pc = 4;
+                    }
+                }
+                4 => {
+                    self.a = self.ram[sym::scrnBelowL];
+                    if self.a == 0x00 {
+                        pc = 13;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    self.calcblue();
+                    self.y = 0x09;
+                    self.getobjid();
+                    self.ram[sym::BELOW] = self.a;
+                    self.a = self.ram[sym::state];
+                    self.ram[sym::SBELOW] = self.a;
+                    pc = 6;
+                }
+                6 => {
+                    self.a = self.ram[sym::SCRNUM];
+                    self.calcblue();
+                    return;
+                }
+                7 => {
+                    self.a = self.ram[sym::PREV + 1 + self.x as usize];
+                    self.ram[sym::BELOW] = self.a;
+                    self.a = self.ram[sym::sprev + 1 + self.x as usize];
+                    self.ram[sym::SBELOW] = self.a;
+                    self.a = self.ram[sym::yindex];
+                    self.c = 0;
+                    let _r = (self.a as u16) + (0x0a) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    self.y = self.a;
+                    self.x = 0x01;
+                    pc = 8;
+                }
+                8 => {
+                    self.ram[sym::xsave] = self.x;
+                    self.getobjid();
+                    self.x = self.ram[sym::xsave];
+                    self.ram[sym::BELOW + self.x as usize] = self.a;
+                    self.a = self.ram[sym::state];
+                    self.ram[sym::SBELOW + self.x as usize] = self.a;
+                    self.y = self.y.wrapping_add(1);
+                    self.x = self.x.wrapping_add(1);
+                    let _o: u8 = 0x0a;
+                    self.c = (self.x >= _o) as u8;
+                    self.z = (self.x == _o) as u8;
+                    self.n = self.x.wrapping_sub(_o) >> 7;
+                    if self.x < 0x0a {
+                        pc = 8;
+                    } else {
+                        pc = 9;
+                    }
+                }
+                9 => {
+                    return;
+                }
+                10 => {
+                    self.a = 0x01;
+                    self.x = self.a;
+                    pc = 11;
+                }
+                11 => {
+                    self.ram[sym::BELOW + self.x as usize] = self.a;
+                    self.x = self.x.wrapping_add(1);
+                    let _o: u8 = 0x0a;
+                    self.c = (self.x >= _o) as u8;
+                    self.z = (self.x == _o) as u8;
+                    self.n = self.x.wrapping_sub(_o) >> 7;
+                    if self.x < 0x0a {
+                        pc = 11;
+                    } else {
+                        pc = 12;
+                    }
+                }
+                12 => {
+                    if self.c != 0 {
+                        pc = 4;
+                    } else {
+                        pc = 13;
+                    }
+                }
+                13 => {
+                    self.a = self.ram[sym::level];
+                    let _o: u8 = 0x0c;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a == 0x0c {
+                        pc = 16;
+                    } else {
+                        pc = 14;
+                    }
+                }
+                14 => {
+                    self.a = 0x14;
+                    pc = 15;
+                }
+                15 => {
+                    self.ram[sym::BELOW] = self.a;
+                    if self.n == 0 {
+                        pc = 6;
+                    } else {
+                        pc = 16;
+                    }
+                }
+                16 => {
+                    self.a = 0x00;
+                    if (self.a as i8) >= 0 {
+                        pc = 15;
+                    } else {
+                        pc = 17;
+                    }
+                }
+                17 => {
+                    self.a = self.ram[sym::objX + self.x as usize];
+                    self.ram[sym::FCharX] = self.a;
+                    self.ram[sym::XCO] = self.a;
+                    self.a = self.ram[sym::objOFF + self.x as usize];
+                    self.ram[sym::OFFSET] = self.a;
+                    self.a = self.ram[sym::objY + self.x as usize];
+                    self.ram[sym::FCharY] = self.a;
+                    self.ram[sym::YCO] = self.a;
+                    self.a = self.ram[sym::objIMG + self.x as usize];
+                    self.ram[sym::IMAGE] = self.a;
+                    self.a = self.ram[sym::objTAB + self.x as usize];
+                    self.ram[sym::TABLE] = self.a;
+                    self.a = self.ram[sym::objFACE + self.x as usize];
+                    self.ram[sym::FCharFace] = self.a;
+                    self.a = self.ram[sym::objCU + self.x as usize];
+                    self.ram[sym::FCharCU] = self.a;
+                    self.a = self.ram[sym::objCD + self.x as usize];
+                    self.ram[sym::FCharCD] = self.a;
+                    self.a = self.ram[sym::objCL + self.x as usize];
+                    self.ram[sym::FCharCL] = self.a;
+                    self.a = self.ram[sym::objCR + self.x as usize];
+                    self.ram[sym::FCharCR] = self.a;
+                    self.a = self.ram[sym::objTYP + self.x as usize];
+                    pc = 18;
+                }
+                18 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.a = self.ram[sym::scrnBelow];
-        if self.a == 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.calcblue();
-        self.y = 0x08;
-        // TODO(pass4): lower LabelStmt
-        self.getobjid();
-        self.ram[sym::BELOW + 1 + self.y as usize] = self.a;
-        self.a = self.ram[sym::state];
-        self.ram[sym::SBELOW + 1 + self.y as usize] = self.a;
-        self.y = self.y.wrapping_sub(1);
-        if (self.y as i8) >= 0 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        self.a = self.ram[sym::scrnBelowL];
-        if self.a == 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.calcblue();
-        self.y = 0x09;
-        self.getobjid();
-        self.ram[sym::BELOW] = self.a;
-        self.a = self.ram[sym::state];
-        self.ram[sym::SBELOW] = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.a = self.ram[sym::SCRNUM];
-        self.calcblue();
-        return;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::BELOW] = self.ram[sym::PREV + 1 + self.x as usize];
-        self.ram[sym::SBELOW] = self.ram[sym::sprev + 1 + self.x as usize];
-        self.a = self.ram[sym::yindex];
-        self.c = 0;
-        let _r = (self.a as u16) + (0x0a) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        self.y = self.a;
-        self.x = 0x01;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::xsave] = self.x;
-        self.getobjid();
-        self.x = self.ram[sym::xsave];
-        self.ram[sym::BELOW + self.x as usize] = self.a;
-        self.a = self.ram[sym::state];
-        self.ram[sym::SBELOW + self.x as usize] = self.a;
-        self.y = self.y.wrapping_add(1);
-        self.x = self.x.wrapping_add(1);
-        let _o: u8 = 0x0a;
-        self.c = (self.x >= _o) as u8;
-        self.z = (self.x == _o) as u8;
-        self.n = self.x.wrapping_sub(_o) >> 7;
-        if self.x < 0x0a {
-            // TODO(pass4): lower GotoStmt
-        }
-        return;
-        // TODO(pass4): lower LabelStmt
-        self.a = 0x01;
-        self.x = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::BELOW + self.x as usize] = self.a;
-        self.x = self.x.wrapping_add(1);
-        let _o: u8 = 0x0a;
-        self.c = (self.x >= _o) as u8;
-        self.z = (self.x == _o) as u8;
-        self.n = self.x.wrapping_sub(_o) >> 7;
-        if self.x < 0x0a {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower RawIfStmt
-        // TODO(pass4): lower LabelStmt
-        self.a = self.ram[sym::level];
-        let _o: u8 = 0x0c;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a == 0x0c {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.a = 0x14;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::BELOW] = self.a;
-        // TODO(pass4): lower RawIfStmt
-        // TODO(pass4): lower LabelStmt
-        self.a = 0x00;
-        if (self.a as i8) >= 0 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::FCharX] = self.ram[sym::objX + self.x as usize];
-        self.ram[sym::XCO] = self.ram[sym::objX + self.x as usize];
-        self.ram[sym::OFFSET] = self.ram[sym::objOFF + self.x as usize];
-        self.ram[sym::FCharY] = self.ram[sym::objY + self.x as usize];
-        self.ram[sym::YCO] = self.ram[sym::objY + self.x as usize];
-        self.ram[sym::IMAGE] = self.ram[sym::objIMG + self.x as usize];
-        self.ram[sym::TABLE] = self.ram[sym::objTAB + self.x as usize];
-        self.ram[sym::FCharFace] = self.ram[sym::objFACE + self.x as usize];
-        self.ram[sym::FCharCU] = self.ram[sym::objCU + self.x as usize];
-        self.ram[sym::FCharCD] = self.ram[sym::objCD + self.x as usize];
-        self.ram[sym::FCharCL] = self.ram[sym::objCL + self.x as usize];
-        self.ram[sym::FCharCR] = self.ram[sym::objCR + self.x as usize];
-        self.a = self.ram[sym::objTYP + self.x as usize];
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn loadobj(&mut self) {
@@ -862,7 +1078,9 @@ impl Cpu {
                 self.z = (self.a == _o) as u8;
                 self.n = self.a.wrapping_sub(_o) >> 7;
                 if self.a != 0x09 {
-                    // TODO(pass4): lower RawIfStmt
+                    if self.z == 0 {
+                        return;
+                    }
                 }
             }
         }
@@ -877,7 +1095,9 @@ impl Cpu {
 
     fn drawc(&mut self) {
         self.checkc();
-        // TODO(pass4): lower RawIfStmt
+        if self.c == 0 {
+            return;
+        }
         self.dodrawc();
         self.domaskb();
         return;
@@ -893,7 +1113,9 @@ impl Cpu {
                     self.z = (self.a == _o) as u8;
                     self.n = self.a.wrapping_sub(_o) >> 7;
                     if self.a < 0x1a {
-                        // TODO(pass4): lower RawIfStmt
+                        if self.c == 0 {
+                            return;
+                        }
                     }
                 }
             }
@@ -1121,7 +1343,9 @@ impl Cpu {
 
     fn redrawd(&mut self) {
         self.drawd();
-        // TODO(pass4): lower RawIfStmt
+        if self.z != 0 {
+            return;
+        }
         self.addfore();
         return;
     }
@@ -1323,7 +1547,9 @@ impl Cpu {
     fn adda(&mut self) {
         self.x = self.ram[sym::objid];
         self.getpiecea();
-        // TODO(pass4): lower RawIfStmt
+        if self.z != 0 {
+            return;
+        }
         self.ram[sym::IMAGE] = self.a;
         self.ram[sym::XCO] = self.ram[sym::blockxco];
         self.a = self.ram[sym::Ay];
@@ -1448,22 +1674,53 @@ impl Cpu {
     }
 
     fn wiped(&mut self) {
-        self.a = self.ram[sym::objid];
-        match self.a {
-            0x09 | 0x07 | 0x0c => {
-                return;
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.a = self.ram[sym::objid];
+                    if self.a == 0x09 {
+                        pc = 5;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    if self.a == 0x07 {
+                        pc = 5;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    if self.a == 0x0c {
+                        pc = 5;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    let _o: u8 = 0x14;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a == 0x14 {
+                        pc = 5;
+                    } else {
+                        pc = 4;
+                    }
+                }
+                4 => {
+                    self.a = 0x03;
+                    self.]wipe();
+                    return;
+                }
+                5 => {
+                    return;
+                }
+                _ => unreachable!(),
             }
-            _ => {}
         }
-        let _o: u8 = 0x14;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a == 0x14 {
-            return;
-        }
-        self.a = 0x03;
-        // TODO(pass4): lower GotoStmt
     }
 
     fn drawloosed(&mut self) {
@@ -1795,153 +2052,236 @@ impl Cpu {
     }
 
     fn drawgatebf(&mut self) {
-        self.setupdgb();
-        self.ram[sym::OPACITY] = 0x01;
-        self.a = self.ram[sym::gatebot];
-        self.c = 1;
-        let _r = (self.a as u16) + (!0x02_u8) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        self.ram[sym::YCO] = self.a;
-        self.a = 0x44;
-        self.ram[sym::IMAGE] = self.a;
-        self.addfore();
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::IMAGE] = 0x37;
-        self.a = self.ram[sym::gatebot];
-        self.c = 1;
-        let _r = (self.a as u16) + (!0x0c_u8) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::YCO] = self.a;
-        let _o: u8 = 0xc0;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a >= 0xc0 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.setupdgb();
+                    self.a = 0x01;
+                    self.ram[sym::OPACITY] = self.a;
+                    self.a = self.ram[sym::gatebot];
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x02_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    self.ram[sym::YCO] = self.a;
+                    self.a = 0x44;
+                    self.ram[sym::IMAGE] = self.a;
+                    self.addfore();
+                    pc = 1;
+                }
+                1 => {
+                    self.a = 0x37;
+                    self.ram[sym::IMAGE] = self.a;
+                    self.a = self.ram[sym::gatebot];
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x0c_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    pc = 2;
+                }
+                2 => {
+                    self.ram[sym::YCO] = self.a;
+                    let _o: u8 = 0xc0;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a >= 0xc0 {
+                        pc = 7;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x07_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    if self.c == 0 {
+                        pc = 6;
+                    } else {
+                        pc = 4;
+                    }
+                }
+                4 => {
+                    let _o: u8 = self.ram[sym::blockthr];
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a < self.ram[sym::blockthr] {
+                        pc = 6;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    self.addfore();
+                    self.a = self.ram[sym::YCO];
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x08_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    if self.a != 0x00 {
+                        pc = 2;
+                    } else {
+                        pc = 6;
+                    }
+                }
+                6 => {
+                    pc = 7;
+                }
+                7 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.c = 1;
-        let _r = (self.a as u16) + (!0x07_u8) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        // TODO(pass4): lower RawIfStmt
-        let _o: u8 = self.ram[sym::blockthr];
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a < self.ram[sym::blockthr] {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.addfore();
-        self.a = self.ram[sym::YCO];
-        self.c = 1;
-        let _r = (self.a as u16) + (!0x08_u8) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn drawgateb(&mut self) {
-        self.setupdgb();
-        self.c = 0;
-        let _r = (self.a as u16) + (0x0c) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        let _o: u8 = self.ram[sym::Ay];
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a < self.ram[sym::Ay] {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.setupdgb();
+                    self.c = 0;
+                    let _r = (self.a as u16) + (0x0c) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    let _o: u8 = self.ram[sym::Ay];
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a < self.ram[sym::Ay] {
+                        pc = 2;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.restorebot();
+                    self.a = self.ram[sym::gatebot];
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x02_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    self.ram[sym::YCO] = self.a;
+                    self.a = 0x44;
+                    self.ram[sym::IMAGE] = self.a;
+                    self.a = 0x01;
+                    self.ram[sym::OPACITY] = self.a;
+                    self.addback();
+                    pc = 3;
+                }
+                2 => {
+                    self.a = self.ram[sym::gatebot];
+                    self.ram[sym::YCO] = self.a;
+                    self.a = 0x43;
+                    self.ram[sym::IMAGE] = self.a;
+                    self.a = 0x02;
+                    self.ram[sym::OPACITY] = self.a;
+                    self.addback();
+                    pc = 3;
+                }
+                3 => {
+                    self.a = 0x02;
+                    self.ram[sym::OPACITY] = self.a;
+                    self.a = 0x37;
+                    self.ram[sym::IMAGE] = self.a;
+                    self.a = self.ram[sym::gatebot];
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x0c_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    pc = 4;
+                }
+                4 => {
+                    self.ram[sym::YCO] = self.a;
+                    let _o: u8 = 0xc0;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a >= 0xc0 {
+                        pc = 11;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x07_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    if self.c == 0 {
+                        pc = 8;
+                    } else {
+                        pc = 6;
+                    }
+                }
+                6 => {
+                    let _o: u8 = self.ram[sym::blockthr];
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a < self.ram[sym::blockthr] {
+                        pc = 8;
+                    } else {
+                        pc = 7;
+                    }
+                }
+                7 => {
+                    self.addback();
+                    self.a = self.ram[sym::YCO];
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x08_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    if self.a != 0x00 {
+                        pc = 4;
+                    } else {
+                        pc = 8;
+                    }
+                }
+                8 => {
+                    self.a = self.ram[sym::YCO];
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!self.ram[sym::blockthr]) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    self.c = 0;
+                    let _r = (self.a as u16) + (0x01) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    if self.z != 0 {
+                        pc = 11;
+                    } else {
+                        pc = 9;
+                    }
+                }
+                9 => {
+                    let _o: u8 = 0x09;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a >= 0x09 {
+                        pc = 11;
+                    } else {
+                        pc = 10;
+                    }
+                }
+                10 => {
+                    self.y = self.a;
+                    self.a = self.ram[sym::gate8b - 1 + self.y as usize];
+                    self.ram[sym::IMAGE] = self.a;
+                    self.addback();
+                    pc = 11;
+                }
+                11 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        // TODO(pass4): lower LabelStmt
-        self.restorebot();
-        self.a = self.ram[sym::gatebot];
-        self.c = 1;
-        let _r = (self.a as u16) + (!0x02_u8) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        self.ram[sym::YCO] = self.a;
-        self.ram[sym::IMAGE] = 0x44;
-        self.a = 0x01;
-        self.ram[sym::OPACITY] = self.a;
-        self.addback();
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::YCO] = self.ram[sym::gatebot];
-        self.ram[sym::IMAGE] = 0x43;
-        self.a = 0x02;
-        self.ram[sym::OPACITY] = self.a;
-        self.addback();
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::OPACITY] = 0x02;
-        self.ram[sym::IMAGE] = 0x37;
-        self.a = self.ram[sym::gatebot];
-        self.c = 1;
-        let _r = (self.a as u16) + (!0x0c_u8) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::YCO] = self.a;
-        let _o: u8 = 0xc0;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a >= 0xc0 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.c = 1;
-        let _r = (self.a as u16) + (!0x07_u8) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        // TODO(pass4): lower RawIfStmt
-        let _o: u8 = self.ram[sym::blockthr];
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a < self.ram[sym::blockthr] {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.addback();
-        self.a = self.ram[sym::YCO];
-        self.c = 1;
-        let _r = (self.a as u16) + (!0x08_u8) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        self.a = self.ram[sym::YCO];
-        self.c = 1;
-        let _r = (self.a as u16) + (!self.ram[sym::blockthr]) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        self.c = 0;
-        let _r = (self.a as u16) + (0x01) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        // TODO(pass4): lower RawIfStmt
-        let _o: u8 = 0x09;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a >= 0x09 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.y = self.a;
-        self.a = self.ram[sym::gate8b - 1 + self.y as usize];
-        self.ram[sym::IMAGE] = self.a;
-        self.addback();
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn restorebot(&mut self) {
@@ -1958,7 +2298,10 @@ impl Cpu {
         self.ram[sym::OPACITY] = self.a;
         self.add();
         self.checkc();
-        // TODO(pass4): lower RawIfStmt
+        if self.c == 0 {
+            self.drawa();
+            return;
+        }
         self.dodrawc();
         self.drawa();
         return;
@@ -2082,87 +2425,156 @@ impl Cpu {
     }
 
     fn getobjbldr(&mut self) {
-        self.a = self.ram[(self.ram[sym::BlueType] as usize | (self.ram[sym::BlueType + 1] as usize) << 8) + self.y as usize];
-        self.a &= 0x1f;
-        // raw: push a                           ; FRAMEADV.S:2120
-        self.getinitobj1();
-        // TODO(pass4): lower RawIfStmt
-        self.a = self.ram[(self.ram[sym::BlueSpec] as usize | (self.ram[sym::BlueSpec + 1] as usize) << 8) + self.y as usize];
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::state] = self.a;
-        // raw: a = pop                          ; FRAMEADV.S:2125
-        return;
-        // TODO(pass4): lower LabelStmt
-        // TODO(pass4): lower LabelStmt
-        self.a = 0x00;
-        self.ram[sym::switches] = self.a;
-        self.x = self.ram[sym::sortX];
-        // TODO(pass4): lower LabelStmt
-        let _o: u8 = 0x01;
-        self.c = (self.x >= _o) as u8;
-        self.z = (self.x == _o) as u8;
-        self.n = self.x.wrapping_sub(_o) >> 7;
-        if self.x == 0x01 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.a = self.ram[(self.ram[sym::BlueType] as usize | (self.ram[sym::BlueType + 1] as usize) << 8) + self.y as usize];
+                    self.a &= 0x1f;
+                    // raw: push a                           ; FRAMEADV.S:2120
+                    self.getinitobj1();
+                    if self.c != 0 {
+                        pc = 8;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.a = self.ram[(self.ram[sym::BlueSpec] as usize | (self.ram[sym::BlueSpec + 1] as usize) << 8) + self.y as usize];
+                    pc = 8;
+                }
+                2 => {
+                    self.ram[sym::state] = self.a;
+                    // raw: a = pop                          ; FRAMEADV.S:2125
+                    return;
+                }
+                3 => {
+                    pc = 4;
+                }
+                4 => {
+                    self.a = 0x00;
+                    self.ram[sym::switches] = self.a;
+                    self.x = self.ram[sym::sortX];
+                    pc = 5;
+                }
+                5 => {
+                    let _o: u8 = 0x01;
+                    self.c = (self.x >= _o) as u8;
+                    self.z = (self.x == _o) as u8;
+                    self.n = self.x.wrapping_sub(_o) >> 7;
+                    if self.x == 0x01 {
+                        pc = 9;
+                    } else {
+                        pc = 6;
+                    }
+                }
+                6 => {
+                    self.ram[sym::xsave] = self.x;
+                    self.compare();
+                    self.x = self.ram[sym::xsave];
+                    if self.c == 0 {
+                        pc = 8;
+                    } else {
+                        pc = 7;
+                    }
+                }
+                7 => {
+                    self.a = self.ram[sym::sortX + self.x as usize];
+                    // raw: push a                           ; FRAMEADV.S:2155
+                    self.a = self.ram[sym::sortX - 1 + self.x as usize];
+                    self.ram[sym::sortX + self.x as usize] = self.a;
+                    // raw: a = pop                          ; FRAMEADV.S:2158
+                    self.ram[sym::sortX - 1 + self.x as usize] = self.a;
+                    pc = 8;
+                }
+                8 => {
+                    self.x = self.x.wrapping_sub(1);
+                    if self.x != 0x00 {
+                        pc = 5;
+                    } else {
+                        pc = 9;
+                    }
+                }
+                9 => {
+                    self.a = self.ram[sym::switches];
+                    if self.a != 0x00 {
+                        pc = 4;
+                    } else {
+                        pc = 10;
+                    }
+                }
+                10 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.ram[sym::xsave] = self.x;
-        self.compare();
-        self.x = self.ram[sym::xsave];
-        // TODO(pass4): lower RawIfStmt
-        self.a = self.ram[sym::sortX + self.x as usize];
-        let tmp0 = self.a;
-        self.ram[sym::sortX + self.x as usize] = self.ram[sym::sortX - 1 + self.x as usize];
-        self.a = tmp0;
-        self.ram[sym::sortX - 1 + self.x as usize] = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.x = self.x.wrapping_sub(1);
-        if self.x != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        self.a = self.ram[sym::switches];
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     // aliases: :newpass
     fn sortlist(&mut self) {
-        self.a = 0x00;
-        self.ram[sym::switches] = self.a;
-        self.x = self.ram[sym::sortX];
-        // TODO(pass4): lower LabelStmt
-        let _o: u8 = 0x01;
-        self.c = (self.x >= _o) as u8;
-        self.z = (self.x == _o) as u8;
-        self.n = self.x.wrapping_sub(_o) >> 7;
-        if self.x == 0x01 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.a = 0x00;
+                    self.ram[sym::switches] = self.a;
+                    self.x = self.ram[sym::sortX];
+                    pc = 1;
+                }
+                1 => {
+                    let _o: u8 = 0x01;
+                    self.c = (self.x >= _o) as u8;
+                    self.z = (self.x == _o) as u8;
+                    self.n = self.x.wrapping_sub(_o) >> 7;
+                    if self.x == 0x01 {
+                        pc = 5;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    self.ram[sym::xsave] = self.x;
+                    self.compare();
+                    self.x = self.ram[sym::xsave];
+                    if self.c == 0 {
+                        pc = 4;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    self.a = self.ram[sym::sortX + self.x as usize];
+                    // raw: push a                           ; FRAMEADV.S:2155
+                    self.a = self.ram[sym::sortX - 1 + self.x as usize];
+                    self.ram[sym::sortX + self.x as usize] = self.a;
+                    // raw: a = pop                          ; FRAMEADV.S:2158
+                    self.ram[sym::sortX - 1 + self.x as usize] = self.a;
+                    pc = 4;
+                }
+                4 => {
+                    self.x = self.x.wrapping_sub(1);
+                    if self.x != 0x00 {
+                        pc = 1;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    self.a = self.ram[sym::switches];
+                    if self.a != 0x00 {
+                        self.:newpass();
+                        return;
+                    } else {
+                        pc = 6;
+                    }
+                }
+                6 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.ram[sym::xsave] = self.x;
-        self.compare();
-        self.x = self.ram[sym::xsave];
-        // TODO(pass4): lower RawIfStmt
-        self.a = self.ram[sym::sortX + self.x as usize];
-        let tmp0 = self.a;
-        self.ram[sym::sortX + self.x as usize] = self.ram[sym::sortX - 1 + self.x as usize];
-        self.a = tmp0;
-        self.ram[sym::sortX - 1 + self.x as usize] = self.a;
-        // TODO(pass4): lower LabelStmt
-        self.x = self.x.wrapping_sub(1);
-        if self.x != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        self.a = self.ram[sym::switches];
-        if self.a != 0x00 {
-            self.:newpass();
-            return;
-        }
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn compare(&mut self) {
@@ -2180,8 +2592,12 @@ impl Cpu {
         self.z = (self.a == _o) as u8;
         self.n = self.a.wrapping_sub(_o) >> 7;
         if self.a != self.ram[sym::objY + self.y as usize] {
-            // TODO(pass4): lower RawIfStmt
-            // TODO(pass4): lower RawIfStmt
+            if self.c == 0 {
+                return;
+            }
+            if self.c != 0 {
+                return;
+            }
         }
         return;
     }
@@ -2212,7 +2628,9 @@ impl Cpu {
                 self.a = self.a.wrapping_shl(1);
                 return;
             }
-            // TODO(pass4): lower RawIfStmt
+            if self.z == 0 {
+                return;
+            }
         }
         self.a = self.ram[(self.ram[sym::BlueSpec] as usize | (self.ram[sym::BlueSpec + 1] as usize) << 8) + self.y as usize];
         self.x = self.a;
@@ -2244,7 +2662,9 @@ impl Cpu {
                 self.a = self.a.wrapping_shl(1);
                 return;
             }
-            // TODO(pass4): lower RawIfStmt
+            if self.z == 0 {
+                return;
+            }
         }
         self.a = self.ram[(self.ram[sym::BlueSpec] as usize | (self.ram[sym::BlueSpec + 1] as usize) << 8) + self.y as usize];
         self.x = self.a;

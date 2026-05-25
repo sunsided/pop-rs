@@ -3,9 +3,10 @@
 // Pass 4 skeleton slice: module + routine scaffolding with leaf-
 // expression, control-flow, data-movement, carry-arithmetic,
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
-// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). SMC, the
-// stack, `RawIfStmt`, and `GotoStmt`/`LabelStmt` are deferred; they
-// appear as `// raw: …` or `// TODO(pass4): …` comments.
+// Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
+// routines emit a `loop { match pc { ... } }` dispatch fallback. SMC
+// and the stack are deferred; they appear as `// raw: …` /
+// `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -342,107 +343,191 @@ impl Cpu {
     }
 
     fn DRAWWIPE(&mut self) {
-        self.a = self.ram[sym::wipeX];
-        if self.a == 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.a = self.ram[sym::wipeX];
+                    if self.a == 0x00 {
+                        pc = 4;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.a = 0x01;
+                    pc = 2;
+                }
+                2 => {
+                    // raw: push a                           ; GRAFIX.S:541
+                    self.x = self.a;
+                    self.a = self.ram[sym::wipeH + self.x as usize];
+                    self.ram[sym::IMAGE] = self.a;
+                    self.a = self.ram[sym::wipeW + self.x as usize];
+                    self.ram[sym::IMAGE + 1] = self.a;
+                    self.a = self.ram[sym::wipeX + self.x as usize];
+                    self.ram[sym::XCO] = self.a;
+                    self.a = self.ram[sym::wipeY + self.x as usize];
+                    self.ram[sym::YCO] = self.a;
+                    self.a = self.ram[sym::wipeCOL + self.x as usize];
+                    self.ram[sym::OPACITY] = self.a;
+                    self.fastblack();
+                    // raw: a = pop                          ; GRAFIX.S:556
+                    self.c = 0;
+                    let _r = (self.a as u16) + (0x01) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    let _o: u8 = self.ram[sym::wipeX];
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a < self.ram[sym::wipeX] {
+                        pc = 2;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    if self.z != 0 {
+                        pc = 2;
+                    } else {
+                        pc = 4;
+                    }
+                }
+                4 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.a = 0x01;
-        // TODO(pass4): lower LabelStmt
-        let tmp0 = self.a;
-        self.x = self.a;
-        self.ram[sym::IMAGE] = self.ram[sym::wipeH + self.x as usize];
-        self.ram[sym::IMAGE + 1] = self.ram[sym::wipeW + self.x as usize];
-        self.ram[sym::XCO] = self.ram[sym::wipeX + self.x as usize];
-        self.ram[sym::YCO] = self.ram[sym::wipeY + self.x as usize];
-        self.a = self.ram[sym::wipeCOL + self.x as usize];
-        self.ram[sym::OPACITY] = self.a;
-        self.fastblack();
-        self.a = tmp0;
-        self.c = 0;
-        let _r = (self.a as u16) + (0x01) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        let _o: u8 = self.ram[sym::wipeX];
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a < self.ram[sym::wipeX] {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower RawIfStmt
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn DRAWBACK(&mut self) {
-        self.a = self.ram[sym::bgX];
-        if self.a == 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.a = self.ram[sym::bgX];
+                    if self.a == 0x00 {
+                        pc = 4;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.x = 0x01;
+                    pc = 2;
+                }
+                2 => {
+                    self.ram[sym::index] = self.x;
+                    self.a = self.ram[sym::bgIMG + self.x as usize];
+                    self.ram[sym::IMAGE] = self.a;
+                    self.setbgimg();
+                    self.a = self.ram[sym::bgX + self.x as usize];
+                    self.ram[sym::XCO] = self.a;
+                    self.a = self.ram[sym::bgY + self.x as usize];
+                    self.ram[sym::YCO] = self.a;
+                    self.a = self.ram[sym::bgOP + self.x as usize];
+                    self.ram[sym::OPACITY] = self.a;
+                    self.fastlay();
+                    self.x = self.ram[sym::index];
+                    self.x = self.x.wrapping_add(1);
+                    let _o: u8 = self.ram[sym::bgX];
+                    self.c = (self.x >= _o) as u8;
+                    self.z = (self.x == _o) as u8;
+                    self.n = self.x.wrapping_sub(_o) >> 7;
+                    if self.x < self.ram[sym::bgX] {
+                        pc = 2;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    if self.z != 0 {
+                        pc = 2;
+                    } else {
+                        pc = 4;
+                    }
+                }
+                4 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.x = 0x01;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::index] = self.x;
-        self.a = self.ram[sym::bgIMG + self.x as usize];
-        self.ram[sym::IMAGE] = self.a;
-        self.setbgimg();
-        self.ram[sym::XCO] = self.ram[sym::bgX + self.x as usize];
-        self.ram[sym::YCO] = self.ram[sym::bgY + self.x as usize];
-        self.a = self.ram[sym::bgOP + self.x as usize];
-        self.ram[sym::OPACITY] = self.a;
-        self.fastlay();
-        self.x = self.ram[sym::index];
-        self.x = self.x.wrapping_add(1);
-        let _o: u8 = self.ram[sym::bgX];
-        self.c = (self.x >= _o) as u8;
-        self.z = (self.x == _o) as u8;
-        self.n = self.x.wrapping_sub(_o) >> 7;
-        if self.x < self.ram[sym::bgX] {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower RawIfStmt
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn DRAWFORE(&mut self) {
-        self.a = self.ram[sym::fgX];
-        if self.a == 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.a = self.ram[sym::fgX];
+                    if self.a == 0x00 {
+                        pc = 7;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.x = 0x01;
+                    pc = 2;
+                }
+                2 => {
+                    self.ram[sym::index] = self.x;
+                    self.a = self.ram[sym::fgIMG + self.x as usize];
+                    self.ram[sym::IMAGE] = self.a;
+                    self.setbgimg();
+                    self.a = self.ram[sym::fgX + self.x as usize];
+                    self.ram[sym::XCO] = self.a;
+                    self.a = self.ram[sym::fgY + self.x as usize];
+                    self.ram[sym::YCO] = self.a;
+                    self.a = self.ram[sym::fgOP + self.x as usize];
+                    let _o: u8 = 0x04;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a != 0x04 {
+                        pc = 4;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    self.fastmask();
+                    pc = 5;
+                }
+                4 => {
+                    self.ram[sym::OPACITY] = self.a;
+                    self.fastlay();
+                    pc = 5;
+                }
+                5 => {
+                    self.x = self.ram[sym::index];
+                    self.x = self.x.wrapping_add(1);
+                    let _o: u8 = self.ram[sym::fgX];
+                    self.c = (self.x >= _o) as u8;
+                    self.z = (self.x == _o) as u8;
+                    self.n = self.x.wrapping_sub(_o) >> 7;
+                    if self.x < self.ram[sym::fgX] {
+                        pc = 2;
+                    } else {
+                        pc = 6;
+                    }
+                }
+                6 => {
+                    if self.z != 0 {
+                        pc = 2;
+                    } else {
+                        pc = 7;
+                    }
+                }
+                7 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.x = 0x01;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::index] = self.x;
-        self.a = self.ram[sym::fgIMG + self.x as usize];
-        self.ram[sym::IMAGE] = self.a;
-        self.setbgimg();
-        self.ram[sym::XCO] = self.ram[sym::fgX + self.x as usize];
-        self.ram[sym::YCO] = self.ram[sym::fgY + self.x as usize];
-        self.a = self.ram[sym::fgOP + self.x as usize];
-        let _o: u8 = 0x04;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a != 0x04 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.fastmask();
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::OPACITY] = self.a;
-        self.fastlay();
-        // TODO(pass4): lower LabelStmt
-        self.x = self.ram[sym::index];
-        self.x = self.x.wrapping_add(1);
-        let _o: u8 = self.ram[sym::fgX];
-        self.c = (self.x >= _o) as u8;
-        self.z = (self.x == _o) as u8;
-        self.n = self.x.wrapping_sub(_o) >> 7;
-        if self.x < self.ram[sym::fgX] {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower RawIfStmt
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn SNGPEEL(&mut self) {
@@ -483,124 +568,213 @@ impl Cpu {
     }
 
     fn DRAWMID(&mut self) {
-        self.a = self.ram[sym::midX];
-        if self.a == 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.a = self.ram[sym::midX];
+                    if self.a == 0x00 {
+                        pc = 10;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.x = 0x01;
+                    pc = 2;
+                }
+                2 => {
+                    self.ram[sym::index] = self.x;
+                    self.a = self.ram[sym::midIMG + self.x as usize];
+                    self.ram[sym::IMAGE] = self.a;
+                    self.a = self.ram[sym::midTAB + self.x as usize];
+                    self.ram[sym::TABLE] = self.a;
+                    self.a = self.ram[sym::midX + self.x as usize];
+                    self.ram[sym::XCO] = self.a;
+                    self.a = self.ram[sym::midY + self.x as usize];
+                    self.ram[sym::YCO] = self.a;
+                    self.a = self.ram[sym::midOP + self.x as usize];
+                    self.ram[sym::OPACITY] = self.a;
+                    self.a = self.ram[sym::midTYP + self.x as usize];
+                    if (self.a as i8) < 0 {
+                        pc = 4;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    self.setbgimg();
+                    pc = 5;
+                }
+                4 => {
+                    self.setcharimg();
+                    pc = 5;
+                }
+                5 => {
+                    self.a &= 0x7f;
+                    if self.a == 0x00 {
+                        pc = 11;
+                    } else {
+                        pc = 6;
+                    }
+                }
+                6 => {
+                    let _o: u8 = 0x01;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a == 0x01 {
+                        pc = 13;
+                    } else {
+                        pc = 7;
+                    }
+                }
+                7 => {
+                    let _o: u8 = 0x02;
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a == 0x02 {
+                        pc = 12;
+                    } else {
+                        pc = 8;
+                    }
+                }
+                8 => {
+                    self.x = self.ram[sym::index];
+                    self.x = self.x.wrapping_add(1);
+                    let _o: u8 = self.ram[sym::midX];
+                    self.c = (self.x >= _o) as u8;
+                    self.z = (self.x == _o) as u8;
+                    self.n = self.x.wrapping_sub(_o) >> 7;
+                    if self.x < self.ram[sym::midX] {
+                        pc = 2;
+                    } else {
+                        pc = 9;
+                    }
+                }
+                9 => {
+                    if self.z != 0 {
+                        pc = 2;
+                    } else {
+                        pc = 10;
+                    }
+                }
+                10 => {
+                    return;
+                }
+                11 => {
+                    self.fastlay();
+                    pc = 8;
+                }
+                12 => {
+                    self.:setaddl();
+                    self.layrsave();
+                    self.ADDPEEL();
+                    self.lay();
+                    pc = 8;
+                }
+                13 => {
+                    self.:setaddl();
+                    self.lay();
+                    pc = 8;
+                }
+                14 => {
+                    self.a = self.ram[sym::midOFF + self.x as usize];
+                    self.ram[sym::OFFSET] = self.a;
+                    self.a = self.ram[sym::midCL + self.x as usize];
+                    self.ram[sym::LEFTCUT] = self.a;
+                    self.a = self.ram[sym::midCR + self.x as usize];
+                    self.ram[sym::RIGHTCUT] = self.a;
+                    self.a = self.ram[sym::midCU + self.x as usize];
+                    self.ram[sym::TOPCUT] = self.a;
+                    self.a = self.ram[sym::midCD + self.x as usize];
+                    self.ram[sym::BOTCUT] = self.a;
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.x = 0x01;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::index] = self.x;
-        self.ram[sym::IMAGE] = self.ram[sym::midIMG + self.x as usize];
-        self.ram[sym::TABLE] = self.ram[sym::midTAB + self.x as usize];
-        self.ram[sym::XCO] = self.ram[sym::midX + self.x as usize];
-        self.ram[sym::YCO] = self.ram[sym::midY + self.x as usize];
-        self.ram[sym::OPACITY] = self.ram[sym::midOP + self.x as usize];
-        self.a = self.ram[sym::midTYP + self.x as usize];
-        if (self.a as i8) < 0 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.setbgimg();
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        self.setcharimg();
-        // TODO(pass4): lower LabelStmt
-        self.a &= 0x7f;
-        if self.a == 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        let _o: u8 = 0x01;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a == 0x01 {
-            // TODO(pass4): lower GotoStmt
-        }
-        let _o: u8 = 0x02;
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a == 0x02 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        self.x = self.ram[sym::index];
-        self.x = self.x.wrapping_add(1);
-        let _o: u8 = self.ram[sym::midX];
-        self.c = (self.x >= _o) as u8;
-        self.z = (self.x == _o) as u8;
-        self.n = self.x.wrapping_sub(_o) >> 7;
-        if self.x < self.ram[sym::midX] {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower RawIfStmt
-        // TODO(pass4): lower LabelStmt
-        return;
-        // TODO(pass4): lower LabelStmt
-        self.fastlay();
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        self.:setaddl();
-        self.layrsave();
-        self.ADDPEEL();
-        self.lay();
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        self.:setaddl();
-        self.lay();
-        // TODO(pass4): lower GotoStmt
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::OFFSET] = self.ram[sym::midOFF + self.x as usize];
-        self.ram[sym::LEFTCUT] = self.ram[sym::midCL + self.x as usize];
-        self.ram[sym::RIGHTCUT] = self.ram[sym::midCR + self.x as usize];
-        self.ram[sym::TOPCUT] = self.ram[sym::midCU + self.x as usize];
-        self.a = self.ram[sym::midCD + self.x as usize];
-        self.ram[sym::BOTCUT] = self.a;
-        return;
     }
 
     fn DRAWMSG(&mut self) {
-        self.a = self.ram[sym::msgX];
-        if self.a == 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.a = self.ram[sym::msgX];
+                    if self.a == 0x00 {
+                        pc = 6;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.x = 0x01;
+                    pc = 2;
+                }
+                2 => {
+                    self.ram[sym::index] = self.x;
+                    self.a = self.ram[sym::msgIMG + self.x as usize];
+                    self.ram[sym::IMAGE] = self.a;
+                    self.setbgimg();
+                    self.a = self.ram[sym::msgX + self.x as usize];
+                    self.ram[sym::XCO] = self.a;
+                    self.a = self.ram[sym::msgOFF + self.x as usize];
+                    self.ram[sym::OFFSET] = self.a;
+                    self.a = self.ram[sym::msgY + self.x as usize];
+                    self.ram[sym::YCO] = self.a;
+                    self.a = 0x00;
+                    self.ram[sym::LEFTCUT] = self.a;
+                    self.ram[sym::TOPCUT] = self.a;
+                    self.a = 0x28;
+                    self.ram[sym::RIGHTCUT] = self.a;
+                    self.a = 0xc0;
+                    self.ram[sym::BOTCUT] = self.a;
+                    self.a = self.ram[sym::msgOP + self.x as usize];
+                    self.ram[sym::OPACITY] = self.a;
+                    self.a &= 0x40;
+                    if self.a == 0x00 {
+                        pc = 4;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    self.a = self.ram[sym::OPACITY];
+                    self.a &= 0xbf;
+                    self.ram[sym::OPACITY] = self.a;
+                    self.layrsave();
+                    self.ADDPEEL();
+                    pc = 4;
+                }
+                4 => {
+                    self.lay();
+                    self.x = self.ram[sym::index];
+                    self.x = self.x.wrapping_add(1);
+                    let _o: u8 = self.ram[sym::msgX];
+                    self.c = (self.x >= _o) as u8;
+                    self.z = (self.x == _o) as u8;
+                    self.n = self.x.wrapping_sub(_o) >> 7;
+                    if self.x < self.ram[sym::msgX] {
+                        pc = 2;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    if self.z != 0 {
+                        pc = 2;
+                    } else {
+                        pc = 6;
+                    }
+                }
+                6 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.x = 0x01;
-        // TODO(pass4): lower LabelStmt
-        self.ram[sym::index] = self.x;
-        self.a = self.ram[sym::msgIMG + self.x as usize];
-        self.ram[sym::IMAGE] = self.a;
-        self.setbgimg();
-        self.ram[sym::XCO] = self.ram[sym::msgX + self.x as usize];
-        self.ram[sym::OFFSET] = self.ram[sym::msgOFF + self.x as usize];
-        self.ram[sym::YCO] = self.ram[sym::msgY + self.x as usize];
-        self.ram[sym::LEFTCUT] = 0x00;
-        self.ram[sym::TOPCUT] = 0x00;
-        self.ram[sym::RIGHTCUT] = 0x28;
-        self.ram[sym::BOTCUT] = 0xc0;
-        self.a = self.ram[sym::msgOP + self.x as usize];
-        self.ram[sym::OPACITY] = self.a;
-        self.a &= 0x40;
-        if self.a == 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.a = self.ram[sym::OPACITY];
-        self.a &= 0xbf;
-        self.ram[sym::OPACITY] = self.a;
-        self.layrsave();
-        self.ADDPEEL();
-        // TODO(pass4): lower LabelStmt
-        self.lay();
-        self.x = self.ram[sym::index];
-        self.x = self.x.wrapping_add(1);
-        let _o: u8 = self.ram[sym::msgX];
-        self.c = (self.x >= _o) as u8;
-        self.z = (self.x == _o) as u8;
-        self.n = self.x.wrapping_sub(_o) >> 7;
-        if self.x < self.ram[sym::msgX] {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower RawIfStmt
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn setbgimg(&mut self) {
@@ -656,12 +830,39 @@ impl Cpu {
                 self.ram[0x0003] = _hi as u8;
                 self.a = _hi as u8;
                 self.c = (_hi >> 8) as u8;
-                // TODO(pass4): lower RawIfStmt
+                if self.z != 0 {
+                    break;
+                }
             }
-            // TODO(pass4): lower RawIfStmt
+            if self.z != 0 {
+                self.y = self.ram[0x0001];
+                self.a = self.ram[sym::ByteTable + self.y as usize];
+                self.c = 0;
+                let _r = (self.a as u16) + self.ram[0x00f0] as u16 + (self.c as u16);
+                self.a = _r as u8;
+                self.c = (_r >> 8) as u8;
+                self.ram[sym::XCO] = self.a;
+                self.a = self.ram[sym::OffsetTable + self.y as usize];
+                self.ram[sym::OFFSET] = self.a;
+                return;
+            }
             return;
         }
-        // TODO(pass4): lower RawIfStmt
+        if self.z != 0 {
+        } else {
+            loop {
+                self.ram[0x00f0] = (self.ram[0x00f0]).wrapping_add(0x24);
+                let _lo = (self.ram[0x0001] as u16) + (!0xfc_u8 as u16) + 1;
+                self.ram[0x0001] = _lo as u8;
+                let _hi = (self.ram[0x0003] as u16) + (!0x00_u8 as u16) + (_lo >> 8);
+                self.ram[0x0003] = _hi as u8;
+                self.a = _hi as u8;
+                self.c = (_hi >> 8) as u8;
+                if self.z != 0 {
+                    break;
+                }
+            }
+        }
         self.y = self.ram[0x0001];
         self.a = self.ram[sym::ByteTable + self.y as usize];
         self.c = 0;
@@ -713,13 +914,17 @@ impl Cpu {
     fn GETSELECT(&mut self) {
         self.a = self.ram[sym::joyon];
         if self.a == 0x00 {
-            // TODO(pass4): lower RawIfStmt
+            if self.z != 0 {
+                self.getkbd();
+                return;
+            }
             self.a = self.ram[sym::joyon];
             if self.a != 0x00 {
                 self.getkbd();
                 return;
             }
-            // TODO(pass4): lower RawIfStmt
+            if self.z != 0 {
+            }
         }
         self.ram[sym::JSTKX] = self.ram[sym::joyX];
         self.ram[sym::JSTKY] = self.ram[sym::joyY];
@@ -738,7 +943,8 @@ impl Cpu {
             self.getkbd();
             return;
         }
-        // TODO(pass4): lower RawIfStmt
+        if self.z != 0 {
+        }
         self.ram[sym::JSTKX] = self.ram[sym::joyX];
         self.ram[sym::JSTKY] = self.ram[sym::joyY];
         self.a = self.ram[sym::BTN1];
@@ -856,65 +1062,124 @@ impl Cpu {
     }
 
     fn PREAD(&mut self) {
-        self.ram[sym::joyX] = 0x00;
-        self.ram[sym::joyY] = 0x00;
-        self.a = self.ram[0xc070];
-        // TODO(pass4): lower LabelStmt
-        self.x = 0x01;
-        // TODO(pass4): lower LabelStmt
-        self.a = self.ram[0xc064 + self.x as usize];
-        if (self.a as i8) >= 0 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.a = 0x00;
+                    self.ram[sym::joyX] = self.a;
+                    self.ram[sym::joyY] = self.a;
+                    self.a = self.ram[0xc070];
+                    pc = 1;
+                }
+                1 => {
+                    self.x = 0x01;
+                    pc = 2;
+                }
+                2 => {
+                    self.a = self.ram[0xc064 + self.x as usize];
+                    if (self.a as i8) >= 0 {
+                        pc = 8;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    // raw: ??? inc joyX,x            ; GRAFIX.S:1209
+                    pc = 4;
+                }
+                4 => {
+                    self.x = self.x.wrapping_sub(1);
+                    if (self.x as i8) >= 0 {
+                        pc = 2;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    self.a = self.ram[0xc064];
+                    self.a |= self.ram[0xc065];
+                    if (self.a as i8) >= 0 {
+                        pc = 12;
+                    } else {
+                        pc = 6;
+                    }
+                }
+                6 => {
+                    self.a = self.ram[sym::joyX];
+                    self.a |= self.ram[sym::joyY];
+                    if (self.a as i8) >= 0 {
+                        pc = 1;
+                    } else {
+                        pc = 7;
+                    }
+                }
+                7 => {
+                    return;
+                }
+                8 => {
+                    // raw: nop                              ; GRAFIX.S:1222
+                    if self.n == 0 {
+                        pc = 4;
+                    } else {
+                        pc = 9;
+                    }
+                }
+                9 => {
+                    self.normspeed();
+                    self.a = 0xff;
+                    self.ram[sym::joyon] = self.a;
+                    self.a = 0x00;
+                    self.ram[sym::jvert] = self.a;
+                    self.ram[sym::jhoriz] = self.a;
+                    self.ram[sym::jbtns] = self.a;
+                    self.PREAD();
+                    self.a = self.ram[sym::joyX];
+                    self.a |= self.ram[sym::joyY];
+                    if (self.a as i8) < 0 {
+                        pc = 11;
+                    } else {
+                        pc = 10;
+                    }
+                }
+                10 => {
+                    self.a = self.ram[sym::joyX];
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x0a_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    self.ram[sym::jthres1x] = self.a;
+                    self.a = self.ram[sym::joyX];
+                    self.c = 0;
+                    let _r = (self.a as u16) + (0x0a) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    self.ram[sym::jthres2x] = self.a;
+                    self.a = self.ram[sym::joyY];
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x0f_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    self.ram[sym::jthres1y] = self.a;
+                    self.a = self.ram[sym::joyY];
+                    self.c = 0;
+                    let _r = (self.a as u16) + (0x0f) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    self.ram[sym::jthres2y] = self.a;
+                    return;
+                }
+                11 => {
+                    self.a = 0x00;
+                    self.ram[sym::joyon] = self.a;
+                    pc = 12;
+                }
+                12 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        // raw: ??? inc joyX,x            ; GRAFIX.S:1209
-        // TODO(pass4): lower LabelStmt
-        self.x = self.x.wrapping_sub(1);
-        if (self.x as i8) >= 0 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.a = self.ram[0xc064];
-        self.a |= self.ram[0xc065];
-        if (self.a as i8) >= 0 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.a = self.ram[sym::joyX];
-        self.a |= self.ram[sym::joyY];
-        if (self.a as i8) >= 0 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        return;
-        // TODO(pass4): lower LabelStmt
-        // raw: nop                              ; GRAFIX.S:1222
-        // TODO(pass4): lower RawIfStmt
-        // TODO(pass4): lower LabelStmt
-        self.normspeed();
-        self.ram[sym::joyon] = 0xff;
-        self.a = 0x00;
-        self.ram[sym::jvert] = self.a;
-        self.ram[sym::jhoriz] = self.a;
-        self.ram[sym::jbtns] = self.a;
-        self.PREAD();
-        self.a = self.ram[sym::joyX];
-        self.a |= self.ram[sym::joyY];
-        if (self.a as i8) < 0 {
-            // TODO(pass4): lower GotoStmt
-        }
-        self.ram[sym::jthres1x] = (self.ram[sym::joyX]).wrapping_sub(0x0a);
-        self.ram[sym::jthres2x] = (self.ram[sym::joyX]).wrapping_add(0x0a);
-        self.ram[sym::jthres1y] = (self.ram[sym::joyY]).wrapping_sub(0x0f);
-        self.a = self.ram[sym::joyY];
-        self.c = 0;
-        let _r = (self.a as u16) + (0x0f) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        self.ram[sym::jthres2y] = self.a;
-        return;
-        // TODO(pass4): lower LabelStmt
-        self.a = 0x00;
-        self.ram[sym::joyon] = self.a;
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn SETCENTER(&mut self) {
@@ -945,31 +1210,49 @@ impl Cpu {
     }
 
     fn MOVEMEM(&mut self) {
-        self.ram[0x00f1] = self.a;
-        self.ram[0x00f3] = self.x;
-        self.ram[0x00f5] = self.y;
-        self.y = 0x00;
-        self.ram[0x00f0] = self.y;
-        self.ram[0x00f2] = self.y;
-        self.ram[0x00f4] = self.y;
-        // TODO(pass4): lower LabelStmt
-        self.a = self.ram[(self.ram[0x00f2] as usize | (self.ram[0x00f3] as usize) << 8) + self.y as usize];
-        self.ram[(self.ram[0x00f0] as usize | (self.ram[0x00f1] as usize) << 8) + self.y as usize] = self.a;
-        self.y = self.y.wrapping_add(1);
-        if self.y != 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.ram[0x00f1] = self.a;
+                    self.ram[0x00f3] = self.x;
+                    self.ram[0x00f5] = self.y;
+                    self.y = 0x00;
+                    self.ram[0x00f0] = self.y;
+                    self.ram[0x00f2] = self.y;
+                    self.ram[0x00f4] = self.y;
+                    pc = 1;
+                }
+                1 => {
+                    self.a = self.ram[(self.ram[0x00f2] as usize | (self.ram[0x00f3] as usize) << 8) + self.y as usize];
+                    self.ram[(self.ram[0x00f0] as usize | (self.ram[0x00f1] as usize) << 8) + self.y as usize] = self.a;
+                    self.y = self.y.wrapping_add(1);
+                    if self.y != 0x00 {
+                        pc = 1;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    self.ram[0x00f3] = self.ram[0x00f3].wrapping_add(1);
+                    self.ram[0x00f1] = self.ram[0x00f1].wrapping_add(1);
+                    self.a = self.ram[0x00f3];
+                    let _o: u8 = self.ram[0x00f5];
+                    self.c = (self.a >= _o) as u8;
+                    self.z = (self.a == _o) as u8;
+                    self.n = self.a.wrapping_sub(_o) >> 7;
+                    if self.a != self.ram[0x00f5] {
+                        pc = 1;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.ram[0x00f3] = self.ram[0x00f3].wrapping_add(1);
-        self.ram[0x00f1] = self.ram[0x00f1].wrapping_add(1);
-        self.a = self.ram[0x00f3];
-        let _o: u8 = self.ram[0x00f5];
-        self.c = (self.a >= _o) as u8;
-        self.z = (self.a == _o) as u8;
-        self.n = self.a.wrapping_sub(_o) >> 7;
-        if self.a != self.ram[0x00f5] {
-            // TODO(pass4): lower GotoStmt
-        }
-        return;
     }
 
     fn GTONE(&mut self) {
@@ -981,64 +1264,114 @@ impl Cpu {
     }
 
     fn WHOOP(&mut self) {
-        self.y = 0x00;
-        // TODO(pass4): lower LabelStmt
-        self.a = self.y;
-        let _o: u8 = self.ram[0xc030];
-        self.z = ((self.a & _o) == 0) as u8;
-        self.n = _o >> 7;
-        // TODO(pass4): lower LabelStmt
-        self.c = 1;
-        let _r = (self.a as u16) + (!0x01_u8) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.y = 0x00;
+                    pc = 1;
+                }
+                1 => {
+                    self.a = self.y;
+                    let _o: u8 = self.ram[0xc030];
+                    self.z = ((self.a & _o) == 0) as u8;
+                    self.n = _o >> 7;
+                    pc = 2;
+                }
+                2 => {
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x01_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    if self.a != 0x00 {
+                        pc = 2;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
+                    self.y = self.y.wrapping_sub(1);
+                    if self.y != 0x00 {
+                        pc = 1;
+                    } else {
+                        pc = 4;
+                    }
+                }
+                4 => {
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.y = self.y.wrapping_sub(1);
-        if self.y != 0x00 {
-            // TODO(pass4): lower GotoStmt
-        }
-        // TODO(pass4): lower LabelStmt
-        return;
     }
 
     fn tone(&mut self) {
-        // raw: patch *:pitch = y            ; GRAFIX.S:1344
-        // raw: patch *:pitch+1 = x            ; GRAFIX.S:1345
-        // TODO(pass4): lower LabelStmt
-        let _o: u8 = self.ram[0xc030];
-        self.z = ((self.a & _o) == 0) as u8;
-        self.n = _o >> 7;
-        self.x = 0x00;
-        // TODO(pass4): lower LabelStmt
-        self.y = 0x00;
-        // TODO(pass4): lower LabelStmt
-        self.y = self.y.wrapping_add(1);
-        // raw: ??? cpy :pitch            ; GRAFIX.S:1350
-        // TODO(pass4): lower RawIfStmt
-        self.x = self.x.wrapping_add(1);
-        // raw: ??? cpx :pitch+1            ; GRAFIX.S:1353
-        // TODO(pass4): lower RawIfStmt
-        self.c = 1;
-        let _r = (self.a as u16) + (!0x01_u8) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        if self.a != 0x00 {
-            // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    // raw: patch *:pitch = y            ; GRAFIX.S:1344
+                    // raw: patch *:pitch+1 = x            ; GRAFIX.S:1345
+                    pc = 1;
+                }
+                1 => {
+                    let _o: u8 = self.ram[0xc030];
+                    self.z = ((self.a & _o) == 0) as u8;
+                    self.n = _o >> 7;
+                    self.x = 0x00;
+                    pc = 2;
+                }
+                2 => {
+                    self.y = 0x00;
+                    pc = 3;
+                }
+                3 => {
+                    self.y = self.y.wrapping_add(1);
+                    // raw: ??? cpy :pitch            ; GRAFIX.S:1350
+                    if self.c == 0 {
+                        pc = 3;
+                    } else {
+                        pc = 4;
+                    }
+                }
+                4 => {
+                    self.x = self.x.wrapping_add(1);
+                    // raw: ??? cpx :pitch+1            ; GRAFIX.S:1353
+                    if self.c == 0 {
+                        pc = 2;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    self.c = 1;
+                    let _r = (self.a as u16) + (!0x01_u8) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    if self.a != 0x00 {
+                        pc = 1;
+                    } else {
+                        pc = 6;
+                    }
+                }
+                6 => {
+                    return;
+                }
+                7 => {
+                    self.a = self.ram[sym::PAGE];
+                    self.c = 0;
+                    let _r = (self.a as u16) + (0x20) as u16 + (self.c as u16);
+                    self.a = _r as u8;
+                    self.c = (_r >> 8) as u8;
+                    self.ram[sym::IMAGE + 1] = self.a;
+                    self.a ^= 0x60;
+                    self.ram[sym::IMAGE] = self.a;
+                    self.copy2000();
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
-        return;
-        // TODO(pass4): lower LabelStmt
-        self.a = self.ram[sym::PAGE];
-        self.c = 0;
-        let _r = (self.a as u16) + (0x20) as u16 + (self.c as u16);
-        self.a = _r as u8;
-        self.c = (_r >> 8) as u8;
-        self.ram[sym::IMAGE + 1] = self.a;
-        self.a ^= 0x60;
-        self.ram[sym::IMAGE] = self.a;
-        self.copy2000();
-        return;
     }
 
     fn COPYSCRN(&mut self) {
@@ -1283,9 +1616,18 @@ impl Cpu {
     }
 
     fn MPLAY(&mut self) {
-        self.]bank1in();
-        self.CALLMPLAY();
-        // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.]bank1in();
+                    self.CALLMPLAY();
+                    self.]bank2in();
+                    return;
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 
     fn XMINIT(&mut self) {
@@ -1355,39 +1697,75 @@ impl Cpu {
     }
 
     fn SAVEBLUE(&mut self) {
-        self.]bank1in();
-        self.a = 0xd7;
-        self.x = 0xb7;
-        self.y = 0xc0;
-        self.movemem();
-        // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.]bank1in();
+                    self.a = 0xd7;
+                    self.x = 0xb7;
+                    self.y = 0xc0;
+                    self.movemem();
+                    self.]bank2in();
+                    return;
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 
     fn SAVEBINFO(&mut self) {
-        self.]bank1in();
-        self.a = 0xd0;
-        self.x = 0xa6;
-        self.y = 0xac;
-        self.movemem();
-        // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.]bank1in();
+                    self.a = 0xd0;
+                    self.x = 0xa6;
+                    self.y = 0xac;
+                    self.movemem();
+                    self.]bank2in();
+                    return;
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 
     fn RELOADBLUE(&mut self) {
-        self.]bank1in();
-        self.a = 0xb7;
-        self.x = 0xd7;
-        self.y = 0xe0;
-        self.movemem();
-        // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.]bank1in();
+                    self.a = 0xb7;
+                    self.x = 0xd7;
+                    self.y = 0xe0;
+                    self.movemem();
+                    self.]bank2in();
+                    return;
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 
     fn RELOADBINFO(&mut self) {
-        self.]bank1in();
-        self.a = 0xa6;
-        self.x = 0xd0;
-        self.y = 0xd6;
-        self.movemem();
-        // TODO(pass4): lower GotoStmt
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.]bank1in();
+                    self.a = 0xa6;
+                    self.x = 0xd0;
+                    self.y = 0xd6;
+                    self.movemem();
+                    self.]bank2in();
+                    return;
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 
     fn GR(&mut self) {
@@ -1500,7 +1878,16 @@ impl Cpu {
     fn MUSICKEYS(&mut self) {
         self.a = self.ram[0xc000];
         self.ram[sym::keypress] = self.a;
-        // TODO(pass4): lower RawIfStmt
+        if self.n == 0 {
+            self.a = self.ram[0xc061];
+            self.a |= self.ram[0xc062];
+            if (self.a as i8) >= 0 {
+                self.a = self.ram[sym::keypress];
+                return;
+            }
+            self.a = 0xff;
+            return;
+        }
         self.ram[0xc010] = self.a;
         let _o: u8 = 0x9b;
         self.c = (self.a >= _o) as u8;
@@ -1529,21 +1916,29 @@ impl Cpu {
                 self.a = self.ram[sym::musicon];
                 self.a ^= 0x01;
                 self.ram[sym::musicon] = self.a;
-                // TODO(pass4): lower RawIfStmt
+                if self.z != 0 {
+                } else {
+                    self.gtone();
+                }
                 self.a = 0x00;
                 return;
             }
             self.a = self.ram[sym::soundon];
             self.a ^= 0x01;
             self.ram[sym::soundon] = self.a;
-            // TODO(pass4): lower RawIfStmt
+            if self.z != 0 {
+            } else {
+                self.gtone();
+            }
             self.a = 0x00;
             return;
         }
         loop {
             self.a = self.ram[0xc000];
             self.ram[sym::keypress] = self.a;
-            // TODO(pass4): lower RawIfStmt
+            if self.n != 0 {
+                break;
+            }
         }
         self.ram[0xc010] = self.a;
         let _o: u8 = 0x9b;
@@ -1573,14 +1968,20 @@ impl Cpu {
                 self.a = self.ram[sym::musicon];
                 self.a ^= 0x01;
                 self.ram[sym::musicon] = self.a;
-                // TODO(pass4): lower RawIfStmt
+                if self.z != 0 {
+                } else {
+                    self.gtone();
+                }
                 self.a = 0x00;
                 return;
             }
             self.a = self.ram[sym::soundon];
             self.a ^= 0x01;
             self.ram[sym::soundon] = self.a;
-            // TODO(pass4): lower RawIfStmt
+            if self.z != 0 {
+            } else {
+                self.gtone();
+            }
             self.a = 0x00;
             return;
         }
@@ -1610,7 +2011,9 @@ impl Cpu {
             let _o: u8 = self.ram[sym::vblflag];
             self.z = ((self.a & _o) == 0) as u8;
             self.n = _o >> 7;
-            // TODO(pass4): lower RawIfStmt
+            if self.n != 0 {
+                break;
+            }
         }
         self.c = self.ram[sym::vblflag] & 1;
         self.ram[sym::vblflag] = self.ram[sym::vblflag].wrapping_shr(1);
@@ -1618,7 +2021,9 @@ impl Cpu {
             let _o: u8 = self.ram[sym::vblflag];
             self.z = ((self.a & _o) == 0) as u8;
             self.n = _o >> 7;
-            // TODO(pass4): lower RawIfStmt
+            if self.n != 0 {
+                break;
+            }
         }
         self.c = self.ram[sym::vblflag] & 1;
         self.ram[sym::vblflag] = self.ram[sym::vblflag].wrapping_shr(1);
