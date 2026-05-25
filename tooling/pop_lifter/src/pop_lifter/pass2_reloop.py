@@ -51,11 +51,15 @@ walks the IR2 body in order and emits a 1-for-1 IR3 stream
 counterparts; `If`/`Branch` become a structured `IfStmt`/`RawIfStmt`
 whose then-block holds a `GotoStmt` to the original target; atoms
 become `RawStmt`). Correctness preserved, structure not improved.
-* Post-dominator analysis. The current algorithm may emit a small
-  amount of code duplication when a block is reached from both the
-  taken edge of an `if` and the fall-through path of the next block.
-  CHECKFLOOR's `:ong` (`tail_call onground`) is the only such case
-  in the pilot — fine for now; a future pass will collapse it.
+* Post-dominator merge. When a conditional's two arms reconverge at a
+  block *after* the fall-through (its immediate post-dominator `M`),
+  the walker emits each arm only up to `M` and the shared continuation
+  once after the `if/else`. Without this the taken arm re-inlines the
+  whole tail, which compounds exponentially across nested conditionals
+  (one routine ballooned ~560x before this landed). Arms that instead
+  diverge to separate exits with only *partial* joins (a block reached
+  from some but not all paths) still duplicate — collapsing those needs
+  labeled-block / multiple-block structuring, a later pass.
 * `match` / `switch` recognition from chained `if a == K` —
   pass 3's job.
 """
@@ -71,7 +75,6 @@ from .cfg import (
     dominates,
     find_back_edges,
     find_dfs_back_edges,
-    natural_loop_body,
 )
 from .ir1 import (
     Branch,
@@ -246,6 +249,7 @@ def reloop_routine(routine: Routine) -> RoutineIR3:
     ):
         return _wrap_unstructured(routine)
 
+    ipostdoms = _compute_ipostdoms(cfg)
     visiting: set[int] = set()
     body = _emit_block(
         cfg, cfg.entry_id,
@@ -254,6 +258,7 @@ def reloop_routine(routine: Routine) -> RoutineIR3:
         loops=loops,
         loop_blocks=loop_blocks,
         active_loop_tail=None,
+        ipostdoms=ipostdoms,
     )
     return RoutineIR3(
         name=routine.name,
@@ -389,6 +394,98 @@ def _invert_loop_exit(cond, cond_is_compare: bool):
     return _INVERT_BRANCH_COND[cond]
 
 
+_EXIT = -1  # virtual exit node for post-dominator analysis
+
+
+def _block_leaves_routine(cfg: CFG, b) -> bool:
+    """True if any control-flow edge out of block `b` leaves the routine
+    — a `return`, a tail-call, a goto/branch to a label outside the
+    routine, or a fall-through past the last block. Such blocks connect
+    to the virtual exit in the reverse CFG."""
+    t = b.terminator
+    if isinstance(t, Return):
+        return True
+    if isinstance(t, Goto):
+        if t.kind == "tail_call":
+            return True
+        return cfg.label_to_block.get(t.target) is None
+    if isinstance(t, (If, Branch)):
+        if cfg.label_to_block.get(t.target) is None:
+            return True
+        return b.id + 1 >= len(cfg.blocks)
+    return True
+
+
+def _compute_ipostdoms(cfg: CFG) -> dict[int, int]:
+    """Immediate post-dominators (`block -> ipostdom`), computed as
+    dominators on the reverse CFG from a virtual exit (`_EXIT`) that
+    every routine-leaving block connects to.
+
+    The relooper uses this to find where a conditional's two arms
+    reconverge: emitting the shared continuation once after the
+    `if/else` instead of inlining it into both arms is what keeps a
+    branch-dense routine from blowing up by code duplication. A result
+    of `_EXIT` means the arms diverge to separate exits (no shared
+    continuation); blocks that can't reach an exit are omitted."""
+    if not cfg.blocks:
+        return {}
+    exit_blocks = [b.id for b in cfg.blocks if _block_leaves_routine(cfg, b)]
+    # Reverse CFG: forward edge u->v becomes v->u; `_EXIT` is the entry
+    # and points at every exit block.
+    rsucc: dict[int, list[int]] = {_EXIT: list(exit_blocks)}
+    for b in cfg.blocks:
+        rsucc[b.id] = list(cfg.pred[b.id])
+    rpred: dict[int, list[int]] = {b.id: list(cfg.succ[b.id]) for b in cfg.blocks}
+    for bid in exit_blocks:
+        rpred[bid] = rpred[bid] + [_EXIT]
+
+    # Reverse post-order over the reverse CFG (iterative, to avoid
+    # recursion limits on large routines).
+    order: list[int] = []
+    seen: set[int] = {_EXIT}
+    stack: list[tuple[int, object]] = [(_EXIT, iter(rsucc.get(_EXIT, [])))]
+    while stack:
+        node, it = stack[-1]
+        for nxt in it:  # type: ignore[assignment]
+            if nxt not in seen:
+                seen.add(nxt)
+                stack.append((nxt, iter(rsucc.get(nxt, []))))
+                break
+        else:
+            order.append(node)
+            stack.pop()
+    rpo = list(reversed(order))
+    rank = {n: i for i, n in enumerate(rpo)}
+
+    idom: dict[int, int] = {_EXIT: _EXIT}
+
+    def intersect(a: int, b: int) -> int:
+        while a != b:
+            while rank[a] > rank[b]:
+                a = idom[a]
+            while rank[b] > rank[a]:
+                b = idom[b]
+        return a
+
+    changed = True
+    while changed:
+        changed = False
+        for n in rpo:
+            if n == _EXIT:
+                continue
+            preds = [p for p in rpred.get(n, []) if p in idom]
+            if not preds:
+                continue
+            new = preds[0]
+            for p in preds[1:]:
+                new = intersect(p, new)
+            if idom.get(n) != new:
+                idom[n] = new
+                changed = True
+
+    return {b: d for b, d in idom.items() if b != _EXIT}
+
+
 def _emit_block(
     cfg: CFG,
     bid: int | None,
@@ -398,6 +495,7 @@ def _emit_block(
     loops: dict[int, SimpleLoop],
     loop_blocks: set[int],
     active_loop_tail: int | None,
+    ipostdoms: dict[int, int],
 ) -> Block:
     """Recursively emit IR3 stmts for block `bid` up to (but not
     including) `exit_id`. `exit_id=None` means "emit until the
@@ -427,7 +525,7 @@ def _emit_block(
         ):
             loop = loops[bid]
             loop_body = _emit_loop_body(
-                cfg, loop, visiting, loops, loop_blocks,
+                cfg, loop, visiting, loops, loop_blocks, ipostdoms,
             )
             stmts.append(LoopStmt(body=loop_body, src=cfg.blocks[bid].terminator.src))
             bid = loop.exit_block
@@ -475,18 +573,61 @@ def _emit_block(
             taken_label = t.target
             taken_id = cfg.label_to_block.get(taken_label)
             ft_id = bid + 1 if bid + 1 < len(cfg.blocks) else None
+            is_loop_continue = (
+                taken_id is not None
+                and active_loop_tail is not None
+                and taken_id == _loop_for_tail(loops, active_loop_tail).header
+            )
+
+            # Merge optimization: when both arms reconverge at a block
+            # `M` *after* the fall-through (the immediate post-dominator),
+            # emit each arm only up to `M` and the shared continuation
+            # once. Without this, the taken arm re-inlines the whole tail
+            # (exit_id=ft_id is never hit), which compounds exponentially
+            # across nested conditionals. The `M == ft_id` case is the
+            # plain `if cond { taken } <fall-through>` shape handled below.
+            merge = ipostdoms.get(bid)
+            if (
+                taken_id is not None
+                and not is_loop_continue
+                and ft_id is not None
+                and merge is not None
+                and merge != _EXIT
+                and merge != ft_id
+                and merge > bid
+            ):
+                then_stmts = list(_emit_block(
+                    cfg, taken_id, exit_id=merge, visiting=visiting,
+                    loops=loops, loop_blocks=loop_blocks,
+                    active_loop_tail=active_loop_tail, ipostdoms=ipostdoms,
+                ).stmts)
+                else_stmts = list(_emit_block(
+                    cfg, ft_id, exit_id=merge, visiting=visiting,
+                    loops=loops, loop_blocks=loop_blocks,
+                    active_loop_tail=active_loop_tail, ipostdoms=ipostdoms,
+                ).stmts)
+                node_cls = IfStmt if isinstance(t, If) else RawIfStmt
+                stmts.append(node_cls(
+                    cond=t.cond,
+                    then_block=Block.of(then_stmts),
+                    else_block=Block.of(else_stmts) if else_stmts else None,
+                    src=t.src,
+                ))
+                visiting.discard(bid)
+                bid = merge
+                continue
 
             then_stmts: list[Stmt]
             if taken_id is None:
                 then_stmts = [TailCallStmt(target=taken_label, src=t.src)]
-            elif active_loop_tail is not None and taken_id == _loop_for_tail(loops, active_loop_tail).header:
+            elif is_loop_continue:
                 # Conditional back-edge inside a loop body → continue.
                 then_stmts = [ContinueStmt(src=t.src)]
             else:
                 then_stmts = list(_emit_block(
                     cfg, taken_id, exit_id=ft_id, visiting=visiting,
                     loops=loops, loop_blocks=loop_blocks,
-                    active_loop_tail=active_loop_tail,
+                    active_loop_tail=active_loop_tail, ipostdoms=ipostdoms,
                 ).stmts)
 
             if isinstance(t, If):
@@ -529,6 +670,7 @@ def _emit_loop_body(
     visiting: set[int],
     loops: dict[int, SimpleLoop],
     loop_blocks: set[int],
+    ipostdoms: dict[int, int],
 ) -> Block:
     """Emit the body of a `LoopStmt` for the simple do-while `loop`.
 
@@ -556,7 +698,7 @@ def _emit_loop_body(
         exit_id=loop.tail,
         visiting=visiting_inner,
         loops=loops, loop_blocks=loop_blocks,
-        active_loop_tail=loop.tail,
+        active_loop_tail=loop.tail, ipostdoms=ipostdoms,
     )
     body_stmts.extend(head_body.stmts)
 

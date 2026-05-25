@@ -522,3 +522,89 @@ def test_relooper_preserves_every_checkfloor_path(source_dir):
             f"IR3 differs from IR2 for action={action} posn={posn}: "
             f"ir2={touched2} ir3={touched3}"
         )
+
+
+# --------------------------------------------------------------- merge dedup
+
+
+def _flatten(stmts):
+    """Yield every statement in `stmts`, descending into if/loop bodies."""
+    for s in stmts:
+        yield s
+        for attr in ("then_block", "else_block", "body"):
+            blk = getattr(s, attr, None)
+            if blk is not None:
+                yield from _flatten(blk.stmts)
+
+
+def _diamond_module():
+    """A diamond: `if a == 1` taken→A, fall-through→B, both reconverging
+    at a shared tail T. The relooper's post-dominator merge should emit
+    T exactly once (in the continuation after an `if/else`), not inline
+    it into both arms."""
+    from pop_lifter.ir1 import Compare, Goto, Label
+    from pop_lifter.ir1 import If as IR1If
+
+    src = SourceRef(file="syn", line=0, raw="")
+    M10 = Abs(name="m10", addr=0x10)
+    M11 = Abs(name="m11", addr=0x11)
+
+    def store(val, target):
+        return [
+            LoadImm(reg=Reg.A, imm=Imm(value=val, text=f"#{val}"), src=src),
+            StoreAbs(reg=Reg.A, target=target, src=src),
+        ]
+
+    body = [
+        LoadImm(reg=Reg.A, imm=Imm(value=1, text="#1"), src=src),
+        IR1If(cond=Compare(reg=Reg.A, op="==", rhs=Imm(value=1, text="#1")),
+              target=":taken", src=src),
+        # fall-through arm B
+        *store(0xB1, M10),
+        Goto(target=":merge", kind="local", src=src),
+        Label(name=":taken", src=src),
+        *store(0xA1, M10),
+        # implicit fall-through into :merge
+        Label(name=":merge", src=src),
+        *store(0xCC, M11),       # shared tail — must appear once
+        Return(src=src),
+    ]
+    return ModuleIR1(name="SYN", file="syn", routines=[Routine(name="diamond", body=body)])
+
+
+def test_postdom_merge_emits_shared_tail_once():
+    mod = _diamond_module()
+    ir2 = structure_module(mod)
+    ir3 = reloop_module(ir2)
+    diamond = ir3.find("diamond")
+
+    # The conditional must structure with a real else-block (the merge
+    # optimization fired) rather than inlining the continuation.
+    ifs = [s for s in diamond.body.stmts if isinstance(s, IfStmt)]
+    assert ifs and ifs[0].else_block is not None, (
+        "expected an if/else from the post-dominator merge"
+    )
+
+    # The shared tail store (mem[0x11] = #0xCC) must be emitted exactly
+    # once, not duplicated into both arms.
+    tail = [
+        s for s in _flatten(diamond.body.stmts)
+        if isinstance(s, RawStmt) and isinstance(s.item, StoreAbs)
+        and s.item.target.addr == 0x11
+    ]
+    assert len(tail) == 1, f"shared tail emitted {len(tail)} times, expected 1"
+
+
+def test_postdom_merge_preserves_behaviour():
+    mod = _diamond_module()
+    ir2 = structure_module(mod)
+    ir3 = reloop_module(ir2)
+
+    ram2 = bytearray(0x10000)
+    ir1_run([ir2], "diamond", ram=ram2)
+    ram3 = bytearray(0x10000)
+    ir3_run([ir3], "diamond", ram=ram3)
+
+    # a == 1, so the taken arm runs: mem[0x10]=0xA1; shared tail mem[0x11]=0xCC.
+    assert (ram3[0x10], ram3[0x11]) == (0xA1, 0xCC)
+    assert ram2[0x10:0x12] == ram3[0x10:0x12]
