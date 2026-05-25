@@ -76,7 +76,7 @@ impl Cpu {
         // raw: patch *:sm+1 = a            ; SOUND.S:134
         self.a = self.ram[sym::lookup + 1 + self.x as usize];
         // raw: patch *:sm+2 = a            ; SOUND.S:136
-        self.$ffff();
+        self._24ffff();
         return;
     }
 

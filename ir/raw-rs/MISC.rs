@@ -785,7 +785,7 @@ impl Cpu {
                     self.z = (self.a == _o) as u8;
                     self.n = self.a.wrapping_sub(_o) >> 7;
                     if self.a != 0x0c {
-                        self.]safe();
+                        self._5dsafe();
                         return;
                     } else {
                         pc = 3;
@@ -794,7 +794,7 @@ impl Cpu {
                 3 => {
                     self.a = self.ram[sym::KidPosn];
                     if self.a == 0x00 {
-                        self.]safe();
+                        self._5dsafe();
                         return;
                     } else {
                         pc = 4;
@@ -817,7 +817,7 @@ impl Cpu {
                     self.z = (self.a == _o) as u8;
                     self.n = self.a.wrapping_sub(_o) >> 7;
                     if self.a < 0xe5 {
-                        self.]safe();
+                        self._5dsafe();
                         return;
                     } else {
                         pc = 6;
@@ -830,7 +830,7 @@ impl Cpu {
                     self.z = (self.a == _o) as u8;
                     self.n = self.a.wrapping_sub(_o) >> 7;
                     if self.a == 0x56 {
-                        self.]safe();
+                        self._5dsafe();
                         return;
                     } else {
                         pc = 7;
@@ -840,7 +840,7 @@ impl Cpu {
                     self.a = self.ram[sym::KidLife];
                     self.a &= self.ram[sym::ShadLife];
                     if (self.a as i8) >= 0 {
-                        self.]safe();
+                        self._5dsafe();
                         return;
                     } else {
                         pc = 8;
@@ -853,7 +853,7 @@ impl Cpu {
                     self.z = (self.a == _o) as u8;
                     self.n = self.a.wrapping_sub(_o) >> 7;
                     if self.a != self.ram[sym::ShadScrn] {
-                        self.]safe();
+                        self._5dsafe();
                         return;
                     } else {
                         pc = 9;
@@ -866,7 +866,7 @@ impl Cpu {
                     self.z = (self.a == _o) as u8;
                     self.n = self.a.wrapping_sub(_o) >> 7;
                     if self.a != self.ram[sym::ShadBlockY] {
-                        self.]safe();
+                        self._5dsafe();
                         return;
                     } else {
                         pc = 10;
@@ -917,7 +917,7 @@ impl Cpu {
                 }
                 12 => {
                     self.a = self.ram[0x00f0];
-                    self.:rdblock();
+                    self._3ardblock();
                     let _o: u8 = 0x12;
                     self.c = (self.a >= _o) as u8;
                     self.z = (self.a == _o) as u8;
@@ -939,7 +939,7 @@ impl Cpu {
                 }
                 14 => {
                     self.a = self.ram[0x00f1];
-                    self.:rdblock();
+                    self._3ardblock();
                     let _o: u8 = 0x04;
                     self.c = (self.a >= _o) as u8;
                     self.z = (self.a == _o) as u8;
@@ -994,7 +994,7 @@ impl Cpu {
                     }
                 }
                 20 => {
-                    self.:rdblock();
+                    self._3ardblock();
                     let _o: u8 = 0x14;
                     self.c = (self.a >= _o) as u8;
                     self.z = (self.a == _o) as u8;
@@ -1207,7 +1207,7 @@ impl Cpu {
         }
     }
 
-    fn :rdblock(&mut self) {
+    fn _3ardblock(&mut self) {
         self.getblockxp();
         self.x = self.a;
         self.y = self.ram[sym::KidBlockY];

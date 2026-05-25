@@ -531,7 +531,7 @@ impl Cpu {
         }
         self.a = self.ram[sym::YScrPos];
         if self.a < 0xc0 {
-            self.:Loop();
+            self.ExpandClm();
             return;
         }
         return;
@@ -635,7 +635,7 @@ impl Cpu {
             match pc {
                 0 => {
                     self.ram[sym::PAGE2off] = self.a;
-                    self.]DE();
+                    self._5dDE();
                     return;
                 }
                 _ => unreachable!(),

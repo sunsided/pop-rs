@@ -965,7 +965,7 @@ impl Cpu {
     fn drawfrnt(&mut self) {
         self.x = self.ram[sym::PRECED];
         if self.x == 0x04 {
-            self.DrawGateBF?();
+            self.DrawGateBF_3f();
         }
         self.x = self.ram[sym::objid];
         if self.x != 0x12 {
@@ -1034,7 +1034,7 @@ impl Cpu {
         return;
     }
 
-    fn DrawGateBF?(&mut self) {
+    fn DrawGateBF_3f(&mut self) {
         self.a = self.ram[sym::rowno];
         if self.a != self.ram[sym::KidBlockY] {
             return;
@@ -1262,7 +1262,7 @@ impl Cpu {
                             } else {
                                 self.a = self.ram[sym::pieceb + self.x as usize];
                                 if self.a == 0x00 {
-                                    self.:stripe();
+                                    self._3astripe();
                                     return;
                                 }
                                 let _o: u8 = 0x9e;
@@ -1283,14 +1283,14 @@ impl Cpu {
                                         return;
                                     }
                                 } else {
-                                    self.:cont1();
+                                    self._3acont1();
                                     self.a = 0x00;
                                     let _o: u8 = 0x02;
                                     self.c = (self.a >= _o) as u8;
                                     self.z = (self.a == _o) as u8;
                                     self.n = self.a.wrapping_sub(_o) >> 7;
                                     if self.a == 0x02 {
-                                        self.:stripe();
+                                        self._3astripe();
                                         return;
                                     }
                                     self.a = self.ram[sym::BGset1];
@@ -1642,16 +1642,16 @@ impl Cpu {
                         if self.x != 0x10 {
                             self.a = self.ram[sym::BGset1];
                             if self.a != 0x01 {
-                                self.]drawflr();
+                                self._5ddrawflr();
                                 return;
                             }
                             if self.x != 0x03 {
                                 if self.x != 0x19 {
-                                    self.]drawflr();
+                                    self._5ddrawflr();
                                     return;
                                 }
                             }
-                            self.:sub();
+                            self._3asub();
                             self.a = 0x0e;
                             if self.a != 0x00 {
                                 break 'b10;
@@ -1660,7 +1660,7 @@ impl Cpu {
                     }
                 }
             }
-            self.:sub();
+            self._3asub();
             self.a = 0x12;
         }
         self.ram[sym::IMAGE] = self.a;
@@ -1720,7 +1720,7 @@ impl Cpu {
                 }
                 4 => {
                     self.a = 0x03;
-                    self.]wipe();
+                    self._5dwipe();
                     return;
                 }
                 5 => {
@@ -2577,7 +2577,7 @@ impl Cpu {
                 5 => {
                     self.a = self.ram[sym::switches];
                     if self.a != 0x00 {
-                        self.:newpass();
+                        self.sortlist();
                         return;
                     } else {
                         pc = 6;
@@ -2777,7 +2777,7 @@ impl Cpu {
         return;
     }
 
-    fn :cont1(&mut self) {
+    fn _3acont1(&mut self) {
         self.ram[sym::IMAGE] = self.a;
         self.ram[sym::XCO] = self.ram[sym::blockxco];
         self.a = self.ram[sym::Dy];
@@ -2802,7 +2802,7 @@ impl Cpu {
         return;
     }
 
-    fn :sub(&mut self) {
+    fn _3asub(&mut self) {
         self.ram[sym::IMAGE] = 0x11;
         self.ram[sym::XCO] = self.ram[sym::blockxco];
         self.ram[sym::YCO] = self.ram[sym::Ay];

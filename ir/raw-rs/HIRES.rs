@@ -137,7 +137,7 @@ impl Cpu {
             match pc {
                 0 => {
                     self.auxmem();
-                    self.]copyscrn();
+                    self._5dcopyscrn();
                     return;
                 }
                 _ => unreachable!(),
@@ -152,7 +152,7 @@ impl Cpu {
                 0 => {
                     self.ram[0xc002] = self.a;
                     self.ram[0xc005] = self.a;
-                    self.]copyscrn();
+                    self._5dcopyscrn();
                     return;
                 }
                 _ => unreachable!(),
@@ -167,7 +167,7 @@ impl Cpu {
                 0 => {
                     self.ram[0xc003] = self.a;
                     self.ram[0xc004] = self.a;
-                    self.]copyscrn();
+                    self._5dcopyscrn();
                     return;
                 }
                 _ => unreachable!(),
@@ -1389,7 +1389,7 @@ impl Cpu {
                     self.PREPREP();
                     self.CROP();
                     if self.n != 0 {
-                        self.]done();
+                        self._5ddone();
                         return;
                     } else {
                         pc = 1;
@@ -3022,7 +3022,7 @@ impl Cpu {
                 0 => {
                     self.a = 0x03;
                     if self.a != 0x00 {
-                        self.]setfast();
+                        self._5dsetfast();
                         return;
                     } else {
                         pc = 1;

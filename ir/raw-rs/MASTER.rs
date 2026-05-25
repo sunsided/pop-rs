@@ -68,7 +68,7 @@ impl Cpu {
         self.initsystem();
         self.ram[sym::invert] = 0x00;
         self.ram[sym::soundon] = 0x01;
-        self.AttractLoop();
+        self.ATTRACTMODE();
         return;
     }
 
@@ -91,7 +91,7 @@ impl Cpu {
                     self.a = 0x14;
                     self.ram[sym::track] = self.a;
                     self.rw18();
-                    self.]mm();
+                    self._5dmm();
                     return;
                 }
                 _ => unreachable!(),
@@ -327,7 +327,7 @@ impl Cpu {
         }
         self.driveoff();
         self.setmain();
-        self.$c00();
+        self._24c00();
         return;
     }
 
@@ -677,7 +677,7 @@ impl Cpu {
         self.a = 0xff;
         self.pauseNI();
         self.fadeout();
-        self.*();
+        self._2a();
         return;
     }
 
@@ -729,7 +729,7 @@ impl Cpu {
                     self.a = _r as u8;
                     self.c = (_r >> 8) as u8;
                     if self.a != 0x00 {
-                        self.:loop();
+                        self.pauseNI();
                         return;
                     } else {
                         pc = 5;
@@ -743,7 +743,7 @@ impl Cpu {
         }
     }
 
-    fn StartGame?(&mut self) {
+    fn StartGame_3f(&mut self) {
         self.musickeys();
         if self.a < 0x80 {
             return;
@@ -769,7 +769,7 @@ impl Cpu {
     }
 
     // aliases: DOSTARTGAME
-    fn :3(&mut self) {
+    fn _3a3(&mut self) {
         self.blackout();
         self.LoadStage3();
         self.set1stlevel();
@@ -820,7 +820,7 @@ impl Cpu {
     fn LoadStage1A(&mut self) {
         self.driveon();
         self.a = 0x16;
-        self.]lsub();
+        self._5dlsub();
         self.setmain();
         self.rw18();
         self.rw18();
@@ -844,7 +844,7 @@ impl Cpu {
             return;
         }
         self.a = 0x12;
-        self.]lsub();
+        self._5dlsub();
         self.driveoff();
         return;
     }
@@ -1025,7 +1025,7 @@ impl Cpu {
                     self.driveon();
                     self.a = 0x18;
                     if self.a != 0x00 {
-                        self.]ls2();
+                        self._5dls2();
                         return;
                     } else {
                         pc = 1;
@@ -1171,7 +1171,7 @@ impl Cpu {
                     pc = 7;
                 }
                 3 => {
-                    self.StartGame?();
+                    self.StartGame_3f();
                     self.xmplay();
                     let _o: u8 = 0x00;
                     self.c = (self.a >= _o) as u8;
@@ -1203,7 +1203,7 @@ impl Cpu {
                     pc = 9;
                 }
                 9 => {
-                    self.StartGame?();
+                    self.StartGame_3f();
                     self.x = self.x.wrapping_sub(1);
                     if self.x != 0x00 {
                         pc = 9;
@@ -1254,7 +1254,7 @@ impl Cpu {
                     pc = 2;
                 }
                 2 => {
-                    self.StartGame?();
+                    self.StartGame_3f();
                     self.x = self.x.wrapping_sub(1);
                     if self.x != 0x00 {
                         pc = 2;
@@ -1277,7 +1277,7 @@ impl Cpu {
                     self.a = _r as u8;
                     self.c = (_r >> 8) as u8;
                     if self.a != 0x00 {
-                        self.:loop();
+                        self.pauseNI();
                         return;
                     } else {
                         pc = 5;
@@ -1298,7 +1298,7 @@ impl Cpu {
         return;
     }
 
-    fn ]lsub(&mut self) {
+    fn _5dlsub(&mut self) {
         let mut pc: u32 = 0;
         loop {
             match pc {

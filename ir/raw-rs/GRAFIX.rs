@@ -670,14 +670,14 @@ impl Cpu {
                     pc = 8;
                 }
                 12 => {
-                    self.:setaddl();
+                    self._3asetaddl();
                     self.layrsave();
                     self.ADDPEEL();
                     self.lay();
                     pc = 8;
                 }
                 13 => {
-                    self.:setaddl();
+                    self._3asetaddl();
                     self.lay();
                     pc = 8;
                 }
@@ -1606,7 +1606,7 @@ impl Cpu {
     }
 
     fn MINIT(&mut self) {
-        self.]bank1in();
+        self._5dbank1in();
         self.CALLMINIT();
         let _o: u8 = self.ram[sym::RWBANK2];
         self.z = ((self.a & _o) == 0) as u8;
@@ -1622,9 +1622,9 @@ impl Cpu {
         loop {
             match pc {
                 0 => {
-                    self.]bank1in();
+                    self._5dbank1in();
                     self.CALLMPLAY();
-                    self.]bank2in();
+                    self._5dbank2in();
                     return;
                 }
                 _ => unreachable!(),
@@ -1703,12 +1703,12 @@ impl Cpu {
         loop {
             match pc {
                 0 => {
-                    self.]bank1in();
+                    self._5dbank1in();
                     self.a = 0xd7;
                     self.x = 0xb7;
                     self.y = 0xc0;
                     self.movemem();
-                    self.]bank2in();
+                    self._5dbank2in();
                     return;
                 }
                 _ => unreachable!(),
@@ -1721,12 +1721,12 @@ impl Cpu {
         loop {
             match pc {
                 0 => {
-                    self.]bank1in();
+                    self._5dbank1in();
                     self.a = 0xd0;
                     self.x = 0xa6;
                     self.y = 0xac;
                     self.movemem();
-                    self.]bank2in();
+                    self._5dbank2in();
                     return;
                 }
                 _ => unreachable!(),
@@ -1739,12 +1739,12 @@ impl Cpu {
         loop {
             match pc {
                 0 => {
-                    self.]bank1in();
+                    self._5dbank1in();
                     self.a = 0xb7;
                     self.x = 0xd7;
                     self.y = 0xe0;
                     self.movemem();
-                    self.]bank2in();
+                    self._5dbank2in();
                     return;
                 }
                 _ => unreachable!(),
@@ -1757,12 +1757,12 @@ impl Cpu {
         loop {
             match pc {
                 0 => {
-                    self.]bank1in();
+                    self._5dbank1in();
                     self.a = 0xa6;
                     self.x = 0xd0;
                     self.y = 0xd6;
                     self.movemem();
-                    self.]bank2in();
+                    self._5dbank2in();
                     return;
                 }
                 _ => unreachable!(),
@@ -1995,7 +1995,7 @@ impl Cpu {
     fn VBLANK(&mut self) {
         self.a = self.ram[0xc019];
         if (self.a as i8) >= 0 {
-            self.:loop1();
+            self.VBLANK();
             return;
         }
         loop {
@@ -2121,7 +2121,7 @@ impl Cpu {
         return;
     }
 
-    fn :setaddl(&mut self) {
+    fn _3asetaddl(&mut self) {
         self.ram[sym::OFFSET] = self.ram[sym::midOFF + self.x as usize];
         self.ram[sym::LEFTCUT] = self.ram[sym::midCL + self.x as usize];
         self.ram[sym::RIGHTCUT] = self.ram[sym::midCR + self.x as usize];
@@ -2131,7 +2131,7 @@ impl Cpu {
         return;
     }
 
-    fn ]bank1in(&mut self) {
+    fn _5dbank1in(&mut self) {
         let _o: u8 = self.ram[sym::RWBANK1];
         self.z = ((self.a & _o) == 0) as u8;
         self.n = _o >> 7;

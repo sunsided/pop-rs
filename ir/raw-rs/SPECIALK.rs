@@ -358,7 +358,7 @@ impl Cpu {
                 self.z = (self.a == _o) as u8;
                 self.n = self.a.wrapping_sub(_o) >> 7;
                 if self.a != 0x01 {
-                    self.:1b();
+                    self._3a1b();
                     return;
                 }
                 self.restart();
@@ -883,7 +883,7 @@ impl Cpu {
                     pc = 1;
                 }
                 1 => {
-                    self.:sub();
+                    self._3asub();
                     self.x = self.ram[0x00f0];
                     let _o: u8 = 0x08;
                     self.c = (self.x >= _o) as u8;
@@ -1031,7 +1031,7 @@ impl Cpu {
         // raw: patch *:sm1+1 = a            ; SPECIALK.S:1179
         self.a = 0x04;
         // raw: patch *:sm2+1 = a            ; SPECIALK.S:1181
-        self.:sub();
+        self._3asub();
         self.ram[sym::MinLeft] = self.y;
         let _o: u8 = 0x02;
         self.c = (self.y >= _o) as u8;
@@ -1046,7 +1046,7 @@ impl Cpu {
         // raw: patch *:sm1+1 = a            ; SPECIALK.S:1195
         self.a = 0x00;
         // raw: patch *:sm2+1 = a            ; SPECIALK.S:1197
-        self.:sub();
+        self._3asub();
         self.ram[sym::SecLeft] = self.y;
         return;
     }
@@ -1371,7 +1371,7 @@ impl Cpu {
         return;
     }
 
-    fn :sub(&mut self) {
+    fn _3asub(&mut self) {
         let mut pc: u32 = 0;
         loop {
             match pc {

@@ -123,7 +123,7 @@ impl Cpu {
                 self.x = 0x07;
                 loop {
                     self.ram[sym::tempblockx] = self.x;
-                    self.:trigloose();
+                    self._3atrigloose();
                     self.x = self.ram[sym::tempblockx];
                     self.x = self.x.wrapping_sub(1);
                     let _o: u8 = 0x02;
@@ -147,7 +147,7 @@ impl Cpu {
                     self.x = 0x07;
                     loop {
                         self.ram[sym::tempblockx] = self.x;
-                        self.:trigloose();
+                        self._3atrigloose();
                         self.x = self.ram[sym::tempblockx];
                         self.x = self.x.wrapping_sub(1);
                         let _o: u8 = 0x02;
@@ -294,7 +294,7 @@ impl Cpu {
         self.a = _r as u8;
         self.c = (_r >> 8) as u8;
         if self.a != 0x00 {
-            self.:outer();
+            self.PAUSE();
             return;
         }
         return;
@@ -527,7 +527,7 @@ impl Cpu {
         self.a = 0x14;
         self.play();
         self.a = 0x6b;
-        self.mjumpseq();
+        self.kjumpseq();
         self.a = 0x14;
         self.play();
         self.a = 0x6f;
@@ -555,7 +555,7 @@ impl Cpu {
         self.a = 0x09;
         self.play();
         self.a = 0x72;
-        self.mjumpseq();
+        self.kjumpseq();
         self.a = 0x3a;
         self.play();
         return;
@@ -578,7 +578,7 @@ impl Cpu {
         self.a = 0x05;
         self.play();
         self.a = 0x0d;
-        self.vjumpseq();
+        self.kjumpseq();
         self.a = 0x02;
         self.play();
         self.ram[sym::KidPosn] = 0x00;
@@ -591,7 +591,7 @@ impl Cpu {
         self.a = 0x0c;
         self.play();
         self.a = 0x65;
-        self.mjumpseq();
+        self.kjumpseq();
         self.a = 0x1e;
         self.play();
         return;
@@ -690,11 +690,11 @@ impl Cpu {
         self.a = 0x05;
         self.play();
         self.a = 0x60;
-        self.vjumpseq();
+        self.kjumpseq();
         self.a = 0x06;
         self.play();
         self.a = 0x61;
-        self.vjumpseq();
+        self.kjumpseq();
         self.a = 0x04;
         self.play();
         self.a = 0x09;
@@ -703,18 +703,18 @@ impl Cpu {
         self.a = 0x04;
         self.play();
         self.a = 0x60;
-        self.vjumpseq();
+        self.kjumpseq();
         self.a = 0x1e;
         self.play();
         self.a = 0x61;
-        self.vjumpseq();
+        self.kjumpseq();
         self.a = 0x04;
         self.play();
         self.a = 0x0a;
         self.x = 0x19;
         self.PlaySongI();
         self.a = 0x66;
-        self.vjumpseq();
+        self.kjumpseq();
         self.a = 0x01;
         self.play();
         self.a = 0x63;
@@ -734,7 +734,7 @@ impl Cpu {
         self.PlaySongI();
         self.ram[sym::SPEED] = 0x07;
         self.a = 0x64;
-        self.vjumpseq();
+        self.kjumpseq();
         self.a = 0x11;
         self.play();
         self.x = 0x01;
@@ -1839,7 +1839,7 @@ impl Cpu {
         return;
     }
 
-    fn :trigloose(&mut self) {
+    fn _3atrigloose(&mut self) {
         self.rdblock1();
         if self.a != 0x0b {
             return;

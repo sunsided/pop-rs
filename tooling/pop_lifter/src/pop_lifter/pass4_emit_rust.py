@@ -151,6 +151,57 @@ _LOWERED_TYPES = (
 )
 
 
+# ------------------------------------------------------------- method names
+
+
+_RUST_IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def _mangle(name: str) -> str:
+    """Map a 6502 routine/alias name to a valid Rust method identifier.
+
+    Names that are already valid identifiers pass through unchanged (the
+    common case), so existing output is untouched. Otherwise every
+    non-identifier byte — the Merlin `:local` / `]macro-local` sigils,
+    `$addr` call targets, `*`, `?` — is escaped as `_<hex>`. The escape is
+    injective, so two distinct names never collide, and a leading digit is
+    prefixed with `_`."""
+    if _RUST_IDENT.fullmatch(name):
+        return name
+    out: list[str] = []
+    for ch in name:
+        if ch.isascii() and (ch.isalnum() or ch == "_"):
+            out.append(ch)
+        else:
+            out.append(f"_{ord(ch):02x}")
+    s = "".join(out) or "_"
+    if s[0].isdigit():
+        s = "_" + s
+    return s
+
+
+def _build_name_table(modules: list[ModuleIR3]) -> dict[str, str]:
+    """Map every routine name *and entry alias* to that routine's
+    canonical name, across all modules being emitted together. Call
+    targets resolve through this so a `jsr`/`jmp` to an alias (e.g. the
+    Merlin local `:next`, an alias of `ANIMCHAR`) emits the canonical
+    method instead of an undefined alias method."""
+    table: dict[str, str] = {}
+    for module in modules:
+        for r in module.routines:
+            table.setdefault(r.name, r.name)
+            for alias in r.entry_aliases:
+                table.setdefault(alias, r.name)
+    return table
+
+
+def _method_name(target: str, names: dict[str, str] | None) -> str:
+    """Resolve a call target to its canonical routine name (if known)
+    then mangle it to a valid Rust method identifier."""
+    canonical = names.get(target, target) if names else target
+    return _mangle(canonical)
+
+
 # ---------------------------------------------------------------- values
 
 
@@ -617,7 +668,12 @@ def _emit_wide16(stmt: Wide16Stmt, syms: SymTable | None) -> list[str]:
 # ---------------------------------------------------------------- statements
 
 
-def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
+def _emit_stmt(
+    stmt,
+    indent: int,
+    syms: SymTable | None = None,
+    names: dict[str, str] | None = None,
+) -> list[str]:
     pad = INDENT * indent
 
     if isinstance(stmt, Assign):
@@ -635,7 +691,7 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
     if isinstance(stmt, LabeledBlock):
         lines = [f"{pad}{stmt.label}: {{"]
         for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms))
+            lines.extend(_emit_stmt(s, indent + 1, syms, names))
         lines.append(f"{pad}}}")
         return lines
 
@@ -647,10 +703,11 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
         return [f"{pad}continue;"]
 
     if isinstance(stmt, CallStmt):
-        return [f"{pad}self.{stmt.target}();"]
+        return [f"{pad}self.{_method_name(stmt.target, names)}();"]
 
     if isinstance(stmt, TailCallStmt):
-        return [f"{pad}self.{stmt.target}();", f"{pad}return;"]
+        method = _method_name(stmt.target, names)
+        return [f"{pad}self.{method}();", f"{pad}return;"]
 
     if isinstance(stmt, SaveTemp):
         return [f"{pad}let tmp{stmt.slot} = self.a;"]
@@ -661,29 +718,29 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
     if isinstance(stmt, IfStmt):
         lines = [f"{pad}if {_emit_compare(stmt.cond, syms)} {{"]
         for s in stmt.then_block.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms))
+            lines.extend(_emit_stmt(s, indent + 1, syms, names))
         if stmt.else_block is not None:
             lines.append(f"{pad}}} else {{")
             for s in stmt.else_block.stmts:
-                lines.extend(_emit_stmt(s, indent + 1, syms))
+                lines.extend(_emit_stmt(s, indent + 1, syms, names))
         lines.append(f"{pad}}}")
         return lines
 
     if isinstance(stmt, RawIfStmt):
         lines = [f"{pad}if {_emit_branch_cond(stmt.cond)} {{"]
         for s in stmt.then_block.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms))
+            lines.extend(_emit_stmt(s, indent + 1, syms, names))
         if stmt.else_block is not None:
             lines.append(f"{pad}}} else {{")
             for s in stmt.else_block.stmts:
-                lines.extend(_emit_stmt(s, indent + 1, syms))
+                lines.extend(_emit_stmt(s, indent + 1, syms, names))
         lines.append(f"{pad}}}")
         return lines
 
     if isinstance(stmt, LoopStmt):
         lines = [f"{pad}loop {{"]
         for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms))
+            lines.extend(_emit_stmt(s, indent + 1, syms, names))
         lines.append(f"{pad}}}")
         return lines
 
@@ -692,7 +749,7 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
         inner = INDENT * (indent + 1)
         lines = [f"{pad}loop {{"]
         for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms))
+            lines.extend(_emit_stmt(s, indent + 1, syms, names))
         lines += [
             f"{inner}if !({cond}) {{",
             f"{inner}    break;",
@@ -711,7 +768,7 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
             f"{pad}loop {{",
         ]
         for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms))
+            lines.extend(_emit_stmt(s, indent + 1, syms, names))
         lines += [
             f"{inner}self.{stmt.var} = self.{stmt.var}.{step_method}({step_lit});",
             f"{inner}if !({cond}) {{",
@@ -730,7 +787,7 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
             f"{pad}for _ in 0..{stmt.count}usize {{",
         ]
         for s in stmt.body.stmts:
-            lines.extend(_emit_stmt(s, indent + 1, syms))
+            lines.extend(_emit_stmt(s, indent + 1, syms, names))
         lines += [
             f"{inner}self.{stmt.var} = self.{stmt.var}.{step_method}({step_lit});",
             f"{pad}}}",
@@ -743,7 +800,7 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
             vals = " | ".join(f"0x{v.value & 0xff:02x}" for v in arm.values)
             lines.append(f"{pad}    {vals} => {{")
             for s in arm.body.stmts:
-                lines.extend(_emit_stmt(s, indent + 2, syms))
+                lines.extend(_emit_stmt(s, indent + 2, syms, names))
             lines.append(f"{pad}    }}")
         lines += [f"{pad}    _ => {{}}", f"{pad}}}"]
         return lines
@@ -761,7 +818,7 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
         for arm in stmt.arms:
             lines.append(f"{inner}{INDENT}{arm.state} => {{")
             for s in arm.body.stmts:
-                lines.extend(_emit_stmt(s, indent + 3, syms))
+                lines.extend(_emit_stmt(s, indent + 3, syms, names))
             lines.append(f"{inner}{INDENT}}}")
         lines += [
             f"{inner}{INDENT}_ => unreachable!(),",
@@ -783,14 +840,19 @@ def _emit_stmt(stmt, indent: int, syms: SymTable | None = None) -> list[str]:
 # ---------------------------------------------------------------- routines / module
 
 
-def emit_routine(routine: RoutineIR3, indent: int = 1, syms: SymTable | None = None) -> list[str]:
+def emit_routine(
+    routine: RoutineIR3,
+    indent: int = 1,
+    syms: SymTable | None = None,
+    names: dict[str, str] | None = None,
+) -> list[str]:
     pad = INDENT * indent
     lines: list[str] = []
     if routine.entry_aliases:
         lines.append(f"{pad}// aliases: {', '.join(routine.entry_aliases)}")
-    lines.append(f"{pad}fn {routine.name}(&mut self) {{")
+    lines.append(f"{pad}fn {_mangle(routine.name)}(&mut self) {{")
     for s in routine.body.stmts:
-        lines.extend(_emit_stmt(s, indent + 1, syms))
+        lines.extend(_emit_stmt(s, indent + 1, syms, names))
     lines.append(f"{pad}}}")
     return lines
 
@@ -820,12 +882,14 @@ def _record_syms(module: ModuleIR3, syms: SymTable) -> None:
         emit_routine(routine, indent=1, syms=syms)
 
 
-def _emit_impl_block(module: ModuleIR3, syms: SymTable) -> list[str]:
+def _emit_impl_block(
+    module: ModuleIR3, syms: SymTable, names: dict[str, str] | None = None
+) -> list[str]:
     lines = ["impl Cpu {"]
     for i, routine in enumerate(module.routines):
         if i:
             lines.append("")
-        lines.extend(emit_routine(routine, indent=1, syms=syms))
+        lines.extend(emit_routine(routine, indent=1, syms=syms, names=names))
     lines.append("}")
     return lines
 
@@ -860,6 +924,9 @@ def emit_modules(modules: list[ModuleIR3]) -> str:
         _record_syms(module, syms)
     syms.finalize()
 
+    # Resolve call targets (incl. entry aliases) to canonical method names.
+    names = _build_name_table(modules)
+
     lines = [*_HEADER, "//"]
     for module in modules:
         lines.append(f"// source: {_portable_path(module.file)}")
@@ -873,7 +940,7 @@ def emit_modules(modules: list[ModuleIR3]) -> str:
     for i, module in enumerate(modules):
         if i:
             lines.append("")
-        lines.extend(_emit_impl_block(module, syms))
+        lines.extend(_emit_impl_block(module, syms, names))
     return "\n".join(lines) + "\n"
 
 

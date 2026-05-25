@@ -280,7 +280,7 @@ impl Cpu {
         self.ram[(self.ram[sym::BlueSpec] as usize | (self.ram[sym::BlueSpec + 1] as usize) << 8) + self.y as usize] = self.a;
         self.x = 0xff;
         if (self.x as i8) < 0 {
-            self.]cont();
+            self._5dcont();
             return;
         }
         self.a = self.ram[(self.ram[sym::BlueSpec] as usize | (self.ram[sym::BlueSpec + 1] as usize) << 8) + self.y as usize];
@@ -580,7 +580,7 @@ impl Cpu {
         self.ram[sym::linkindex] = self.ram[sym::linkindex].wrapping_add(1);
         self.getlastflag();
         if self.z != 0 {
-            self.:loop();
+            self.trigger();
             return;
         }
         return;
@@ -1279,14 +1279,14 @@ impl Cpu {
         self.GETFLASKFRAME();
         self.a |= self.ram[sym::temp1];
         self.ram[sym::state] = self.a;
-        self.redflask();
+        self.redsword();
         return;
     }
 
     fn animsword(&mut self) {
         self.a = self.ram[sym::trscrn];
         if self.a != self.ram[sym::VisScrn] {
-            self.]purge();
+            self._5dpurge();
             return;
         }
         self.ram[sym::state] = self.ram[sym::state].wrapping_sub(1);
@@ -1312,13 +1312,13 @@ impl Cpu {
         }
         self.a = self.ram[sym::trscrn];
         if self.a != self.ram[sym::VisScrn] {
-            self.]purge();
+            self._5dpurge();
             return;
         }
         self.a = self.ram[sym::state];
         self.GETFLAMEFRAME();
         self.ram[sym::state] = self.a;
-        self.redtorch();
+        self.redexit();
         return;
     }
 
@@ -1547,7 +1547,7 @@ impl Cpu {
     fn check(&mut self) {
         self.a = self.ram[sym::trscrn];
         if self.a != self.ram[sym::VisScrn] {
-            self.]above();
+            self._5dabove();
             return;
         }
         self.y = self.ram[sym::trloc];
@@ -1558,7 +1558,7 @@ impl Cpu {
         self.a = self.ram[sym::trscrn];
         if self.a != self.ram[sym::VisScrn] {
             if self.a != self.ram[sym::scrnRight] {
-                self.]above();
+                self._5dabove();
                 return;
             }
             self.y = self.ram[sym::trloc];
@@ -1578,15 +1578,15 @@ impl Cpu {
         }
         match self.y {
             0x00 => {
-                self.]no();
+                self._5dno();
                 return;
             }
             0x0a => {
-                self.]no();
+                self._5dno();
                 return;
             }
             0x14 => {
-                self.]no();
+                self._5dno();
                 return;
             }
             _ => {}
@@ -1600,7 +1600,7 @@ impl Cpu {
             self.a = self.ram[sym::trscrn];
             if self.a != self.ram[sym::VisScrn] {
                 if self.a != self.ram[sym::scrnLeft] {
-                    self.]above();
+                    self._5dabove();
                     return;
                 }
                 self.y = self.ram[sym::trloc];
@@ -1643,7 +1643,7 @@ impl Cpu {
                     }
                     self.y = self.ram[sym::trloc];
                     if self.y != 0x09 {
-                        self.]no();
+                        self._5dno();
                         return;
                     }
                     self.y = 0x14;
@@ -1651,7 +1651,7 @@ impl Cpu {
                 }
                 self.y = self.ram[sym::trloc];
                 if self.y >= 0x09 {
-                    self.]no();
+                    self._5dno();
                     return;
                 }
                 self.a = self.y;
@@ -1669,7 +1669,7 @@ impl Cpu {
             }
             if self.y != 0x13 {
                 if self.y != 0x1d {
-                    self.]no();
+                    self._5dno();
                     return;
                 }
             }
@@ -1688,11 +1688,11 @@ impl Cpu {
         }
         match self.y {
             0x13 => {
-                self.]no();
+                self._5dno();
                 return;
             }
             0x1d => {
-                self.]no();
+                self._5dno();
                 return;
             }
             _ => {}

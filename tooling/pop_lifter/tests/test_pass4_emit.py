@@ -91,6 +91,7 @@ from pop_lifter.pass4_emit_rust import (
     _emit_compare,
     _emit_stmt,
     _emit_value,
+    _mangle,
     emit_module,
     emit_modules,
     emit_routine,
@@ -254,6 +255,40 @@ def test_call_stmt_lowered():
 def test_tail_call_stmt_lowered():
     lines = _emit_stmt(TailCallStmt(target="jump_target", src=SRC), 0)
     assert lines == ["self.jump_target();", "return;"]
+
+
+def test_mangle_passes_valid_idents_through():
+    assert _mangle("ANIMCHAR") == "ANIMCHAR"
+    assert _mangle("getseq") == "getseq"
+
+
+def test_mangle_escapes_non_identifier_names():
+    # Merlin sigils / raw-address / `*` targets aren't valid Rust idents;
+    # each non-ident byte is escaped as `_<hex>` (`:`=3a, `]`=5d, `$`=24).
+    assert _mangle(":next") == "_3anext"
+    assert _mangle("]clr") == "_5dclr"
+    assert _mangle("$c00") == "_24c00"
+    assert _mangle(":slice?") == "_3aslice_3f"
+
+
+def test_call_target_resolves_alias_to_canonical():
+    # A call to an entry alias (`:next`, an alias of ANIMCHAR) must emit
+    # the canonical method, not an undefined alias method.
+    names = {"ANIMCHAR": "ANIMCHAR", ":next": "ANIMCHAR"}
+    out = _emit_stmt(CallStmt(target=":next", src=SRC), 0, None, names)
+    assert out == ["self.ANIMCHAR();"]
+
+
+def test_call_target_unresolved_is_escaped():
+    # A target with no known routine (raw address / cross-module) keeps
+    # its name but is escaped to a valid identifier.
+    out = _emit_stmt(CallStmt(target="$c00", src=SRC), 0, None, {})
+    assert out == ["self._24c00();"]
+
+
+def test_routine_fn_name_is_mangled():
+    r = _routine([ReturnStmt(src=SRC)], name=":clr")
+    assert emit_routine(r)[0] == "    fn _3aclr(&mut self) {"
 
 
 def test_raw_if_lowers_flag_condition():

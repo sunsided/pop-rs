@@ -1731,7 +1731,7 @@ impl Cpu {
 
     fn MARKRED(&mut self) {
         if self.c != 0 {
-            self.]os();
+            self._5dos();
             return;
         }
         self.ram[sym::redbuf + self.y as usize] = self.a;
@@ -1775,7 +1775,7 @@ impl Cpu {
 
     fn MARKMOVE(&mut self) {
         if self.c != 0 {
-            self.]os();
+            self._5dos();
             return;
         }
         self.ram[sym::movebuf + self.y as usize] = self.a;
@@ -1784,7 +1784,7 @@ impl Cpu {
 
     fn MARKFLOOR(&mut self) {
         if self.c != 0 {
-            self.]os();
+            self._5dos();
             return;
         }
         self.ram[sym::floorbuf + self.y as usize] = self.a;
@@ -1793,7 +1793,7 @@ impl Cpu {
 
     fn MARKHALF(&mut self) {
         if self.c != 0 {
-            self.]os();
+            self._5dos();
             return;
         }
         self.ram[sym::halfbuf + self.y as usize] = self.a;
