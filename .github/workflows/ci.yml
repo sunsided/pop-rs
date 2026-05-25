@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lifter:
+    name: pop-lifter tests (incl. rustc compile-check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The lifter tests read the vendored POP source; without the
+          # submodule the `source_dir` fixture skips most of the suite.
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # `tests/test_rust_compile.py` compiles the generated `ir/raw-rs`
+      # tree under `rustc -D warnings`; it skips when rustc is absent, so
+      # CI installs a toolchain to make the compile-check actually run.
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+
+      - name: Install pop-lifter + test deps
+        working-directory: tooling/pop_lifter
+        run: pip install -e . pytest
+
+      - name: Run test suite
+        working-directory: tooling/pop_lifter
+        run: pytest -q
