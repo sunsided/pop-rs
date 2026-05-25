@@ -356,6 +356,7 @@ def _regen_cup_rs(source_dir: Path) -> str:
     from pop_lifter.pass2_struct import structure_module
     from pop_lifter.pass3_expr import fold_module
     from pop_lifter.pass3_loops import recover_loops
+    from pop_lifter.pass3_match import recognize_module
     from pop_lifter.pass3_temps import recover_temps
     from pop_lifter.pass4_emit_rust import emit_module
     ast = parse_files(
@@ -369,7 +370,7 @@ def _regen_cup_rs(source_dir: Path) -> str:
     auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
     ir1_module = lift_file(auto, ast.symbols(), ["Cup"]).module
     ir3_module = reloop_module(structure_module(ir1_module))
-    recovered = recover_temps(recover_loops(fold_module(ir3_module)))
+    recovered = recover_temps(recover_loops(recognize_module(fold_module(ir3_module))))
     return emit_module(recovered)
 
 
@@ -401,6 +402,7 @@ def _regen_chgshadposn_rs(source_dir: Path) -> str:
     from pop_lifter.pass2_struct import structure_module
     from pop_lifter.pass3_expr import fold_module
     from pop_lifter.pass3_loops import recover_loops
+    from pop_lifter.pass3_match import recognize_module
     from pop_lifter.pass3_temps import recover_temps
     from pop_lifter.pass4_emit_rust import emit_module
     ast = parse_files(
@@ -414,7 +416,7 @@ def _regen_chgshadposn_rs(source_dir: Path) -> str:
     auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
     ir1_module = lift_file(auto, ast.symbols(), ["chgshadposn"]).module
     ir3_module = reloop_module(structure_module(ir1_module))
-    recovered = recover_temps(recover_loops(fold_module(ir3_module)))
+    recovered = recover_temps(recover_loops(recognize_module(fold_module(ir3_module))))
     return emit_module(recovered)
 
 

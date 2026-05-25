@@ -701,13 +701,12 @@ def _cmd_temps(args: argparse.Namespace) -> int:
 
 
 def _cmd_emit(args: argparse.Namespace) -> int:
-    """Run the full pass-3 chain (reloop + fold + loop + temp recovery)
-    then emit Rust source from the structured IR3. This first slice lays
-    down module / routine scaffolding and lowers leaf expressions
-    (folded `Assign`s and `return`s); statements not yet lowered appear
-    as `// TODO(pass4)` / `// raw:` comments. Writes the `.rs` text to
-    `--out` (or stdout); the summary reports lowered vs. deferred
-    top-level statements."""
+    """Run the full pass-3 chain (reloop + fold + match recognition +
+    loop + temp recovery) then emit Rust source from the structured
+    IR3. Recognised jump-table dispatches emit as `match`; remaining
+    statements not yet lowered appear as `// TODO(pass4)` / `// raw:`
+    comments. Writes the `.rs` text to `--out` (or stdout); the summary
+    reports lowered vs. deferred top-level statements."""
     src_dir = _resolve_source_dir(args)
     if src_dir is None:
         return 2
@@ -749,7 +748,7 @@ def _cmd_emit(args: argparse.Namespace) -> int:
         if not local_entries:
             continue
         ir3_module = reloop_module(structure_module(lift_file(file_ast, symbols, local_entries).module))
-        recovered = recover_temps(recover_loops(fold_module(ir3_module)))
+        recovered = recover_temps(recover_loops(recognize_module(fold_module(ir3_module))))
         total_routines += len(recovered.routines)
         lowered, deferred = lower_stats(recovered)
         total_lowered += lowered
@@ -1026,10 +1025,10 @@ def _emit_all_artifacts(src_dir: Path) -> list[tuple[str, str]]:
     implementation. Deterministic, so the output can be pinned.
 
     The chain mirrors `pop-lifter emit` exactly
-    (`structure → reloop → fold → recover_loops → recover_temps →
-    emit_module`); it is intentionally strict (a routine the pipeline
-    can't process raises rather than being skipped) so the pinned tree
-    can never silently drop coverage."""
+    (`structure → reloop → fold → match → recover_loops →
+    recover_temps → emit_module`); it is intentionally strict (a
+    routine the pipeline can't process raises rather than being
+    skipped) so the pinned tree can never silently drop coverage."""
     files = sorted(src_dir.glob("*.S"))
     base = [p for p in (src_dir / "EQ.S", src_dir / "GAMEEQ.S") if p.exists()]
     others = [p for p in files if p not in base]
@@ -1056,7 +1055,7 @@ def _emit_all_artifacts(src_dir: Path) -> list[tuple[str, str]]:
             skipped.append(src_path.name)
             continue
         ir3 = reloop_module(structure_module(module))
-        recovered = recover_temps(recover_loops(fold_module(ir3)))
+        recovered = recover_temps(recover_loops(recognize_module(fold_module(ir3))))
         lowered, deferred = lower_stats(recovered)
         artifacts.append((f"{src_path.stem.upper()}.rs", emit_module(recovered)))
         rows.append((src_path.name, len(recovered.routines), lowered, deferred))
@@ -1317,9 +1316,9 @@ def main(argv: list[str] | None = None) -> int:
 
     p_emit = sub.add_parser(
         "emit",
-        help="Pass 4 (skeleton slice): run the full pass-3 chain, then emit "
-             "Rust source — module / routine scaffolding plus leaf-expression "
-             "lowering of folded assigns.",
+        help="Pass 4: run the full pass-3 chain (incl. match recognition), "
+             "then emit Rust source — structured control flow, raw-atom "
+             "lowering, and `match` for recognised dispatches.",
     )
     p_emit.add_argument(
         "file", nargs="+",

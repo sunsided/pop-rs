@@ -1309,17 +1309,20 @@ impl Cpu {
             self.y = self.a;
             return;
         }
-        if self.y == 0x00 {
-            self.]no();
-            return;
-        }
-        if self.y == 0x0a {
-            self.]no();
-            return;
-        }
-        if self.y == 0x14 {
-            self.]no();
-            return;
+        match self.y {
+            0x00 => {
+                self.]no();
+                return;
+            }
+            0x0a => {
+                self.]no();
+                return;
+            }
+            0x14 => {
+                self.]no();
+                return;
+            }
+            _ => {}
         }
         self.y = self.y.wrapping_sub(1);
         return;
@@ -1416,13 +1419,16 @@ impl Cpu {
             self.y = self.y.wrapping_add(1);
             return;
         }
-        if self.y == 0x13 {
-            self.]no();
-            return;
-        }
-        if self.y == 0x1d {
-            self.]no();
-            return;
+        match self.y {
+            0x13 => {
+                self.]no();
+                return;
+            }
+            0x1d => {
+                self.]no();
+                return;
+            }
+            _ => {}
         }
         self.a = self.y;
         self.c = 1;

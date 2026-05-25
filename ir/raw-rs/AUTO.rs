@@ -131,13 +131,16 @@ impl Cpu {
             self.ram[sym::refract] = self.ram[sym::refract].wrapping_sub(1);
         }
         self.a = self.ram[sym::CharID];
-        if self.a == 0x18 {
-            self.MouseProg();
-            return;
-        }
-        if self.a == 0x04 {
-            self.SkelProg();
-            return;
+        match self.a {
+            0x18 => {
+                self.MouseProg();
+                return;
+            }
+            0x04 => {
+                self.SkelProg();
+                return;
+            }
+            _ => {}
         }
         if self.a < 0x02 {
             self.ShadowProg();
@@ -707,11 +710,11 @@ impl Cpu {
 
     fn MaybeStrike(&mut self) {
         self.x = self.ram[sym::OpPosn];
-        if self.x == 0xa9 {
-            return;
-        }
-        if self.x == 0x97 {
-            return;
+        match self.x {
+            0xa9 | 0x97 => {
+                return;
+            }
+            _ => {}
         }
         self.x = self.ram[sym::CharPosn];
         if self.x != 0xa1 {
@@ -1231,11 +1234,11 @@ impl Cpu {
             return;
         }
         self.a = self.ram[sym::ShadID];
-        if self.a == 0x01 {
-            return;
-        }
-        if self.a == 0x18 {
-            return;
+        match self.a {
+            0x01 | 0x18 => {
+                return;
+            }
+            _ => {}
         }
         'b6: {
             self.a = 0x00;
@@ -1625,17 +1628,20 @@ impl Cpu {
     }
 
     fn CUT(&mut self) {
-        if self.a == 0x03 {
-            self.Cdown();
-            return;
-        }
-        if self.a == 0x01 {
-            self.Cright();
-            return;
-        }
-        if self.a == 0x02 {
-            self.Cup();
-            return;
+        match self.a {
+            0x03 => {
+                self.Cdown();
+                return;
+            }
+            0x01 => {
+                self.Cright();
+                return;
+            }
+            0x02 => {
+                self.Cup();
+                return;
+            }
+            _ => {}
         }
         self.a = self.ram[sym::CharScrn];
         self.getleft();

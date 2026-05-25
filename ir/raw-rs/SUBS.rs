@@ -1628,27 +1628,30 @@ impl Cpu {
 
     fn DEADENEMY(&mut self) {
         self.a = self.ram[sym::level];
-        if self.a == 0x00 {
-            self.ram[sym::milestone] = 0x01;
-            self.a = 0x00;
-            self.ram[sym::PreRecPtr] = self.a;
-            self.ram[sym::PlayCount] = self.a;
-            return;
-        }
-        if self.a == 0x0d {
-            self.a = 0x09;
-            self.x = 0x19;
-            self.cuesong();
-            self.ram[sym::lightcolor] = 0xff;
-            self.ram[sym::lightning] = 0x0a;
-            self.ram[sym::exitopen] = 0x01;
-            self.ram[sym::timerequest] = 0x04;
-            self.a = 0x18;
-            self.x = 0x00;
-            self.y = 0x00;
-            self.rdblock();
-            self.pushpp();
-            return;
+        match self.a {
+            0x00 => {
+                self.ram[sym::milestone] = 0x01;
+                self.a = 0x00;
+                self.ram[sym::PreRecPtr] = self.a;
+                self.ram[sym::PlayCount] = self.a;
+                return;
+            }
+            0x0d => {
+                self.a = 0x09;
+                self.x = 0x19;
+                self.cuesong();
+                self.ram[sym::lightcolor] = 0xff;
+                self.ram[sym::lightning] = 0x0a;
+                self.ram[sym::exitopen] = 0x01;
+                self.ram[sym::timerequest] = 0x04;
+                self.a = 0x18;
+                self.x = 0x00;
+                self.y = 0x00;
+                self.rdblock();
+                self.pushpp();
+                return;
+            }
+            _ => {}
         }
         self.a = self.ram[sym::CharID];
         if self.a == 0x01 {
