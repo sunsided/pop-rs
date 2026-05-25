@@ -251,8 +251,10 @@ def test_shared_handler_is_behaviour_preserving():
     post = ModuleIR3("M", "syn", [matched])
     # keys {1,2} -> 0x00; a<9 (and not a key) -> 0x11; else -> 0x00.
     for inp, expected in [(1, 0x00), (2, 0x00), (5, 0x11), (9, 0x00), (200, 0x00)]:
-        r1 = bytearray(0x10000); r1[0x300] = inp
-        r2 = bytearray(0x10000); r2[0x300] = inp
+        r1 = bytearray(0x10000)
+        r1[0x300] = inp
+        r2 = bytearray(0x10000)
+        r2[0x300] = inp
         ir3_run([pre], "sh", ram=r1)
         ir3_run([post], "sh", ram=r2)
         assert r1 == r2, f"shared-handler match diverged for input {inp}"
