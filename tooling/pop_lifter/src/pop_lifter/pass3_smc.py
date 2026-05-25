@@ -36,11 +36,15 @@ from dataclasses import replace
 from .ir1 import (
     AdcImm,
     CmpImm,
+    DecTarget,
+    IncTarget,
     Label,
     LoadAbs,
     LoadImm,
     LoadIndexed,
+    LocalRef,
     ModuleIR1,
+    OpVarRef,
     Routine,
     SbcImm,
     StoreAbs,
@@ -93,15 +97,22 @@ def recognize_routine(routine: Routine) -> Routine:
     #   * address site — patched at offsets ⊆ {1, 2}, labelled instruction
     #     has a 16-bit `Abs` operand (`lda/sta abs[,x/y]`).
     # Anything else (opcode patch at offset 0, branch/jump-target patch,
-    # unresolved label) is left as an opaque `StoreLocal`.
+    # unresolved label) is left as an opaque `StoreLocal` / `LocalRef`.
+    # Both `sta :label+N` (StoreLocal) and `inc`/`dec :label+N`
+    # (IncTarget/DecTarget on a LocalRef) count as patches.
     offsets_for: dict[str, set[int]] = {}
     idx_for: dict[str, int | None] = {}
+
+    def _note(label: str, offset: int) -> None:
+        offsets_for.setdefault(label, set()).add(offset)
+        if label not in idx_for:
+            idx_for[label] = _patched_instr_index(body, label_pos, label)
+
     for it in body:
         if isinstance(it, StoreLocal):
-            offsets_for.setdefault(it.target_label, set()).add(it.offset)
-            if it.target_label not in idx_for:
-                idx_for[it.target_label] = _patched_instr_index(
-                    body, label_pos, it.target_label)
+            _note(it.target_label, it.offset)
+        elif isinstance(it, (IncTarget, DecTarget)) and isinstance(it.target, LocalRef):
+            _note(it.target.label, it.target.offset)
 
     imm_var: dict[str, str] = {}            # label -> operand-var (immediate)
     imm_idx: dict[str, int] = {}            # label -> patched-instr index
@@ -122,17 +133,30 @@ def recognize_routine(routine: Routine) -> Routine:
     if not imm_var and not addr_var:
         return routine
 
+    def _op_ref(label: str, offset: int) -> OpVarRef | None:
+        """Map a recognised (label, offset) patch site to its operand-var
+        reference: the whole immediate byte (`half=None`), or an address
+        byte half."""
+        if label in imm_var and offset == 1:
+            return OpVarRef(name=imm_var[label], half=None)
+        if label in addr_var and offset in (1, 2):
+            return OpVarRef(name=addr_var[label], half="lo" if offset == 1 else "hi")
+        return None
+
     new = list(body)
-    # Rewrite the patch stores.
+    # Rewrite the patch stores and the read-modify-write inc/dec bumps.
     for i, it in enumerate(new):
-        if not isinstance(it, StoreLocal):
-            continue
-        if it.target_label in imm_var and it.offset == 1:
-            new[i] = StoreOpVar(reg=it.reg, name=imm_var[it.target_label], src=it.src)
-        elif it.target_label in addr_var and it.offset in (1, 2):
-            half = "lo" if it.offset == 1 else "hi"
-            new[i] = StoreOpAddr(
-                reg=it.reg, name=addr_var[it.target_label], half=half, src=it.src)
+        if isinstance(it, StoreLocal):
+            ref = _op_ref(it.target_label, it.offset)
+            if isinstance(ref, OpVarRef) and ref.half is None:
+                new[i] = StoreOpVar(reg=it.reg, name=ref.name, src=it.src)
+            elif ref is not None:
+                new[i] = StoreOpAddr(
+                    reg=it.reg, name=ref.name, half=ref.half, src=it.src)
+        elif isinstance(it, (IncTarget, DecTarget)) and isinstance(it.target, LocalRef):
+            ref = _op_ref(it.target.label, it.target.offset)
+            if ref is not None:
+                new[i] = replace(it, target=ref)
     # Mark the patched immediate so the interpreter reads the variable.
     for label, idx in imm_idx.items():
         instr = new[idx]

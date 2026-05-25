@@ -114,6 +114,7 @@ from .ir1 import (
     LoadIndexed,
     LoadIndirect,
     Lsr,
+    OpVarRef,
     Pha,
     Pla,
     Reg,
@@ -556,7 +557,14 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         if isinstance(target, Abs):
             place = f"self.mem[{_abs_index(target, syms)}]"
             return [f"{place} = {place}.{method}(1);"]
-        return None  # LocalRef: self-modifying-code operand bump — deferred
+        if isinstance(target, OpVarRef):
+            # Recognised SMC operand bump: read-modify-write the operand
+            # variable the matching store wrote and the patched instruction
+            # reads. `half` picks the immediate byte or an address byte.
+            suffix = f"_{target.half}" if target.half else ""
+            place = f"self.smc.{_mangle(target.name)}{suffix}"
+            return [f"{place} = {place}.{method}(1);"]
+        return None  # unrecognised LocalRef bump — deferred
 
     # ---- carry / flag operations ----------------------------------------
 

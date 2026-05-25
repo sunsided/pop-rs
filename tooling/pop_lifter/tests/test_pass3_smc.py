@@ -20,10 +20,13 @@ from pop_lifter.ir1 import (
     Clc,
     Imm,
     Label,
+    IncTarget,
     LoadAbs,
     LoadImm,
     LoadIndexed,
+    LocalRef,
     ModuleIR1,
+    OpVarRef,
     Reg,
     Return,
     Routine,
@@ -116,6 +119,47 @@ def test_address_patch_recognized_as_store_op_addr():
     ld = next(it for it in rec.body if isinstance(it, LoadIndexed))
     assert ld.base.opvar == "smL"
     assert ld.base.addr == 0x2000  # assembled fallback preserved
+
+
+def test_inc_dec_on_operand_var_recognized_as_op_var_ref():
+    """`inc :label+N` / `dec :label+N` on a recognised operand-var site is
+    rewritten to target an `OpVarRef`, so the bump hits the same variable
+    the store wrote and the patched instruction reads."""
+    routine = Routine(name="t", body=[
+        StoreLocal(reg=Reg.A, target_label=":smB", offset=2, src=SRC),
+        IncTarget(target=LocalRef(label=":smB", offset=2), src=SRC),
+        Label(name=":smB", src=SRC),
+        LoadIndexed(reg=Reg.A, base=Abs(name="$0300", addr=0x0300), index=Reg.Y, src=SRC),
+        Return(src=SRC),
+    ])
+    rec = recognize_routine(routine)
+    inc = next(it for it in rec.body if isinstance(it, IncTarget))
+    assert isinstance(inc.target, OpVarRef)
+    assert inc.target.name == "smB" and inc.target.half == "hi"
+    # The label is still a recognised address operand var (high byte).
+    ld = next(it for it in rec.body if isinstance(it, LoadIndexed))
+    assert ld.base.opvar == "smB" and "hi" in ld.base.opvar_halves
+
+
+def test_inc_on_operand_var_bumps_the_variable():
+    """The recognised bump takes effect: storing hi=3 then `inc`-ing it
+    makes the patched load read from 0x0400, not 0x0300."""
+    routine = Routine(name="t", body=[
+        LoadImm(reg=Reg.A, imm=_imm(0x03), src=SRC),          # hi = 0x03
+        StoreLocal(reg=Reg.A, target_label=":smB", offset=2, src=SRC),
+        IncTarget(target=LocalRef(label=":smB", offset=2), src=SRC),  # hi -> 0x04
+        LoadImm(reg=Reg.Y, imm=_imm(0x00), src=SRC),
+        Label(name=":smB", src=SRC),
+        LoadAbs(reg=Reg.A, source=Abs(name="$0000", addr=0x0000), src=SRC),  # reads 0x0400
+        StoreAbs(reg=Reg.A, target=Abs(name="out", addr=0x80), src=SRC),
+        Return(src=SRC),
+    ])
+    mod = ModuleIR1(name="M", file="syn", routines=[routine])
+    ram = bytearray(0x10000)
+    ram[0x400] = 0x42
+    out = ir1_run(recognize_smc(mod), "t", ram=ram)
+    assert out.ram[0x80] == 0x42         # read from the bumped 0x0400
+    assert out.operand_addr_hi["smB"] == 0x04
 
 
 def test_address_patch_takes_effect_after_recognition():

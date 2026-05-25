@@ -296,8 +296,8 @@ impl Cpu {
                     }
                 }
                 3 => {
-                    // raw: patch *:loop+2 += 1                         ; HIRES.S:224
-                    // raw: patch *:smod+2 += 1                         ; HIRES.S:225
+                    self.smc.loop_hi = self.smc.loop_hi.wrapping_add(1);
+                    self.smc.smod_hi = self.smc.smod_hi.wrapping_add(1);
                     self.reg.x = self.reg.x.wrapping_sub(1);
                     if self.reg.x != 0x00 {
                         pc = 1;
@@ -3322,10 +3322,10 @@ impl Cpu {
                     }
                 }
                 6 => {
-                    // raw: patch *:org1+2 += 1                         ; HIRES.S:2085
-                    // raw: patch *:org2+2 += 1                         ; HIRES.S:2086
-                    // raw: patch *:dst1+2 += 1                         ; HIRES.S:2087
-                    // raw: patch *:dst2+2 += 1                         ; HIRES.S:2088
+                    self.smc.org1_hi = self.smc.org1_hi.wrapping_add(1);
+                    self.smc.org2_hi = self.smc.org2_hi.wrapping_add(1);
+                    self.smc.dst1_hi = self.smc.dst1_hi.wrapping_add(1);
+                    self.smc.dst2_hi = self.smc.dst2_hi.wrapping_add(1);
                     self.reg.x = self.reg.x.wrapping_sub(1);
                     if self.reg.x != 0x00 {
                         pc = 1;
