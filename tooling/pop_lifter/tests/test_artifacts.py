@@ -32,6 +32,7 @@ IR_PILOT_FASTBLACK_SMC = REPO_ROOT / "ir" / "pilot" / "fastblack.smc.ir1"
 IR_PILOT_CHGSHADPOSN_LOOPS = REPO_ROOT / "ir" / "pilot" / "chgshadposn.loops.ir3"
 IR_PILOT_PAUSE_LOOPS = REPO_ROOT / "ir" / "pilot" / "pause.loops.ir3"
 IR_RAW = REPO_ROOT / "ir" / "raw"
+IR_RAW_RS = REPO_ROOT / "ir" / "raw-rs"
 
 PILOT_ENTRIES = [
     "DoStrike", "DoBlock", "DoTurn",
@@ -680,5 +681,43 @@ def test_pass1_raw_artifacts_match(source_dir):
     stale = sorted(name for name, body in actual.items() if expected[name] != body)
     assert not stale, (
         f"{stale} are stale under {IR_RAW.relative_to(REPO_ROOT)}. "
+        f"regenerate with:\n{regen_cmd}"
+    )
+
+
+def test_pass4_emit_all_artifacts_match(source_dir):
+    """The full per-file pass-4 Rust sweep under `ir/raw-rs/` is the
+    whole-codebase view of what the emitter produces today. Its
+    SUMMARY.md lowered-% is the headline progress signal; every lifting
+    change must regenerate the tree so the diff records the change."""
+    from pop_lifter.cli import _emit_all_artifacts
+
+    if not IR_RAW_RS.is_dir():
+        raise AssertionError(
+            f"missing artifact dir {IR_RAW_RS}. regenerate with:\n"
+            f"  pop-lifter emit-all --out-dir {IR_RAW_RS.relative_to(REPO_ROOT)}"
+        )
+
+    actual = dict(_emit_all_artifacts(source_dir))
+    expected = {
+        p.name: p.read_text(encoding="utf-8")
+        for p in IR_RAW_RS.iterdir()
+        if p.suffix == ".rs" or p.name == "SUMMARY.md"
+    }
+
+    regen_cmd = f"  pop-lifter emit-all --out-dir {IR_RAW_RS.relative_to(REPO_ROOT)}"
+    extra_on_disk = set(expected) - set(actual)
+    missing_on_disk = set(actual) - set(expected)
+    assert not extra_on_disk, (
+        f"{sorted(extra_on_disk)} present in {IR_RAW_RS} but not in regen output. "
+        f"regenerate with:\n{regen_cmd}"
+    )
+    assert not missing_on_disk, (
+        f"{sorted(missing_on_disk)} produced by regen but not in {IR_RAW_RS}. "
+        f"regenerate with:\n{regen_cmd}"
+    )
+    stale = sorted(name for name, body in actual.items() if expected[name] != body)
+    assert not stale, (
+        f"{stale} are stale under {IR_RAW_RS.relative_to(REPO_ROOT)}. "
         f"regenerate with:\n{regen_cmd}"
     )
