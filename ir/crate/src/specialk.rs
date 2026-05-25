@@ -315,7 +315,7 @@ pub fn DevelKeys(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: ]sm
+#[doc(alias = "]sm")]
 pub fn postload(cpu: &mut Cpu) {
     cpu.reg.a = 0xa9;
     cpu.mem[sym::BBundID] = cpu.reg.a;
@@ -1049,7 +1049,7 @@ pub fn CUESONG(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: STROBE
+#[doc(alias = "STROBE")]
 pub fn DLOOP(cpu: &mut Cpu) {
     crate::ext::keys(cpu);
     crate::ext::controller(cpu);

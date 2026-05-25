@@ -181,7 +181,7 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: :outer
+#[doc(alias = ":outer")]
 pub fn PAUSE(cpu: &mut Cpu) {
     cpu.stack.push(cpu.reg.a);
     cpu.reg.x = 0x00;
@@ -555,7 +555,7 @@ pub fn PlayCut2(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: PlayCut3
+#[doc(alias = "PlayCut3")]
 pub fn PlayCut1(cpu: &mut Cpu) {
     getglass(cpu);
     addglass(cpu);
@@ -1086,7 +1086,8 @@ pub fn pjumpseq(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: mjumpseq, vjumpseq
+#[doc(alias = "mjumpseq")]
+#[doc(alias = "vjumpseq")]
 pub fn kjumpseq(cpu: &mut Cpu) {
     let tmp0 = cpu.reg.a;
     crate::ext::LoadKid(cpu);

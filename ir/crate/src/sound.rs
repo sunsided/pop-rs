@@ -5,7 +5,8 @@
 use crate::cpu::Cpu;
 use crate::sym;
 
-// aliases: lookup, endlook
+#[doc(alias = "lookup")]
+#[doc(alias = "endlook")]
 pub fn ZEROSOUND(cpu: &mut Cpu) {
     cpu.reg.a = 0x00;
     cpu.mem[sym::soundtable] = cpu.reg.a;
@@ -94,7 +95,8 @@ pub fn DoJawsClash(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: DoSwordClash1, DoSwordClash2
+#[doc(alias = "DoSwordClash1")]
+#[doc(alias = "DoSwordClash2")]
 pub fn DoSpecialKey1(cpu: &mut Cpu) {
     cpu.reg.y = 0x0f;
     cpu.reg.x = 0x00;
@@ -129,7 +131,7 @@ pub fn DoLooseCrash(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: DoFlashMsg
+#[doc(alias = "DoFlashMsg")]
 pub fn DoGotKey(cpu: &mut Cpu) {
     cpu.reg.a = 0x02;
     loop {

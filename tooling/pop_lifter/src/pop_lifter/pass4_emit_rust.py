@@ -1340,6 +1340,21 @@ def _make_call_render(
     return render
 
 
+def _alias_attrs(aliases: list[str]) -> list[str]:
+    """Record each entry alias as a rustdoc `#[doc(alias = "…")]`, so a
+    `jsr`/`jmp` to the alias name is discoverable from the canonical free
+    function (e.g. `DoTurn`'s `DoDown` alias). An alias rustdoc can't
+    represent — one containing a `"` or whitespace — falls back to a plain
+    comment so the output always compiles."""
+    out: list[str] = []
+    for a in aliases:
+        if a and '"' not in a and not any(c.isspace() for c in a):
+            out.append(f'#[doc(alias = "{a}")]')
+        else:
+            out.append(f"// alias: {a}")
+    return out
+
+
 def _emit_crate_segment(
     module: ModuleIR3,
     syms: SymTable,
@@ -1350,13 +1365,12 @@ def _emit_crate_segment(
 ) -> str:
     """Render one segment module: each routine as a `pub fn Name(cpu: &mut
     Cpu)` free function over the shared state, with calls bound per the
-    resolution policy. Imports `sym` only when the bodies reference it."""
+    resolution policy and entry aliases recorded as `#[doc(alias)]`.
+    Imports `sym` only when the bodies reference it."""
     call_render = _make_call_render(module.name, name_map, canon, mod_of, ext_sink)
     fn_blocks: list[list[str]] = []
     for r in module.routines:
-        block: list[str] = []
-        if r.entry_aliases:
-            block.append(f"// aliases: {', '.join(r.entry_aliases)}")
+        block: list[str] = _alias_attrs(r.entry_aliases)
         block.append(f"pub fn {_mangle(r.name)}(cpu: &mut Cpu) {{")
         body = _emit_block_lines(r.body.stmts, 1, syms, None, call_render)[0]
         block += _to_cpu_receiver(body)

@@ -1384,7 +1384,7 @@ pub fn addmidezfast(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: ]add
+#[doc(alias = "]add")]
 pub fn add(cpu: &mut Cpu) {
     crate::ext::addback(cpu);
     return;
@@ -2402,7 +2402,7 @@ pub fn getobjbldr(cpu: &mut Cpu) {
     }
 }
 
-// aliases: :newpass
+#[doc(alias = ":newpass")]
 pub fn sortlist(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {

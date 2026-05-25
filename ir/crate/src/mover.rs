@@ -486,7 +486,7 @@ pub fn JAMPP(cpu: &mut Cpu) {
     }
 }
 
-// aliases: :loop
+#[doc(alias = ":loop")]
 pub fn trigger(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::linkindex];
     cpu.reg.a = cpu.mem[sym::LINKLOC + cpu.reg.x as usize];
@@ -1417,7 +1417,7 @@ pub fn redtrobj(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: redtorch
+#[doc(alias = "redtorch")]
 pub fn redexit(cpu: &mut Cpu) {
     checkright(cpu);
     cpu.reg.a = 0x02;
@@ -1425,7 +1425,7 @@ pub fn redexit(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: redflask
+#[doc(alias = "redflask")]
 pub fn redsword(cpu: &mut Cpu) {
     check(cpu);
     cpu.reg.a = 0x02;

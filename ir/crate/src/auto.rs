@@ -736,7 +736,7 @@ pub fn DoRelease(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: DoFwd
+#[doc(alias = "DoFwd")]
 pub fn DoAdvance(cpu: &mut Cpu) {
     cpu.reg.a = 0xff;
     cpu.mem[sym::clrF] = cpu.reg.a;
@@ -744,7 +744,7 @@ pub fn DoAdvance(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: DoBack
+#[doc(alias = "DoBack")]
 pub fn DoRetreat(cpu: &mut Cpu) {
     cpu.mem[sym::clrB] = 0xff;
     cpu.reg.a = 0x01;
@@ -752,7 +752,7 @@ pub fn DoRetreat(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: DoUp
+#[doc(alias = "DoUp")]
 pub fn DoBlock(cpu: &mut Cpu) {
     cpu.reg.a = 0xff;
     cpu.mem[sym::clrU] = cpu.reg.a;
@@ -760,7 +760,7 @@ pub fn DoBlock(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: DoDown
+#[doc(alias = "DoDown")]
 pub fn DoTurn(cpu: &mut Cpu) {
     cpu.mem[sym::clrD] = 0xff;
     cpu.reg.a = 0x01;
@@ -774,7 +774,7 @@ pub fn DoStandup(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: DoRunaway
+#[doc(alias = "DoRunaway")]
 pub fn DoDropguard(cpu: &mut Cpu) {
     cpu.mem[sym::clrD] = 0xff;
     DoRetreat(cpu);
@@ -787,7 +787,7 @@ pub fn DoEngarde(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: DoPress
+#[doc(alias = "DoPress")]
 pub fn DoStrike(cpu: &mut Cpu) {
     cpu.reg.a = 0xff;
     cpu.mem[sym::clrbtn] = cpu.reg.a;
@@ -1111,7 +1111,7 @@ pub fn AUTOPLAYBACK(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: CUTCHECK
+#[doc(alias = "CUTCHECK")]
 pub fn _3aendpb(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::CUTTIMER];
     if cpu.reg.a == 0x00 {
@@ -1950,7 +1950,7 @@ pub fn ADDGUARD(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: AddNormalGd
+#[doc(alias = "AddNormalGd")]
 pub fn _3anot5(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::VisScrn];
     cpu.reg.a = cpu.mem[sym::GdStartBlock - 1 + cpu.reg.x as usize];

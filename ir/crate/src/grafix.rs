@@ -1359,7 +1359,12 @@ pub fn SCREENDUMP(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: SAVELEVELG, READDIR, WRITEDIR, GOBUILD, GOGAME, EDREBOOT
+#[doc(alias = "SAVELEVELG")]
+#[doc(alias = "READDIR")]
+#[doc(alias = "WRITEDIR")]
+#[doc(alias = "GOBUILD")]
+#[doc(alias = "GOGAME")]
+#[doc(alias = "EDREBOOT")]
 pub fn SAVELEVEL(cpu: &mut Cpu) {
     return;
 }
@@ -1868,7 +1873,7 @@ pub fn MUSICKEYS(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: :loop1
+#[doc(alias = ":loop1")]
 pub fn VBLANK(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[0xc019];
     if (cpu.reg.a as i8) >= 0 {

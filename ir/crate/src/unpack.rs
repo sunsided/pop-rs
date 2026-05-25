@@ -449,7 +449,7 @@ pub fn DeltaExp(cpu: &mut Cpu) {
     }
 }
 
-// aliases: :Loop
+#[doc(alias = ":Loop")]
 pub fn ExpandClm(cpu: &mut Cpu) {
     cpu.reg.y = 0x00;
     cpu.reg.a = cpu.mem[(cpu.mem[sym::CrnDatPtr] as usize | (cpu.mem[sym::CrnDatPtr + 1] as usize) << 8) + cpu.reg.y as usize];

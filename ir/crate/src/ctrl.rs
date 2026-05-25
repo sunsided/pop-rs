@@ -700,7 +700,7 @@ pub fn onground(cpu: &mut Cpu) {
     }
 }
 
-// aliases: startfall
+#[doc(alias = "startfall")]
 pub fn _3ano(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -2834,7 +2834,7 @@ pub fn _3adoit(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: ]clr
+#[doc(alias = "]clr")]
 pub fn _3aclr(cpu: &mut Cpu) {
     clrall(cpu);
     return;

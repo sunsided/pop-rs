@@ -623,7 +623,7 @@ pub fn AirBump(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: BumpSound
+#[doc(alias = "BumpSound")]
 pub fn _3asmackwall(cpu: &mut Cpu) {
     cpu.mem[sym::alertguard] = 0x01;
     cpu.reg.a = 0x0d;
@@ -1092,7 +1092,7 @@ pub fn DBarr(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: :next
+#[doc(alias = ":next")]
 pub fn ANIMCHAR(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -1896,7 +1896,7 @@ pub fn _3aslice_3f(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: ]slice
+#[doc(alias = "]slice")]
 pub fn _3aslice(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[(cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize];
     cpu.reg.a |= 0x80;

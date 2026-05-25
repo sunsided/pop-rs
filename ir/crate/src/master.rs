@@ -467,7 +467,7 @@ pub fn EPILOG(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: AttractLoop
+#[doc(alias = "AttractLoop")]
 pub fn ATTRACTMODE(cpu: &mut Cpu) {
     cpu.reg.a = 0x01;
     cpu.mem[sym::musicon] = cpu.reg.a;
@@ -643,7 +643,7 @@ pub fn Demo(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: :loop
+#[doc(alias = ":loop")]
 pub fn pauseNI(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -719,7 +719,7 @@ pub fn StartGame_3f(cpu: &mut Cpu) {
     return;
 }
 
-// aliases: DOSTARTGAME
+#[doc(alias = "DOSTARTGAME")]
 pub fn _3a3(cpu: &mut Cpu) {
     crate::ext::blackout(cpu);
     LoadStage3(cpu);
@@ -1190,7 +1190,7 @@ pub fn PlaySongI(cpu: &mut Cpu) {
     }
 }
 
-// aliases: :loop
+#[doc(alias = ":loop")]
 pub fn tpause(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
