@@ -360,11 +360,11 @@ impl Cpu {
         self.a = self.ram[sym::AMtimer];
         if self.a == 0x00 {
             self.a = self.ram[sym::CharAction];
-            if self.a == 0x02 {
-                return;
-            }
-            if self.a == 0x06 {
-                return;
+            match self.a {
+                0x02 | 0x06 => {
+                    return;
+                }
+                _ => {}
             }
             self.a = self.ram[sym::CharPosn];
             if self.a >= 0x87 {

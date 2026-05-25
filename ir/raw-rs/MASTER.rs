@@ -334,20 +334,23 @@ impl Cpu {
         self.ram[sym::CHset] = self.x;
         self.ram[sym::track] = self.ram[sym::ch4trk + self.x as usize];
         self.a = self.ram[sym::ch4off + self.x as usize];
-        if self.a == 0x00 {
-            self.rw18();
-            self.rw18();
-            return;
-        }
-        if self.a == 0x06 {
-            self.rw18();
-            self.rw18();
-            return;
-        }
-        if self.a == 0x0c {
-            self.rw18();
-            self.rw18();
-            return;
+        match self.a {
+            0x00 => {
+                self.rw18();
+                self.rw18();
+                return;
+            }
+            0x06 => {
+                self.rw18();
+                self.rw18();
+                return;
+            }
+            0x0c => {
+                self.rw18();
+                self.rw18();
+                return;
+            }
+            _ => {}
         }
         return;
     }

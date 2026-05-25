@@ -1013,18 +1013,21 @@ impl Cpu {
         self.ram[sym::clrD] = 0x01;
         self.ram[sym::CharSword] = 0x00;
         self.a = self.ram[sym::CharID];
-        if self.a == 0x00 {
-            self.ram[sym::offguard] = 0x01;
-            self.ram[sym::refract] = 0x09;
-            self.ram[sym::heroic] = 0x00;
-            self.a = 0x5d;
-            self.jumpseq();
-            return;
-        }
-        if self.a == 0x01 {
-            self.a = 0x5c;
-            self.jumpseq();
-            return;
+        match self.a {
+            0x00 => {
+                self.ram[sym::offguard] = 0x01;
+                self.ram[sym::refract] = 0x09;
+                self.ram[sym::heroic] = 0x00;
+                self.a = 0x5d;
+                self.jumpseq();
+                return;
+            }
+            0x01 => {
+                self.a = 0x5c;
+                self.jumpseq();
+                return;
+            }
+            _ => {}
         }
         self.a = 0x57;
         self.jumpseq();

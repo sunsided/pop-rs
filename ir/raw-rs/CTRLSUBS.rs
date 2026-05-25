@@ -1500,11 +1500,11 @@ impl Cpu {
 
     fn usealtsets(&mut self) {
         self.x = self.ram[sym::CharID];
-        if self.x == 0x00 {
-            return;
-        }
-        if self.x == 0x18 {
-            return;
+        match self.x {
+            0x00 | 0x18 => {
+                return;
+            }
+            _ => {}
         }
         if self.x >= 0x05 {
             self.a = self.ram[sym::CharPosn];

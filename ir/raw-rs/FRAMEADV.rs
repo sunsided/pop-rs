@@ -1449,14 +1449,11 @@ impl Cpu {
 
     fn wiped(&mut self) {
         self.a = self.ram[sym::objid];
-        if self.a == 0x09 {
-            return;
-        }
-        if self.a == 0x07 {
-            return;
-        }
-        if self.a == 0x0c {
-            return;
+        match self.a {
+            0x09 | 0x07 | 0x0c => {
+                return;
+            }
+            _ => {}
         }
         let _o: u8 = 0x14;
         self.c = (self.a >= _o) as u8;
@@ -2053,30 +2050,33 @@ impl Cpu {
         self.ram[sym::state] = self.ram[(self.ram[sym::BlueSpec] as usize | (self.ram[sym::BlueSpec + 1] as usize) << 8) + self.y as usize];
         self.a = self.ram[(self.ram[sym::BlueType] as usize | (self.ram[sym::BlueType + 1] as usize) << 8) + self.y as usize];
         self.a &= 0x1f;
-        if self.a == 0x06 {
-            self.a = self.ram[sym::state];
-            self.x = self.a;
-            self.a = self.ram[sym::LINKMAP + self.x as usize];
-            self.a &= 0x1f;
-            if self.a < 0x02 {
-                self.a = 0x06;
+        match self.a {
+            0x06 => {
+                self.a = self.ram[sym::state];
+                self.x = self.a;
+                self.a = self.ram[sym::LINKMAP + self.x as usize];
+                self.a &= 0x1f;
+                if self.a < 0x02 {
+                    self.a = 0x06;
+                    return;
+                }
+                self.a = 0x05;
                 return;
             }
-            self.a = 0x05;
-            return;
-        }
-        if self.a == 0x0f {
-            self.a = self.ram[sym::state];
-            self.x = self.a;
-            self.a = self.ram[sym::LINKMAP + self.x as usize];
-            self.a &= 0x1f;
-            if self.a < 0x02 {
-                self.a = 0x0f;
+            0x0f => {
+                self.a = self.ram[sym::state];
+                self.x = self.a;
+                self.a = self.ram[sym::LINKMAP + self.x as usize];
+                self.a &= 0x1f;
+                if self.a < 0x02 {
+                    self.a = 0x0f;
+                    return;
+                }
+                self.ram[sym::state] = 0x00;
+                self.a = 0x01;
                 return;
             }
-            self.ram[sym::state] = 0x00;
-            self.a = 0x01;
-            return;
+            _ => {}
         }
         return;
     }
@@ -2294,30 +2294,33 @@ impl Cpu {
         self.ram[sym::state] = self.ram[(self.ram[sym::BlueSpec] as usize | (self.ram[sym::BlueSpec + 1] as usize) << 8) + self.y as usize];
         self.a = self.ram[(self.ram[sym::BlueType] as usize | (self.ram[sym::BlueType + 1] as usize) << 8) + self.y as usize];
         self.a &= 0x1f;
-        if self.a == 0x06 {
-            self.a = self.ram[sym::state];
-            self.x = self.a;
-            self.a = self.ram[sym::LINKMAP + self.x as usize];
-            self.a &= 0x1f;
-            if self.a < 0x02 {
-                self.a = 0x06;
+        match self.a {
+            0x06 => {
+                self.a = self.ram[sym::state];
+                self.x = self.a;
+                self.a = self.ram[sym::LINKMAP + self.x as usize];
+                self.a &= 0x1f;
+                if self.a < 0x02 {
+                    self.a = 0x06;
+                    return;
+                }
+                self.a = 0x05;
                 return;
             }
-            self.a = 0x05;
-            return;
-        }
-        if self.a == 0x0f {
-            self.a = self.ram[sym::state];
-            self.x = self.a;
-            self.a = self.ram[sym::LINKMAP + self.x as usize];
-            self.a &= 0x1f;
-            if self.a < 0x02 {
-                self.a = 0x0f;
+            0x0f => {
+                self.a = self.ram[sym::state];
+                self.x = self.a;
+                self.a = self.ram[sym::LINKMAP + self.x as usize];
+                self.a &= 0x1f;
+                if self.a < 0x02 {
+                    self.a = 0x0f;
+                    return;
+                }
+                self.ram[sym::state] = 0x00;
+                self.a = 0x01;
                 return;
             }
-            self.ram[sym::state] = 0x00;
-            self.a = 0x01;
-            return;
+            _ => {}
         }
         return;
     }
