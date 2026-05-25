@@ -30,7 +30,7 @@ from .pass3_loops import dowhile_stats, for_stats, recover_loops, repeat_stats
 from .pass3_match import match_stats, recognize_module
 from .pass3_smc import recognize_smc, smc_store_count, smc_var_count
 from .pass3_temps import recover_temps, temp_stats
-from .pass4_emit_rust import emit_module, emit_modules, lower_stats
+from .pass4_emit_rust import emit_crate, emit_module, emit_modules, lower_stats
 
 DEFAULT_SOURCE_REL = Path("01 POP Source/Source")
 
@@ -1145,6 +1145,38 @@ def _render_emit_all_summary(
     return "\n".join(lines)
 
 
+def _emit_crate_artifacts(src_dir: Path) -> dict[str, str]:
+    """Pure crate-scaffold build shared by `_cmd_emit_crate` and the regen
+    test: lift the whole program and lay it out as one coherent crate."""
+    return emit_crate(lift_all_modules(src_dir))
+
+
+def _cmd_emit_crate(args: argparse.Namespace) -> int:
+    """Assemble the lifted program into one crate scaffold under
+    `--out-dir` (default `ir/crate/`): a shared `cpu` module (the single
+    `Cpu` state), a shared `sym` module (address constants), and one
+    empty module per POP source segment, plus `Cargo.toml`. Routine
+    bodies move into the segment modules in a later slice (#47); the
+    scaffold exists so the assembled tree `cargo build`s as they land."""
+    src_dir = _resolve_source_dir(args)
+    if src_dir is None:
+        return 2
+
+    out_dir = Path(args.out_dir)
+    files = _emit_crate_artifacts(src_dir)
+    for rel, content in files.items():
+        path = out_dir / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+
+    n_seg = sum(
+        1 for rel in files
+        if rel.startswith("src/") and rel not in ("src/lib.rs", "src/cpu.rs", "src/sym.rs")
+    )
+    print(f"wrote crate scaffold ({len(files)} files, {n_seg} segment modules) under {out_dir}")
+    return 0
+
+
 def _cmd_emit_all(args: argparse.Namespace) -> int:
     """Pass-4 counterpart of `lift-all`: sweep every `.S` in the source
     tree and write one `<NAME>.rs` per module under `--out-dir`
@@ -1398,6 +1430,18 @@ def main(argv: list[str] | None = None) -> int:
         help="Directory to write <MODULE>.rs files into.",
     )
     p_emit_all.set_defaults(func=_cmd_emit_all)
+
+    p_emit_crate = sub.add_parser(
+        "emit-crate",
+        help="Pass 4: assemble the whole lifted program into one crate "
+             "scaffold — shared cpu/sym modules + one (empty) module per "
+             "source segment + Cargo.toml (issue #47).",
+    )
+    p_emit_crate.add_argument(
+        "--out-dir", default="ir/crate",
+        help="Directory to write the crate scaffold into.",
+    )
+    p_emit_crate.set_defaults(func=_cmd_emit_crate)
 
     args = parser.parse_args(argv)
     return args.func(args)
