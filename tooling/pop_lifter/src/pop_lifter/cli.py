@@ -1019,6 +1019,49 @@ def _cmd_lift_all(args: argparse.Namespace) -> int:
     return 0
 
 
+def _recovered_module(file_ast, symbols, entries) -> ir3_mod.ModuleIR3 | None:
+    """Run one file's `entries` through the full pass-1→3 chain and
+    return the recovered IR3 module pass 4 emits from — or `None` when
+    the file lifts no routines. Shared by `_emit_all_artifacts` and
+    `lift_all_modules` so both consume an identical pipeline
+    (`smc → structure → reloop → fold → match → recover_loops →
+    recover_temps`)."""
+    module = recognize_smc(lift_file(file_ast, symbols, entries).module)
+    if not module.routines:
+        return None
+    ir3 = reloop_module(structure_module(module))
+    return recover_temps(recover_loops(recognize_module(fold_module(ir3))))
+
+
+def lift_all_modules(src_dir: Path) -> list[ir3_mod.ModuleIR3]:
+    """Lift every code-bearing `.S` file through the full pass-1→3 chain
+    and return the recovered IR3 modules — the program-wide module set
+    crate-assembly analysis (issue #47) reasons over. Mirrors
+    `_emit_all_artifacts`'s discovery/skip rules but yields the module
+    objects instead of emitted text."""
+    files = sorted(src_dir.glob("*.S"))
+    base = [p for p in (src_dir / "EQ.S", src_dir / "GAMEEQ.S") if p.exists()]
+    others = [p for p in files if p not in base]
+    ast = parse_files([*base, *others], search_paths=[src_dir])
+    symbols = ast.symbols()
+
+    modules: list[ir3_mod.ModuleIR3] = []
+    for src_path in files:
+        file_ast = next(
+            (f for f in ast.files if Path(f.path).resolve() == src_path.resolve()),
+            None,
+        )
+        if file_ast is None:
+            continue
+        entries = discover_entries(file_ast)
+        if not entries:
+            continue
+        recovered = _recovered_module(file_ast, symbols, entries)
+        if recovered is not None:
+            modules.append(recovered)
+    return modules
+
+
 def _emit_all_artifacts(src_dir: Path) -> list[tuple[str, str]]:
     """Sweep every code-bearing `.S` file through the full pass-1→4
     chain and return `[(filename, content)]` — one `<NAME>.rs` per
@@ -1052,12 +1095,10 @@ def _emit_all_artifacts(src_dir: Path) -> list[tuple[str, str]]:
         if not entries:
             skipped.append(src_path.name)
             continue
-        module = recognize_smc(lift_file(file_ast, symbols, entries).module)
-        if not module.routines:
+        recovered = _recovered_module(file_ast, symbols, entries)
+        if recovered is None:
             skipped.append(src_path.name)
             continue
-        ir3 = reloop_module(structure_module(module))
-        recovered = recover_temps(recover_loops(recognize_module(fold_module(ir3))))
         lowered, deferred = lower_stats(recovered)
         artifacts.append((f"{src_path.stem.upper()}.rs", emit_module(recovered)))
         rows.append((src_path.name, len(recovered.routines), lowered, deferred))
