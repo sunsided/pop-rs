@@ -87,10 +87,19 @@ class Imm:
 @dataclass(frozen=True)
 class Abs:
     """An absolute (or zero-page) address — e.g. `STA clrU`. We don't
-    distinguish zero-page from absolute in IR1; the address value does."""
+    distinguish zero-page from absolute in IR1; the address value does.
+
+    `opvar` names a self-modifying-code *address* operand variable: when
+    set, this operand's effective address isn't the assembled `addr` but
+    a runtime value patched byte-wise by `StoreOpAddr` (low byte from
+    `:label+1`, high byte from `:label+2`). Pass 3's SMC recognition sets
+    it on the instruction a patch pair targets; the interpreter reads the
+    patched address from `Trace.operand_addr_lo`/`_hi`, falling back to
+    the assembled `addr` byte for any half that was never patched."""
 
     name: str
     addr: int
+    opvar: str | None = None
 
 
 # Other operand kinds (`IndexedX`, `IndexedY`, `IndY`, `IndX`) will land
@@ -184,6 +193,28 @@ class StoreOpVar:
 
     reg: Reg
     name: str
+    src: SourceRef
+
+
+@dataclass(frozen=True)
+class StoreOpAddr:
+    """`opaddr NAME.half = reg` — a recognised self-modifying-code
+    *address* patch. Pass 3's SMC recognition rewrites a `StoreLocal`
+    whose `:label+1` / `:label+2` patches the low / high byte of the
+    16-bit absolute operand of the instruction at `:label` (a
+    `lda/sta abs[,x/y]`) into this form. `half` is `"lo"` (offset 1) or
+    `"hi"` (offset 2).
+
+    The matching memory operand carries `Abs.opvar = NAME`. The
+    interpreter writes `Trace.operand_addr_lo`/`_hi[name]`, which that
+    operand reads back — so the patched address actually takes effect
+    (the opaque `StoreLocal` / `code_patches` model silently dropped
+    it). A half never patched falls back to the assembled `Abs.addr`
+    byte, so a low-byte-only patch keeps the original high byte."""
+
+    reg: Reg
+    name: str
+    half: str  # "lo" | "hi"
     src: SourceRef
 
 
@@ -790,7 +821,7 @@ Instr = (
     | Pha | Pla
     | CmpIndexed | AdcIndexed | SbcIndexed
     | Rol | Ror | ShiftMem
-    | StoreLocal | StoreOpVar | SbcIndirect
+    | StoreLocal | StoreOpVar | StoreOpAddr | SbcIndirect
     | Nop | FlagOp
     | Unsupported
 )
@@ -882,6 +913,10 @@ def _fmt_imm(imm: Imm) -> str:
 
 
 def _fmt_abs(a: Abs) -> str:
+    if a.opvar is not None:
+        # SMC address operand: show the patched-operand variable and the
+        # assembled fallback address.
+        return f"{{{a.opvar}}}@{a.addr:#06x}"
     return f"{a.name}@{a.addr:#06x}"
 
 
@@ -910,6 +945,8 @@ def format_item(item: Item) -> str:
         return f"  patch *{loc} = {item.reg}            ; {item.src.short()}"
     if isinstance(item, StoreOpVar):
         return f"  opvar {item.name} = {item.reg}            ; {item.src.short()}"
+    if isinstance(item, StoreOpAddr):
+        return f"  opaddr {item.name}.{item.half} = {item.reg}            ; {item.src.short()}"
     if isinstance(item, Asl):
         return f"  a = a << 1                       ; {item.src.short()}"
     if isinstance(item, Clc):

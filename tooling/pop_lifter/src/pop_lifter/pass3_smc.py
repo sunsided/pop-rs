@@ -37,16 +37,31 @@ from .ir1 import (
     AdcImm,
     CmpImm,
     Label,
+    LoadAbs,
     LoadImm,
+    LoadIndexed,
     ModuleIR1,
     Routine,
     SbcImm,
+    StoreAbs,
+    StoreIndexed,
     StoreLocal,
+    StoreOpAddr,
     StoreOpVar,
 )
 
 # Immediate-operand instructions whose `#imm` byte sits at `label+1`.
 _IMM_OPS = (LoadImm, AdcImm, SbcImm, CmpImm)
+
+# Absolute-operand instructions whose 16-bit address sits at `label+1`
+# (low byte) / `label+2` (high byte), mapped to the field holding the
+# `Abs` operand to mark.
+_ADDR_OP_FIELD = {
+    LoadAbs: "source",
+    StoreAbs: "target",
+    LoadIndexed: "base",
+    StoreIndexed: "base",
+}
 
 
 def _opvar_name(label: str) -> str:
@@ -71,30 +86,63 @@ def recognize_routine(routine: Routine) -> Routine:
     body = list(routine.body)
     label_pos = {it.name: i for i, it in enumerate(body) if isinstance(it, Label)}
 
-    # A label is a recognised immediate-SMC site if it's patched at
-    # offset 1 and the instruction it labels has an immediate operand.
-    opvar_for: dict[str, str] = {}      # label -> operand-variable name
-    instr_idx_for: dict[str, int] = {}  # label -> index of patched instr
+    # Group every patch label's offsets and resolve the instruction it
+    # labels, then classify:
+    #   * immediate site — patched only at offset 1, labelled instruction
+    #     has a `#imm` operand (`lda/adc/sbc/cmp #imm`);
+    #   * address site — patched at offsets ⊆ {1, 2}, labelled instruction
+    #     has a 16-bit `Abs` operand (`lda/sta abs[,x/y]`).
+    # Anything else (opcode patch at offset 0, branch/jump-target patch,
+    # unresolved label) is left as an opaque `StoreLocal`.
+    offsets_for: dict[str, set[int]] = {}
+    idx_for: dict[str, int | None] = {}
     for it in body:
-        if isinstance(it, StoreLocal) and it.offset == 1:
-            idx = _patched_instr_index(body, label_pos, it.target_label)
-            if idx is None or not isinstance(body[idx], _IMM_OPS):
-                continue
-            opvar_for[it.target_label] = _opvar_name(it.target_label)
-            instr_idx_for[it.target_label] = idx
+        if isinstance(it, StoreLocal):
+            offsets_for.setdefault(it.target_label, set()).add(it.offset)
+            if it.target_label not in idx_for:
+                idx_for[it.target_label] = _patched_instr_index(
+                    body, label_pos, it.target_label)
 
-    if not opvar_for:
+    imm_var: dict[str, str] = {}            # label -> operand-var (immediate)
+    imm_idx: dict[str, int] = {}            # label -> patched-instr index
+    addr_var: dict[str, str] = {}           # label -> operand-var (address)
+    addr_idx: dict[str, int] = {}
+    for label, offsets in offsets_for.items():
+        idx = idx_for[label]
+        if idx is None:
+            continue
+        instr = body[idx]
+        if offsets == {1} and isinstance(instr, _IMM_OPS):
+            imm_var[label] = _opvar_name(label)
+            imm_idx[label] = idx
+        elif offsets <= {1, 2} and type(instr) in _ADDR_OP_FIELD:
+            addr_var[label] = _opvar_name(label)
+            addr_idx[label] = idx
+
+    if not imm_var and not addr_var:
         return routine
 
     new = list(body)
-    # Rewrite every patch store of a recognised label into a StoreOpVar.
+    # Rewrite the patch stores.
     for i, it in enumerate(new):
-        if isinstance(it, StoreLocal) and it.offset == 1 and it.target_label in opvar_for:
-            new[i] = StoreOpVar(reg=it.reg, name=opvar_for[it.target_label], src=it.src)
+        if not isinstance(it, StoreLocal):
+            continue
+        if it.target_label in imm_var and it.offset == 1:
+            new[i] = StoreOpVar(reg=it.reg, name=imm_var[it.target_label], src=it.src)
+        elif it.target_label in addr_var and it.offset in (1, 2):
+            half = "lo" if it.offset == 1 else "hi"
+            new[i] = StoreOpAddr(
+                reg=it.reg, name=addr_var[it.target_label], half=half, src=it.src)
     # Mark the patched immediate so the interpreter reads the variable.
-    for label, idx in instr_idx_for.items():
+    for label, idx in imm_idx.items():
         instr = new[idx]
-        new[idx] = replace(instr, imm=replace(instr.imm, opvar=opvar_for[label]))
+        new[idx] = replace(instr, imm=replace(instr.imm, opvar=imm_var[label]))
+    # Mark the patched address operand likewise.
+    for label, idx in addr_idx.items():
+        instr = new[idx]
+        field = _ADDR_OP_FIELD[type(instr)]
+        operand = getattr(instr, field)
+        new[idx] = replace(instr, **{field: replace(operand, opvar=addr_var[label])})
 
     return replace(routine, body=new)
 

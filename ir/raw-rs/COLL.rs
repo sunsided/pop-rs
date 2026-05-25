@@ -5,9 +5,9 @@
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
 // routines emit a `loop { match pc { ... } }` dispatch fallback; the
-// stack rides `self.stack: Vec<u8>` and recognised SMC immediate
-// patches ride `self.<opvar>` fields. Opaque address-patch SMC stays
-// deferred as `// raw: …` / `// TODO(pass4): …` comments.
+// stack rides `self.stack: Vec<u8>` and recognised SMC operand
+// patches ride `self.<opvar>` / `self.<opvar>_lo`/`_hi` fields.
+// Opcode / branch-target SMC stays deferred as `// raw: …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -24,7 +24,6 @@ mod sym {
     pub const BlueSpec: usize = 0x0026;
     pub const CDLeftEj: usize = 0x00be;
     pub const CDRightEj: usize = 0x00bf;
-    pub const CDbelow: usize = 0x0340;
     pub const CDlastframe: usize = 0x0330;
     pub const CDthisframe: usize = 0x0320;
     pub const CharAction: usize = 0x0046;
@@ -178,8 +177,8 @@ impl Cpu {
     }
 
     fn getCData(&mut self) {
-        // raw: patch *:smodSN+1 = a            ; COLL.S:195
-        // raw: patch *:smodCD+1 = x            ; COLL.S:196
+        self.smodSN_lo = self.a;
+        self.smodCD_lo = self.x;
         self.a = self.ram[sym::begrange];
         self.getblockej();
         self.c = 0;
@@ -231,8 +230,8 @@ impl Cpu {
             }
             self.a |= self.ram[sym::ztemp];
             self.x = self.ram[sym::tempblockx];
-            self.ram[sym::CDthisframe + self.x as usize] = self.a;
-            self.ram[sym::SNthisframe + self.x as usize] = self.ram[sym::tempscrn];
+            self.ram[((self.smodCD_hi as usize) << 8 | self.smodCD_lo as usize) + self.x as usize] = self.a;
+            self.ram[((self.smodSN_hi as usize) << 8 | self.smodSN_lo as usize) + self.x as usize] = self.ram[sym::tempscrn];
             self.a = self.ram[sym::blockedge];
             self.c = 0;
             let _r = (self.a as u16) + (0x0e) as u16 + (self.c as u16);
@@ -318,12 +317,12 @@ impl Cpu {
                 }
             }
         }
-        // raw: patch *:smodSN+1 = a            ; COLL.S:306
-        // raw: patch *:smodCD+1 = x            ; COLL.S:307
+        self.smodSN_lo = self.a;
+        self.smodCD_lo = self.x;
         self.x = 0x09;
         loop {
-            self.ram[sym::SNlastframe + self.x as usize] = self.ram[sym::SNbelow + self.x as usize];
-            self.ram[sym::CDlastframe + self.x as usize] = self.ram[sym::CDbelow + self.x as usize];
+            self.ram[sym::SNlastframe + self.x as usize] = self.ram[((self.smodSN_hi as usize) << 8 | self.smodSN_lo as usize) + self.x as usize];
+            self.ram[sym::CDlastframe + self.x as usize] = self.ram[((self.smodCD_hi as usize) << 8 | self.smodCD_lo as usize) + self.x as usize];
             self.a = 0xff;
             self.ram[sym::SNthisframe + self.x as usize] = self.a;
             self.ram[sym::SNabove + self.x as usize] = self.a;
