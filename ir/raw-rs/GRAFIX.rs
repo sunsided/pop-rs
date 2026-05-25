@@ -5,8 +5,9 @@
 // `(ptr),y` indirect, cmp/bit flag, and 16-bit (`Wide16`) lowering.
 // Flags are `self.c`/`self.z`/`self.n: u8` (provisional). Unstructured
 // routines emit a `loop { match pc { ... } }` dispatch fallback; the
-// stack rides `self.stack: Vec<u8>`. SMC is deferred; it appears as
-// `// raw: …` / `// TODO(pass4): …` comments.
+// stack rides `self.stack: Vec<u8>` and recognised SMC immediate
+// patches ride `self.<opvar>` fields. Opaque address-patch SMC stays
+// deferred as `// raw: …` / `// TODO(pass4): …` comments.
 // The `Cpu` receiver and `self.ram`/`self.c`/`self.z`/`self.n` are
 // provisional, pending the state/trait design slice. RAM addresses
 // keep their source symbol names via the `sym` constants below.
@@ -289,7 +290,7 @@ impl Cpu {
             self.a = self.ram[sym::dummy + self.x as usize];
             self.a = 0x2e;
         }
-        // raw: patch *:sm+1 = a            ; GRAFIX.S:450
+        self.sm = self.a;
         self.x = self.a;
         self.a = self.ram[sym::peelX + self.x as usize];
         self.c = 0;
@@ -301,7 +302,7 @@ impl Cpu {
         }
         self.ram[sym::peelX + self.x as usize] = self.a;
         self.c = 0;
-        let _r = (self.a as u16) + (0x00) as u16 + (self.c as u16);
+        let _r = (self.a as u16) + (self.sm) as u16 + (self.c as u16);
         self.a = _r as u8;
         self.c = (_r >> 8) as u8;
         self.x = self.a;
@@ -538,14 +539,14 @@ impl Cpu {
         } else {
             self.x = 0x2e;
         }
-        // raw: patch *:sm+1 = x            ; GRAFIX.S:645
+        self.sm = self.x;
         self.a = self.ram[sym::peelX + self.x as usize];
         if self.a == 0x00 {
         } else {
             loop {
                 let tmp0 = self.a;
                 self.c = 0;
-                let _r = (self.a as u16) + (0x00) as u16 + (self.c as u16);
+                let _r = (self.a as u16) + (self.sm) as u16 + (self.c as u16);
                 self.a = _r as u8;
                 self.c = (_r >> 8) as u8;
                 self.x = self.a;

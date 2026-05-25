@@ -367,8 +367,9 @@ def _regen_cup_rs(source_dir: Path) -> str:
         ],
         search_paths=[source_dir],
     )
+    from pop_lifter.pass3_smc import recognize_smc
     auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
-    ir1_module = lift_file(auto, ast.symbols(), ["Cup"]).module
+    ir1_module = recognize_smc(lift_file(auto, ast.symbols(), ["Cup"]).module)
     ir3_module = reloop_module(structure_module(ir1_module))
     recovered = recover_temps(recover_loops(recognize_module(fold_module(ir3_module))))
     return emit_module(recovered)
@@ -413,8 +414,9 @@ def _regen_chgshadposn_rs(source_dir: Path) -> str:
         ],
         search_paths=[source_dir],
     )
+    from pop_lifter.pass3_smc import recognize_smc
     auto = next(f for f in ast.files if Path(f.path).name == "AUTO.S")
-    ir1_module = lift_file(auto, ast.symbols(), ["chgshadposn"]).module
+    ir1_module = recognize_smc(lift_file(auto, ast.symbols(), ["chgshadposn"]).module)
     ir3_module = reloop_module(structure_module(ir1_module))
     recovered = recover_temps(recover_loops(recognize_module(fold_module(ir3_module))))
     return emit_module(recovered)

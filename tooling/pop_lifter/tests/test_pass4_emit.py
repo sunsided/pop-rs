@@ -56,6 +56,7 @@ from pop_lifter.ir1 import (
     StoreIndexed,
     StoreIndirect,
     StoreLocal,
+    StoreOpVar,
     Transfer,
 )
 from pop_lifter.ir1 import Compare
@@ -588,12 +589,17 @@ def test_raw_load_imm():
     assert _raw(LoadImm(reg=Reg.X, imm=_imm(0x12), src=SRC)) == "self.x = 0x12;"
 
 
-def test_raw_load_imm_opvar_deferred():
-    # A self-modifying-code operand variable can't be lowered to a static
-    # byte, so the whole load stays a `// raw:` comment.
+def test_raw_load_imm_opvar_reads_operand_var():
+    # A recognised SMC operand immediate reads the provisional operand-
+    # variable field that the matching StoreOpVar writes.
     smc = Imm(value=0, text="#smXCO", opvar="smXCO")
     out = _raw(LoadImm(reg=Reg.A, imm=smc, src=SRC))
-    assert out.startswith("// raw: ")
+    assert out == "self.a = self.smXCO;"
+
+
+def test_raw_store_opvar_writes_operand_var():
+    out = _raw(StoreOpVar(reg=Reg.A, name="smXCO", src=SRC))
+    assert out == "self.smXCO = self.a;"
 
 
 def test_raw_load_indexed():
