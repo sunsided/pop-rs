@@ -1076,13 +1076,9 @@ pub fn _3asub(cpu: &mut Cpu) {
                 cpu.mem[sym::FCharIndex] = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::CharPosn];
                 if cpu.reg.a != 0xb9 {
-                    let _o: u8 = 0xb1;
-                    cpu.flags.c = cpu.reg.a >= _o;
-                    cpu.flags.z = cpu.reg.a == _o;
-                    cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if cpu.reg.a == 0xb1 {
-                        // raw: ??? lda #-5 impaled            ; GAMEBG.S:1004
-                        if !cpu.flags.z {
+                        cpu.reg.a = 0xfb;
+                        if cpu.reg.a != 0x00 {
                             break 'b11;
                         } else {
                             break 'b10;

@@ -1040,14 +1040,10 @@ impl Cpu {
                         return;
                     }
                 }
-                let _o: u8 = 0x1d;
-                self.flags.c = self.reg.a >= _o;
-                self.flags.z = self.reg.a == _o;
-                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if self.reg.a >= 0x1d {
                     return;
                 }
-                // raw: ??? lda #99 "stabbed"            ; AUTO.S:1002
+                self.reg.a = 0x63;
                 self.mem[sym::OpAction] = self.reg.a;
                 return;
             }

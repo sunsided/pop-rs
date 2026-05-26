@@ -890,14 +890,10 @@ pub fn TestStrike(cpu: &mut Cpu) {
                     return;
                 }
             }
-            let _o: u8 = 0x1d;
-            cpu.flags.c = cpu.reg.a >= _o;
-            cpu.flags.z = cpu.reg.a == _o;
-            cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
             if cpu.reg.a >= 0x1d {
                 return;
             }
-            // raw: ??? lda #99 "stabbed"            ; AUTO.S:1002
+            cpu.reg.a = 0x63;
             cpu.mem[sym::OpAction] = cpu.reg.a;
             return;
         }

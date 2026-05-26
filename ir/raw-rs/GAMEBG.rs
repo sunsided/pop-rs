@@ -1209,13 +1209,9 @@ impl Cpu {
                     self.mem[sym::FCharIndex] = self.reg.a;
                     self.reg.a = self.mem[sym::CharPosn];
                     if self.reg.a != 0xb9 {
-                        let _o: u8 = 0xb1;
-                        self.flags.c = self.reg.a >= _o;
-                        self.flags.z = self.reg.a == _o;
-                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                         if self.reg.a == 0xb1 {
-                            // raw: ??? lda #-5 impaled            ; GAMEBG.S:1004
-                            if !self.flags.z {
+                            self.reg.a = 0xfb;
+                            if self.reg.a != 0x00 {
                                 break 'b11;
                             } else {
                                 break 'b10;
