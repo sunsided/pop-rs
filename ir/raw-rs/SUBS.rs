@@ -665,7 +665,7 @@ impl Cpu {
 
     fn PlayCut6(&mut self) {
         self.mem[sym::SPEED] = 0x16;
-        self.reg.x = 0x08;
+        self.reg.x = 0x08;  // empty hourglass
         self.addglass();
         self.reg.a = 0x02;
         self.play();
@@ -779,7 +779,7 @@ impl Cpu {
         self.reg.a = 0x0a;
         self.reg.x = 0x19;
         self.PlaySongI();
-        self.reg.a = 0x66;
+        self.reg.a = 0x66;  // raises arms
         self.kjumpseq();
         self.reg.a = 0x01;
         self.play();
@@ -1343,7 +1343,7 @@ impl Cpu {
         self.reg.a = 0x6d;
         self.reg.x = 0x01;
         if self.reg.x != self.mem[sym::purpleflag] {
-            self.reg.a = 0x78;
+            self.reg.a = 0x78;  // crash (copy protect)
         }
         self.jumpseq();
         self.animchar();
@@ -1535,7 +1535,7 @@ impl Cpu {
         self.flags.z = self.reg.x == _o;
         self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
         if self.reg.x >= 0x04 {
-            self.reg.a = 0x19;
+            self.reg.a = 0x19;  // delay 5 cycles
         }
         self.mem[sym::msgtimer] = self.reg.a;
         self.reg.a = 0x00;
@@ -1752,7 +1752,7 @@ impl Cpu {
             self.SaveKid();
             return;
         }
-        self.reg.a = 0x03;
+        self.reg.a = 0x03;  // down
         self.cut();
         self.SaveKid();
         return;
@@ -1789,7 +1789,7 @@ impl Cpu {
             self.SaveKid();
             return;
         }
-        self.reg.a = 0x03;
+        self.reg.a = 0x03;  // down
         self.cut();
         self.SaveKid();
         return;
@@ -1871,7 +1871,7 @@ impl Cpu {
     }
 
     fn INITIALGUARDS(&mut self) {
-        self.reg.y = 0x18;
+        self.reg.y = 0x18;  // screen #
         loop {
             self.reg.a = self.mem[sym::GdStartBlock - 1 + self.reg.y as usize];
             let _o: u8 = 0x1e;

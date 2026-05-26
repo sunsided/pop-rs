@@ -30,7 +30,7 @@ pub fn KEYS(cpu: &mut Cpu) {
     }
     cpu.reg.x = 0x00;
     cpu.mem[sym::SINGSTEP] = cpu.reg.x;
-    cpu.reg.a = 0x00;
+    cpu.reg.a = 0x00;  // ignore the keypress that breaks ESC
     if cpu.reg.a == 0x00 {
         KEYS2(cpu);
         return;
@@ -51,7 +51,7 @@ pub fn freeze(cpu: &mut Cpu) {
     if cpu.reg.a != 0x9b {
         cpu.reg.x = 0x00;
         cpu.mem[sym::SINGSTEP] = cpu.reg.x;
-        cpu.reg.a = 0x00;
+        cpu.reg.a = 0x00;  // ignore the keypress that breaks ESC
         if cpu.reg.a == 0x00 {
             KEYS2(cpu);
             return;
@@ -101,7 +101,7 @@ pub fn KEYS1(cpu: &mut Cpu) {
                             }
                         }
                     } else {
-                        cpu.reg.a = 0x00;
+                        cpu.reg.a = 0x00;  // 1st digit
                     }
                     cpu.flags.c = false;
                     let _r = (cpu.reg.a as u16) + cpu.mem[sym::keypress] as u16 + (cpu.flags.c as u16);
@@ -142,10 +142,10 @@ pub fn KEYS1(cpu: &mut Cpu) {
         cpu.reg.x = 0x03;
         checkcode(cpu);
         if cpu.flags.z {
-            cpu.reg.a = 0x03;
+            cpu.reg.a = 0x03;  // up to level 4
             cpu.reg.x = cpu.mem[sym::develment];
             if cpu.reg.x != 0x00 {
-                cpu.reg.a = 0x0b;
+                cpu.reg.a = 0x0b;  // or level 12 in cheat mode
             }
             let _o: u8 = cpu.mem[sym::level];
             cpu.flags.c = cpu.reg.a >= _o;
@@ -207,7 +207,7 @@ pub fn KEYS2(cpu: &mut Cpu) {
                             }
                         }
                     } else {
-                        cpu.reg.a = 0x00;
+                        cpu.reg.a = 0x00;  // 1st digit
                     }
                     cpu.flags.c = false;
                     let _r = (cpu.reg.a as u16) + cpu.mem[sym::keypress] as u16 + (cpu.flags.c as u16);
@@ -248,10 +248,10 @@ pub fn KEYS2(cpu: &mut Cpu) {
         cpu.reg.x = 0x03;
         checkcode(cpu);
         if cpu.flags.z {
-            cpu.reg.a = 0x03;
+            cpu.reg.a = 0x03;  // up to level 4
             cpu.reg.x = cpu.mem[sym::develment];
             if cpu.reg.x != 0x00 {
-                cpu.reg.a = 0x0b;
+                cpu.reg.a = 0x0b;  // or level 12 in cheat mode
             }
             let _o: u8 = cpu.mem[sym::level];
             cpu.flags.c = cpu.reg.a >= _o;
@@ -343,7 +343,7 @@ pub fn addkey(cpu: &mut Cpu) {
     cpu.flags.z = _v == 0;
     cpu.flags.n = (_v >> 7) != 0;
     if cpu.reg.x >= 0x0a {
-        cpu.reg.x = 0x00;
+        cpu.reg.x = 0x00;  // wrap around
     }
     cpu.mem[sym::keybufptr] = cpu.reg.x;
     cpu.mem[sym::keybuf + cpu.reg.x as usize] = cpu.reg.a;
@@ -358,7 +358,7 @@ pub fn checkcode(cpu: &mut Cpu) {
                 cpu.smc.smod_lo = cpu.reg.a;
                 cpu.smc.smod_hi = cpu.reg.x;
                 cpu.reg.x = cpu.mem[sym::keybufptr];
-                cpu.reg.y = 0x00;
+                cpu.reg.y = 0x00;  // last char of code seq
                 pc = 1;
             }
             1 => {
@@ -433,7 +433,7 @@ pub fn checkcode(cpu: &mut Cpu) {
                 }
             }
             8 => {
-                cpu.reg.x = 0x09;
+                cpu.reg.x = 0x09;  // wrap around
                 if (cpu.reg.x as i8) >= 0 {
                     pc = 1;
                 } else {
@@ -765,7 +765,7 @@ pub fn CLRJSTK(cpu: &mut Cpu) {
 }
 
 pub fn ZEROSOUND(cpu: &mut Cpu) {
-    cpu.reg.a = 0x00;
+    cpu.reg.a = 0x00;  // # sounds in table
     cpu.mem[sym::soundtable] = cpu.reg.a;
     return;
 }
@@ -950,7 +950,7 @@ pub fn BURN(cpu: &mut Cpu) {
     cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::torchx + cpu.reg.x as usize];
     if (cpu.reg.a as i8) < 0 {
-        cpu.reg.x = 0x00;
+        cpu.reg.x = 0x00;  // start again at beginning of list
     }
     cpu.mem[sym::torchcount] = cpu.reg.x;
     cpu.mem[sym::XCO] = cpu.mem[sym::torchx + cpu.reg.x as usize];
@@ -1286,7 +1286,7 @@ pub fn TempDevel(cpu: &mut Cpu) {
                                     cpu.flags.z = cpu.reg.a == _o;
                                     cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                                     if cpu.reg.a < 0x05 {
-                                        cpu.reg.a = 0x01;
+                                        cpu.reg.a = 0x01;  // fastest
                                         cpu.mem[sym::SPEED] = cpu.reg.a;
                                         return;
                                     }
@@ -1356,7 +1356,7 @@ pub fn _3asub(cpu: &mut Cpu) {
     loop {
         match pc {
             0 => {
-                cpu.reg.y = 0x61;
+                cpu.reg.y = 0x61;  // counter
                 pc = 1;
             }
             1 => {

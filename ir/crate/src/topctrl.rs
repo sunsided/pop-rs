@@ -14,7 +14,7 @@ pub fn START(cpu: &mut Cpu) {
 
 pub fn STARTRESUME(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
-    cpu.reg.a = 0x04;
+    cpu.reg.a = 0x04;  // arbitrary value >1
     StartGame(cpu);
     ResumeGame(cpu);
     return;
@@ -72,7 +72,7 @@ pub fn initgame(cpu: &mut Cpu) {
     cpu.mem[sym::NextTimeMsg] = 0x00;
     cpu.mem[sym::MinLeft] = 0xff;
     cpu.mem[sym::SecLeft] = 0xff;
-    cpu.reg.a = 0x01;
+    cpu.reg.a = 0x01;  // no delay
     cpu.mem[sym::SPEED] = cpu.reg.a;
     return;
 }
@@ -379,7 +379,7 @@ pub fn setupshad(cpu: &mut Cpu) {
         crate::ext::addshadobj(cpu);
         return;
     }
-    cpu.reg.a = 0x04;
+    cpu.reg.a = 0x04;  // Clip shadman at L as he jumps out of mirror
     cpu.flags.c = (cpu.reg.a >> 7) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shl(1);
     cpu.flags.c = (cpu.reg.a >> 7) != 0;
@@ -467,7 +467,7 @@ pub fn flashon(cpu: &mut Cpu) {
     if (cpu.reg.a as i8) >= 0 {
         return;
     }
-    cpu.reg.a = 0x11;
+    cpu.reg.a = 0x11;  // Flash red if kid's been hurt
     crate::ext::doflashon(cpu);
     return;
 }
@@ -646,7 +646,7 @@ pub fn deathsong(cpu: &mut Cpu) {
                 if cpu.reg.a != 0x00 {
                     break 'b4;
                 } else {
-                    cpu.reg.a = 0x01;
+                    cpu.reg.a = 0x01;  // no--"accidental death" music
                     if cpu.reg.a != 0x00 {
                         break 'b5;
                     }
@@ -802,7 +802,7 @@ pub fn entrance(cpu: &mut Cpu) {
 }
 
 pub fn addsfx(cpu: &mut Cpu) {
-    cpu.reg.a = 0xa7;
+    cpu.reg.a = 0xa7;  // blocked strike
     if cpu.reg.a == cpu.mem[sym::KidPosn] {
         cpu.reg.a = 0x11;
         if cpu.reg.a != 0x00 {

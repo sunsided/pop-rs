@@ -89,7 +89,7 @@ pub fn SURE(cpu: &mut Cpu) {
                 pc = 1;
             }
             5 => {
-                cpu.reg.y = 0x02;
+                cpu.reg.y = 0x02;  // bottom row of scrn above
                 cpu.mem[sym::rowno] = cpu.reg.y;
                 cpu.reg.a = 0x02;
                 cpu.mem[sym::Dy] = cpu.reg.a;
@@ -129,7 +129,7 @@ pub fn SURE(cpu: &mut Cpu) {
                 }
             }
             7 => {
-                cpu.reg.a = 0x01;
+                cpu.reg.a = 0x01;  // If screen above is null screen,
                 if cpu.reg.a != 0x00 {
                     pc = 9;
                 } else {
@@ -524,8 +524,8 @@ pub fn drawobjs(cpu: &mut Cpu) {
                 }
             }
             1 => {
-                cpu.reg.y = 0x00;
-                cpu.reg.x = 0x01;
+                cpu.reg.y = 0x00;  // y = sort list index
+                cpu.reg.x = 0x01;  // x = object list index
                 pc = 2;
             }
             2 => {
@@ -690,7 +690,7 @@ pub fn getbelow(cpu: &mut Cpu) {
             }
             2 => {
                 crate::ext::calcblue(cpu);
-                cpu.reg.y = 0x08;
+                cpu.reg.y = 0x08;  // skip rmost
                 pc = 3;
             }
             3 => {
@@ -718,7 +718,7 @@ pub fn getbelow(cpu: &mut Cpu) {
             }
             5 => {
                 crate::ext::calcblue(cpu);
-                cpu.reg.y = 0x09;
+                cpu.reg.y = 0x09;  // u.r. block
                 getobjid(cpu);
                 cpu.mem[sym::BELOW] = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::state];
@@ -1324,7 +1324,7 @@ pub fn drawd(cpu: &mut Cpu) {
                     adda(cpu);
                     return;
                 }
-                cpu.reg.a = 0xa1;
+                cpu.reg.a = 0xa1;  // arch ends to L of panel
                 adda1(cpu);
                 return;
             }
@@ -1397,7 +1397,7 @@ pub fn drawa(cpu: &mut Cpu) {
             adda(cpu);
             return;
         }
-        cpu.reg.a = 0xa1;
+        cpu.reg.a = 0xa1;  // arch ends to L of panel
         adda1(cpu);
         return;
     }
@@ -1710,7 +1710,7 @@ pub fn getpiecea(cpu: &mut Cpu) {
 pub fn drawspikea(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::state];
     if (cpu.reg.x as i8) < 0 {
-        cpu.reg.x = 0x05;
+        cpu.reg.x = 0x05;  // hibit set --> spikes extended
     }
     cpu.reg.a = cpu.mem[sym::spikea + cpu.reg.x as usize];
     if cpu.reg.a == 0x00 {
@@ -1733,7 +1733,7 @@ pub fn drawspikea(cpu: &mut Cpu) {
 pub fn drawspikeb(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::spreced];
     if (cpu.reg.x as i8) < 0 {
-        cpu.reg.x = 0x05;
+        cpu.reg.x = 0x05;  // hibit set --> spikes extended
     }
     cpu.reg.a = cpu.mem[sym::spikeb + cpu.reg.x as usize];
     if cpu.reg.a == 0x00 {
@@ -1773,7 +1773,7 @@ pub fn drawslicera(cpu: &mut Cpu) {
     cpu.reg.a &= 0x7f;
     cpu.reg.x = cpu.reg.a;
     if cpu.reg.x >= 0x06 {
-        cpu.reg.x = 0x06;
+        cpu.reg.x = 0x06;  // fully retracted
     }
     'b6: {
         'b5: {
@@ -1828,7 +1828,7 @@ pub fn drawslicerf(cpu: &mut Cpu) {
     cpu.reg.a &= 0x7f;
     cpu.reg.x = cpu.reg.a;
     if cpu.reg.x >= 0x06 {
-        cpu.reg.x = 0x06;
+        cpu.reg.x = 0x06;  // fully retracted
     }
     cpu.reg.a = cpu.mem[sym::slicerseq + cpu.reg.x as usize];
     cpu.reg.x = cpu.reg.a;
@@ -2347,10 +2347,10 @@ pub fn getobjid(cpu: &mut Cpu) {
             cpu.reg.a = cpu.mem[sym::LINKMAP + cpu.reg.x as usize];
             cpu.reg.a &= 0x1f;
             if cpu.reg.a < 0x02 {
-                cpu.reg.a = 0x06;
+                cpu.reg.a = 0x06;  // plate up
                 return;
             }
-            cpu.reg.a = 0x05;
+            cpu.reg.a = 0x05;  // plate depressed
             return;
         }
         0x0f => {
@@ -2363,7 +2363,7 @@ pub fn getobjid(cpu: &mut Cpu) {
                 return;
             }
             cpu.mem[sym::state] = 0x00;
-            cpu.reg.a = 0x01;
+            cpu.reg.a = 0x01;  // depressed upp looks just like floor
             return;
         }
         _ => {}
@@ -2566,7 +2566,7 @@ pub fn GETINITOBJ(cpu: &mut Cpu) {
     cpu.reg.a &= 0x1f;
     if cpu.reg.a != 0x04 {
         if cpu.reg.a == 0x0b {
-            cpu.reg.a = 0x00;
+            cpu.reg.a = 0x00;  // loose floor
             return;
         }
         let _o: u8 = 0x0a;
@@ -2600,7 +2600,7 @@ pub fn GETINITOBJ(cpu: &mut Cpu) {
 pub fn getinitobj1(cpu: &mut Cpu) {
     if cpu.reg.a != 0x04 {
         if cpu.reg.a == 0x0b {
-            cpu.reg.a = 0x00;
+            cpu.reg.a = 0x00;  // loose floor
             return;
         }
         let _o: u8 = 0x0a;
@@ -2689,10 +2689,10 @@ pub fn getobjid1(cpu: &mut Cpu) {
             cpu.reg.a = cpu.mem[sym::LINKMAP + cpu.reg.x as usize];
             cpu.reg.a &= 0x1f;
             if cpu.reg.a < 0x02 {
-                cpu.reg.a = 0x06;
+                cpu.reg.a = 0x06;  // plate up
                 return;
             }
-            cpu.reg.a = 0x05;
+            cpu.reg.a = 0x05;  // plate depressed
             return;
         }
         0x0f => {
@@ -2705,7 +2705,7 @@ pub fn getobjid1(cpu: &mut Cpu) {
                 return;
             }
             cpu.mem[sym::state] = 0x00;
-            cpu.reg.a = 0x01;
+            cpu.reg.a = 0x01;  // depressed upp looks just like floor
             return;
         }
         _ => {}

@@ -251,7 +251,7 @@ impl Cpu {
         self.mem[sym::trloc] = self.reg.y;
         self.mem[sym::trscrn] = self.reg.a;
         self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = 0xac;
-        self.reg.a = 0x03;
+        self.reg.a = 0x03;  // coming down fast
         self.mem[sym::trdirec] = self.reg.a;
         self.addtrob();
         return;
@@ -310,7 +310,7 @@ impl Cpu {
             self.mem[sym::trscrn] = self.reg.a;
             self.addtrob();
             self.redspikes();
-            self.reg.a = 0x02;
+            self.reg.a = 0x02;  // TEMP
             self.addsound();
             return;
         }
@@ -320,7 +320,7 @@ impl Cpu {
         if self.reg.a == 0xff {
             return;
         }
-        self.reg.a = 0x8f;
+        self.reg.a = 0x8f;  // Nonzero, hibit set: spikes are fully
         self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
         return;
     }
@@ -328,7 +328,7 @@ impl Cpu {
     fn JAMSPIKES(&mut self) {
         self.reg.a = 0xff;
         self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
-        self.reg.x = 0xff;
+        self.reg.x = 0xff;  // stop object
         if (self.reg.x as i8) < 0 {
             self._5dcont();
             return;
@@ -355,7 +355,7 @@ impl Cpu {
                 }
             }
         }
-        self.reg.a = 0x00;
+        self.reg.a = 0x00;  // safe: retracted or retracting
         return;
     }
 
@@ -382,7 +382,7 @@ impl Cpu {
                 }
             }
         }
-        self.reg.a = 0x00;
+        self.reg.a = 0x00;  // safe: retracted or retracting
         return;
     }
 
@@ -402,7 +402,7 @@ impl Cpu {
         self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.mem[sym::state];
         self.mem[sym::trloc] = self.reg.y;
         self.mem[sym::trscrn] = self.mem[sym::tempscrn];
-        self.reg.a = 0x00;
+        self.reg.a = 0x00;  // down
         self.mem[sym::trdirec] = self.reg.a;
         self.addtrob();
         self.redloose();
@@ -425,7 +425,7 @@ impl Cpu {
         self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.mem[sym::state];
         self.mem[sym::trloc] = self.reg.y;
         self.mem[sym::trscrn] = self.mem[sym::tempscrn];
-        self.reg.a = 0x00;
+        self.reg.a = 0x00;  // down
         self.mem[sym::trdirec] = self.reg.a;
         self.addtrob();
         self.redloose();
@@ -457,7 +457,7 @@ impl Cpu {
             self.trigger();
             return;
         }
-        self.reg.a = 0x05;
+        self.reg.a = 0x05;  // put plate down for the count
         self.chgtimer();
         self.mem[sym::trloc] = self.reg.y;
         self.mem[sym::trscrn] = self.mem[sym::tempscrn];
@@ -494,7 +494,7 @@ impl Cpu {
             self.trigger();
             return;
         }
-        self.reg.a = 0x05;
+        self.reg.a = 0x05;  // put plate down for the count
         self.chgtimer();
         self.mem[sym::trloc] = self.reg.y;
         self.mem[sym::trscrn] = self.mem[sym::tempscrn];
@@ -713,12 +713,12 @@ impl Cpu {
                     return;
                 }
                 4 => {
-                    self.reg.a = 0x03;
+                    self.reg.a = 0x03;  // down fast
                     self.mem[sym::trdirec] = self.reg.a;
                     return;
                 }
                 5 => {
-                    self.reg.x = 0x02;
+                    self.reg.x = 0x02;  // open & jam
                     self.mem[sym::trdirec] = self.reg.x;
                     let _o: u8 = 0xbc;
                     self.flags.c = self.reg.a >= _o;
@@ -731,7 +731,7 @@ impl Cpu {
                     }
                 }
                 6 => {
-                    self.reg.a = 0xff;
+                    self.reg.a = 0xff;  // "jammed open" state
                     if (self.reg.a as i8) < 0 {
                         pc = 10;
                     } else {
@@ -739,7 +739,7 @@ impl Cpu {
                     }
                 }
                 7 => {
-                    self.reg.x = 0x01;
+                    self.reg.x = 0x01;  // open
                     self.mem[sym::trdirec] = self.reg.x;
                     let _o: u8 = 0xff;
                     self.flags.c = self.reg.a >= _o;
@@ -807,7 +807,7 @@ impl Cpu {
                     }
                 }
                 16 => {
-                    self.reg.a = 0xff;
+                    self.reg.a = 0xff;  // yes--mark it for deletion
                     self.local.insert(("]cleanflag", 0), self.reg.a);
                     pc = 17;
                 }
@@ -834,8 +834,8 @@ impl Cpu {
                     }
                 }
                 19 => {
-                    self.reg.x = 0x01;
-                    self.reg.y = 0x00;
+                    self.reg.x = 0x01;  // source index (assume numtrans > 0)
+                    self.reg.y = 0x00;  // dest index
                     pc = 20;
                 }
                 20 => {
@@ -924,7 +924,7 @@ impl Cpu {
                     }
                 }
                 3 => {
-                    self.reg.a = 0xff;
+                    self.reg.a = 0xff;  // yes--mark it for deletion
                     self.local.insert(("]cleanflag", 0), self.reg.a);
                     pc = 4;
                 }
@@ -951,8 +951,8 @@ impl Cpu {
                     }
                 }
                 6 => {
-                    self.reg.x = 0x01;
-                    self.reg.y = 0x00;
+                    self.reg.x = 0x01;  // source index (assume numtrans > 0)
+                    self.reg.y = 0x00;  // dest index
                     pc = 7;
                 }
                 7 => {
@@ -1248,11 +1248,11 @@ impl Cpu {
                     self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.x < 0x02 {
                         self.mem[sym::state] = 0xee;
-                        self.reg.a = 0x00;
+                        self.reg.a = 0x00;  // down
                         self.mem[sym::trdirec] = self.reg.a;
                         return;
                     }
-                    self.reg.a = 0xff;
+                    self.reg.a = 0xff;  // jammed-open value
                     self.mem[sym::state] = self.reg.a;
                 } else {
                     self.reg.a = 0x0b;
@@ -1309,7 +1309,7 @@ impl Cpu {
                 self.reg.a = _r as u8;
                 self.flags.c = (_r >> 8) != 0;
                 if self.reg.a >= 0x10 {
-                    self.reg.a = 0x01;
+                    self.reg.a = 0x01;  // wrap around
                 }
                 self.reg.a |= self.mem[sym::state];
                 self.mem[sym::state] = self.reg.a;
@@ -1431,7 +1431,7 @@ impl Cpu {
             self.reg.a = _r as u8;
             self.flags.c = (_r >> 8) != 0;
             if self.reg.a >= 0x12 {
-                self.reg.a = 0x00;
+                self.reg.a = 0x00;  // wrap around
             }
         }
         return;
@@ -1494,7 +1494,7 @@ impl Cpu {
         self.reg.a = self.mem[sym::state];
         self.reg.a &= 0x7f;
         if self.reg.a == 0x00 {
-            self.reg.a = 0x06;
+            self.reg.a = 0x06;  // First "retracting" frame
             self.mem[sym::state] = self.reg.a;
             if !self.flags.z {
                 self.redspikes();
@@ -1913,8 +1913,8 @@ impl Cpu {
                     }
                 }
                 2 => {
-                    self.reg.x = 0x01;
-                    self.reg.y = 0x00;
+                    self.reg.x = 0x01;  // source index (assume nummob > 0)
+                    self.reg.y = 0x00;  // dest index
                     pc = 3;
                 }
                 3 => {
@@ -2244,7 +2244,7 @@ impl Cpu {
         self.reg.a = 0x01;
         self.decstr();
         if self.flags.z {
-            self.reg.a = 0x16;
+            self.reg.a = 0x16;  // temp
             self.jumpseq();
             return;
         }

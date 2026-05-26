@@ -365,7 +365,7 @@ pub fn rightcoll(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (!cpu.mem[sym::CDLeftEj]) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
-    cpu.reg.x = 0x00;
+    cpu.reg.x = 0x00;  // right
     collide(cpu);
     return;
 }
@@ -390,7 +390,7 @@ pub fn leftcoll(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (!cpu.mem[sym::CDRightEj]) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
-    cpu.reg.x = 0xff;
+    cpu.reg.x = 0xff;  // left
     collide(cpu);
     return;
 }
@@ -888,8 +888,8 @@ pub fn GETFWDDIST(cpu: &mut Cpu) {
                 }
             }
             11 => {
-                cpu.reg.a = 0x0b;
-                cpu.reg.x = 0x02;
+                cpu.reg.a = 0x0b;  // natural step size
+                cpu.reg.x = 0x02;  // clear
                 if cpu.reg.x != 0x00 {
                     pc = 15;
                 } else {
@@ -914,7 +914,7 @@ pub fn GETFWDDIST(cpu: &mut Cpu) {
             }
             14 => {
                 crate::ext::getdist(cpu);
-                cpu.reg.x = 0x00;
+                cpu.reg.x = 0x00;  // edge
                 pc = 15;
             }
             15 => {
@@ -936,7 +936,7 @@ pub fn GETFWDDIST(cpu: &mut Cpu) {
                 }
             }
             18 => {
-                cpu.reg.x = 0x01;
+                cpu.reg.x = 0x01;  // barrier
                 if cpu.reg.x != 0x00 {
                     pc = 15;
                 } else {

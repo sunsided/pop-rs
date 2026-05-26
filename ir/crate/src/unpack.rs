@@ -671,8 +671,8 @@ pub fn INVERTY(cpu: &mut Cpu) {
     loop {
         match pc {
             0 => {
-                cpu.reg.x = 0xbf;
-                cpu.reg.y = 0x00;
+                cpu.reg.x = 0xbf;  // low line
+                cpu.reg.y = 0x00;  // high line
                 pc = 6;
             }
             1 => {
@@ -959,7 +959,7 @@ pub fn FADEIN(cpu: &mut Cpu) {
     cpu.reg.a = 0xc1;
     cpu.mem[0xc029] = cpu.reg.a;
     // 65816 (IIgs-only, not modeled): rep $20  ; UNPACK.S:722
-    cpu.reg.x = 0x00;
+    cpu.reg.x = 0x00;  // aux mem
     cpu.reg.y = 0xca;
     cpu.reg.a = 0x1f;
     // 65816 (IIgs-only, not modeled): phb  ; UNPACK.S:729

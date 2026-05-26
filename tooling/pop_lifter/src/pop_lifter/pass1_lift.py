@@ -338,7 +338,10 @@ def _lift_instr(
     if mnemonic is None or mnemonic in _NON_CODE_DIRECTIVES:
         return None
 
-    src = SourceRef(file=str(line.file), line=line.lineno, raw=line.raw.rstrip("\n"))
+    src = SourceRef(
+        file=str(line.file), line=line.lineno, raw=line.raw.rstrip("\n"),
+        comment=line.comment,
+    )
 
     if mnemonic == "rts":
         return Return(src=src)

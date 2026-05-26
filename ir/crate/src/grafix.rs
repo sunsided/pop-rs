@@ -253,7 +253,7 @@ pub fn DRAWWIPE(cpu: &mut Cpu) {
                 }
             }
             1 => {
-                cpu.reg.a = 0x01;
+                cpu.reg.a = 0x01;  // start with image #1
                 pc = 2;
             }
             2 => {
@@ -692,7 +692,7 @@ pub fn DRAWMSG(cpu: &mut Cpu) {
 pub fn setbgimg(cpu: &mut Cpu) {
     'b3: {
         cpu.reg.y = cpu.reg.a;
-        cpu.reg.a = 0x03;
+        cpu.reg.a = 0x03;  // auxmem
         cpu.mem[sym::BANK] = cpu.reg.a;
         cpu.reg.a = 0x00;
         cpu.mem[sym::TABLE] = cpu.reg.a;

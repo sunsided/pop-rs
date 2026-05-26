@@ -159,7 +159,7 @@ impl Cpu {
 
     fn STARTRESUME(&mut self) {
         self.mem[sym::ALTZPon] = self.reg.a;
-        self.reg.a = 0x04;
+        self.reg.a = 0x04;  // arbitrary value >1
         self.StartGame();
         self.ResumeGame();
         return;
@@ -217,7 +217,7 @@ impl Cpu {
         self.mem[sym::NextTimeMsg] = 0x00;
         self.mem[sym::MinLeft] = 0xff;
         self.mem[sym::SecLeft] = 0xff;
-        self.reg.a = 0x01;
+        self.reg.a = 0x01;  // no delay
         self.mem[sym::SPEED] = self.reg.a;
         return;
     }
@@ -524,7 +524,7 @@ impl Cpu {
             self.addshadobj();
             return;
         }
-        self.reg.a = 0x04;
+        self.reg.a = 0x04;  // Clip shadman at L as he jumps out of mirror
         self.flags.c = (self.reg.a >> 7) != 0;
         self.reg.a = self.reg.a.wrapping_shl(1);
         self.flags.c = (self.reg.a >> 7) != 0;
@@ -612,7 +612,7 @@ impl Cpu {
         if (self.reg.a as i8) >= 0 {
             return;
         }
-        self.reg.a = 0x11;
+        self.reg.a = 0x11;  // Flash red if kid's been hurt
         self.doflashon();
         return;
     }
@@ -791,7 +791,7 @@ impl Cpu {
                     if self.reg.a != 0x00 {
                         break 'b4;
                     } else {
-                        self.reg.a = 0x01;
+                        self.reg.a = 0x01;  // no--"accidental death" music
                         if self.reg.a != 0x00 {
                             break 'b5;
                         }
@@ -947,7 +947,7 @@ impl Cpu {
     }
 
     fn addsfx(&mut self) {
-        self.reg.a = 0xa7;
+        self.reg.a = 0xa7;  // blocked strike
         if self.reg.a == self.mem[sym::KidPosn] {
             self.reg.a = 0x11;
             if self.reg.a != 0x00 {

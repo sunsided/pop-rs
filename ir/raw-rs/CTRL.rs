@@ -2558,7 +2558,7 @@ impl Cpu {
                     }
                 }
                 9 => {
-                    self.reg.a = 0xfd;
+                    self.reg.a = 0xfd;  // He jumped too late; he'll miss edge
                     pc = 10;
                 }
                 10 => {
@@ -2922,7 +2922,7 @@ impl Cpu {
         self.reg.x = self.mem[sym::CharPosn];
         if self.reg.x == 0x6d {
             if self.reg.a == 0x16 {
-                self.reg.a = 0xff;
+                self.reg.a = 0xff;  // sword
                 self.RemoveObj();
                 self.reg.a = 0x5b;
                 self.jumpseq();
@@ -2940,7 +2940,7 @@ impl Cpu {
             self.flags.c = (self.reg.a & 1) != 0;
             self.reg.a = self.reg.a.wrapping_shr(1);
             self.RemoveObj();
-            self.reg.a = 0x4e;
+            self.reg.a = 0x4e;  // pick up & drink potion
             self.jumpseq();
             return;
         }

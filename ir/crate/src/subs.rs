@@ -525,7 +525,7 @@ pub fn PlayCut7(cpu: &mut Cpu) {
 
 pub fn PlayCut6(cpu: &mut Cpu) {
     cpu.mem[sym::SPEED] = 0x16;
-    cpu.reg.x = 0x08;
+    cpu.reg.x = 0x08;  // empty hourglass
     addglass(cpu);
     cpu.reg.a = 0x02;
     play(cpu);
@@ -639,7 +639,7 @@ pub fn PlayCut0(cpu: &mut Cpu) {
     cpu.reg.a = 0x0a;
     cpu.reg.x = 0x19;
     PlaySongI(cpu);
-    cpu.reg.a = 0x66;
+    cpu.reg.a = 0x66;  // raises arms
     kjumpseq(cpu);
     cpu.reg.a = 0x01;
     play(cpu);
@@ -1204,7 +1204,7 @@ pub fn startP7(cpu: &mut Cpu) {
     cpu.reg.a = 0x6d;
     cpu.reg.x = 0x01;
     if cpu.reg.x != cpu.mem[sym::purpleflag] {
-        cpu.reg.a = 0x78;
+        cpu.reg.a = 0x78;  // crash (copy protect)
     }
     crate::ext::jumpseq(cpu);
     crate::ext::animchar(cpu);
@@ -1396,7 +1396,7 @@ pub fn SHOWTIME(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.x == _o;
     cpu.flags.n = (cpu.reg.x.wrapping_sub(_o) >> 7) != 0;
     if cpu.reg.x >= 0x04 {
-        cpu.reg.a = 0x19;
+        cpu.reg.a = 0x19;  // delay 5 cycles
     }
     cpu.mem[sym::msgtimer] = cpu.reg.a;
     cpu.reg.a = 0x00;
@@ -1613,7 +1613,7 @@ pub fn STARTKID(cpu: &mut Cpu) {
         crate::ext::SaveKid(cpu);
         return;
     }
-    cpu.reg.a = 0x03;
+    cpu.reg.a = 0x03;  // down
     crate::ext::cut(cpu);
     crate::ext::SaveKid(cpu);
     return;
@@ -1650,7 +1650,7 @@ pub fn STARTKID1(cpu: &mut Cpu) {
         crate::ext::SaveKid(cpu);
         return;
     }
-    cpu.reg.a = 0x03;
+    cpu.reg.a = 0x03;  // down
     crate::ext::cut(cpu);
     crate::ext::SaveKid(cpu);
     return;
@@ -1732,7 +1732,7 @@ pub fn ADDFALL(cpu: &mut Cpu) {
 }
 
 pub fn INITIALGUARDS(cpu: &mut Cpu) {
-    cpu.reg.y = 0x18;
+    cpu.reg.y = 0x18;  // screen #
     loop {
         cpu.reg.a = cpu.mem[sym::GdStartBlock - 1 + cpu.reg.y as usize];
         let _o: u8 = 0x1e;

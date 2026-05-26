@@ -49,6 +49,9 @@ class SourceRef:
     file: str
     line: int
     raw: str
+    # The source line's trailing comment, if any, kept so emitted code can
+    # surface human-meaningful annotations (e.g. `lda #99 "stabbed"`).
+    comment: str | None = None
 
     def short(self) -> str:
         # Normalise both separators by hand: on POSIX hosts `PurePath`

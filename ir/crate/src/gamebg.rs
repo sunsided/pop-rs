@@ -538,7 +538,7 @@ pub fn DRAWOPPMETER(cpu: &mut Cpu) {
             6 => {
                 cpu.reg.a = 0xbf;
                 cpu.mem[sym::YCO] = cpu.reg.a;
-                cpu.reg.a = 0x82;
+                cpu.reg.a = 0x82;  // mirror
                 cpu.mem[sym::OPACITY] = cpu.reg.a;
                 cpu.reg.x = 0x00;
                 cpu.mem[sym::xsave] = cpu.reg.x;
@@ -1077,7 +1077,7 @@ pub fn _3asub(cpu: &mut Cpu) {
                 cpu.reg.a = cpu.mem[sym::CharPosn];
                 if cpu.reg.a != 0xb9 {
                     if cpu.reg.a == 0xb1 {
-                        cpu.reg.a = 0xfb;
+                        cpu.reg.a = 0xfb;  // impaled
                         if cpu.reg.a != 0x00 {
                             break 'b11;
                         } else {
@@ -1095,7 +1095,7 @@ pub fn _3asub(cpu: &mut Cpu) {
                         cpu.reg.a = 0xf1;
                         cpu.reg.x = cpu.mem[sym::CharID];
                         if cpu.reg.x != 0x00 {
-                            cpu.reg.a = 0xf5;
+                            cpu.reg.a = 0xf5;  // kid strikes lower than opponent
                         }
                         cpu.flags.c = false;
                         let _r = (cpu.reg.a as u16) + cpu.mem[sym::FCharY] as u16 + (cpu.flags.c as u16);
@@ -1118,7 +1118,7 @@ pub fn _3asub(cpu: &mut Cpu) {
     crate::ext::addfcharx(cpu);
     cpu.reg.a = cpu.mem[sym::CharID];
     if cpu.reg.a != 0x00 {
-        cpu.reg.a = 0x01;
+        cpu.reg.a = 0x01;  // opponents: 1
     }
     cpu.reg.a ^= cpu.mem[sym::FCharX];
     cpu.reg.a ^= cpu.mem[sym::FCharFace];

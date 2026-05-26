@@ -227,6 +227,18 @@ def test_raw_load_abs_is_lowered():
     assert _emit_one(raw) == "self.reg.a = self.mem[0x0010];"
 
 
+def test_load_imm_surfaces_source_comment():
+    # A magic immediate keeps its source annotation as a trailing comment.
+    src = SourceRef(file="syn", line=0, raw="", comment='"stabbed"')
+    raw = RawStmt(item=LoadImm(reg=Reg.A, imm=_imm(0x63), src=src))
+    assert _emit_one(raw) == 'self.reg.a = 0x63;  // "stabbed"'
+
+
+def test_load_imm_without_comment_has_no_suffix():
+    raw = RawStmt(item=LoadImm(reg=Reg.A, imm=_imm(5), src=SRC))
+    assert _emit_one(raw) == "self.reg.a = 0x05;"
+
+
 def test_raw_pha_pushes_value_stack():
     # An unpaired `pha` (pass 3 couldn't fold it into a SaveTemp) lowers
     # over the provisional value stack.

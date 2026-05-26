@@ -383,8 +383,8 @@ pub fn rdbluep(cpu: &mut Cpu) {
 }
 
 pub fn copy1to2(cpu: &mut Cpu) {
-    cpu.reg.a = 0x40;
-    cpu.reg.x = 0x20;
+    cpu.reg.a = 0x40;  // dest
+    cpu.reg.x = 0x20;  // org
     if cpu.reg.x == 0x00 {
         cpu.reg.a = 0x20;
         cpu.reg.x = 0x40;
@@ -416,7 +416,7 @@ pub fn copydhires(cpu: &mut Cpu) {
 
 pub fn CUTPRINCESS(cpu: &mut Cpu) {
     crate::ext::blackout(cpu);
-    cpu.reg.a = 0x01;
+    cpu.reg.a = 0x01;  // seek track 0
     LoadStage2(cpu);
     cpu.reg.a = 0x84;
     crate::ext::SngExpand(cpu);
@@ -563,9 +563,9 @@ pub fn Prolog1(cpu: &mut Cpu) {
 pub fn PrincessScene(cpu: &mut Cpu) {
     crate::ext::blackout(cpu);
     ReloadStuff(cpu);
-    cpu.reg.a = 0x00;
+    cpu.reg.a = 0x00;  // don't seek track 0
     cutprincess1(cpu);
-    cpu.reg.a = 0x00;
+    cpu.reg.a = 0x00;  // cut #0 (intro)
     crate::ext::xplaycut(cpu);
     return;
 }
@@ -614,13 +614,13 @@ pub fn unpacksplash(cpu: &mut Cpu) {
 }
 
 pub fn SuperEpilog(cpu: &mut Cpu) {
-    cpu.reg.a = 0x01;
+    cpu.reg.a = 0x01;  // aux
     crate::ext::fadein(cpu);
     setaux(cpu);
     cpu.reg.a = 0x01;
     PlaySongNI(cpu);
     crate::ext::fadeout(cpu);
-    cpu.reg.a = 0x00;
+    cpu.reg.a = 0x00;  // main
     crate::ext::fadein(cpu);
     setaux(cpu);
     cpu.reg.a = 0x50;
@@ -722,7 +722,7 @@ pub fn StartGame_3f(cpu: &mut Cpu) {
         crate::ext::start(cpu);
         return;
     }
-    cpu.reg.a = 0x04;
+    cpu.reg.a = 0x04;  // arbitrary
     crate::ext::startresume(cpu);
     return;
 }
@@ -741,7 +741,7 @@ pub fn _3a3(cpu: &mut Cpu) {
         crate::ext::start(cpu);
         return;
     }
-    cpu.reg.a = 0x04;
+    cpu.reg.a = 0x04;  // arbitrary
     crate::ext::startresume(cpu);
     return;
 }

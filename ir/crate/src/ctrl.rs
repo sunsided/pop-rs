@@ -2449,7 +2449,7 @@ pub fn DoRunjump(cpu: &mut Cpu) {
                 }
             }
             9 => {
-                cpu.reg.a = 0xfd;
+                cpu.reg.a = 0xfd;  // He jumped too late; he'll miss edge
                 pc = 10;
             }
             10 => {
@@ -2813,7 +2813,7 @@ pub fn PickItUp(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::CharPosn];
     if cpu.reg.x == 0x6d {
         if cpu.reg.a == 0x16 {
-            cpu.reg.a = 0xff;
+            cpu.reg.a = 0xff;  // sword
             crate::ext::RemoveObj(cpu);
             cpu.reg.a = 0x5b;
             crate::ext::jumpseq(cpu);
@@ -2831,7 +2831,7 @@ pub fn PickItUp(cpu: &mut Cpu) {
         cpu.flags.c = (cpu.reg.a & 1) != 0;
         cpu.reg.a = cpu.reg.a.wrapping_shr(1);
         crate::ext::RemoveObj(cpu);
-        cpu.reg.a = 0x4e;
+        cpu.reg.a = 0x4e;  // pick up & drink potion
         crate::ext::jumpseq(cpu);
         return;
     }

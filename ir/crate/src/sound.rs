@@ -8,7 +8,7 @@ use crate::sym;
 #[doc(alias = "lookup")]
 #[doc(alias = "endlook")]
 pub fn ZEROSOUND(cpu: &mut Cpu) {
-    cpu.reg.a = 0x00;
+    cpu.reg.a = 0x00;  // # sounds in table
     cpu.mem[sym::soundtable] = cpu.reg.a;
     return;
 }
