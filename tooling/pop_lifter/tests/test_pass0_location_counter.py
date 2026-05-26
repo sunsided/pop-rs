@@ -124,3 +124,55 @@ def test_origin_dependent_equate_stays_unresolved(tmp_path):
     ]))
     ast = parse_files([src])
     assert "foo" not in ast.equates
+
+
+# ---- PR #60 review fixes
+
+
+def test_dum_block_does_not_affect_main_pc(tmp_path):
+    # A `dum` overlay emits no object bytes and lives in its own address
+    # space, so it must neither advance the main PC nor record its field
+    # labels for position equates. `after-tbl` counts only `tbl`'s bytes.
+    src = _write(tmp_path, "T.S", "\n".join([
+        " org $2000",
+        "tbl db 0,1,2",       # 3 bytes
+        " dum $00",
+        "fieldA ds 8",        # dum field — separate address space
+        " dend",
+        "after",
+        "sz = after-tbl",
+        "",
+    ]))
+    ast = parse_files([src])
+    assert ast.equates["sz"] == 3
+
+
+def test_unknown_macro_advances_pc_by_zero(tmp_path):
+    # A macro invocation has unknown byte size, so PC tracking treats it
+    # as 0 bytes rather than guessing a 1/2/3-byte instruction size.
+    src = _write(tmp_path, "T.S", "\n".join([
+        " org $2000",
+        "tbl db 0,1",         # 2 bytes
+        " mymacro arg1,arg2",  # unknown mnemonic → 0 bytes
+        "after",
+        "sz = after-tbl",
+        "",
+    ]))
+    ast = parse_files([src])
+    assert ast.equates["sz"] == 2
+
+
+def test_equate_wins_over_label_pc_in_fallback(tmp_path):
+    # When a name is both an equate and a label, the equate value wins in
+    # the position-equate fallback (matching `symbols()` precedence). `w`
+    # is the equate constant 3, so `*-w` is an address expression (not a
+    # size) and is correctly left unresolved rather than using w's PC.
+    src = _write(tmp_path, "T.S", "\n".join([
+        "w = 3",
+        " org $2000",
+        "w db 0,0",
+        "sz = *-w",
+        "",
+    ]))
+    ast = parse_files([src])
+    assert "sz" not in ast.equates

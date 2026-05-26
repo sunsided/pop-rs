@@ -336,6 +336,20 @@ _BRANCH_OPS = frozenset({
     "bcc", "bcs", "beq", "bne", "bpl", "bmi", "bvc", "bvs", "bra",
 })
 
+# Every 6502/65C02 mnemonic the lifter recognises. A line whose mnemonic
+# isn't here (and isn't a data directive) is a macro invocation whose byte
+# size we can't know, so PC tracking advances by 0 for it rather than
+# guessing — see `_parse_file`.
+_OPCODES = _IMPLIED_OPS | _BRANCH_OPS | frozenset({
+    "lda", "ldx", "ldy", "sta", "stx", "sty", "stz",
+    "adc", "sbc", "and", "ora", "eor", "bit",
+    "cmp", "cpx", "cpy",
+    "asl", "lsr", "rol", "ror",
+    "inc", "dec",
+    "jmp", "jsr",
+    "tsb", "trb",
+})
+
 
 def _count_operands(operand: str | None) -> int:
     """Count comma-separated top-level operands; commas inside a quoted
@@ -460,8 +474,12 @@ class Parser:
 
             # Record the PC at every global label before the line emits
             # any bytes, so a later `LABEL = *-thislabel` equate resolves.
+            # Skipped inside a `dum` overlay: those labels live in the
+            # overlay's own address space (and become equates via
+            # `_handle_ds`), not the main program counter.
             if (
-                line.label
+                dum is None
+                and line.label
                 and not line.is_equate
                 and not line.label.startswith((":", "]"))
             ):
@@ -530,12 +548,20 @@ class Parser:
                 continue
 
             # Real opcodes and data directives advance the PC so that
-            # location-counter equates resolve. The raw line still stays
-            # on `file_ast.lines` for later passes.
+            # location-counter equates resolve. A data directive is sized
+            # by its operands; a recognised opcode by its addressing mode.
+            # An unrecognised mnemonic is a macro whose expansion size we
+            # can't know, so it advances by 0 — which only shifts the
+            # absolute PC base and cancels out of the origin-independent
+            # equate differences we resolve. The raw line still stays on
+            # `file_ast.lines` for later passes.
             if mnemonic is not None:
                 size = _directive_size(mnemonic, line.operand, self.ast.equates)
                 if size is None:
-                    size = _instr_size(mnemonic, line.operand, self.ast.equates)
+                    size = (
+                        _instr_size(mnemonic, line.operand, self.ast.equates)
+                        if mnemonic in _OPCODES else 0
+                    )
                 self._pc += size
 
         # An open `dum` at end of file is implicitly closed.
@@ -598,7 +624,10 @@ class Parser:
         def evaluate(shift: int) -> int:
             syms = dict(self.ast.equates)
             for name, pc in self._pc_of_label.items():
-                syms[name] = pc + shift
+                # Equates win over label PCs, matching `symbols()`
+                # precedence: a name that's both (e.g. a dum-field equate)
+                # keeps its equate value rather than its recorded PC.
+                syms.setdefault(name, pc + shift)
             syms["*"] = self._pc + shift
             return eval_expr(expr, syms)
 
