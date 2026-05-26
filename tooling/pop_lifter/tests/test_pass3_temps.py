@@ -192,7 +192,9 @@ def test_phy_between_push_pop_emits_faithful_stack_ops():
     assert "let tmp" not in text
     assert "self.stack.push(self.reg.a);" in text
     assert "self.stack.push(self.reg.y);" in text
-    assert 'self.reg.a = self.stack.pop().expect("pla on empty stack");' in text
+    # pla pops into A via set_a (binds a temp first; pop borrows self mut).
+    assert 'let _v = self.stack.pop().expect("pla on empty stack");' in text
+    assert "self.set_a(_v);" in text
 
 
 def test_unmatched_push_left_raw():

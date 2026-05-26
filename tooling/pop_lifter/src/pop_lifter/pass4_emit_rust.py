@@ -409,18 +409,22 @@ def _indexed_place(base: str, idx) -> str:
     return f"self.mem[({base} + self.reg.{idx} as usize) & 0xffff]"
 
 
+def _set_zn_lines(place: str) -> list[str]:
+    """Set Z/N from `place` for an op that writes memory but still sets the
+    flags (inc/dec/shift on memory). Routes through `Cpu::set_nz` so the
+    flag rule lives in one spot."""
+    return [f"self.set_nz({place});"]
+
+
 def _load_with_flags(reg, rvalue: str, comment: str = "") -> list[str]:
-    """A register load and its Z/N update. On the 6502 every register load
-    sets Z/N from the loaded byte; the emitter writes them unconditionally
-    (like `cmp`/`inc`/`dec`/`pla`) so a flag that's live-out to a caller's
-    branch — which fusion can't bridge across a `jsr`/`rts` — stays
-    correct. `comment` is an optional trailing `// …` on the load line."""
-    place = f"self.reg.{reg}"
-    return [
-        f"{place} = {rvalue};{comment}",
-        f"self.flags.z = {place} == 0;",
-        f"self.flags.n = ({place} >> 7) != 0;",
-    ]
+    """A register write that also sets Z/N from the stored byte (loads,
+    transfers, bitwise, shifts, adc/sbc, pulls). Emits `self.set_<reg>(v)`
+    — `Cpu::set_a`/`set_x`/`set_y` write the register and Z/N together — so
+    a flag live-out across a fusion-breaking `jsr`/`rts` stays correct and
+    the rule isn't duplicated at every call site. `comment` is an optional
+    trailing `// …`. The value `rvalue` must not itself borrow `self`
+    mutably (e.g. `stack.pop()`); such callers bind a temp first."""
+    return [f"self.set_{reg}({rvalue});{comment}"]
 
 
 def _local_key(label: str, offset: int) -> str:
@@ -617,20 +621,24 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         return [f"self.mem[{_indirect_index(item.target, syms)}] = self.reg.{item.reg};"]
 
     if isinstance(item, Transfer):
-        return [f"self.reg.{item.dst_reg} = self.reg.{item.src_reg};"]
+        return [f"self.set_{item.dst_reg}(self.reg.{item.src_reg});"]
 
     if isinstance(item, Bitwise):
         op = _BITWISE_OPS.get(item.op)
         if op is None or not isinstance(item.source, (Imm, Abs, IndexedAbs, IndirectY)):
             return None
-        return [f"self.reg.a {op}= {_emit_value(item.source, syms)};"]
+        return [f"self.set_a(self.reg.a {op} {_emit_value(item.source, syms)});"]
 
     if isinstance(item, (IncTarget, DecTarget)):
         method = "wrapping_add" if isinstance(item, IncTarget) else "wrapping_sub"
         target = item.target
+        # inc/dec set Z/N from the post-update value (6502 semantics). For a
+        # register target `set_<reg>` writes the value and Z/N together; for
+        # memory the temp avoids recomputing an indexed place, and `set_nz`
+        # keeps an unfused `dec foo ; bne` reading the right Z.
         if isinstance(target, Reg):
-            place = f"self.reg.{target}"
-        elif isinstance(target, Abs):
+            return [f"self.set_{target}(self.reg.{target}.{method}(1));"]
+        if isinstance(target, Abs):
             place = f"self.mem[{_abs_index(target, syms)}]"
         elif isinstance(target, IndexedAbs):
             place = _indexed_place(_abs_index(target.base, syms), target.index)
@@ -642,15 +650,10 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             place = f"self.smc.{_mangle(target.name)}{suffix}"
         else:
             return None  # unrecognised LocalRef bump — deferred
-        # inc/dec set Z/N from the post-update value (6502 semantics,
-        # matching exec_atom). A memory inc/dec branch (`dec foo ; bne`)
-        # is unfused, so the flags must be written here or it reads stale
-        # Z. The temp keeps an indexed place from being recomputed.
         return [
             f"let _v = {place}.{method}(1);",
             f"{place} = _v;",
-            "self.flags.z = _v == 0;",
-            "self.flags.n = (_v >> 7) != 0;",
+            "self.set_nz(_v);",
         ]
 
     # ---- carry / flag operations ----------------------------------------
@@ -674,10 +677,8 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             rhs = f"{_indexed_place(_abs_index(item.base, syms), item.index)} as u16"
         return [
             f"let _r = (self.reg.a as u16) + {rhs} + (self.flags.c as u16);",
-            "self.reg.a = _r as u8;",
             "self.flags.c = (_r >> 8) != 0;",
-            "self.flags.z = self.reg.a == 0;",
-            "self.flags.n = (self.reg.a >> 7) != 0;",
+            "self.set_a(_r as u8);",
         ]
 
     if isinstance(item, (SbcImm, SbcAbs, SbcIndexed, SbcIndirect)):
@@ -696,35 +697,33 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             rhs = f"(!self.mem[{_indirect_index(item.source, syms)}]) as u16"
         return [
             f"let _r = (self.reg.a as u16) + {rhs} + (self.flags.c as u16);",
-            "self.reg.a = _r as u8;",
             "self.flags.c = (_r >> 8) != 0;",
-            "self.flags.z = self.reg.a == 0;",
-            "self.flags.n = (self.reg.a >> 7) != 0;",
+            "self.set_a(_r as u8);",
         ]
 
     if isinstance(item, Asl):
         return [
             "self.flags.c = (self.reg.a >> 7) != 0;",
-            "self.reg.a = self.reg.a.wrapping_shl(1);",
+            "self.set_a(self.reg.a.wrapping_shl(1));",
         ]
 
     if isinstance(item, Lsr):
         return [
             "self.flags.c = (self.reg.a & 1) != 0;",
-            "self.reg.a = self.reg.a.wrapping_shr(1);",
+            "self.set_a(self.reg.a.wrapping_shr(1));",
         ]
 
     if isinstance(item, Rol):
         return [
             "let _c = self.reg.a >> 7;",
-            "self.reg.a = self.reg.a.wrapping_shl(1) | (self.flags.c as u8);",
+            "self.set_a(self.reg.a.wrapping_shl(1) | (self.flags.c as u8));",
             "self.flags.c = _c != 0;",
         ]
 
     if isinstance(item, Ror):
         return [
             "let _c = self.reg.a & 1;",
-            "self.reg.a = self.reg.a.wrapping_shr(1) | ((self.flags.c as u8) << 7);",
+            "self.set_a(self.reg.a.wrapping_shr(1) | ((self.flags.c as u8) << 7));",
             "self.flags.c = _c != 0;",
         ]
 
@@ -734,23 +733,27 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             return [
                 f"self.flags.c = ({place} >> 7) != 0;",
                 f"{place} = {place}.wrapping_shl(1);",
+                *_set_zn_lines(place),
             ]
         if item.op == "lsr":
             return [
                 f"self.flags.c = ({place} & 1) != 0;",
                 f"{place} = {place}.wrapping_shr(1);",
+                *_set_zn_lines(place),
             ]
         if item.op == "rol":
             return [
                 f"let _c = {place} >> 7;",
                 f"{place} = {place}.wrapping_shl(1) | (self.flags.c as u8);",
                 "self.flags.c = _c != 0;",
+                *_set_zn_lines(place),
             ]
         if item.op == "ror":
             return [
                 f"let _c = {place} & 1;",
                 f"{place} = {place}.wrapping_shr(1) | ((self.flags.c as u8) << 7);",
                 "self.flags.c = _c != 0;",
+                *_set_zn_lines(place),
             ]
 
     # ---- flag-only comparisons ------------------------------------------
@@ -799,10 +802,11 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         ]
 
     if isinstance(item, Pla):
+        # `stack.pop()` borrows self mutably, so it can't be the argument
+        # to `set_a` (two-phase borrow); bind it first.
         return [
-            "self.reg.a = self.stack.pop().expect(\"pla on empty stack\");",
-            "self.flags.z = self.reg.a == 0;",
-            "self.flags.n = (self.reg.a >> 7) != 0;",
+            "let _v = self.stack.pop().expect(\"pla on empty stack\");",
+            "self.set_a(_v);",
         ]
 
     if isinstance(item, StoreLocal):
@@ -1195,6 +1199,22 @@ def _emit_state_defs(smc_fields: list[str]) -> list[str]:
         "            local: std::collections::HashMap::new(),",
         "        }",
         "    }",
+        "",
+        "    // Register loads/transfers/arith set Z (result == 0) and N",
+        "    // (bit 7) on the 6502; these helpers keep that in one place so",
+        "    // every reg write stays flag-faithful. `set_nz` is for ops that",
+        "    // write memory but still set Z/N (inc/dec/shift on memory).",
+        "    #[inline]",
+        "    pub fn set_nz(&mut self, v: u8) {",
+        "        self.flags.z = v == 0;",
+        "        self.flags.n = (v >> 7) != 0;",
+        "    }",
+        "    #[inline]",
+        "    pub fn set_a(&mut self, v: u8) { self.reg.a = v; self.set_nz(v); }",
+        "    #[inline]",
+        "    pub fn set_x(&mut self, v: u8) { self.reg.x = v; self.set_nz(v); }",
+        "    #[inline]",
+        "    pub fn set_y(&mut self, v: u8) { self.reg.y = v; self.set_nz(v); }",
         "}",
     ]
     return lines
