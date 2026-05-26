@@ -83,7 +83,7 @@ fn check128k {
   if a != #0x06 goto NOT128K  ; BOOT.S:151
   bit *$C017@0xc017                ; BOOT.S:153
   if mi goto NOT128K       ; BOOT.S:154
-  ??? ldx #CHECKEND            ; BOOT.S:156
+  x = #CHECKEND                  ; BOOT.S:156
 :0:
   a = *(CHECKER@0x0076 + x)   ; BOOT.S:157
   *($180@0x0180 + x) = a   ; BOOT.S:158

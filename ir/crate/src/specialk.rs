@@ -1030,8 +1030,7 @@ pub fn KEEPTIME(cpu: &mut Cpu) {
         cpu.mem[sym::FrameCount + 1] = cpu.reg.a;
     }
     cpu.reg.y = cpu.mem[sym::NextTimeMsg];
-    // raw: ??? cpy #nummsg            ; SPECIALK.S:1283
-    if cpu.flags.c {
+    if cpu.reg.y >= 0x24 {
         return;
     }
     cpu.reg.a = cpu.mem[sym::FrameCount + 1];

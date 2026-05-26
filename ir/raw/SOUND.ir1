@@ -37,7 +37,7 @@ fn PLAYBACK {
 
 fn makesound {
   a = a << 1                       ; SOUND.S:128
-  ??? cmp #maxaddr            ; SOUND.S:129
+  cmp a, #maxaddr              ; SOUND.S:129
   if cs goto :rts       ; SOUND.S:130
   x = a                            ; SOUND.S:132
   a = *(lookup@0x02f2 + x)   ; SOUND.S:133

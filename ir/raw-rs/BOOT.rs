@@ -179,14 +179,11 @@ impl Cpu {
             self.NOT128K();
             return;
         }
-        // raw: ??? ldx #CHECKEND            ; BOOT.S:156
+        self.reg.x = 0x25;
         loop {
             self.reg.a = self.mem[sym::CHECKER + self.reg.x as usize];
             self.mem[0x0180 + self.reg.x as usize] = self.reg.a;
-            let _v = self.reg.x.wrapping_sub(1);
-            self.reg.x = _v;
-            self.flags.z = _v == 0;
-            self.flags.n = (_v >> 7) != 0;
+            self.reg.x = self.reg.x.wrapping_sub(0x01);
             if !((self.reg.x as i8) >= 0) {
                 break;
             }

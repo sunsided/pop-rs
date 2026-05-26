@@ -113,14 +113,11 @@ pub fn check128k(cpu: &mut Cpu) {
         NOT128K(cpu);
         return;
     }
-    // raw: ??? ldx #CHECKEND            ; BOOT.S:156
+    cpu.reg.x = 0x25;
     loop {
         cpu.reg.a = cpu.mem[sym::CHECKER + cpu.reg.x as usize];
         cpu.mem[0x0180 + cpu.reg.x as usize] = cpu.reg.a;
-        let _v = cpu.reg.x.wrapping_sub(1);
-        cpu.reg.x = _v;
-        cpu.flags.z = _v == 0;
-        cpu.flags.n = (_v >> 7) != 0;
+        cpu.reg.x = cpu.reg.x.wrapping_sub(0x01);
         if !((cpu.reg.x as i8) >= 0) {
             break;
         }

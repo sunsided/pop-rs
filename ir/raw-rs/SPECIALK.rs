@@ -1146,8 +1146,7 @@ impl Cpu {
             self.mem[sym::FrameCount + 1] = self.reg.a;
         }
         self.reg.y = self.mem[sym::NextTimeMsg];
-        // raw: ??? cpy #nummsg            ; SPECIALK.S:1283
-        if self.flags.c {
+        if self.reg.y >= 0x24 {
             return;
         }
         self.reg.a = self.mem[sym::FrameCount + 1];

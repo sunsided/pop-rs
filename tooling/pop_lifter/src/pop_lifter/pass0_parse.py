@@ -19,6 +19,7 @@ as raw `Line` objects in `FileAST.lines` for later passes.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -291,6 +292,12 @@ class _ExprParser:
         if tok[0].isdigit():
             return int(tok, 10)
         if tok == "*":
+            # Current location counter. Resolvable only when the caller
+            # threads a PC value in under the `*` key (the position-equate
+            # fallback does this); otherwise pass 0 doesn't track PC and a
+            # plain equate eval can't use it.
+            if "*" in self.symbols:
+                return self.symbols["*"]
             raise ValueError("current-PC operator `*` not resolvable in pass 0")
         if tok in self.symbols:
             return self.symbols[tok]
@@ -307,6 +314,111 @@ def eval_expr(s: str, symbols: dict[str, int]) -> int:
 
 _IGNORED_DIRECTIVES = {"lst", "tr", "xc", "mx"}
 
+# ---- location-counter sizing -----------------------------------------
+#
+# To resolve location-counter equates — `LABEL = *-table` / `a-b` table
+# sizes that POP uses as immediates (`cpx #maxgatevel`) — pass 0 tracks a
+# running program counter through each file's code and data, recording the
+# PC at every global label. The equate's value is then a PC difference,
+# which is origin-independent so the absolute base doesn't matter (only
+# correct *relative* sizing within the span between the label and the `*`).
+# We size the instruction forms and data directives POP actually uses; an
+# unrecognised line advances the PC by 0, which only perturbs the absolute
+# base and so cancels out of any difference.
+
+_IMPLIED_OPS = frozenset({
+    "clc", "sec", "cli", "sei", "cld", "sed", "clv", "nop", "rts", "rti",
+    "brk", "tax", "tay", "txa", "tya", "tsx", "txs", "dex", "dey", "inx",
+    "iny", "pha", "pla", "php", "plp", "phx", "phy", "plx", "ply",
+})
+
+_BRANCH_OPS = frozenset({
+    "bcc", "bcs", "beq", "bne", "bpl", "bmi", "bvc", "bvs", "bra",
+})
+
+
+def _count_operands(operand: str | None) -> int:
+    """Count comma-separated top-level operands; commas inside a quoted
+    string don't split. `db 0,0,0,20` → 4."""
+    if not operand:
+        return 0
+    count = 1
+    quote: str | None = None
+    for c in operand:
+        if quote is not None:
+            if c == quote:
+                quote = None
+        elif c in ('"', "'"):
+            quote = c
+        elif c == ",":
+            count += 1
+    return count
+
+
+def _string_bytes(operand: str | None) -> int:
+    """Best-effort byte count for `asc`/`str`/`rev`/... — characters inside
+    the first delimited string plus any trailing comma-separated bytes.
+    (POP only uses these outside the spans we measure, so approximations
+    here cancel out of the differences.)"""
+    if not operand:
+        return 0
+    s = operand.strip()
+    if s[0] in ('"', "'"):
+        end = s.find(s[0], 1)
+        if end == -1:
+            return len(s) - 1
+        n = end - 1
+        rest = s[end + 1:].lstrip()
+        if rest.startswith(","):
+            n += _count_operands(rest[1:])
+        return n
+    return _count_operands(s)
+
+
+def _directive_size(mnemonic: str, operand: str | None, symbols: dict[str, int]) -> int | None:
+    """Byte size emitted by a data pseudo-op, or `None` if `mnemonic`
+    isn't one (the caller then tries instruction sizing)."""
+    if mnemonic in ("db", "dfb"):
+        return _count_operands(operand)
+    if mnemonic in ("dw", "da", "ddb"):
+        return 2 * _count_operands(operand)
+    if mnemonic == "ds":
+        try:
+            return int(eval_expr((operand or "0").split(",", 1)[0], symbols))
+        except ValueError:
+            return 0
+    if mnemonic == "hex":
+        return len(re.sub(r"[^0-9a-fA-F]", "", operand or "")) // 2
+    if mnemonic in ("asc", "dci", "str", "inv", "fls", "rev", "ascii"):
+        return _string_bytes(operand)
+    return None
+
+
+def _instr_size(mnemonic: str, operand: str | None, symbols: dict[str, int]) -> int:
+    """Encoded byte size of a 6502 instruction (1/2/3). Memory operands
+    are zero-page (2) when the base resolves below $100, else absolute
+    (3); an unresolved (forward-label) base is assumed absolute."""
+    if mnemonic in _IMPLIED_OPS:
+        return 1
+    op = (operand or "").strip()
+    if mnemonic in ("asl", "lsr", "rol", "ror") and op.lower() in ("", "a"):
+        return 1  # accumulator form
+    if mnemonic in _BRANCH_OPS:
+        return 2
+    if mnemonic in ("jmp", "jsr"):
+        return 3
+    if op.startswith("#"):
+        return 2  # immediate
+    if op.startswith("("):
+        return 2  # zero-page indirect ((zp),y / (zp,x) / (zp))
+    if not op:
+        return 1
+    base = op.split(",", 1)[0].strip().lstrip("<>/")
+    try:
+        return 2 if 0 <= eval_expr(base, symbols) < 0x100 else 3
+    except ValueError:
+        return 3  # forward / unresolved → assume absolute
+
 
 @dataclass
 class _DumState:
@@ -319,6 +431,10 @@ class Parser:
         self.ast = ProgramAST()
         self.search_paths = search_paths
         self._included: set[Path] = set()
+        # Running program counter and the PC recorded at each global
+        # label, for resolving location-counter (`*`) equates.
+        self._pc = 0
+        self._pc_of_label: dict[str, int] = {}
 
     def parse(self, path: Path) -> ProgramAST:
         self._parse_file(path.resolve())
@@ -342,6 +458,15 @@ class Parser:
 
             mnemonic = line.mnemonic
 
+            # Record the PC at every global label before the line emits
+            # any bytes, so a later `LABEL = *-thislabel` equate resolves.
+            if (
+                line.label
+                and not line.is_equate
+                and not line.label.startswith((":", "]"))
+            ):
+                self._pc_of_label[line.label] = self._pc
+
             # `LABEL = EXPR` equate
             if line.is_equate:
                 if not line.label or not line.operand:
@@ -350,12 +475,23 @@ class Parser:
                 try:
                     value = eval_expr(line.operand, self.ast.equates)
                 except ValueError as exc:
-                    self._warn(line, f"equate eval failed: {exc}")
-                    continue
+                    value = self._resolve_position_equate(line.operand)
+                    if value is None:
+                        self._warn(line, f"equate eval failed: {exc}")
+                        continue
                 self.ast.equates[line.label] = value
                 continue
 
             if mnemonic in _IGNORED_DIRECTIVES:
+                continue
+
+            if mnemonic == "org":
+                # Set the location counter to an absolute address.
+                if line.operand:
+                    try:
+                        self._pc = eval_expr(line.operand, self.ast.equates)
+                    except ValueError as exc:
+                        self._warn(line, f"org addr eval failed: {exc}")
                 continue
 
             if mnemonic == "put":
@@ -375,17 +511,32 @@ class Parser:
 
             if mnemonic == "ds":
                 if dum is None:
-                    # `ds` outside a `dum` block advances the regular
-                    # location counter; that's relevant only for files
-                    # that emit code/data, not the equate files we
-                    # focus on in pass 0.
+                    # `ds N` outside a `dum` block reserves N bytes and
+                    # advances the main location counter.
+                    try:
+                        self._pc += int(
+                            eval_expr((line.operand or "0").split(",", 1)[0],
+                                      self.ast.equates)
+                        )
+                    except ValueError:
+                        pass
                     continue
                 self._handle_ds(line, dum)
                 continue
 
-            # Anything else (real opcodes, db/dw/hex/asc/dfb, org, jmp,
-            # macros) is not yet processed by pass 0. The raw line stays
+            # Inside a `dum` overlay no object bytes are emitted, so the
+            # main PC is frozen (the block tracks its own `lc`).
+            if dum is not None:
+                continue
+
+            # Real opcodes and data directives advance the PC so that
+            # location-counter equates resolve. The raw line still stays
             # on `file_ast.lines` for later passes.
+            if mnemonic is not None:
+                size = _directive_size(mnemonic, line.operand, self.ast.equates)
+                if size is None:
+                    size = _instr_size(mnemonic, line.operand, self.ast.equates)
+                self._pc += size
 
         # An open `dum` at end of file is implicitly closed.
 
@@ -431,6 +582,32 @@ class Parser:
             # equate at the current location counter.
             self.ast.equates[line.label] = dum.lc
         dum.lc += size
+
+    def _resolve_position_equate(self, expr: str) -> int | None:
+        """Resolve an equate the normal symbol table can't because it
+        references the location counter `*` or program labels (e.g.
+        `maxgatevel = *-gatevel-1`). Evaluated in PC coordinates: `*` is
+        the current PC and each global label is its recorded PC.
+
+        Only returns a value when the expression is *origin-independent*
+        — a true size/offset whose position terms cancel. We check that
+        by evaluating at two different origins and requiring agreement;
+        an address-valued expression (e.g. `label+1`) differs and is
+        left unresolved, exactly as before, so no real address is ever
+        invented from a synthetic PC base."""
+        def evaluate(shift: int) -> int:
+            syms = dict(self.ast.equates)
+            for name, pc in self._pc_of_label.items():
+                syms[name] = pc + shift
+            syms["*"] = self._pc + shift
+            return eval_expr(expr, syms)
+
+        try:
+            base = evaluate(0)
+            shifted = evaluate(0x1000)
+        except ValueError:
+            return None
+        return base if base == shifted else None
 
     def _handle_put(self, current: Path, operand: str) -> None:
         # Strip a trailing comment if the lexer didn't already.
