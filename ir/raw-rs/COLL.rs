@@ -477,7 +477,7 @@ impl Cpu {
         let _r = (self.reg.a as u16) + (!self.mem[sym::CDLeftEj]) as u16 + (self.flags.c as u16);
         self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
-        self.reg.x = 0x00;
+        self.reg.x = 0x00;  // right
         self.collide();
         return;
     }
@@ -502,7 +502,7 @@ impl Cpu {
         let _r = (self.reg.a as u16) + (!self.mem[sym::CDRightEj]) as u16 + (self.flags.c as u16);
         self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
-        self.reg.x = 0xff;
+        self.reg.x = 0xff;  // left
         self.collide();
         return;
     }
@@ -1000,8 +1000,8 @@ impl Cpu {
                     }
                 }
                 11 => {
-                    self.reg.a = 0x0b;
-                    self.reg.x = 0x02;
+                    self.reg.a = 0x0b;  // natural step size
+                    self.reg.x = 0x02;  // clear
                     if self.reg.x != 0x00 {
                         pc = 15;
                     } else {
@@ -1026,7 +1026,7 @@ impl Cpu {
                 }
                 14 => {
                     self.getdist();
-                    self.reg.x = 0x00;
+                    self.reg.x = 0x00;  // edge
                     pc = 15;
                 }
                 15 => {
@@ -1048,7 +1048,7 @@ impl Cpu {
                     }
                 }
                 18 => {
-                    self.reg.x = 0x01;
+                    self.reg.x = 0x01;  // barrier
                     if self.reg.x != 0x00 {
                         pc = 15;
                     } else {

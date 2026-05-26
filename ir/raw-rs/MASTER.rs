@@ -473,8 +473,8 @@ impl Cpu {
     }
 
     fn copy1to2(&mut self) {
-        self.reg.a = 0x40;
-        self.reg.x = 0x20;
+        self.reg.a = 0x40;  // dest
+        self.reg.x = 0x20;  // org
         if self.reg.x == 0x00 {
             self.reg.a = 0x20;
             self.reg.x = 0x40;
@@ -506,7 +506,7 @@ impl Cpu {
 
     fn CUTPRINCESS(&mut self) {
         self.blackout();
-        self.reg.a = 0x01;
+        self.reg.a = 0x01;  // seek track 0
         self.LoadStage2();
         self.reg.a = 0x84;
         self.SngExpand();
@@ -653,9 +653,9 @@ impl Cpu {
     fn PrincessScene(&mut self) {
         self.blackout();
         self.ReloadStuff();
-        self.reg.a = 0x00;
+        self.reg.a = 0x00;  // don't seek track 0
         self.cutprincess1();
-        self.reg.a = 0x00;
+        self.reg.a = 0x00;  // cut #0 (intro)
         self.xplaycut();
         return;
     }
@@ -704,13 +704,13 @@ impl Cpu {
     }
 
     fn SuperEpilog(&mut self) {
-        self.reg.a = 0x01;
+        self.reg.a = 0x01;  // aux
         self.fadein();
         self.setaux();
         self.reg.a = 0x01;
         self.PlaySongNI();
         self.fadeout();
-        self.reg.a = 0x00;
+        self.reg.a = 0x00;  // main
         self.fadein();
         self.setaux();
         self.reg.a = 0x50;
@@ -812,7 +812,7 @@ impl Cpu {
             self.start();
             return;
         }
-        self.reg.a = 0x04;
+        self.reg.a = 0x04;  // arbitrary
         self.startresume();
         return;
     }
@@ -831,7 +831,7 @@ impl Cpu {
             self.start();
             return;
         }
-        self.reg.a = 0x04;
+        self.reg.a = 0x04;  // arbitrary
         self.startresume();
         return;
     }

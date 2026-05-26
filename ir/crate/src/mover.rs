@@ -140,7 +140,7 @@ pub fn CLOSEEXIT(cpu: &mut Cpu) {
     cpu.mem[sym::trloc] = cpu.reg.y;
     cpu.mem[sym::trscrn] = cpu.reg.a;
     cpu.mem[(cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize] = 0xac;
-    cpu.reg.a = 0x03;
+    cpu.reg.a = 0x03;  // coming down fast
     cpu.mem[sym::trdirec] = cpu.reg.a;
     addtrob(cpu);
     return;
@@ -199,7 +199,7 @@ pub fn TRIGSPIKES(cpu: &mut Cpu) {
         cpu.mem[sym::trscrn] = cpu.reg.a;
         addtrob(cpu);
         redspikes(cpu);
-        cpu.reg.a = 0x02;
+        cpu.reg.a = 0x02;  // TEMP
         crate::ext::addsound(cpu);
         return;
     }
@@ -209,7 +209,7 @@ pub fn TRIGSPIKES(cpu: &mut Cpu) {
     if cpu.reg.a == 0xff {
         return;
     }
-    cpu.reg.a = 0x8f;
+    cpu.reg.a = 0x8f;  // Nonzero, hibit set: spikes are fully
     cpu.mem[(cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
     return;
 }
@@ -217,7 +217,7 @@ pub fn TRIGSPIKES(cpu: &mut Cpu) {
 pub fn JAMSPIKES(cpu: &mut Cpu) {
     cpu.reg.a = 0xff;
     cpu.mem[(cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
-    cpu.reg.x = 0xff;
+    cpu.reg.x = 0xff;  // stop object
     if (cpu.reg.x as i8) < 0 {
         crate::ext::_5dcont(cpu);
         return;
@@ -244,7 +244,7 @@ pub fn JAMSPIKES(cpu: &mut Cpu) {
             }
         }
     }
-    cpu.reg.a = 0x00;
+    cpu.reg.a = 0x00;  // safe: retracted or retracting
     return;
 }
 
@@ -271,7 +271,7 @@ pub fn GETSPIKES(cpu: &mut Cpu) {
             }
         }
     }
-    cpu.reg.a = 0x00;
+    cpu.reg.a = 0x00;  // safe: retracted or retracting
     return;
 }
 
@@ -291,7 +291,7 @@ pub fn BREAKLOOSE(cpu: &mut Cpu) {
     cpu.mem[(cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.mem[sym::state];
     cpu.mem[sym::trloc] = cpu.reg.y;
     cpu.mem[sym::trscrn] = cpu.mem[sym::tempscrn];
-    cpu.reg.a = 0x00;
+    cpu.reg.a = 0x00;  // down
     cpu.mem[sym::trdirec] = cpu.reg.a;
     addtrob(cpu);
     redloose(cpu);
@@ -314,7 +314,7 @@ pub fn BREAKLOOSE1(cpu: &mut Cpu) {
     cpu.mem[(cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.mem[sym::state];
     cpu.mem[sym::trloc] = cpu.reg.y;
     cpu.mem[sym::trscrn] = cpu.mem[sym::tempscrn];
-    cpu.reg.a = 0x00;
+    cpu.reg.a = 0x00;  // down
     cpu.mem[sym::trdirec] = cpu.reg.a;
     addtrob(cpu);
     redloose(cpu);
@@ -346,7 +346,7 @@ pub fn PUSHPP(cpu: &mut Cpu) {
         trigger(cpu);
         return;
     }
-    cpu.reg.a = 0x05;
+    cpu.reg.a = 0x05;  // put plate down for the count
     chgtimer(cpu);
     cpu.mem[sym::trloc] = cpu.reg.y;
     cpu.mem[sym::trscrn] = cpu.mem[sym::tempscrn];
@@ -383,7 +383,7 @@ pub fn pushpp1(cpu: &mut Cpu) {
         trigger(cpu);
         return;
     }
-    cpu.reg.a = 0x05;
+    cpu.reg.a = 0x05;  // put plate down for the count
     chgtimer(cpu);
     cpu.mem[sym::trloc] = cpu.reg.y;
     cpu.mem[sym::trscrn] = cpu.mem[sym::tempscrn];
@@ -602,12 +602,12 @@ pub fn triggate(cpu: &mut Cpu) {
                 return;
             }
             4 => {
-                cpu.reg.a = 0x03;
+                cpu.reg.a = 0x03;  // down fast
                 cpu.mem[sym::trdirec] = cpu.reg.a;
                 return;
             }
             5 => {
-                cpu.reg.x = 0x02;
+                cpu.reg.x = 0x02;  // open & jam
                 cpu.mem[sym::trdirec] = cpu.reg.x;
                 let _o: u8 = 0xbc;
                 cpu.flags.c = cpu.reg.a >= _o;
@@ -620,7 +620,7 @@ pub fn triggate(cpu: &mut Cpu) {
                 }
             }
             6 => {
-                cpu.reg.a = 0xff;
+                cpu.reg.a = 0xff;  // "jammed open" state
                 if (cpu.reg.a as i8) < 0 {
                     pc = 10;
                 } else {
@@ -628,7 +628,7 @@ pub fn triggate(cpu: &mut Cpu) {
                 }
             }
             7 => {
-                cpu.reg.x = 0x01;
+                cpu.reg.x = 0x01;  // open
                 cpu.mem[sym::trdirec] = cpu.reg.x;
                 let _o: u8 = 0xff;
                 cpu.flags.c = cpu.reg.a >= _o;
@@ -696,7 +696,7 @@ pub fn triggate(cpu: &mut Cpu) {
                 }
             }
             16 => {
-                cpu.reg.a = 0xff;
+                cpu.reg.a = 0xff;  // yes--mark it for deletion
                 cpu.local.insert(("]cleanflag", 0), cpu.reg.a);
                 pc = 17;
             }
@@ -723,8 +723,8 @@ pub fn triggate(cpu: &mut Cpu) {
                 }
             }
             19 => {
-                cpu.reg.x = 0x01;
-                cpu.reg.y = 0x00;
+                cpu.reg.x = 0x01;  // source index (assume numtrans > 0)
+                cpu.reg.y = 0x00;  // dest index
                 pc = 20;
             }
             20 => {
@@ -813,7 +813,7 @@ pub fn ANIMTRANS(cpu: &mut Cpu) {
                 }
             }
             3 => {
-                cpu.reg.a = 0xff;
+                cpu.reg.a = 0xff;  // yes--mark it for deletion
                 cpu.local.insert(("]cleanflag", 0), cpu.reg.a);
                 pc = 4;
             }
@@ -840,8 +840,8 @@ pub fn ANIMTRANS(cpu: &mut Cpu) {
                 }
             }
             6 => {
-                cpu.reg.x = 0x01;
-                cpu.reg.y = 0x00;
+                cpu.reg.x = 0x01;  // source index (assume numtrans > 0)
+                cpu.reg.y = 0x00;  // dest index
                 pc = 7;
             }
             7 => {
@@ -1137,11 +1137,11 @@ pub fn animgate(cpu: &mut Cpu) {
                 cpu.flags.n = (cpu.reg.x.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.x < 0x02 {
                     cpu.mem[sym::state] = 0xee;
-                    cpu.reg.a = 0x00;
+                    cpu.reg.a = 0x00;  // down
                     cpu.mem[sym::trdirec] = cpu.reg.a;
                     return;
                 }
-                cpu.reg.a = 0xff;
+                cpu.reg.a = 0xff;  // jammed-open value
                 cpu.mem[sym::state] = cpu.reg.a;
             } else {
                 cpu.reg.a = 0x0b;
@@ -1198,7 +1198,7 @@ pub fn animslicer(cpu: &mut Cpu) {
             cpu.reg.a = _r as u8;
             cpu.flags.c = (_r >> 8) != 0;
             if cpu.reg.a >= 0x10 {
-                cpu.reg.a = 0x01;
+                cpu.reg.a = 0x01;  // wrap around
             }
             cpu.reg.a |= cpu.mem[sym::state];
             cpu.mem[sym::state] = cpu.reg.a;
@@ -1320,7 +1320,7 @@ pub fn GETFLAMEFRAME(cpu: &mut Cpu) {
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
         if cpu.reg.a >= 0x12 {
-            cpu.reg.a = 0x00;
+            cpu.reg.a = 0x00;  // wrap around
         }
     }
     return;
@@ -1383,7 +1383,7 @@ pub fn animspikes(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::state];
     cpu.reg.a &= 0x7f;
     if cpu.reg.a == 0x00 {
-        cpu.reg.a = 0x06;
+        cpu.reg.a = 0x06;  // First "retracting" frame
         cpu.mem[sym::state] = cpu.reg.a;
         if !cpu.flags.z {
             redspikes(cpu);
@@ -1802,8 +1802,8 @@ pub fn ANIMMOBS(cpu: &mut Cpu) {
                 }
             }
             2 => {
-                cpu.reg.x = 0x01;
-                cpu.reg.y = 0x00;
+                cpu.reg.x = 0x01;  // source index (assume nummob > 0)
+                cpu.reg.y = 0x00;  // dest index
                 pc = 3;
             }
             3 => {
@@ -2133,7 +2133,7 @@ pub fn crushchar(cpu: &mut Cpu) {
     cpu.reg.a = 0x01;
     crate::ext::decstr(cpu);
     if cpu.flags.z {
-        cpu.reg.a = 0x16;
+        cpu.reg.a = 0x16;  // temp
         crate::ext::jumpseq(cpu);
         return;
     }

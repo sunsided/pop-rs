@@ -303,8 +303,8 @@ impl Cpu {
         self.reg.a = self.mem[sym::PlayCount];
         if self.reg.a == 0x00 {
             self.reg.a = 0x18;
-            self.reg.x = 0x01;
-            self.reg.y = 0x00;
+            self.reg.x = 0x01;  // x
+            self.reg.y = 0x00;  // y
             self.rdblock();
             self.reg.a = self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize];
             if self.reg.a < 0x14 {
@@ -1015,7 +1015,7 @@ impl Cpu {
                             }
                             self.reg.a = self.mem[sym::CharID];
                             if self.reg.a != 0x00 {
-                                self.reg.a = 0x04;
+                                self.reg.a = 0x04;  // yes--impair my blocking ability for a while
                                 self.mem[sym::justblocked] = self.reg.a;
                             }
                             self.reg.a = 0x45;
@@ -1040,14 +1040,10 @@ impl Cpu {
                         return;
                     }
                 }
-                let _o: u8 = 0x1d;
-                self.flags.c = self.reg.a >= _o;
-                self.flags.z = self.reg.a == _o;
-                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if self.reg.a >= 0x1d {
                     return;
                 }
-                // raw: ??? lda #99 "stabbed"            ; AUTO.S:1002
+                self.reg.a = 0x63;  // "stabbed"
                 self.mem[sym::OpAction] = self.reg.a;
                 return;
             }
@@ -1429,7 +1425,7 @@ impl Cpu {
             _ => {}
         }
         'b6: {
-            self.reg.a = 0x00;
+            self.reg.a = 0x00;  // arbitrary--ADDGUARD will reconstruct
             self.mem[sym::tempblockx] = self.reg.a;
             self.reg.a = self.mem[sym::ShadBlockY];
             self.mem[sym::tempblocky] = self.reg.a;
@@ -1763,7 +1759,7 @@ impl Cpu {
         if self.reg.a != 0x03 {
             return;
         }
-        self.reg.a = 0x07;
+        self.reg.a = 0x07;  // scrn to R of gate
         if self.reg.a != self.mem[sym::CharScrn] {
             return;
         }
@@ -1860,7 +1856,7 @@ impl Cpu {
         self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
         self.mem[sym::CharX] = self.reg.a;
-        self.reg.x = 0x01;
+        self.reg.x = 0x01;  // new FromDir
         return;
     }
 
@@ -1874,7 +1870,7 @@ impl Cpu {
         self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
         self.mem[sym::CharX] = self.reg.a;
-        self.reg.x = 0x01;
+        self.reg.x = 0x01;  // new FromDir
         return;
     }
 
@@ -2022,12 +2018,12 @@ impl Cpu {
                     self.flags.z = self.reg.a == _o;
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a == 0x03 {
-                        self.reg.a = 0x04;
+                        self.reg.a = 0x04;  // skel
                         if self.reg.a != 0x00 {
                             break 'b22;
                         }
                     }
-                    self.reg.a = 0x02;
+                    self.reg.a = 0x02;  // guard
                 }
                 self.mem[sym::CharID] = self.reg.a;
                 self.reg.a = self.mem[sym::GdStartSeqH - 1 + self.reg.x as usize];
@@ -2041,14 +2037,14 @@ impl Cpu {
                         if self.reg.a == 0x04 {
                             self.reg.a = 0x02;
                             self.mem[sym::CharSword] = self.reg.a;
-                            self.reg.a = 0x3f;
+                            self.reg.a = 0x3f;  // skel (ready)
                             if self.reg.a != 0x00 {
                                 break 'b26;
                             }
                         }
                         self.reg.a = 0x00;
                         self.mem[sym::CharSword] = self.reg.a;
-                        self.reg.a = 0x4d;
+                        self.reg.a = 0x4d;  // guard
                     }
                     self.jumpseq();
                     break 'b28;
@@ -2115,7 +2111,7 @@ impl Cpu {
         self.flags.z = self.reg.a == _o;
         self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
         if self.reg.a >= 0x0c {
-            self.reg.a = 0x03;
+            self.reg.a = 0x03;  // default
         }
         self.mem[sym::guardprog] = self.reg.a;
         self.reg.x = self.mem[sym::level];
@@ -2150,12 +2146,12 @@ impl Cpu {
             self.mem[sym::CharFace] = self.reg.a;
             self.reg.a = self.mem[sym::level];
             if self.reg.a == 0x03 {
-                self.reg.a = 0x04;
+                self.reg.a = 0x04;  // skel
                 if self.reg.a != 0x00 {
                     break 'b4;
                 }
             }
-            self.reg.a = 0x02;
+            self.reg.a = 0x02;  // guard
         }
         self.mem[sym::CharID] = self.reg.a;
         self.reg.a = self.mem[sym::GdStartSeqH - 1 + self.reg.x as usize];
@@ -2169,14 +2165,14 @@ impl Cpu {
                 if self.reg.a == 0x04 {
                     self.reg.a = 0x02;
                     self.mem[sym::CharSword] = self.reg.a;
-                    self.reg.a = 0x3f;
+                    self.reg.a = 0x3f;  // skel (ready)
                     if self.reg.a != 0x00 {
                         break 'b8;
                     }
                 }
                 self.reg.a = 0x00;
                 self.mem[sym::CharSword] = self.reg.a;
-                self.reg.a = 0x4d;
+                self.reg.a = 0x4d;  // guard
             }
             self.jumpseq();
         }
@@ -2208,7 +2204,7 @@ impl Cpu {
         self.reg.x = self.mem[sym::VisScrn];
         self.reg.a = self.mem[sym::GdStartProg - 1 + self.reg.x as usize];
         if self.reg.a >= 0x0c {
-            self.reg.a = 0x03;
+            self.reg.a = 0x03;  // default
         }
         self.mem[sym::guardprog] = self.reg.a;
         self.reg.x = self.mem[sym::level];

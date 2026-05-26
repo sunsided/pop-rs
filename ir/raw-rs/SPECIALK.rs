@@ -146,7 +146,7 @@ impl Cpu {
         }
         self.reg.x = 0x00;
         self.mem[sym::SINGSTEP] = self.reg.x;
-        self.reg.a = 0x00;
+        self.reg.a = 0x00;  // ignore the keypress that breaks ESC
         if self.reg.a == 0x00 {
             self.KEYS2();
             return;
@@ -167,7 +167,7 @@ impl Cpu {
         if self.reg.a != 0x9b {
             self.reg.x = 0x00;
             self.mem[sym::SINGSTEP] = self.reg.x;
-            self.reg.a = 0x00;
+            self.reg.a = 0x00;  // ignore the keypress that breaks ESC
             if self.reg.a == 0x00 {
                 self.KEYS2();
                 return;
@@ -217,7 +217,7 @@ impl Cpu {
                                 }
                             }
                         } else {
-                            self.reg.a = 0x00;
+                            self.reg.a = 0x00;  // 1st digit
                         }
                         self.flags.c = false;
                         let _r = (self.reg.a as u16) + self.mem[sym::keypress] as u16 + (self.flags.c as u16);
@@ -258,10 +258,10 @@ impl Cpu {
             self.reg.x = 0x03;
             self.checkcode();
             if self.flags.z {
-                self.reg.a = 0x03;
+                self.reg.a = 0x03;  // up to level 4
                 self.reg.x = self.mem[sym::develment];
                 if self.reg.x != 0x00 {
-                    self.reg.a = 0x0b;
+                    self.reg.a = 0x0b;  // or level 12 in cheat mode
                 }
                 let _o: u8 = self.mem[sym::level];
                 self.flags.c = self.reg.a >= _o;
@@ -323,7 +323,7 @@ impl Cpu {
                                 }
                             }
                         } else {
-                            self.reg.a = 0x00;
+                            self.reg.a = 0x00;  // 1st digit
                         }
                         self.flags.c = false;
                         let _r = (self.reg.a as u16) + self.mem[sym::keypress] as u16 + (self.flags.c as u16);
@@ -364,10 +364,10 @@ impl Cpu {
             self.reg.x = 0x03;
             self.checkcode();
             if self.flags.z {
-                self.reg.a = 0x03;
+                self.reg.a = 0x03;  // up to level 4
                 self.reg.x = self.mem[sym::develment];
                 if self.reg.x != 0x00 {
-                    self.reg.a = 0x0b;
+                    self.reg.a = 0x0b;  // or level 12 in cheat mode
                 }
                 let _o: u8 = self.mem[sym::level];
                 self.flags.c = self.reg.a >= _o;
@@ -459,7 +459,7 @@ impl Cpu {
         self.flags.z = _v == 0;
         self.flags.n = (_v >> 7) != 0;
         if self.reg.x >= 0x0a {
-            self.reg.x = 0x00;
+            self.reg.x = 0x00;  // wrap around
         }
         self.mem[sym::keybufptr] = self.reg.x;
         self.mem[sym::keybuf + self.reg.x as usize] = self.reg.a;
@@ -474,7 +474,7 @@ impl Cpu {
                     self.smc.smod_lo = self.reg.a;
                     self.smc.smod_hi = self.reg.x;
                     self.reg.x = self.mem[sym::keybufptr];
-                    self.reg.y = 0x00;
+                    self.reg.y = 0x00;  // last char of code seq
                     pc = 1;
                 }
                 1 => {
@@ -549,7 +549,7 @@ impl Cpu {
                     }
                 }
                 8 => {
-                    self.reg.x = 0x09;
+                    self.reg.x = 0x09;  // wrap around
                     if (self.reg.x as i8) >= 0 {
                         pc = 1;
                     } else {
@@ -881,7 +881,7 @@ impl Cpu {
     }
 
     fn ZEROSOUND(&mut self) {
-        self.reg.a = 0x00;
+        self.reg.a = 0x00;  // # sounds in table
         self.mem[sym::soundtable] = self.reg.a;
         return;
     }
@@ -1066,7 +1066,7 @@ impl Cpu {
         self.flags.n = (_v >> 7) != 0;
         self.reg.a = self.mem[sym::torchx + self.reg.x as usize];
         if (self.reg.a as i8) < 0 {
-            self.reg.x = 0x00;
+            self.reg.x = 0x00;  // start again at beginning of list
         }
         self.mem[sym::torchcount] = self.reg.x;
         self.mem[sym::XCO] = self.mem[sym::torchx + self.reg.x as usize];
@@ -1402,7 +1402,7 @@ impl Cpu {
                                         self.flags.z = self.reg.a == _o;
                                         self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                                         if self.reg.a < 0x05 {
-                                            self.reg.a = 0x01;
+                                            self.reg.a = 0x01;  // fastest
                                             self.mem[sym::SPEED] = self.reg.a;
                                             return;
                                         }
@@ -1472,7 +1472,7 @@ impl Cpu {
         loop {
             match pc {
                 0 => {
-                    self.reg.y = 0x61;
+                    self.reg.y = 0x61;  // counter
                     pc = 1;
                 }
                 1 => {

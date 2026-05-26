@@ -375,7 +375,7 @@ impl Cpu {
                             if self.reg.x != 0x05 {
                                 return;
                             }
-                            self.reg.a = 0x05;
+                            self.reg.a = 0x05;  // yecch
                             self.addsound();
                             self.reg.a = 0xff;
                             self.mem[sym::ChgKidStr] = self.reg.a;
@@ -461,7 +461,7 @@ impl Cpu {
                     if self.reg.a != 0x02 {
                         self.reg.a = 0x64;
                         self.decstr();
-                        self.reg.a = 0x55;
+                        self.reg.a = 0x55;  // dropdead?
                     } else {
                         self.reg.a = self.mem[sym::CharID];
                         let _o: u8 = 0x04;
@@ -680,7 +680,7 @@ impl Cpu {
                 self.mem[sym::CharXVel] = 0x00;
                 self.mem[sym::CharYVel] = 0x00;
                 self.mem[sym::CharSword] = 0x02;
-                self.reg.a = 0x04;
+                self.reg.a = 0x04;  // skeleton
                 self.mem[sym::CharID] = self.reg.a;
                 self.SaveShad();
                 return;
@@ -942,7 +942,7 @@ impl Cpu {
                     }
                 }
                 10 => {
-                    self.reg.a = 0x02;
+                    self.reg.a = 0x02;  // clear path
                     self.mem[sym::EnemyAlert] = self.reg.a;
                     self.reg.a = self.mem[sym::KidBlockX];
                     self.getblockej();

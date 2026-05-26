@@ -635,9 +635,8 @@ fn TestStrike {
 :ong:
   if a < #strikerange1 goto ]rts  ; AUTO.S:997
 :cont1:
-  cmp a, #strikerange2              ; AUTO.S:999
   if a >= #strikerange2 goto ]rts  ; AUTO.S:1000
-  ??? lda #99 "stabbed"            ; AUTO.S:1002
+  a = #0x63                  ; AUTO.S:1002
   *OpAction@0x03a2 = a            ; AUTO.S:1003
 ]rts:
   return                           ; AUTO.S:1004

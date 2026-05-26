@@ -401,7 +401,7 @@ impl Cpu {
             self.reg.a = _r as u8;
             self.flags.c = (_r >> 8) != 0;
             self.mem[sym::ztemp] = self.reg.a;
-            self.reg.a = 0xff;
+            self.reg.a = 0xff;  // hibit set
         }
         self.reg.a ^= self.mem[sym::FCharFace];
         if (self.reg.a as i8) < 0 {
@@ -1099,7 +1099,7 @@ impl Cpu {
 
     fn decodeswim(&mut self) {
         self.mem[sym::FCharImage] = self.reg.a;
-        self.reg.a = 0x02;
+        self.reg.a = 0x02;  // chtable3
         self.mem[sym::FCharTable] = self.reg.a;
         return;
     }
@@ -1157,7 +1157,7 @@ impl Cpu {
         self.mem[sym::topej] = self.reg.a;
         self.getblocky();
         if self.reg.a == 0x03 {
-            self.reg.a = 0xff;
+            self.reg.a = 0xff;  // if o.s., call it -1
         }
         self.mem[sym::topblock] = self.reg.a;
         self.reg.a = self.mem[sym::FCharY];
@@ -1173,7 +1173,7 @@ impl Cpu {
         self.reg.a = self.mem[sym::Fcheck];
         self.reg.a &= 0x20;
         if self.reg.a != 0x00 {
-            self.reg.a = 0x03;
+            self.reg.a = 0x03;  // make character 3 bits thinner
             self.mem[sym::ztemp] = self.reg.a;
         }
         self.mem[sym::CDLeftEj] = (self.mem[sym::leftej]).wrapping_add(self.mem[sym::ztemp]);
@@ -1681,14 +1681,14 @@ impl Cpu {
     fn CMPBARR(&mut self) {
         match self.reg.a {
             0x07 | 0x0c | 0x04 => {
-                self.reg.a = 0x01;
+                self.reg.a = 0x01;  // panel/gate
                 return;
             }
             _ => {}
         }
         match self.reg.a {
             0x0d | 0x12 => {
-                self.reg.a = 0x03;
+                self.reg.a = 0x03;  // mirror/slicer
                 return;
             }
             _ => {}
@@ -1697,7 +1697,7 @@ impl Cpu {
             self.reg.a = 0x00;
             return;
         }
-        self.reg.a = 0x04;
+        self.reg.a = 0x04;  // block
         return;
     }
 
@@ -2239,7 +2239,7 @@ impl Cpu {
     fn GETOPDIST(&mut self) {
         self.reg.a = self.mem[sym::CharScrn];
         if self.reg.a != self.mem[sym::OpScrn] {
-            self.reg.x = 0x7f;
+            self.reg.x = 0x7f;  // arbitrary large dist.
         } else {
             'b7: {
                 self.reg.a = self.mem[sym::OpX];

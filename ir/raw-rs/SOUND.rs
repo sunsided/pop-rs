@@ -66,7 +66,7 @@ mod sym {
 impl Cpu {
     // aliases: lookup, endlook
     fn ZEROSOUND(&mut self) {
-        self.reg.a = 0x00;
+        self.reg.a = 0x00;  // # sounds in table
         self.mem[sym::soundtable] = self.reg.a;
         return;
     }

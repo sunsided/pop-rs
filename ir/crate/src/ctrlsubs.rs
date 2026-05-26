@@ -249,7 +249,7 @@ pub fn ADDFCHARX(cpu: &mut Cpu) {
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
         cpu.mem[sym::ztemp] = cpu.reg.a;
-        cpu.reg.a = 0xff;
+        cpu.reg.a = 0xff;  // hibit set
     }
     cpu.reg.a ^= cpu.mem[sym::FCharFace];
     if (cpu.reg.a as i8) < 0 {
@@ -947,7 +947,7 @@ pub fn decodeim(cpu: &mut Cpu) {
 
 pub fn decodeswim(cpu: &mut Cpu) {
     cpu.mem[sym::FCharImage] = cpu.reg.a;
-    cpu.reg.a = 0x02;
+    cpu.reg.a = 0x02;  // chtable3
     cpu.mem[sym::FCharTable] = cpu.reg.a;
     return;
 }
@@ -1005,7 +1005,7 @@ pub fn GETEDGES(cpu: &mut Cpu) {
     cpu.mem[sym::topej] = cpu.reg.a;
     crate::ext::getblocky(cpu);
     if cpu.reg.a == 0x03 {
-        cpu.reg.a = 0xff;
+        cpu.reg.a = 0xff;  // if o.s., call it -1
     }
     cpu.mem[sym::topblock] = cpu.reg.a;
     cpu.reg.a = cpu.mem[sym::FCharY];
@@ -1021,7 +1021,7 @@ pub fn GETEDGES(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::Fcheck];
     cpu.reg.a &= 0x20;
     if cpu.reg.a != 0x00 {
-        cpu.reg.a = 0x03;
+        cpu.reg.a = 0x03;  // make character 3 bits thinner
         cpu.mem[sym::ztemp] = cpu.reg.a;
     }
     cpu.mem[sym::CDLeftEj] = (cpu.mem[sym::leftej]).wrapping_add(cpu.mem[sym::ztemp]);
@@ -1529,14 +1529,14 @@ pub fn CMPSPACE(cpu: &mut Cpu) {
 pub fn CMPBARR(cpu: &mut Cpu) {
     match cpu.reg.a {
         0x07 | 0x0c | 0x04 => {
-            cpu.reg.a = 0x01;
+            cpu.reg.a = 0x01;  // panel/gate
             return;
         }
         _ => {}
     }
     match cpu.reg.a {
         0x0d | 0x12 => {
-            cpu.reg.a = 0x03;
+            cpu.reg.a = 0x03;  // mirror/slicer
             return;
         }
         _ => {}
@@ -1545,7 +1545,7 @@ pub fn CMPBARR(cpu: &mut Cpu) {
         cpu.reg.a = 0x00;
         return;
     }
-    cpu.reg.a = 0x04;
+    cpu.reg.a = 0x04;  // block
     return;
 }
 
@@ -2087,7 +2087,7 @@ pub fn BOOSTMETER(cpu: &mut Cpu) {
 pub fn GETOPDIST(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::CharScrn];
     if cpu.reg.a != cpu.mem[sym::OpScrn] {
-        cpu.reg.x = 0x7f;
+        cpu.reg.x = 0x7f;  // arbitrary large dist.
     } else {
         'b7: {
             cpu.reg.a = cpu.mem[sym::OpX];

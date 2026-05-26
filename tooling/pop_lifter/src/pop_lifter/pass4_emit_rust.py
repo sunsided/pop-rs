@@ -557,7 +557,10 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
     `StoreOpAddr` 16-bit address). The opaque `StoreLocal` (offset-0
     opcode patches, branch / jump-target patches) stays deferred."""
     if isinstance(item, LoadImm):
-        return [f"self.reg.{item.reg} = {_emit_imm(item.imm)};"]
+        # Surface the source comment so a magic immediate keeps its name
+        # (`self.reg.a = 0x63; // "stabbed"`).
+        cmt = f"  // {item.src.comment}" if item.src.comment else ""
+        return [f"self.reg.{item.reg} = {_emit_imm(item.imm)};{cmt}"]
 
     if isinstance(item, LoadAbs):
         return [f"self.reg.{item.reg} = self.mem[{_abs_index(item.source, syms)}];"]

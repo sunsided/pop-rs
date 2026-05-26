@@ -238,7 +238,7 @@ pub fn POTIONEFFECT(cpu: &mut Cpu) {
                         if cpu.reg.x != 0x05 {
                             return;
                         }
-                        cpu.reg.a = 0x05;
+                        cpu.reg.a = 0x05;  // yecch
                         crate::ext::addsound(cpu);
                         cpu.reg.a = 0xff;
                         cpu.mem[sym::ChgKidStr] = cpu.reg.a;
@@ -324,7 +324,7 @@ pub fn STABCHAR(cpu: &mut Cpu) {
                 if cpu.reg.a != 0x02 {
                     cpu.reg.a = 0x64;
                     crate::ext::decstr(cpu);
-                    cpu.reg.a = 0x55;
+                    cpu.reg.a = 0x55;  // dropdead?
                 } else {
                     cpu.reg.a = cpu.mem[sym::CharID];
                     let _o: u8 = 0x04;
@@ -543,7 +543,7 @@ pub fn BONESRISE(cpu: &mut Cpu) {
             cpu.mem[sym::CharXVel] = 0x00;
             cpu.mem[sym::CharYVel] = 0x00;
             cpu.mem[sym::CharSword] = 0x02;
-            cpu.reg.a = 0x04;
+            cpu.reg.a = 0x04;  // skeleton
             cpu.mem[sym::CharID] = cpu.reg.a;
             crate::ext::SaveShad(cpu);
             return;
@@ -805,7 +805,7 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
                 }
             }
             10 => {
-                cpu.reg.a = 0x02;
+                cpu.reg.a = 0x02;  // clear path
                 cpu.mem[sym::EnemyAlert] = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::KidBlockX];
                 crate::ext::getblockej(cpu);

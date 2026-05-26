@@ -671,7 +671,7 @@ impl Cpu {
                 6 => {
                     self.reg.a = 0xbf;
                     self.mem[sym::YCO] = self.reg.a;
-                    self.reg.a = 0x82;
+                    self.reg.a = 0x82;  // mirror
                     self.mem[sym::OPACITY] = self.reg.a;
                     self.reg.x = 0x00;
                     self.mem[sym::xsave] = self.reg.x;
@@ -1209,13 +1209,9 @@ impl Cpu {
                     self.mem[sym::FCharIndex] = self.reg.a;
                     self.reg.a = self.mem[sym::CharPosn];
                     if self.reg.a != 0xb9 {
-                        let _o: u8 = 0xb1;
-                        self.flags.c = self.reg.a >= _o;
-                        self.flags.z = self.reg.a == _o;
-                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                         if self.reg.a == 0xb1 {
-                            // raw: ??? lda #-5 impaled            ; GAMEBG.S:1004
-                            if !self.flags.z {
+                            self.reg.a = 0xfb;  // impaled
+                            if self.reg.a != 0x00 {
                                 break 'b11;
                             } else {
                                 break 'b10;
@@ -1232,7 +1228,7 @@ impl Cpu {
                             self.reg.a = 0xf1;
                             self.reg.x = self.mem[sym::CharID];
                             if self.reg.x != 0x00 {
-                                self.reg.a = 0xf5;
+                                self.reg.a = 0xf5;  // kid strikes lower than opponent
                             }
                             self.flags.c = false;
                             let _r = (self.reg.a as u16) + self.mem[sym::FCharY] as u16 + (self.flags.c as u16);
@@ -1255,7 +1251,7 @@ impl Cpu {
         self.addfcharx();
         self.reg.a = self.mem[sym::CharID];
         if self.reg.a != 0x00 {
-            self.reg.a = 0x01;
+            self.reg.a = 0x01;  // opponents: 1
         }
         self.reg.a ^= self.mem[sym::FCharX];
         self.reg.a ^= self.mem[sym::FCharFace];

@@ -418,7 +418,7 @@ impl Cpu {
                     }
                 }
                 1 => {
-                    self.reg.a = 0x01;
+                    self.reg.a = 0x01;  // start with image #1
                     pc = 2;
                 }
                 2 => {
@@ -857,7 +857,7 @@ impl Cpu {
     fn setbgimg(&mut self) {
         'b3: {
             self.reg.y = self.reg.a;
-            self.reg.a = 0x03;
+            self.reg.a = 0x03;  // auxmem
             self.mem[sym::BANK] = self.reg.a;
             self.reg.a = 0x00;
             self.mem[sym::TABLE] = self.reg.a;

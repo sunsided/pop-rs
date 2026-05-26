@@ -281,7 +281,7 @@ impl Cpu {
                     self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
                     self.smc.smod_hi = self.reg.a;
-                    self.reg.a = 0x80;
+                    self.reg.a = 0x80;  // black2
                     self.reg.x = 0x10;
                     self.reg.y = 0x00;
                     pc = 1;
@@ -445,7 +445,7 @@ impl Cpu {
             self.flags.z = self.reg.a == _o;
             self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
             if self.reg.a >= self.mem[sym::BOTCUT] {
-                self.reg.a = 0xff;
+                self.reg.a = 0xff;  // Entire image is o.s. - skip it
                 return;
             }
             self.flags.c = true;
@@ -490,7 +490,7 @@ impl Cpu {
                 self.reg.a = _r as u8;
                 self.flags.c = (_r >> 8) != 0;
                 if (self.reg.a as i8) < 0 {
-                    self.reg.a = 0xff;
+                    self.reg.a = 0xff;  // Entire image is o.s. - skip it
                     return;
                 }
                 self.mem[sym::VISWIDTH] = self.reg.a;
@@ -510,7 +510,7 @@ impl Cpu {
                 self.flags.z = self.reg.a == _o;
                 self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if self.reg.a >= self.mem[sym::RIGHTCUT] {
-                    self.reg.a = 0xff;
+                    self.reg.a = 0xff;  // Entire image is o.s. - skip it
                     return;
                 }
                 self.flags.c = false;
@@ -556,7 +556,7 @@ impl Cpu {
             self.reg.a = _r as u8;
             self.flags.c = (_r >> 8) != 0;
             if (self.reg.a as i8) < 0 {
-                self.reg.a = 0xff;
+                self.reg.a = 0xff;  // Entire image is o.s. - skip it
                 return;
             }
             self.mem[sym::VISWIDTH] = self.reg.a;
@@ -587,7 +587,7 @@ impl Cpu {
                     self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
                     if (self.reg.a as i8) < 0 {
-                        self.reg.a = 0xff;
+                        self.reg.a = 0xff;  // Entire image is o.s. - skip it
                         return;
                     }
                     self.mem[sym::VISWIDTH] = self.reg.a;
@@ -607,7 +607,7 @@ impl Cpu {
                     self.flags.z = self.reg.a == _o;
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a >= self.mem[sym::RIGHTCUT] {
-                        self.reg.a = 0xff;
+                        self.reg.a = 0xff;  // Entire image is o.s. - skip it
                         return;
                     }
                     self.flags.c = false;
@@ -653,7 +653,7 @@ impl Cpu {
                 self.reg.a = _r as u8;
                 self.flags.c = (_r >> 8) != 0;
                 if (self.reg.a as i8) < 0 {
-                    self.reg.a = 0xff;
+                    self.reg.a = 0xff;  // Entire image is o.s. - skip it
                     return;
                 }
                 self.mem[sym::VISWIDTH] = self.reg.a;
@@ -681,7 +681,7 @@ impl Cpu {
                     self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
                     if (self.reg.a as i8) < 0 {
-                        self.reg.a = 0xff;
+                        self.reg.a = 0xff;  // Entire image is o.s. - skip it
                         return;
                     }
                     self.mem[sym::VISWIDTH] = self.reg.a;
@@ -701,7 +701,7 @@ impl Cpu {
                     self.flags.z = self.reg.a == _o;
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a >= self.mem[sym::RIGHTCUT] {
-                        self.reg.a = 0xff;
+                        self.reg.a = 0xff;  // Entire image is o.s. - skip it
                         return;
                     }
                     self.flags.c = false;
@@ -747,7 +747,7 @@ impl Cpu {
                 self.reg.a = _r as u8;
                 self.flags.c = (_r >> 8) != 0;
                 if (self.reg.a as i8) < 0 {
-                    self.reg.a = 0xff;
+                    self.reg.a = 0xff;  // Entire image is o.s. - skip it
                     return;
                 }
                 self.mem[sym::VISWIDTH] = self.reg.a;
@@ -768,7 +768,7 @@ impl Cpu {
                     self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
                     if (self.reg.a as i8) < 0 {
-                        self.reg.a = 0xff;
+                        self.reg.a = 0xff;  // Entire image is o.s. - skip it
                         return;
                     }
                     self.mem[sym::VISWIDTH] = self.reg.a;
@@ -788,7 +788,7 @@ impl Cpu {
                     self.flags.z = self.reg.a == _o;
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a >= self.mem[sym::RIGHTCUT] {
-                        self.reg.a = 0xff;
+                        self.reg.a = 0xff;  // Entire image is o.s. - skip it
                         return;
                     }
                     self.flags.c = false;
@@ -834,7 +834,7 @@ impl Cpu {
                 self.reg.a = _r as u8;
                 self.flags.c = (_r >> 8) != 0;
                 if (self.reg.a as i8) < 0 {
-                    self.reg.a = 0xff;
+                    self.reg.a = 0xff;  // Entire image is o.s. - skip it
                     return;
                 }
                 self.mem[sym::VISWIDTH] = self.reg.a;
@@ -857,7 +857,7 @@ impl Cpu {
             self.flags.z = self.reg.a == _o;
             self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
             if self.reg.a >= self.mem[sym::BOTCUT] {
-                self.reg.a = 0xff;
+                self.reg.a = 0xff;  // Entire image is o.s. - skip it
                 return;
             }
             self.flags.c = true;
@@ -902,7 +902,7 @@ impl Cpu {
                 self.reg.a = _r as u8;
                 self.flags.c = (_r >> 8) != 0;
                 if (self.reg.a as i8) < 0 {
-                    self.reg.a = 0xff;
+                    self.reg.a = 0xff;  // Entire image is o.s. - skip it
                     return;
                 }
                 self.mem[sym::VISWIDTH] = self.reg.a;
@@ -922,7 +922,7 @@ impl Cpu {
                 self.flags.z = self.reg.a == _o;
                 self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if self.reg.a >= self.mem[sym::RIGHTCUT] {
-                    self.reg.a = 0xff;
+                    self.reg.a = 0xff;  // Entire image is o.s. - skip it
                     return;
                 }
                 self.flags.c = false;
@@ -968,7 +968,7 @@ impl Cpu {
             self.reg.a = _r as u8;
             self.flags.c = (_r >> 8) != 0;
             if (self.reg.a as i8) < 0 {
-                self.reg.a = 0xff;
+                self.reg.a = 0xff;  // Entire image is o.s. - skip it
                 return;
             }
             self.mem[sym::VISWIDTH] = self.reg.a;
@@ -988,7 +988,7 @@ impl Cpu {
             self.reg.a = _r as u8;
             self.flags.c = (_r >> 8) != 0;
             if (self.reg.a as i8) < 0 {
-                self.reg.a = 0xff;
+                self.reg.a = 0xff;  // Entire image is o.s. - skip it
                 return;
             }
             self.mem[sym::VISWIDTH] = self.reg.a;
@@ -1008,7 +1008,7 @@ impl Cpu {
             self.flags.z = self.reg.a == _o;
             self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
             if self.reg.a >= self.mem[sym::RIGHTCUT] {
-                self.reg.a = 0xff;
+                self.reg.a = 0xff;  // Entire image is o.s. - skip it
                 return;
             }
             self.flags.c = false;
@@ -1054,7 +1054,7 @@ impl Cpu {
         self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
         if (self.reg.a as i8) < 0 {
-            self.reg.a = 0xff;
+            self.reg.a = 0xff;  // Entire image is o.s. - skip it
             return;
         }
         self.mem[sym::VISWIDTH] = self.reg.a;
@@ -1201,7 +1201,7 @@ impl Cpu {
                     pc = 11;
                 }
                 11 => {
-                    self.reg.y = self.smc.smSTART;
+                    self.reg.y = self.smc.smSTART;  // VISWIDTH-1
                     pc = 12;
                 }
                 12 => {
@@ -1221,7 +1221,7 @@ impl Cpu {
                     }
                 }
                 14 => {
-                    self.reg.a = self.smc.smWIDTH;
+                    self.reg.a = self.smc.smWIDTH;  // VISWIDTH
                     let _r = (self.reg.a as u16) + self.mem[sym::PEELBUF] as u16 + (self.flags.c as u16);
                     self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
@@ -1663,7 +1663,7 @@ impl Cpu {
                     pc = 11;
                 }
                 11 => {
-                    self.reg.a = self.smc.AMASK;
+                    self.reg.a = self.smc.AMASK;  // AMASK
                     self.mem[sym::CARRY] = self.reg.a;
                     self.reg.a &= self.mem[(self.mem[sym::BASE] as usize | (self.mem[sym::BASE + 1] as usize) << 8) + self.reg.y as usize];
                     self.mem[sym::carryim] = self.reg.a;
@@ -1732,7 +1732,7 @@ impl Cpu {
                     pc = 21;
                 }
                 21 => {
-                    self.reg.a = self.smc.BMASK;
+                    self.reg.a = self.smc.BMASK;  // BMASK
                     self.reg.a |= self.mem[sym::CARRY];
                     pc = 22;
                 }
@@ -1922,7 +1922,7 @@ impl Cpu {
                 12 => {
                     self.reg.a &= 0x00;
                     self.mem[sym::CARRY] = self.reg.a;
-                    self.reg.a = 0x00;
+                    self.reg.a = 0x00;  // 0 XOR X == X
                     self.mem[sym::carryim] = self.reg.a;
                     pc = 13;
                 }
@@ -2403,7 +2403,7 @@ impl Cpu {
                     pc = 11;
                 }
                 11 => {
-                    self.reg.a = self.smc.AMASK;
+                    self.reg.a = self.smc.AMASK;  // AMASK
                     self.mem[sym::CARRY] = self.reg.a;
                     self.reg.a &= self.mem[(self.mem[sym::BASE] as usize | (self.mem[sym::BASE + 1] as usize) << 8) + self.reg.y as usize];
                     self.mem[sym::carryim] = self.reg.a;
@@ -2669,7 +2669,7 @@ impl Cpu {
                     pc = 11;
                 }
                 11 => {
-                    self.reg.a = self.smc.AMASK;
+                    self.reg.a = self.smc.AMASK;  // AMASK
                     self.reg.a &= self.mem[(self.mem[sym::BASE] as usize | (self.mem[sym::BASE + 1] as usize) << 8) + self.reg.y as usize];
                     self.mem[sym::CARRY] = self.reg.a;
                     self.reg.a = 0x00;
@@ -2870,7 +2870,7 @@ impl Cpu {
                     }
                 }
                 3 => {
-                    self.reg.a = 0xff;
+                    self.reg.a = 0xff;  // limited Y-clipping
                     pc = 4;
                 }
                 4 => {
@@ -3021,7 +3021,7 @@ impl Cpu {
                     }
                 }
                 1 => {
-                    self.reg.a = 0xff;
+                    self.reg.a = 0xff;  // limited Y-clipping
                     pc = 2;
                 }
                 2 => {
@@ -3172,7 +3172,7 @@ impl Cpu {
                     }
                 }
                 2 => {
-                    self.reg.a = 0xff;
+                    self.reg.a = 0xff;  // limited Y-clipping
                     pc = 3;
                 }
                 3 => {
@@ -3292,7 +3292,7 @@ impl Cpu {
     }
 
     fn SETFASTMAIN(&mut self) {
-        self.reg.a = 0x02;
+        self.reg.a = 0x02;  // RAMRD main
         self.local.insert(("]ramrd1", 1), self.reg.a);
         self.local.insert(("]ramrd2", 1), self.reg.a);
         self.local.insert(("]ramrd3", 1), self.reg.a);
@@ -3306,7 +3306,7 @@ impl Cpu {
         loop {
             match pc {
                 0 => {
-                    self.reg.a = 0x03;
+                    self.reg.a = 0x03;  // RAMRD aux
                     if self.reg.a != 0x00 {
                         self._5dsetfast();
                         return;
@@ -3583,8 +3583,8 @@ impl Cpu {
     }
 
     fn INVERTY(&mut self) {
-        self.reg.x = 0xbf;
-        self.reg.y = 0x00;
+        self.reg.x = 0xbf;  // low line
+        self.reg.y = 0x00;  // high line
         loop {
             self.reg.a = self.mem[sym::YLO + self.reg.x as usize];
             let tmp0 = self.reg.a;

@@ -761,8 +761,8 @@ impl Cpu {
         loop {
             match pc {
                 0 => {
-                    self.reg.x = 0xbf;
-                    self.reg.y = 0x00;
+                    self.reg.x = 0xbf;  // low line
+                    self.reg.y = 0x00;  // high line
                     pc = 6;
                 }
                 1 => {
@@ -1049,7 +1049,7 @@ impl Cpu {
         self.reg.a = 0xc1;
         self.mem[0xc029] = self.reg.a;
         // 65816 (IIgs-only, not modeled): rep $20  ; UNPACK.S:722
-        self.reg.x = 0x00;
+        self.reg.x = 0x00;  // aux mem
         self.reg.y = 0xca;
         self.reg.a = 0x1f;
         // 65816 (IIgs-only, not modeled): phb  ; UNPACK.S:729

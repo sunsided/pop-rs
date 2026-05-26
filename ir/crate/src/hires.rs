@@ -143,7 +143,7 @@ pub fn CLS(cpu: &mut Cpu) {
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
                 cpu.smc.smod_hi = cpu.reg.a;
-                cpu.reg.a = 0x80;
+                cpu.reg.a = 0x80;  // black2
                 cpu.reg.x = 0x10;
                 cpu.reg.y = 0x00;
                 pc = 1;
@@ -307,7 +307,7 @@ pub fn CROP(cpu: &mut Cpu) {
         cpu.flags.z = cpu.reg.a == _o;
         cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
         if cpu.reg.a >= cpu.mem[sym::BOTCUT] {
-            cpu.reg.a = 0xff;
+            cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
             return;
         }
         cpu.flags.c = true;
@@ -352,7 +352,7 @@ pub fn CROP(cpu: &mut Cpu) {
             cpu.reg.a = _r as u8;
             cpu.flags.c = (_r >> 8) != 0;
             if (cpu.reg.a as i8) < 0 {
-                cpu.reg.a = 0xff;
+                cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
                 return;
             }
             cpu.mem[sym::VISWIDTH] = cpu.reg.a;
@@ -372,7 +372,7 @@ pub fn CROP(cpu: &mut Cpu) {
             cpu.flags.z = cpu.reg.a == _o;
             cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
             if cpu.reg.a >= cpu.mem[sym::RIGHTCUT] {
-                cpu.reg.a = 0xff;
+                cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
                 return;
             }
             cpu.flags.c = false;
@@ -418,7 +418,7 @@ pub fn CROP(cpu: &mut Cpu) {
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
         if (cpu.reg.a as i8) < 0 {
-            cpu.reg.a = 0xff;
+            cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
             return;
         }
         cpu.mem[sym::VISWIDTH] = cpu.reg.a;
@@ -449,7 +449,7 @@ pub fn CROP(cpu: &mut Cpu) {
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
                 if (cpu.reg.a as i8) < 0 {
-                    cpu.reg.a = 0xff;
+                    cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
                     return;
                 }
                 cpu.mem[sym::VISWIDTH] = cpu.reg.a;
@@ -469,7 +469,7 @@ pub fn CROP(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a >= cpu.mem[sym::RIGHTCUT] {
-                    cpu.reg.a = 0xff;
+                    cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
                     return;
                 }
                 cpu.flags.c = false;
@@ -515,7 +515,7 @@ pub fn CROP(cpu: &mut Cpu) {
             cpu.reg.a = _r as u8;
             cpu.flags.c = (_r >> 8) != 0;
             if (cpu.reg.a as i8) < 0 {
-                cpu.reg.a = 0xff;
+                cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
                 return;
             }
             cpu.mem[sym::VISWIDTH] = cpu.reg.a;
@@ -543,7 +543,7 @@ pub fn CROP(cpu: &mut Cpu) {
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
                 if (cpu.reg.a as i8) < 0 {
-                    cpu.reg.a = 0xff;
+                    cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
                     return;
                 }
                 cpu.mem[sym::VISWIDTH] = cpu.reg.a;
@@ -563,7 +563,7 @@ pub fn CROP(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a >= cpu.mem[sym::RIGHTCUT] {
-                    cpu.reg.a = 0xff;
+                    cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
                     return;
                 }
                 cpu.flags.c = false;
@@ -609,7 +609,7 @@ pub fn CROP(cpu: &mut Cpu) {
             cpu.reg.a = _r as u8;
             cpu.flags.c = (_r >> 8) != 0;
             if (cpu.reg.a as i8) < 0 {
-                cpu.reg.a = 0xff;
+                cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
                 return;
             }
             cpu.mem[sym::VISWIDTH] = cpu.reg.a;
@@ -630,7 +630,7 @@ pub fn CROP(cpu: &mut Cpu) {
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
                 if (cpu.reg.a as i8) < 0 {
-                    cpu.reg.a = 0xff;
+                    cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
                     return;
                 }
                 cpu.mem[sym::VISWIDTH] = cpu.reg.a;
@@ -650,7 +650,7 @@ pub fn CROP(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a >= cpu.mem[sym::RIGHTCUT] {
-                    cpu.reg.a = 0xff;
+                    cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
                     return;
                 }
                 cpu.flags.c = false;
@@ -696,7 +696,7 @@ pub fn CROP(cpu: &mut Cpu) {
             cpu.reg.a = _r as u8;
             cpu.flags.c = (_r >> 8) != 0;
             if (cpu.reg.a as i8) < 0 {
-                cpu.reg.a = 0xff;
+                cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
                 return;
             }
             cpu.mem[sym::VISWIDTH] = cpu.reg.a;
@@ -719,7 +719,7 @@ pub fn CROP(cpu: &mut Cpu) {
         cpu.flags.z = cpu.reg.a == _o;
         cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
         if cpu.reg.a >= cpu.mem[sym::BOTCUT] {
-            cpu.reg.a = 0xff;
+            cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
             return;
         }
         cpu.flags.c = true;
@@ -764,7 +764,7 @@ pub fn CROP(cpu: &mut Cpu) {
             cpu.reg.a = _r as u8;
             cpu.flags.c = (_r >> 8) != 0;
             if (cpu.reg.a as i8) < 0 {
-                cpu.reg.a = 0xff;
+                cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
                 return;
             }
             cpu.mem[sym::VISWIDTH] = cpu.reg.a;
@@ -784,7 +784,7 @@ pub fn CROP(cpu: &mut Cpu) {
             cpu.flags.z = cpu.reg.a == _o;
             cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
             if cpu.reg.a >= cpu.mem[sym::RIGHTCUT] {
-                cpu.reg.a = 0xff;
+                cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
                 return;
             }
             cpu.flags.c = false;
@@ -830,7 +830,7 @@ pub fn CROP(cpu: &mut Cpu) {
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
         if (cpu.reg.a as i8) < 0 {
-            cpu.reg.a = 0xff;
+            cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
             return;
         }
         cpu.mem[sym::VISWIDTH] = cpu.reg.a;
@@ -850,7 +850,7 @@ pub fn CROP(cpu: &mut Cpu) {
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
         if (cpu.reg.a as i8) < 0 {
-            cpu.reg.a = 0xff;
+            cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
             return;
         }
         cpu.mem[sym::VISWIDTH] = cpu.reg.a;
@@ -870,7 +870,7 @@ pub fn CROP(cpu: &mut Cpu) {
         cpu.flags.z = cpu.reg.a == _o;
         cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
         if cpu.reg.a >= cpu.mem[sym::RIGHTCUT] {
-            cpu.reg.a = 0xff;
+            cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
             return;
         }
         cpu.flags.c = false;
@@ -916,7 +916,7 @@ pub fn CROP(cpu: &mut Cpu) {
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
     if (cpu.reg.a as i8) < 0 {
-        cpu.reg.a = 0xff;
+        cpu.reg.a = 0xff;  // Entire image is o.s. - skip it
         return;
     }
     cpu.mem[sym::VISWIDTH] = cpu.reg.a;
@@ -1063,7 +1063,7 @@ pub fn LAYRSAVE(cpu: &mut Cpu) {
                 pc = 11;
             }
             11 => {
-                cpu.reg.y = cpu.smc.smSTART;
+                cpu.reg.y = cpu.smc.smSTART;  // VISWIDTH-1
                 pc = 12;
             }
             12 => {
@@ -1083,7 +1083,7 @@ pub fn LAYRSAVE(cpu: &mut Cpu) {
                 }
             }
             14 => {
-                cpu.reg.a = cpu.smc.smWIDTH;
+                cpu.reg.a = cpu.smc.smWIDTH;  // VISWIDTH
                 let _r = (cpu.reg.a as u16) + cpu.mem[sym::PEELBUF] as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
@@ -1525,7 +1525,7 @@ pub fn LayMask(cpu: &mut Cpu) {
                 pc = 11;
             }
             11 => {
-                cpu.reg.a = cpu.smc.AMASK;
+                cpu.reg.a = cpu.smc.AMASK;  // AMASK
                 cpu.mem[sym::CARRY] = cpu.reg.a;
                 cpu.reg.a &= cpu.mem[(cpu.mem[sym::BASE] as usize | (cpu.mem[sym::BASE + 1] as usize) << 8) + cpu.reg.y as usize];
                 cpu.mem[sym::carryim] = cpu.reg.a;
@@ -1594,7 +1594,7 @@ pub fn LayMask(cpu: &mut Cpu) {
                 pc = 21;
             }
             21 => {
-                cpu.reg.a = cpu.smc.BMASK;
+                cpu.reg.a = cpu.smc.BMASK;  // BMASK
                 cpu.reg.a |= cpu.mem[sym::CARRY];
                 pc = 22;
             }
@@ -1784,7 +1784,7 @@ pub fn LayXOR(cpu: &mut Cpu) {
             12 => {
                 cpu.reg.a &= 0x00;
                 cpu.mem[sym::CARRY] = cpu.reg.a;
-                cpu.reg.a = 0x00;
+                cpu.reg.a = 0x00;  // 0 XOR X == X
                 cpu.mem[sym::carryim] = cpu.reg.a;
                 pc = 13;
             }
@@ -2265,7 +2265,7 @@ pub fn MLayMask(cpu: &mut Cpu) {
                 pc = 11;
             }
             11 => {
-                cpu.reg.a = cpu.smc.AMASK;
+                cpu.reg.a = cpu.smc.AMASK;  // AMASK
                 cpu.mem[sym::CARRY] = cpu.reg.a;
                 cpu.reg.a &= cpu.mem[(cpu.mem[sym::BASE] as usize | (cpu.mem[sym::BASE + 1] as usize) << 8) + cpu.reg.y as usize];
                 cpu.mem[sym::carryim] = cpu.reg.a;
@@ -2531,7 +2531,7 @@ pub fn MLayXOR(cpu: &mut Cpu) {
                 pc = 11;
             }
             11 => {
-                cpu.reg.a = cpu.smc.AMASK;
+                cpu.reg.a = cpu.smc.AMASK;  // AMASK
                 cpu.reg.a &= cpu.mem[(cpu.mem[sym::BASE] as usize | (cpu.mem[sym::BASE + 1] as usize) << 8) + cpu.reg.y as usize];
                 cpu.mem[sym::CARRY] = cpu.reg.a;
                 cpu.reg.a = 0x00;
@@ -2732,7 +2732,7 @@ pub fn FASTLAY(cpu: &mut Cpu) {
                 }
             }
             3 => {
-                cpu.reg.a = 0xff;
+                cpu.reg.a = 0xff;  // limited Y-clipping
                 pc = 4;
             }
             4 => {
@@ -2883,7 +2883,7 @@ pub fn fastlaySTA(cpu: &mut Cpu) {
                 }
             }
             1 => {
-                cpu.reg.a = 0xff;
+                cpu.reg.a = 0xff;  // limited Y-clipping
                 pc = 2;
             }
             2 => {
@@ -3034,7 +3034,7 @@ pub fn FASTMASK(cpu: &mut Cpu) {
                 }
             }
             2 => {
-                cpu.reg.a = 0xff;
+                cpu.reg.a = 0xff;  // limited Y-clipping
                 pc = 3;
             }
             3 => {
@@ -3154,7 +3154,7 @@ pub fn FASTMASK(cpu: &mut Cpu) {
 }
 
 pub fn SETFASTMAIN(cpu: &mut Cpu) {
-    cpu.reg.a = 0x02;
+    cpu.reg.a = 0x02;  // RAMRD main
     cpu.local.insert(("]ramrd1", 1), cpu.reg.a);
     cpu.local.insert(("]ramrd2", 1), cpu.reg.a);
     cpu.local.insert(("]ramrd3", 1), cpu.reg.a);
@@ -3168,7 +3168,7 @@ pub fn SETFASTAUX(cpu: &mut Cpu) {
     loop {
         match pc {
             0 => {
-                cpu.reg.a = 0x03;
+                cpu.reg.a = 0x03;  // RAMRD aux
                 if cpu.reg.a != 0x00 {
                     crate::ext::_5dsetfast(cpu);
                     return;
@@ -3445,8 +3445,8 @@ pub fn COPYSCRN(cpu: &mut Cpu) {
 }
 
 pub fn INVERTY(cpu: &mut Cpu) {
-    cpu.reg.x = 0xbf;
-    cpu.reg.y = 0x00;
+    cpu.reg.x = 0xbf;  // low line
+    cpu.reg.y = 0x00;  // high line
     loop {
         cpu.reg.a = cpu.mem[sym::YLO + cpu.reg.x as usize];
         let tmp0 = cpu.reg.a;

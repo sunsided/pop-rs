@@ -260,7 +260,7 @@ impl Cpu {
                     pc = 1;
                 }
                 5 => {
-                    self.reg.y = 0x02;
+                    self.reg.y = 0x02;  // bottom row of scrn above
                     self.mem[sym::rowno] = self.reg.y;
                     self.reg.a = 0x02;
                     self.mem[sym::Dy] = self.reg.a;
@@ -300,7 +300,7 @@ impl Cpu {
                     }
                 }
                 7 => {
-                    self.reg.a = 0x01;
+                    self.reg.a = 0x01;  // If screen above is null screen,
                     if self.reg.a != 0x00 {
                         pc = 9;
                     } else {
@@ -695,8 +695,8 @@ impl Cpu {
                     }
                 }
                 1 => {
-                    self.reg.y = 0x00;
-                    self.reg.x = 0x01;
+                    self.reg.y = 0x00;  // y = sort list index
+                    self.reg.x = 0x01;  // x = object list index
                     pc = 2;
                 }
                 2 => {
@@ -861,7 +861,7 @@ impl Cpu {
                 }
                 2 => {
                     self.calcblue();
-                    self.reg.y = 0x08;
+                    self.reg.y = 0x08;  // skip rmost
                     pc = 3;
                 }
                 3 => {
@@ -889,7 +889,7 @@ impl Cpu {
                 }
                 5 => {
                     self.calcblue();
-                    self.reg.y = 0x09;
+                    self.reg.y = 0x09;  // u.r. block
                     self.getobjid();
                     self.mem[sym::BELOW] = self.reg.a;
                     self.reg.a = self.mem[sym::state];
@@ -1495,7 +1495,7 @@ impl Cpu {
                         self.adda();
                         return;
                     }
-                    self.reg.a = 0xa1;
+                    self.reg.a = 0xa1;  // arch ends to L of panel
                     self.adda1();
                     return;
                 }
@@ -1568,7 +1568,7 @@ impl Cpu {
                 self.adda();
                 return;
             }
-            self.reg.a = 0xa1;
+            self.reg.a = 0xa1;  // arch ends to L of panel
             self.adda1();
             return;
         }
@@ -1881,7 +1881,7 @@ impl Cpu {
     fn drawspikea(&mut self) {
         self.reg.x = self.mem[sym::state];
         if (self.reg.x as i8) < 0 {
-            self.reg.x = 0x05;
+            self.reg.x = 0x05;  // hibit set --> spikes extended
         }
         self.reg.a = self.mem[sym::spikea + self.reg.x as usize];
         if self.reg.a == 0x00 {
@@ -1904,7 +1904,7 @@ impl Cpu {
     fn drawspikeb(&mut self) {
         self.reg.x = self.mem[sym::spreced];
         if (self.reg.x as i8) < 0 {
-            self.reg.x = 0x05;
+            self.reg.x = 0x05;  // hibit set --> spikes extended
         }
         self.reg.a = self.mem[sym::spikeb + self.reg.x as usize];
         if self.reg.a == 0x00 {
@@ -1944,7 +1944,7 @@ impl Cpu {
         self.reg.a &= 0x7f;
         self.reg.x = self.reg.a;
         if self.reg.x >= 0x06 {
-            self.reg.x = 0x06;
+            self.reg.x = 0x06;  // fully retracted
         }
         'b6: {
             'b5: {
@@ -1999,7 +1999,7 @@ impl Cpu {
         self.reg.a &= 0x7f;
         self.reg.x = self.reg.a;
         if self.reg.x >= 0x06 {
-            self.reg.x = 0x06;
+            self.reg.x = 0x06;  // fully retracted
         }
         self.reg.a = self.mem[sym::slicerseq + self.reg.x as usize];
         self.reg.x = self.reg.a;
@@ -2518,10 +2518,10 @@ impl Cpu {
                 self.reg.a = self.mem[sym::LINKMAP + self.reg.x as usize];
                 self.reg.a &= 0x1f;
                 if self.reg.a < 0x02 {
-                    self.reg.a = 0x06;
+                    self.reg.a = 0x06;  // plate up
                     return;
                 }
-                self.reg.a = 0x05;
+                self.reg.a = 0x05;  // plate depressed
                 return;
             }
             0x0f => {
@@ -2534,7 +2534,7 @@ impl Cpu {
                     return;
                 }
                 self.mem[sym::state] = 0x00;
-                self.reg.a = 0x01;
+                self.reg.a = 0x01;  // depressed upp looks just like floor
                 return;
             }
             _ => {}
@@ -2737,7 +2737,7 @@ impl Cpu {
         self.reg.a &= 0x1f;
         if self.reg.a != 0x04 {
             if self.reg.a == 0x0b {
-                self.reg.a = 0x00;
+                self.reg.a = 0x00;  // loose floor
                 return;
             }
             let _o: u8 = 0x0a;
@@ -2771,7 +2771,7 @@ impl Cpu {
     fn getinitobj1(&mut self) {
         if self.reg.a != 0x04 {
             if self.reg.a == 0x0b {
-                self.reg.a = 0x00;
+                self.reg.a = 0x00;  // loose floor
                 return;
             }
             let _o: u8 = 0x0a;
@@ -2860,10 +2860,10 @@ impl Cpu {
                 self.reg.a = self.mem[sym::LINKMAP + self.reg.x as usize];
                 self.reg.a &= 0x1f;
                 if self.reg.a < 0x02 {
-                    self.reg.a = 0x06;
+                    self.reg.a = 0x06;  // plate up
                     return;
                 }
-                self.reg.a = 0x05;
+                self.reg.a = 0x05;  // plate depressed
                 return;
             }
             0x0f => {
@@ -2876,7 +2876,7 @@ impl Cpu {
                     return;
                 }
                 self.mem[sym::state] = 0x00;
-                self.reg.a = 0x01;
+                self.reg.a = 0x01;  // depressed upp looks just like floor
                 return;
             }
             _ => {}
