@@ -391,12 +391,22 @@ def _indirect_index(iy: IndirectY, syms: SymTable | None) -> str:
     address: fetch the 16-bit pointer from the zero-page bytes at `ptr`
     (low) and `ptr + 1` (high), then add Y. The high byte is rendered via
     `_offset_abs(ptr, 1)` so it resolves to `sym::<base> + <off+1>` even
-    when `ptr` itself carries an offset (`(ztemp+1),y`). Matches the
-    interpreter's permissive rule (no page wrap on the pointer, no 16-bit
-    wrap on `+ Y`) and the unmasked `IndexedAbs` form."""
+    when `ptr` itself carries an offset (`(ztemp+1),y`). The effective
+    address is wrapped to 16 bits (`& 0xffff`), matching the interpreter
+    (`_resolve_indirect_y`) so a high pointer plus Y wraps rather than
+    indexing past the end of `self.mem`."""
     lo = f"self.mem[{_abs_index(iy.ptr, syms)}]"
     hi = f"self.mem[{_abs_index(_offset_abs(iy.ptr, 1), syms)}]"
-    return f"({lo} as usize | ({hi} as usize) << 8) + self.reg.y as usize"
+    return f"(({lo} as usize | ({hi} as usize) << 8) + self.reg.y as usize) & 0xffff"
+
+
+def _indexed_place(base: str, idx) -> str:
+    """`self.mem[…]` for a `base,idx` indexed access, with the effective
+    address wrapped to 16 bits (`& 0xffff`) like the interpreter
+    (`_indexed_addr`). Without the wrap a base near the top of memory plus
+    a non-zero index would panic on an out-of-range `self.mem` index
+    instead of wrapping as the 6502 does."""
+    return f"self.mem[({base} + self.reg.{idx} as usize) & 0xffff]"
 
 
 def _load_with_flags(reg, rvalue: str, comment: str = "") -> list[str]:
@@ -441,7 +451,7 @@ def _cmp_operand(item, syms: SymTable | None) -> str:
     if isinstance(item, CmpAbs):
         return f"self.mem[{_abs_index(item.source, syms)}]"
     if isinstance(item, CmpIndexed):
-        return f"self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize]"
+        return _indexed_place(_abs_index(item.base, syms), item.index)
     if isinstance(item, CmpLocal):
         return f"self.local.get(&{_local_key(item.source_label, item.offset)}).copied().unwrap_or(0)"
     return f"self.mem[{_indirect_index(item.source, syms)}]"  # CmpIndirect
@@ -468,7 +478,7 @@ def _emit_value(v, syms: SymTable | None = None) -> str:
     if isinstance(v, Abs):
         return f"self.mem[{_abs_index(v, syms)}]"
     if isinstance(v, IndexedAbs):
-        return f"self.mem[{_abs_index(v.base, syms)} + self.reg.{v.index} as usize]"
+        return _indexed_place(_abs_index(v.base, syms), v.index)
     if isinstance(v, IndirectY):
         return f"self.mem[{_indirect_index(v, syms)}]"
     if isinstance(v, BinExpr):
@@ -499,7 +509,7 @@ def _emit_target(target, syms: SymTable | None = None) -> str | None:
     if isinstance(target, Abs):
         return f"self.mem[{_abs_index(target, syms)}]"
     if isinstance(target, IndexedAbs):
-        return f"self.mem[{_abs_index(target.base, syms)} + self.reg.{target.index} as usize]"
+        return _indexed_place(_abs_index(target.base, syms), target.index)
     if isinstance(target, IndirectY):
         return f"self.mem[{_indirect_index(target, syms)}]"
     return None  # anything else: deferred
@@ -586,8 +596,7 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         )
 
     if isinstance(item, LoadIndexed):
-        place = f"self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize]"
-        return _load_with_flags(item.reg, place)
+        return _load_with_flags(item.reg, _indexed_place(_abs_index(item.base, syms), item.index))
 
     if isinstance(item, LoadIndirect):
         idx = (
@@ -601,7 +610,7 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         return [f"self.mem[{_abs_index(item.target, syms)}] = self.reg.{item.reg};"]
 
     if isinstance(item, StoreIndexed):
-        place = f"self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize]"
+        place = _indexed_place(_abs_index(item.base, syms), item.index)
         return [f"{place} = self.reg.{item.reg};"]
 
     if isinstance(item, StoreIndirect):
@@ -624,10 +633,7 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         elif isinstance(target, Abs):
             place = f"self.mem[{_abs_index(target, syms)}]"
         elif isinstance(target, IndexedAbs):
-            place = (
-                f"self.mem[{_abs_index(target.base, syms)} "
-                f"+ self.reg.{target.index} as usize]"
-            )
+            place = _indexed_place(_abs_index(target.base, syms), target.index)
         elif isinstance(target, OpVarRef):
             # Recognised SMC operand bump: read-modify-write the operand
             # variable the matching store wrote and the patched instruction
@@ -665,11 +671,13 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         elif isinstance(item, AdcAbs):
             rhs = f"self.mem[{_abs_index(item.source, syms)}] as u16"
         else:
-            rhs = f"self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize] as u16"
+            rhs = f"{_indexed_place(_abs_index(item.base, syms), item.index)} as u16"
         return [
             f"let _r = (self.reg.a as u16) + {rhs} + (self.flags.c as u16);",
             "self.reg.a = _r as u8;",
             "self.flags.c = (_r >> 8) != 0;",
+            "self.flags.z = self.reg.a == 0;",
+            "self.flags.n = (self.reg.a >> 7) != 0;",
         ]
 
     if isinstance(item, (SbcImm, SbcAbs, SbcIndexed, SbcIndirect)):
@@ -683,13 +691,15 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         elif isinstance(item, SbcAbs):
             rhs = f"(!self.mem[{_abs_index(item.source, syms)}]) as u16"
         elif isinstance(item, SbcIndexed):
-            rhs = f"(!self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize]) as u16"
+            rhs = f"(!{_indexed_place(_abs_index(item.base, syms), item.index)}) as u16"
         else:
             rhs = f"(!self.mem[{_indirect_index(item.source, syms)}]) as u16"
         return [
             f"let _r = (self.reg.a as u16) + {rhs} + (self.flags.c as u16);",
             "self.reg.a = _r as u8;",
             "self.flags.c = (_r >> 8) != 0;",
+            "self.flags.z = self.reg.a == 0;",
+            "self.flags.n = (self.reg.a >> 7) != 0;",
         ]
 
     if isinstance(item, Asl):

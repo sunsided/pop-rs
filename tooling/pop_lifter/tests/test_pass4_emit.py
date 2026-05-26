@@ -151,14 +151,14 @@ def test_value_abs_read():
 
 def test_value_indexed_read():
     iv = IndexedAbs(base=_abs("tbl", 0x0200), index=Reg.X)
-    assert _emit_value(iv) == "self.mem[0x0200 + self.reg.x as usize]"
+    assert _emit_value(iv) == "self.mem[(0x0200 + self.reg.x as usize) & 0xffff]"
 
 
 def test_value_indirect_y():
     out = _emit_value(IndirectY(ptr=_abs("ptr", 0x20)))
     assert out == (
-        "self.mem[(self.mem[0x0020] as usize "
-        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize]"
+        "self.mem[((self.mem[0x0020] as usize "
+        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize) & 0xffff]"
     )
 
 
@@ -207,14 +207,14 @@ def test_assign_abs_to_abs():
 def test_assign_indexed_target():
     tgt = IndexedAbs(base=_abs("tbl", 0x0200), index=Reg.Y)
     a = Assign(target=tgt, source=_imm(0), src=SRC)
-    assert _emit_one(a) == "self.mem[0x0200 + self.reg.y as usize] = 0x00;"
+    assert _emit_one(a) == "self.mem[(0x0200 + self.reg.y as usize) & 0xffff] = 0x00;"
 
 
 def test_assign_indirect_y_target():
     a = Assign(target=IndirectY(ptr=_abs("ptr", 0x20)), source=_imm(0), src=SRC)
     assert _emit_one(a) == (
-        "self.mem[(self.mem[0x0020] as usize "
-        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize] = 0x00;"
+        "self.mem[((self.mem[0x0020] as usize "
+        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize) & 0xffff] = 0x00;"
     )
 
 
@@ -722,8 +722,8 @@ def test_address_opvar_operand_composes_runtime_base():
     item = LoadIndexed(reg=Reg.A, base=base, index=Reg.Y, src=SRC)
     assert _raw(item) == _loaded(
         "a",
-        "self.mem[((self.smc.smBASE_hi as usize) << 8 "
-        "| (self.smc.smBASE_lo as usize)) + self.reg.y as usize]",
+        "self.mem[(((self.smc.smBASE_hi as usize) << 8 "
+        "| (self.smc.smBASE_lo as usize)) + self.reg.y as usize) & 0xffff]",
     )
 
 
@@ -738,7 +738,7 @@ def test_address_opvar_partial_patch_bakes_assembled_byte():
 
 def test_raw_load_indexed():
     item = LoadIndexed(reg=Reg.A, base=_abs("tbl", 0x0200), index=Reg.Y, src=SRC)
-    assert _raw(item) == _loaded("a", "self.mem[0x0200 + self.reg.y as usize]")
+    assert _raw(item) == _loaded("a", "self.mem[(0x0200 + self.reg.y as usize) & 0xffff]")
 
 
 def test_raw_store_abs():
@@ -747,7 +747,7 @@ def test_raw_store_abs():
 
 def test_raw_store_indexed():
     item = StoreIndexed(reg=Reg.A, base=_abs("tbl", 0x0200), index=Reg.X, src=SRC)
-    assert _raw(item) == "self.mem[0x0200 + self.reg.x as usize] = self.reg.a;"
+    assert _raw(item) == "self.mem[(0x0200 + self.reg.x as usize) & 0xffff] = self.reg.a;"
 
 
 def test_raw_transfer():
@@ -758,14 +758,14 @@ def test_raw_bitwise_and_or_eor():
     assert _raw(Bitwise(op="and", source=_imm(0x0f), src=SRC)) == "self.reg.a &= 0x0f;"
     assert _raw(Bitwise(op="or", source=_abs("M", 0x40), src=SRC)) == "self.reg.a |= self.mem[0x0040];"
     eor_indexed = Bitwise(op="eor", source=IndexedAbs(base=_abs("t", 0x0200), index=Reg.X), src=SRC)
-    assert _raw(eor_indexed) == "self.reg.a ^= self.mem[0x0200 + self.reg.x as usize];"
+    assert _raw(eor_indexed) == "self.reg.a ^= self.mem[(0x0200 + self.reg.x as usize) & 0xffff];"
 
 
 def test_raw_bitwise_indirect():
     item = Bitwise(op="and", source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
     assert _raw(item) == (
-        "self.reg.a &= self.mem[(self.mem[0x0020] as usize "
-        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize];"
+        "self.reg.a &= self.mem[((self.mem[0x0020] as usize "
+        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize) & 0xffff];"
     )
 
 
@@ -808,8 +808,8 @@ def test_raw_inc_local_ref_deferred():
 
 def _indirect(name: str, addr: int) -> str:
     return (
-        f"self.mem[(self.mem[{addr:#06x}] as usize "
-        f"| (self.mem[{addr + 1:#06x}] as usize) << 8) + self.reg.y as usize]"
+        f"self.mem[((self.mem[{addr:#06x}] as usize "
+        f"| (self.mem[{addr + 1:#06x}] as usize) << 8) + self.reg.y as usize) & 0xffff]"
     )
 
 
@@ -839,8 +839,8 @@ def test_raw_sbc_indirect():
     item = SbcIndirect(source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
     lines = _emit_stmt(RawStmt(item=item), 0)
     assert lines[0] == (
-        "let _r = (self.reg.a as u16) + (!self.mem[(self.mem[0x0020] as usize "
-        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize]) as u16 + (self.flags.c as u16);"
+        "let _r = (self.reg.a as u16) + (!self.mem[((self.mem[0x0020] as usize "
+        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize) & 0xffff]) as u16 + (self.flags.c as u16);"
     )
     assert lines[1] == "self.reg.a = _r as u8;"
     assert lines[2] == "self.flags.c = (_r >> 8) != 0;"
@@ -867,8 +867,8 @@ def test_indirect_high_byte_resolves_to_symbol():
     lo = Assign(target=_abs("ztemp", 0xF0), source=_imm(0), src=SRC)
     load = RawStmt(item=LoadIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ztemp", 0xF0)), src=SRC))
     out = emit_module(_module([_routine([lo, load, ReturnStmt(src=SRC)], name="r")]))
-    assert "self.reg.a = self.mem[(self.mem[sym::ztemp] as usize " in out
-    assert "(self.mem[sym::ztemp + 1] as usize) << 8) + self.reg.y as usize];" in out
+    assert "self.reg.a = self.mem[((self.mem[sym::ztemp] as usize " in out
+    assert "(self.mem[sym::ztemp + 1] as usize) << 8) + self.reg.y as usize) & 0xffff];" in out
 
 
 def test_indirect_ptr_with_offset_folds_into_high_byte():
@@ -876,8 +876,8 @@ def test_indirect_ptr_with_offset_folds_into_high_byte():
     # the high byte is `ztemp+2`, not the unparseable `ztemp+1+1`.
     load = RawStmt(item=LoadIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ztemp+1", 0xF1)), src=SRC))
     out = emit_module(_module([_routine([load, ReturnStmt(src=SRC)], name="r")]))
-    assert "self.reg.a = self.mem[(self.mem[sym::ztemp + 1] as usize " in out
-    assert "(self.mem[sym::ztemp + 2] as usize) << 8) + self.reg.y as usize];" in out
+    assert "self.reg.a = self.mem[((self.mem[sym::ztemp + 1] as usize " in out
+    assert "(self.mem[sym::ztemp + 2] as usize) << 8) + self.reg.y as usize) & 0xffff];" in out
 
 
 # ---------------------------------------------------------------- cmp / bit flag lowering
@@ -905,15 +905,15 @@ def test_raw_cmp_abs_and_indexed():
     assert abs_lines[0] == "let _o: u8 = self.mem[0x0040];"
     idx = CmpIndexed(reg=Reg.A, base=_abs("tbl", 0x0200), index=Reg.X, src=SRC)
     idx_lines = _emit_stmt(RawStmt(item=idx), 0)
-    assert idx_lines[0] == "let _o: u8 = self.mem[0x0200 + self.reg.x as usize];"
+    assert idx_lines[0] == "let _o: u8 = self.mem[(0x0200 + self.reg.x as usize) & 0xffff];"
 
 
 def test_raw_cmp_indirect():
     item = CmpIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
     lines = _emit_stmt(RawStmt(item=item), 0)
     assert lines[0] == (
-        "let _o: u8 = self.mem[(self.mem[0x0020] as usize "
-        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize];"
+        "let _o: u8 = self.mem[((self.mem[0x0020] as usize "
+        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize) & 0xffff];"
     )
     assert lines[1] == "self.flags.c = self.reg.a >= _o;"
 
@@ -1057,6 +1057,10 @@ def test_raw_adc_imm():
     assert lines[0] == "let _r = (self.reg.a as u16) + (0xbd) as u16 + (self.flags.c as u16);"
     assert lines[1] == "self.reg.a = _r as u8;"
     assert lines[2] == "self.flags.c = (_r >> 8) != 0;"
+    # adc/sbc set Z/N from the result, like loads — needed when a branch
+    # on Z/N follows across an intervening store the fuser can't span.
+    assert lines[3] == "self.flags.z = self.reg.a == 0;"
+    assert lines[4] == "self.flags.n = (self.reg.a >> 7) != 0;"
 
 
 def test_raw_asl_and_lsr():

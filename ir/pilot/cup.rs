@@ -76,6 +76,8 @@ impl Cpu {
         let _r = (self.reg.a as u16) + (0xbd) as u16 + (self.flags.c as u16);
         self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::CharY] = self.reg.a;
         self.reg.x = 0x03;
         self.flags.z = self.reg.x == 0;

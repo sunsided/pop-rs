@@ -46,8 +46,8 @@ pub fn entry(cpu: &mut Cpu) {
         cpu.reg.y = cpu.mem[sym::sector];
         cpu.flags.z = cpu.reg.y == 0;
         cpu.flags.n = (cpu.reg.y >> 7) != 0;
-        cpu.mem[0x003d] = cpu.mem[sym::skewtbl + cpu.reg.y as usize];
-        cpu.reg.a = cpu.mem[sym::sectaddr + cpu.reg.y as usize];
+        cpu.mem[0x003d] = cpu.mem[(sym::skewtbl + cpu.reg.y as usize) & 0xffff];
+        cpu.reg.a = cpu.mem[(sym::sectaddr + cpu.reg.y as usize) & 0xffff];
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if cpu.reg.a == 0x00 {
@@ -137,10 +137,10 @@ pub fn check128k(cpu: &mut Cpu) {
     }
     cpu.reg.x = 0x25;
     loop {
-        cpu.reg.a = cpu.mem[sym::CHECKER + cpu.reg.x as usize];
+        cpu.reg.a = cpu.mem[(sym::CHECKER + cpu.reg.x as usize) & 0xffff];
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
-        cpu.mem[0x0180 + cpu.reg.x as usize] = cpu.reg.a;
+        cpu.mem[(0x0180 + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
         cpu.reg.x = cpu.reg.x.wrapping_sub(0x01);
         if !((cpu.reg.x as i8) >= 0) {
             break;
@@ -162,7 +162,7 @@ pub fn NOT128K(cpu: &mut Cpu) {
                 cpu.reg.x = cpu.mem[sym::SLOT];
                 cpu.flags.z = cpu.reg.x == 0;
                 cpu.flags.n = (cpu.reg.x >> 7) != 0;
-                cpu.reg.a = cpu.mem[0xc088 + cpu.reg.x as usize];
+                cpu.reg.a = cpu.mem[(0xc088 + cpu.reg.x as usize) & 0xffff];
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 crate::ext::text(cpu);
@@ -177,7 +177,7 @@ pub fn NOT128K(cpu: &mut Cpu) {
                 pc = 1;
             }
             1 => {
-                cpu.reg.a = cpu.mem[sym::MEMTEXT + cpu.reg.y as usize];
+                cpu.reg.a = cpu.mem[(sym::MEMTEXT + cpu.reg.y as usize) & 0xffff];
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a == 0x00 {
@@ -248,10 +248,10 @@ pub fn NOT128K(cpu: &mut Cpu) {
                 pc = 7;
             }
             7 => {
-                cpu.reg.a = cpu.mem[(cpu.mem[sym::source] as usize | (cpu.mem[sym::source + 1] as usize) << 8) + cpu.reg.y as usize];
+                cpu.reg.a = cpu.mem[((cpu.mem[sym::source] as usize | (cpu.mem[sym::source + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff];
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
-                cpu.mem[(cpu.mem[sym::dest] as usize | (cpu.mem[sym::dest + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
+                cpu.mem[((cpu.mem[sym::dest] as usize | (cpu.mem[sym::dest + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
                 let _v = cpu.reg.y.wrapping_add(1);
                 cpu.reg.y = _v;
                 cpu.flags.z = _v == 0;
@@ -327,10 +327,10 @@ pub fn moverw18(cpu: &mut Cpu) {
                 pc = 2;
             }
             2 => {
-                cpu.reg.a = cpu.mem[(cpu.mem[sym::source] as usize | (cpu.mem[sym::source + 1] as usize) << 8) + cpu.reg.y as usize];
+                cpu.reg.a = cpu.mem[((cpu.mem[sym::source] as usize | (cpu.mem[sym::source + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff];
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
-                cpu.mem[(cpu.mem[sym::dest] as usize | (cpu.mem[sym::dest + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
+                cpu.mem[((cpu.mem[sym::dest] as usize | (cpu.mem[sym::dest + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
                 let _v = cpu.reg.y.wrapping_add(1);
                 cpu.reg.y = _v;
                 cpu.flags.z = _v == 0;
@@ -388,10 +388,10 @@ pub fn movemem(cpu: &mut Cpu) {
                 pc = 1;
             }
             1 => {
-                cpu.reg.a = cpu.mem[(cpu.mem[sym::source] as usize | (cpu.mem[sym::source + 1] as usize) << 8) + cpu.reg.y as usize];
+                cpu.reg.a = cpu.mem[((cpu.mem[sym::source] as usize | (cpu.mem[sym::source + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff];
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
-                cpu.mem[(cpu.mem[sym::dest] as usize | (cpu.mem[sym::dest + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
+                cpu.mem[((cpu.mem[sym::dest] as usize | (cpu.mem[sym::dest + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
                 let _v = cpu.reg.y.wrapping_add(1);
                 cpu.reg.y = _v;
                 cpu.flags.z = _v == 0;

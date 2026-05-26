@@ -199,10 +199,10 @@ pub fn SAVEGAME(cpu: &mut Cpu) {
     cpu.mem[sym::RAMRDaux] = cpu.reg.a;
     cpu.reg.x = 0x0f;
     loop {
-        cpu.reg.a = cpu.mem[sym::savedgame + cpu.reg.x as usize];
+        cpu.reg.a = cpu.mem[(sym::savedgame + cpu.reg.x as usize) & 0xffff];
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
-        cpu.mem[0x0200 + cpu.reg.x as usize] = cpu.reg.a;
+        cpu.mem[(0x0200 + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
         cpu.reg.x = cpu.reg.x.wrapping_sub(0x01);
         if !((cpu.reg.x as i8) >= 0) {
             break;
@@ -232,10 +232,10 @@ pub fn LOADGAME(cpu: &mut Cpu) {
     cpu.mem[sym::RAMWRTaux] = cpu.reg.a;
     cpu.reg.x = 0x0f;
     loop {
-        cpu.reg.a = cpu.mem[0x0200 + cpu.reg.x as usize];
+        cpu.reg.a = cpu.mem[(0x0200 + cpu.reg.x as usize) & 0xffff];
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
-        cpu.mem[sym::savedgame + cpu.reg.x as usize] = cpu.reg.a;
+        cpu.mem[(sym::savedgame + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
         cpu.reg.x = cpu.reg.x.wrapping_sub(0x01);
         if !((cpu.reg.x as i8) >= 0) {
             break;
@@ -311,6 +311,8 @@ pub fn vidstuff(cpu: &mut Cpu) {
         let _r = (cpu.reg.a as u16) + (0x12) as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.local.insert((":sm", 0), cpu.reg.a);
         let _o: u8 = 0x6c;
         cpu.flags.c = cpu.reg.a >= _o;
@@ -334,7 +336,7 @@ pub fn rdbg1(cpu: &mut Cpu) {
         return;
     }
     cpu.mem[sym::BGset1] = cpu.reg.x;
-    cpu.reg.a = cpu.mem[sym::bg1trk + cpu.reg.x as usize];
+    cpu.reg.a = cpu.mem[(sym::bg1trk + cpu.reg.x as usize) & 0xffff];
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::track] = cpu.reg.a;
@@ -351,7 +353,7 @@ pub fn rdbg2(cpu: &mut Cpu) {
         return;
     }
     cpu.mem[sym::BGset2] = cpu.reg.x;
-    cpu.reg.a = cpu.mem[sym::bg2trk + cpu.reg.x as usize];
+    cpu.reg.a = cpu.mem[(sym::bg2trk + cpu.reg.x as usize) & 0xffff];
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::track] = cpu.reg.a;
@@ -367,8 +369,8 @@ pub fn rdch4(cpu: &mut Cpu) {
         return;
     }
     cpu.mem[sym::CHset] = cpu.reg.x;
-    cpu.mem[sym::track] = cpu.mem[sym::ch4trk + cpu.reg.x as usize];
-    cpu.reg.a = cpu.mem[sym::ch4off + cpu.reg.x as usize];
+    cpu.mem[sym::track] = cpu.mem[(sym::ch4trk + cpu.reg.x as usize) & 0xffff];
+    cpu.reg.a = cpu.mem[(sym::ch4off + cpu.reg.x as usize) & 0xffff];
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     match cpu.reg.a {
@@ -859,6 +861,8 @@ pub fn pauseNI(cpu: &mut Cpu) {
                 let _r = (cpu.reg.a as u16) + (!0x01_u8) as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a != 0x00 {
                     pauseNI(cpu);
                     return;
@@ -1434,6 +1438,8 @@ pub fn PlaySongI(cpu: &mut Cpu) {
                 let _r = (cpu.reg.a as u16) + (!0x01_u8) as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a != 0x00 {
                     pc = 7;
                 } else {
@@ -1497,6 +1503,8 @@ pub fn tpause(cpu: &mut Cpu) {
                 let _r = (cpu.reg.a as u16) + (!0x01_u8) as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a != 0x00 {
                     pauseNI(cpu);
                     return;

@@ -25,7 +25,7 @@ pub fn ADDSOUND(cpu: &mut Cpu) {
         cpu.reg.x = _v;
         cpu.flags.z = _v == 0;
         cpu.flags.n = (_v >> 7) != 0;
-        cpu.mem[sym::soundtable + cpu.reg.x as usize] = cpu.reg.a;
+        cpu.mem[(sym::soundtable + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
         cpu.mem[sym::soundtable] = cpu.reg.x;
     }
     cpu.reg.x = cpu.mem[sym::savex];
@@ -46,7 +46,7 @@ pub fn PLAYBACK(cpu: &mut Cpu) {
         if cpu.reg.x == 0x00 {
         } else {
             loop {
-                cpu.reg.a = cpu.mem[sym::soundtable + cpu.reg.x as usize];
+                cpu.reg.a = cpu.mem[(sym::soundtable + cpu.reg.x as usize) & 0xffff];
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::savex] = cpu.reg.x;
@@ -74,11 +74,11 @@ pub fn makesound(cpu: &mut Cpu) {
         return;
     }
     cpu.reg.x = cpu.reg.a;
-    cpu.reg.a = cpu.mem[sym::lookup + cpu.reg.x as usize];
+    cpu.reg.a = cpu.mem[(sym::lookup + cpu.reg.x as usize) & 0xffff];
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.local.insert((":sm", 1), cpu.reg.a);
-    cpu.reg.a = cpu.mem[sym::lookup + 1 + cpu.reg.x as usize];
+    cpu.reg.a = cpu.mem[(sym::lookup + 1 + cpu.reg.x as usize) & 0xffff];
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.local.insert((":sm", 2), cpu.reg.a);
@@ -228,6 +228,8 @@ pub fn DoGotKey(cpu: &mut Cpu) {
         let _r = (cpu.reg.a as u16) + (!0x01_u8) as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if !(cpu.reg.a != 0x00) {
             break;
         }
@@ -374,6 +376,8 @@ pub fn tone(cpu: &mut Cpu) {
                 let _r = (cpu.reg.a as u16) + (!0x01_u8) as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a != 0x00 {
                     pc = 1;
                 } else {

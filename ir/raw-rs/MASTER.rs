@@ -289,10 +289,10 @@ impl Cpu {
         self.mem[sym::RAMRDaux] = self.reg.a;
         self.reg.x = 0x0f;
         loop {
-            self.reg.a = self.mem[sym::savedgame + self.reg.x as usize];
+            self.reg.a = self.mem[(sym::savedgame + self.reg.x as usize) & 0xffff];
             self.flags.z = self.reg.a == 0;
             self.flags.n = (self.reg.a >> 7) != 0;
-            self.mem[0x0200 + self.reg.x as usize] = self.reg.a;
+            self.mem[(0x0200 + self.reg.x as usize) & 0xffff] = self.reg.a;
             self.reg.x = self.reg.x.wrapping_sub(0x01);
             if !((self.reg.x as i8) >= 0) {
                 break;
@@ -322,10 +322,10 @@ impl Cpu {
         self.mem[sym::RAMWRTaux] = self.reg.a;
         self.reg.x = 0x0f;
         loop {
-            self.reg.a = self.mem[0x0200 + self.reg.x as usize];
+            self.reg.a = self.mem[(0x0200 + self.reg.x as usize) & 0xffff];
             self.flags.z = self.reg.a == 0;
             self.flags.n = (self.reg.a >> 7) != 0;
-            self.mem[sym::savedgame + self.reg.x as usize] = self.reg.a;
+            self.mem[(sym::savedgame + self.reg.x as usize) & 0xffff] = self.reg.a;
             self.reg.x = self.reg.x.wrapping_sub(0x01);
             if !((self.reg.x as i8) >= 0) {
                 break;
@@ -401,6 +401,8 @@ impl Cpu {
             let _r = (self.reg.a as u16) + (0x12) as u16 + (self.flags.c as u16);
             self.reg.a = _r as u8;
             self.flags.c = (_r >> 8) != 0;
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.local.insert((":sm", 0), self.reg.a);
             let _o: u8 = 0x6c;
             self.flags.c = self.reg.a >= _o;
@@ -424,7 +426,7 @@ impl Cpu {
             return;
         }
         self.mem[sym::BGset1] = self.reg.x;
-        self.reg.a = self.mem[sym::bg1trk + self.reg.x as usize];
+        self.reg.a = self.mem[(sym::bg1trk + self.reg.x as usize) & 0xffff];
         self.flags.z = self.reg.a == 0;
         self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::track] = self.reg.a;
@@ -441,7 +443,7 @@ impl Cpu {
             return;
         }
         self.mem[sym::BGset2] = self.reg.x;
-        self.reg.a = self.mem[sym::bg2trk + self.reg.x as usize];
+        self.reg.a = self.mem[(sym::bg2trk + self.reg.x as usize) & 0xffff];
         self.flags.z = self.reg.a == 0;
         self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::track] = self.reg.a;
@@ -457,8 +459,8 @@ impl Cpu {
             return;
         }
         self.mem[sym::CHset] = self.reg.x;
-        self.mem[sym::track] = self.mem[sym::ch4trk + self.reg.x as usize];
-        self.reg.a = self.mem[sym::ch4off + self.reg.x as usize];
+        self.mem[sym::track] = self.mem[(sym::ch4trk + self.reg.x as usize) & 0xffff];
+        self.reg.a = self.mem[(sym::ch4off + self.reg.x as usize) & 0xffff];
         self.flags.z = self.reg.a == 0;
         self.flags.n = (self.reg.a >> 7) != 0;
         match self.reg.a {
@@ -949,6 +951,8 @@ impl Cpu {
                     let _r = (self.reg.a as u16) + (!0x01_u8) as u16 + (self.flags.c as u16);
                     self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     if self.reg.a != 0x00 {
                         self.pauseNI();
                         return;
@@ -1524,6 +1528,8 @@ impl Cpu {
                     let _r = (self.reg.a as u16) + (!0x01_u8) as u16 + (self.flags.c as u16);
                     self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     if self.reg.a != 0x00 {
                         pc = 7;
                     } else {
@@ -1587,6 +1593,8 @@ impl Cpu {
                     let _r = (self.reg.a as u16) + (!0x01_u8) as u16 + (self.flags.c as u16);
                     self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     if self.reg.a != 0x00 {
                         self.pauseNI();
                         return;

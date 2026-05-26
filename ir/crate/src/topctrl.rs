@@ -33,7 +33,7 @@ pub fn INITSYSTEM(cpu: &mut Cpu) {
     cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = cpu.reg.x;
     loop {
-        cpu.mem[0x0000 + cpu.reg.x as usize] = cpu.reg.a;
+        cpu.mem[(0x0000 + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
         let _v = cpu.reg.x.wrapping_add(1);
         cpu.reg.x = _v;
         cpu.flags.z = _v == 0;
@@ -468,6 +468,8 @@ pub fn setupshad(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (0x01) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::FCharCL] = cpu.reg.a;
     crate::ext::addshadobj(cpu);
     return;
@@ -602,10 +604,10 @@ pub fn initCDbuf(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     loop {
-        cpu.mem[sym::SNlastframe + cpu.reg.x as usize] = cpu.reg.a;
-        cpu.mem[sym::SNthisframe + cpu.reg.x as usize] = cpu.reg.a;
-        cpu.mem[sym::SNbelow + cpu.reg.x as usize] = cpu.reg.a;
-        cpu.mem[sym::SNabove + cpu.reg.x as usize] = cpu.reg.a;
+        cpu.mem[(sym::SNlastframe + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
+        cpu.mem[(sym::SNthisframe + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
+        cpu.mem[(sym::SNbelow + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
+        cpu.mem[(sym::SNabove + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
         let _v = cpu.reg.x.wrapping_sub(1);
         cpu.reg.x = _v;
         cpu.flags.z = _v == 0;
@@ -879,6 +881,8 @@ pub fn shakeloose(cpu: &mut Cpu) {
         let _r = (cpu.reg.a as u16) + (!0x01_u8) as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         crate::ext::shakem(cpu);
         return;
     }
@@ -939,6 +943,8 @@ pub fn chgmeters(cpu: &mut Cpu) {
         let _r = (cpu.reg.a as u16) + cpu.mem[sym::ChgKidStr] as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = cpu.mem[sym::MaxKidStr];
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -957,6 +963,8 @@ pub fn chgmeters(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + cpu.mem[sym::ChgOppStr] as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     let _o: u8 = cpu.mem[sym::MaxOppStr];
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
@@ -979,7 +987,7 @@ pub fn entrance(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.y == 0;
     cpu.flags.n = (cpu.reg.y >> 7) != 0;
     loop {
-        cpu.reg.a = cpu.mem[(cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize];
+        cpu.reg.a = cpu.mem[((cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff];
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.a &= 0x1f;
@@ -1217,6 +1225,8 @@ pub fn wtlessflash(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (!0x01_u8) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::weightless] = cpu.reg.a;
     if !cpu.flags.z {
         cpu.reg.x = 0xff;

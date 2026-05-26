@@ -68,7 +68,7 @@ impl Cpu {
         self.mem[sym::ztemp + 1] = self.reg.x;
         self.reg.y = 0x06;
         loop {
-            self.mem[sym::Char + self.reg.y as usize] = self.mem[(self.mem[sym::ztemp] as usize | (self.mem[sym::ztemp + 1] as usize) << 8) + self.reg.y as usize];
+            self.mem[(sym::Char + self.reg.y as usize) & 0xffff] = self.mem[((self.mem[sym::ztemp] as usize | (self.mem[sym::ztemp + 1] as usize) << 8) + self.reg.y as usize) & 0xffff];
             self.reg.y = self.reg.y.wrapping_sub(0x01);
             if !((self.reg.y as i8) >= 0) {
                 break;
@@ -77,7 +77,7 @@ impl Cpu {
         self.reg.y = 0x07;
         self.flags.z = self.reg.y == 0;
         self.flags.n = (self.reg.y >> 7) != 0;
-        self.reg.a = self.mem[(self.mem[sym::ztemp] as usize | (self.mem[sym::ztemp + 1] as usize) << 8) + self.reg.y as usize];
+        self.reg.a = self.mem[((self.mem[sym::ztemp] as usize | (self.mem[sym::ztemp + 1] as usize) << 8) + self.reg.y as usize) & 0xffff];
         self.flags.z = self.reg.a == 0;
         self.flags.n = (self.reg.a >> 7) != 0;
         self.jumpseq();
