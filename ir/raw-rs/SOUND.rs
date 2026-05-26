@@ -75,7 +75,10 @@ impl Cpu {
         self.mem[sym::savex] = self.reg.x;
         self.reg.x = self.mem[sym::soundtable];
         if self.reg.x < 0x20 {
-            self.reg.x = self.reg.x.wrapping_add(1);
+            let _v = self.reg.x.wrapping_add(1);
+            self.reg.x = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             self.mem[sym::soundtable + self.reg.x as usize] = self.reg.a;
             self.mem[sym::soundtable] = self.reg.x;
         }
@@ -95,7 +98,10 @@ impl Cpu {
                     self.mem[sym::savex] = self.reg.x;
                     self.makesound();
                     self.reg.x = self.mem[sym::savex];
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    let _v = self.reg.x.wrapping_sub(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if !(self.reg.x != 0x00) {
                         break;
                     }
@@ -284,7 +290,10 @@ impl Cpu {
                     pc = 3;
                 }
                 3 => {
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     let _o: u8 = self.local.get(&(":pitch", 0)).copied().unwrap_or(0);
                     self.flags.c = self.reg.y >= _o;
                     self.flags.z = self.reg.y == _o;
@@ -296,7 +305,10 @@ impl Cpu {
                     }
                 }
                 4 => {
-                    self.reg.x = self.reg.x.wrapping_add(1);
+                    let _v = self.reg.x.wrapping_add(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     let _o: u8 = self.local.get(&(":pitch", 1)).copied().unwrap_or(0);
                     self.flags.c = self.reg.x >= _o;
                     self.flags.z = self.reg.x == _o;

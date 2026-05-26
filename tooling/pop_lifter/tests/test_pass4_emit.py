@@ -680,10 +680,18 @@ def test_raw_store_op_addr_writes_byte_halves():
 def test_raw_inc_dec_op_var_ref_bumps_field():
     # inc/dec of a recognised operand var read-modify-writes the field;
     # `half` selects the immediate byte or an address byte.
-    assert _raw(IncTarget(target=OpVarRef(name="smBASE", half="hi"), src=SRC)) == \
-        "self.smc.smBASE_hi = self.smc.smBASE_hi.wrapping_add(1);"
-    assert _raw(DecTarget(target=OpVarRef(name="smXCO", half=None), src=SRC)) == \
-        "self.smc.smXCO = self.smc.smXCO.wrapping_sub(1);"
+    assert _raw(IncTarget(target=OpVarRef(name="smBASE", half="hi"), src=SRC)) == (
+        "let _v = self.smc.smBASE_hi.wrapping_add(1);\n"
+        "self.smc.smBASE_hi = _v;\n"
+        "self.flags.z = _v == 0;\n"
+        "self.flags.n = (_v >> 7) != 0;"
+    )
+    assert _raw(DecTarget(target=OpVarRef(name="smXCO", half=None), src=SRC)) == (
+        "let _v = self.smc.smXCO.wrapping_sub(1);\n"
+        "self.smc.smXCO = _v;\n"
+        "self.flags.z = _v == 0;\n"
+        "self.flags.n = (_v >> 7) != 0;"
+    )
 
 
 def test_address_opvar_operand_composes_runtime_base():
@@ -739,13 +747,34 @@ def test_raw_bitwise_indirect():
 
 
 def test_raw_inc_dec_register():
-    assert _raw(IncTarget(target=Reg.X, src=SRC)) == "self.reg.x = self.reg.x.wrapping_add(1);"
-    assert _raw(DecTarget(target=Reg.Y, src=SRC)) == "self.reg.y = self.reg.y.wrapping_sub(1);"
+    # inc/dec set Z/N from the post-update value (6502; matches the interp).
+    assert _raw(IncTarget(target=Reg.X, src=SRC)) == (
+        "let _v = self.reg.x.wrapping_add(1);\n"
+        "self.reg.x = _v;\n"
+        "self.flags.z = _v == 0;\n"
+        "self.flags.n = (_v >> 7) != 0;"
+    )
+    assert _raw(DecTarget(target=Reg.Y, src=SRC)) == (
+        "let _v = self.reg.y.wrapping_sub(1);\n"
+        "self.reg.y = _v;\n"
+        "self.flags.z = _v == 0;\n"
+        "self.flags.n = (_v >> 7) != 0;"
+    )
 
 
 def test_raw_inc_dec_memory():
-    assert _raw(IncTarget(target=_abs("M", 0x40), src=SRC)) == "self.mem[0x0040] = self.mem[0x0040].wrapping_add(1);"
-    assert _raw(DecTarget(target=_abs("M", 0x40), src=SRC)) == "self.mem[0x0040] = self.mem[0x0040].wrapping_sub(1);"
+    assert _raw(IncTarget(target=_abs("M", 0x40), src=SRC)) == (
+        "let _v = self.mem[0x0040].wrapping_add(1);\n"
+        "self.mem[0x0040] = _v;\n"
+        "self.flags.z = _v == 0;\n"
+        "self.flags.n = (_v >> 7) != 0;"
+    )
+    assert _raw(DecTarget(target=_abs("M", 0x40), src=SRC)) == (
+        "let _v = self.mem[0x0040].wrapping_sub(1);\n"
+        "self.mem[0x0040] = _v;\n"
+        "self.flags.z = _v == 0;\n"
+        "self.flags.n = (_v >> 7) != 0;"
+    )
 
 
 def test_raw_inc_local_ref_deferred():

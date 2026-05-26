@@ -111,7 +111,10 @@ impl Cpu {
                 self.mem[0x0027] = self.reg.a;
                 self._24005c();
             }
-            self.mem[sym::sector] = self.mem[sym::sector].wrapping_sub(1);
+            let _v = self.mem[sym::sector].wrapping_sub(1);
+            self.mem[sym::sector] = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             if self.flags.z {
                 break;
             }
@@ -180,7 +183,10 @@ impl Cpu {
         loop {
             self.reg.a = self.mem[sym::CHECKER + self.reg.x as usize];
             self.mem[0x0180 + self.reg.x as usize] = self.reg.a;
-            self.reg.x = self.reg.x.wrapping_sub(1);
+            let _v = self.reg.x.wrapping_sub(1);
+            self.reg.x = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             if !((self.reg.x as i8) >= 0) {
                 break;
             }
@@ -234,7 +240,10 @@ impl Cpu {
                     pc = 4;
                 }
                 4 => {
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if self.reg.y != 0x00 {
                         pc = 1;
                     } else {
@@ -266,7 +275,10 @@ impl Cpu {
                 7 => {
                     self.reg.a = self.mem[(self.mem[sym::source] as usize | (self.mem[sym::source + 1] as usize) << 8) + self.reg.y as usize];
                     self.mem[(self.mem[sym::dest] as usize | (self.mem[sym::dest + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if self.reg.y != 0x00 {
                         pc = 7;
                     } else {
@@ -274,8 +286,14 @@ impl Cpu {
                     }
                 }
                 8 => {
-                    self.mem[sym::source + 1] = self.mem[sym::source + 1].wrapping_add(1);
-                    self.mem[sym::dest + 1] = self.mem[sym::dest + 1].wrapping_add(1);
+                    let _v = self.mem[sym::source + 1].wrapping_add(1);
+                    self.mem[sym::source + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
+                    let _v = self.mem[sym::dest + 1].wrapping_add(1);
+                    self.mem[sym::dest + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.a = self.mem[sym::source + 1];
                     let _o: u8 = self.mem[sym::endsourc + 1];
                     self.flags.c = self.reg.a >= _o;
@@ -324,7 +342,10 @@ impl Cpu {
                 2 => {
                     self.reg.a = self.mem[(self.mem[sym::source] as usize | (self.mem[sym::source + 1] as usize) << 8) + self.reg.y as usize];
                     self.mem[(self.mem[sym::dest] as usize | (self.mem[sym::dest + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if self.reg.y != 0x00 {
                         pc = 2;
                     } else {
@@ -332,8 +353,14 @@ impl Cpu {
                     }
                 }
                 3 => {
-                    self.mem[sym::source + 1] = self.mem[sym::source + 1].wrapping_add(1);
-                    self.mem[sym::dest + 1] = self.mem[sym::dest + 1].wrapping_add(1);
+                    let _v = self.mem[sym::source + 1].wrapping_add(1);
+                    self.mem[sym::source + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
+                    let _v = self.mem[sym::dest + 1].wrapping_add(1);
+                    self.mem[sym::dest + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.a = self.mem[sym::source + 1];
                     let _o: u8 = self.mem[sym::endsourc + 1];
                     self.flags.c = self.reg.a >= _o;
@@ -370,7 +397,10 @@ impl Cpu {
                 1 => {
                     self.reg.a = self.mem[(self.mem[sym::source] as usize | (self.mem[sym::source + 1] as usize) << 8) + self.reg.y as usize];
                     self.mem[(self.mem[sym::dest] as usize | (self.mem[sym::dest + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if self.reg.y != 0x00 {
                         pc = 1;
                     } else {
@@ -378,8 +408,14 @@ impl Cpu {
                     }
                 }
                 2 => {
-                    self.mem[sym::source + 1] = self.mem[sym::source + 1].wrapping_add(1);
-                    self.mem[sym::dest + 1] = self.mem[sym::dest + 1].wrapping_add(1);
+                    let _v = self.mem[sym::source + 1].wrapping_add(1);
+                    self.mem[sym::source + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
+                    let _v = self.mem[sym::dest + 1].wrapping_add(1);
+                    self.mem[sym::dest + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.a = self.mem[sym::source + 1];
                     let _o: u8 = self.mem[sym::endsourc + 1];
                     self.flags.c = self.reg.a >= _o;

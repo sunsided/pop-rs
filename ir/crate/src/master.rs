@@ -660,7 +660,10 @@ pub fn pauseNI(cpu: &mut Cpu) {
                 pc = 2;
             }
             2 => {
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.x != 0x00 {
                     pc = 2;
                 } else {
@@ -668,7 +671,10 @@ pub fn pauseNI(cpu: &mut Cpu) {
                 }
             }
             3 => {
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.y != 0x00 {
                     pc = 1;
                 } else {
@@ -1157,7 +1163,10 @@ pub fn PlaySongI(cpu: &mut Cpu) {
             }
             9 => {
                 StartGame_3f(cpu);
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.x != 0x00 {
                     pc = 9;
                 } else {
@@ -1165,7 +1174,10 @@ pub fn PlaySongI(cpu: &mut Cpu) {
                 }
             }
             10 => {
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.y != 0x00 {
                     pc = 8;
                 } else {
@@ -1208,7 +1220,10 @@ pub fn tpause(cpu: &mut Cpu) {
             }
             2 => {
                 StartGame_3f(cpu);
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.x != 0x00 {
                     pc = 2;
                 } else {
@@ -1216,7 +1231,10 @@ pub fn tpause(cpu: &mut Cpu) {
                 }
             }
             3 => {
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.y != 0x00 {
                     pc = 1;
                 } else {

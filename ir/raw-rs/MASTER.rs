@@ -750,7 +750,10 @@ impl Cpu {
                     pc = 2;
                 }
                 2 => {
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    let _v = self.reg.x.wrapping_sub(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if self.reg.x != 0x00 {
                         pc = 2;
                     } else {
@@ -758,7 +761,10 @@ impl Cpu {
                     }
                 }
                 3 => {
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if self.reg.y != 0x00 {
                         pc = 1;
                     } else {
@@ -1247,7 +1253,10 @@ impl Cpu {
                 }
                 9 => {
                     self.StartGame_3f();
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    let _v = self.reg.x.wrapping_sub(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if self.reg.x != 0x00 {
                         pc = 9;
                     } else {
@@ -1255,7 +1264,10 @@ impl Cpu {
                     }
                 }
                 10 => {
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if self.reg.y != 0x00 {
                         pc = 8;
                     } else {
@@ -1298,7 +1310,10 @@ impl Cpu {
                 }
                 2 => {
                     self.StartGame_3f();
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    let _v = self.reg.x.wrapping_sub(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if self.reg.x != 0x00 {
                         pc = 2;
                     } else {
@@ -1306,7 +1321,10 @@ impl Cpu {
                     }
                 }
                 3 => {
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if self.reg.y != 0x00 {
                         pc = 1;
                     } else {

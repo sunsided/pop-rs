@@ -117,7 +117,10 @@ impl Cpu {
     fn falling(&mut self) {
         self.reg.a = self.mem[sym::CharY];
         self.reg.x = self.mem[sym::CharBlockY];
-        self.reg.x = self.reg.x.wrapping_add(1);
+        let _v = self.reg.x.wrapping_add(1);
+        self.reg.x = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         let _o: u8 = self.mem[sym::FloorY + self.reg.x as usize];
         self.flags.c = self.reg.a >= _o;
         self.flags.z = self.reg.a == _o;
@@ -132,7 +135,10 @@ impl Cpu {
                 self.hitflr();
                 return;
             }
-            self.mem[sym::CharBlockY] = self.mem[sym::CharBlockY].wrapping_add(1);
+            let _v = self.mem[sym::CharBlockY].wrapping_add(1);
+            self.mem[sym::CharBlockY] = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             return;
         }
         self.fallon();
@@ -184,7 +190,10 @@ impl Cpu {
             match pc {
                 0 => {
                     self.reg.x = self.mem[sym::CharBlockY];
-                    self.reg.x = self.reg.x.wrapping_add(1);
+                    let _v = self.reg.x.wrapping_add(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.a = self.mem[sym::FloorY + self.reg.x as usize];
                     self.mem[sym::CharY] = self.reg.a;
                     self.getunderft();
@@ -435,7 +444,10 @@ impl Cpu {
         self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
         self.reg.x = self.mem[sym::CharBlockY];
-        self.reg.x = self.reg.x.wrapping_add(1);
+        let _v = self.reg.x.wrapping_add(1);
+        self.reg.x = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         let _o: u8 = self.mem[sym::FloorY + self.reg.x as usize];
         self.flags.c = self.reg.a >= _o;
         self.flags.z = self.reg.a == _o;
@@ -454,7 +466,10 @@ impl Cpu {
             self.addcharx();
             self.mem[sym::CharX] = self.reg.a;
             self.reg.x = self.mem[sym::CharBlockY];
-            self.reg.x = self.reg.x.wrapping_add(1);
+            let _v = self.reg.x.wrapping_add(1);
+            self.reg.x = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             self.mem[sym::CharY] = self.mem[sym::FloorY + self.reg.x as usize];
             self.mem[sym::CharYVel] = 0x00;
             self.reg.a = 0x0f;
@@ -576,7 +591,10 @@ impl Cpu {
                     self.indexblock();
                     self.reg.a = 0x02;
                     self._3asub();
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 11;
                 }
                 11 => {
@@ -591,7 +609,10 @@ impl Cpu {
                     self.reg.a = 0x00;
                     self.mem[sym::rjumpflag] = self.reg.a;
                     self.mem[sym::CharSword] = self.reg.a;
-                    self.mem[sym::CharBlockY] = self.mem[sym::CharBlockY].wrapping_add(1);
+                    let _v = self.mem[sym::CharBlockY].wrapping_add(1);
+                    self.mem[sym::CharBlockY] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.addslicers();
                     self.reg.a = self.mem[sym::CharPosn];
                     self.mem[sym::rjumpflag] = self.reg.a;
@@ -818,7 +839,10 @@ impl Cpu {
                     self.reg.a = 0x00;
                     self.mem[sym::rjumpflag] = self.reg.a;
                     self.mem[sym::CharSword] = self.reg.a;
-                    self.mem[sym::CharBlockY] = self.mem[sym::CharBlockY].wrapping_add(1);
+                    let _v = self.mem[sym::CharBlockY].wrapping_add(1);
+                    self.mem[sym::CharBlockY] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.addslicers();
                     self.reg.a = self.mem[sym::CharPosn];
                     self.mem[sym::rjumpflag] = self.reg.a;
@@ -1158,7 +1182,10 @@ impl Cpu {
         }
         self.reg.a = self.mem[sym::stunned];
         if self.reg.a != 0x00 {
-            self.mem[sym::stunned] = self.mem[sym::stunned].wrapping_sub(1);
+            let _v = self.mem[sym::stunned].wrapping_sub(1);
+            self.mem[sym::stunned] = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
         }
         self.reg.a = self.mem[sym::level];
         if self.reg.a != 0x00 {
@@ -2428,7 +2455,10 @@ impl Cpu {
                 2 => {
                     self.reg.a = self.mem[sym::blockx];
                     self.reg.x = self.mem[sym::CharFace];
-                    self.reg.x = self.reg.x.wrapping_add(1);
+                    let _v = self.reg.x.wrapping_add(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.flags.c = false;
                     let _r = (self.reg.a as u16) + self.mem[sym::plus1 + self.reg.x as usize] as u16 + (self.flags.c as u16);
                     self.reg.a = _r as u8;
@@ -2457,7 +2487,10 @@ impl Cpu {
                     }
                 }
                 4 => {
-                    self.mem[sym::bufindex] = self.mem[sym::bufindex].wrapping_add(1);
+                    let _v = self.mem[sym::bufindex].wrapping_add(1);
+                    self.mem[sym::bufindex] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.a = self.mem[sym::bufindex];
                     let _o: u8 = 0x02;
                     self.flags.c = self.reg.a >= _o;
@@ -2626,7 +2659,10 @@ impl Cpu {
         self.getblockx();
         self.reg.x = self.reg.a;
         self.reg.y = self.mem[sym::CharBlockY];
-        self.reg.y = self.reg.y.wrapping_sub(1);
+        let _v = self.reg.y.wrapping_sub(1);
+        self.reg.y = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         self.reg.a = self.mem[sym::CharScrn];
         self.rdblock();
         if self.reg.a != 0x14 {
@@ -2821,7 +2857,10 @@ impl Cpu {
     fn DOIMPALE(&mut self) {
         self.jamspikes();
         self.reg.x = self.mem[sym::CharBlockY];
-        self.reg.x = self.reg.x.wrapping_add(1);
+        let _v = self.reg.x.wrapping_add(1);
+        self.reg.x = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         self.mem[sym::CharY] = self.mem[sym::FloorY + self.reg.x as usize];
         self.reg.a = self.mem[sym::tempblockx];
         self.getblockej();

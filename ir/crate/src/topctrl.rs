@@ -30,7 +30,10 @@ pub fn INITSYSTEM(cpu: &mut Cpu) {
     cpu.reg.a = cpu.reg.x;
     loop {
         cpu.mem[0x0000 + cpu.reg.x as usize] = cpu.reg.a;
-        cpu.reg.x = cpu.reg.x.wrapping_add(1);
+        let _v = cpu.reg.x.wrapping_add(1);
+        cpu.reg.x = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         if !(cpu.reg.x != 0x00) {
             break;
         }
@@ -472,7 +475,10 @@ pub fn flashon(cpu: &mut Cpu) {
 pub fn flashoff(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::lightning];
     if cpu.reg.a != 0x00 {
-        cpu.mem[sym::lightning] = cpu.mem[sym::lightning].wrapping_sub(1);
+        let _v = cpu.mem[sym::lightning].wrapping_sub(1);
+        cpu.mem[sym::lightning] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         if !cpu.flags.n {
             crate::ext::doflashoff(cpu);
             return;
@@ -494,7 +500,10 @@ pub fn initCDbuf(cpu: &mut Cpu) {
         cpu.mem[sym::SNthisframe + cpu.reg.x as usize] = cpu.reg.a;
         cpu.mem[sym::SNbelow + cpu.reg.x as usize] = cpu.reg.a;
         cpu.mem[sym::SNabove + cpu.reg.x as usize] = cpu.reg.a;
-        cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+        let _v = cpu.reg.x.wrapping_sub(1);
+        cpu.reg.x = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         if !((cpu.reg.x as i8) >= 0) {
             break;
         }
@@ -621,7 +630,10 @@ pub fn ctrlplayer(cpu: &mut Cpu) {
         YouLose(cpu);
         return;
     }
-    cpu.mem[sym::CharLife] = cpu.mem[sym::CharLife].wrapping_add(1);
+    let _v = cpu.mem[sym::CharLife].wrapping_add(1);
+    cpu.mem[sym::CharLife] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     return;
 }
 
@@ -774,7 +786,10 @@ pub fn entrance(cpu: &mut Cpu) {
         cpu.flags.z = cpu.reg.a == _o;
         cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
         if cpu.reg.a != 0x10 {
-            cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+            let _v = cpu.reg.y.wrapping_sub(1);
+            cpu.reg.y = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
             if (cpu.reg.y as i8) >= 0 {
                 continue;
             }
@@ -808,7 +823,10 @@ pub fn dispmsg(cpu: &mut Cpu) {
     if cpu.reg.a == 0x00 {
         return;
     }
-    cpu.mem[sym::msgtimer] = cpu.mem[sym::msgtimer].wrapping_sub(1);
+    let _v = cpu.mem[sym::msgtimer].wrapping_sub(1);
+    cpu.mem[sym::msgtimer] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::KidLife];
     if (cpu.reg.a as i8) < 0 {
         cpu.reg.a = cpu.mem[sym::msgtimer];
@@ -898,9 +916,15 @@ pub fn misctimers(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::mergetimer];
     if cpu.reg.a != 0x00 {
         if !cpu.flags.n {
-            cpu.mem[sym::mergetimer] = cpu.mem[sym::mergetimer].wrapping_sub(1);
+            let _v = cpu.mem[sym::mergetimer].wrapping_sub(1);
+            cpu.mem[sym::mergetimer] = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
             if cpu.flags.z {
-                cpu.mem[sym::mergetimer] = cpu.mem[sym::mergetimer].wrapping_sub(1);
+                let _v = cpu.mem[sym::mergetimer].wrapping_sub(1);
+                cpu.mem[sym::mergetimer] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
             }
         }
     }
@@ -922,7 +946,10 @@ pub fn misctimers(cpu: &mut Cpu) {
                             crate::ext::mouserescue(cpu);
                         }
                     }
-                    cpu.mem[sym::exitopen] = cpu.mem[sym::exitopen].wrapping_add(1);
+                    let _v = cpu.mem[sym::exitopen].wrapping_add(1);
+                    cpu.mem[sym::exitopen] = _v;
+                    cpu.flags.z = _v == 0;
+                    cpu.flags.n = (_v >> 7) != 0;
                 }
             }
         }
@@ -1049,7 +1076,10 @@ pub fn develpatch(cpu: &mut Cpu) {
     if cpu.reg.a == 0x00 {
         return;
     }
-    cpu.mem[sym::redrawflg] = cpu.mem[sym::redrawflg].wrapping_sub(1);
+    let _v = cpu.mem[sym::redrawflg].wrapping_sub(1);
+    cpu.mem[sym::redrawflg] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     crate::ext::markmeters(cpu);
     crate::ext::sure(cpu);
     return;

@@ -12,7 +12,10 @@ pub fn VBLvect(cpu: &mut Cpu) {
 
 pub fn ADDBACK(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::bgX];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     if cpu.reg.x < 0xc8 {
         cpu.mem[sym::bgX + cpu.reg.x as usize] = cpu.mem[sym::XCO];
         cpu.reg.a = cpu.mem[sym::YCO];
@@ -29,7 +32,10 @@ pub fn ADDBACK(cpu: &mut Cpu) {
 
 pub fn ADDFORE(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::fgX];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     if cpu.reg.x >= 0x64 {
         return;
     }
@@ -48,7 +54,10 @@ pub fn ADDFORE(cpu: &mut Cpu) {
 
 pub fn ADDMSG(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::msgX];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     if cpu.reg.x >= 0x20 {
         return;
     }
@@ -64,7 +73,10 @@ pub fn ADDMSG(cpu: &mut Cpu) {
 
 pub fn ADDWIPE(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::wipeX];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     if cpu.reg.x >= 0x14 {
         return;
     }
@@ -85,7 +97,10 @@ pub fn ADDWIPE(cpu: &mut Cpu) {
 
 pub fn ADDMID(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::midX];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     if cpu.reg.x >= 0x2e {
         return;
     }
@@ -113,7 +128,10 @@ pub fn ADDMIDEZ(cpu: &mut Cpu) {
     cpu.reg.a = 0x00;
     cpu.mem[sym::OFFSET] = cpu.reg.a;
     cpu.reg.x = cpu.mem[sym::midX];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     if cpu.reg.x >= 0x2e {
         return;
     }
@@ -135,7 +153,10 @@ pub fn ADDMIDEZ(cpu: &mut Cpu) {
 
 pub fn ADDMIDEZO(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::midX];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     if cpu.reg.x >= 0x2e {
         return;
     }
@@ -310,7 +331,10 @@ pub fn DRAWBACK(cpu: &mut Cpu) {
                 cpu.mem[sym::OPACITY] = cpu.reg.a;
                 crate::hires::fastlay(cpu);
                 cpu.reg.x = cpu.mem[sym::index];
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_add(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = cpu.mem[sym::bgX];
                 cpu.flags.c = cpu.reg.x >= _o;
                 cpu.flags.z = cpu.reg.x == _o;
@@ -383,7 +407,10 @@ pub fn DRAWFORE(cpu: &mut Cpu) {
             }
             5 => {
                 cpu.reg.x = cpu.mem[sym::index];
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_add(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = cpu.mem[sym::fgX];
                 cpu.flags.c = cpu.reg.x >= _o;
                 cpu.flags.z = cpu.reg.x == _o;
@@ -521,7 +548,10 @@ pub fn DRAWMID(cpu: &mut Cpu) {
             }
             8 => {
                 cpu.reg.x = cpu.mem[sym::index];
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_add(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = cpu.mem[sym::midX];
                 cpu.flags.c = cpu.reg.x >= _o;
                 cpu.flags.z = cpu.reg.x == _o;
@@ -630,7 +660,10 @@ pub fn DRAWMSG(cpu: &mut Cpu) {
             4 => {
                 crate::hires::lay(cpu);
                 cpu.reg.x = cpu.mem[sym::index];
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_add(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = cpu.mem[sym::msgX];
                 cpu.flags.c = cpu.reg.x >= _o;
                 cpu.flags.z = cpu.reg.x == _o;
@@ -873,7 +906,10 @@ pub fn JREAD(cpu: &mut Cpu) {
     PREAD(cpu);
     cpu.reg.x = 0x00;
     cvtpdl(cpu);
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cvtpdl(cpu);
     cpu.reg.a = cpu.mem[sym::jvert];
     if cpu.reg.a != 0x00 {
@@ -964,11 +1000,17 @@ pub fn PREAD(cpu: &mut Cpu) {
                 }
             }
             3 => {
-                cpu.mem[sym::joyX + cpu.reg.x as usize] = cpu.mem[sym::joyX + cpu.reg.x as usize].wrapping_add(1);
+                let _v = cpu.mem[sym::joyX + cpu.reg.x as usize].wrapping_add(1);
+                cpu.mem[sym::joyX + cpu.reg.x as usize] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 4;
             }
             4 => {
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.x as i8) >= 0 {
                     pc = 2;
                 } else {
@@ -1105,7 +1147,10 @@ pub fn MOVEMEM(cpu: &mut Cpu) {
             1 => {
                 cpu.reg.a = cpu.mem[(cpu.mem[0x00f2] as usize | (cpu.mem[0x00f3] as usize) << 8) + cpu.reg.y as usize];
                 cpu.mem[(cpu.mem[0x00f0] as usize | (cpu.mem[0x00f1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.y != 0x00 {
                     pc = 1;
                 } else {
@@ -1113,8 +1158,14 @@ pub fn MOVEMEM(cpu: &mut Cpu) {
                 }
             }
             2 => {
-                cpu.mem[0x00f3] = cpu.mem[0x00f3].wrapping_add(1);
-                cpu.mem[0x00f1] = cpu.mem[0x00f1].wrapping_add(1);
+                let _v = cpu.mem[0x00f3].wrapping_add(1);
+                cpu.mem[0x00f3] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
+                let _v = cpu.mem[0x00f1].wrapping_add(1);
+                cpu.mem[0x00f1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.a = cpu.mem[0x00f3];
                 let _o: u8 = cpu.mem[0x00f5];
                 cpu.flags.c = cpu.reg.a >= _o;
@@ -1169,7 +1220,10 @@ pub fn WHOOP(cpu: &mut Cpu) {
                 }
             }
             3 => {
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.y != 0x00 {
                     pc = 1;
                 } else {
@@ -1205,7 +1259,10 @@ pub fn tone(cpu: &mut Cpu) {
                 pc = 3;
             }
             3 => {
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = cpu.local.get(&(":pitch", 0)).copied().unwrap_or(0);
                 cpu.flags.c = cpu.reg.y >= _o;
                 cpu.flags.z = cpu.reg.y == _o;
@@ -1217,7 +1274,10 @@ pub fn tone(cpu: &mut Cpu) {
                 }
             }
             4 => {
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_add(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = cpu.local.get(&(":pitch", 1)).copied().unwrap_or(0);
                 cpu.flags.c = cpu.reg.x >= _o;
                 cpu.flags.z = cpu.reg.x == _o;

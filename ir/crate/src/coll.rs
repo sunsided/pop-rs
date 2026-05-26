@@ -36,7 +36,10 @@ pub fn CHECKBARR(cpu: &mut Cpu) {
         cpu.reg.a = cpu.mem[sym::CDLeftEj];
         crate::ext::getblockxp(cpu);
         cpu.reg.x = cpu.reg.a;
-        cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+        let _v = cpu.reg.x.wrapping_sub(1);
+        cpu.reg.x = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         cpu.mem[sym::begrange] = cpu.reg.x;
         cpu.mem[sym::blocky] = cpu.mem[sym::BlockYthis];
         cpu.reg.a = 0x60;
@@ -169,7 +172,10 @@ pub fn getCData(cpu: &mut Cpu) {
         cpu.flags.c = (_r >> 8) != 0;
         cpu.mem[sym::blockedge] = cpu.reg.a;
         cpu.reg.x = cpu.mem[sym::bufindex];
-        cpu.reg.x = cpu.reg.x.wrapping_add(1);
+        let _v = cpu.reg.x.wrapping_add(1);
+        cpu.reg.x = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         let _o: u8 = cpu.mem[sym::endrange];
         cpu.flags.c = cpu.reg.x >= _o;
         cpu.flags.z = cpu.reg.x == _o;
@@ -332,7 +338,10 @@ pub fn COLLISIONS(cpu: &mut Cpu) {
         return;
     }
     cpu.reg.a = cpu.mem[0xc030];
-    cpu.mem[sym::AMtimer] = cpu.mem[sym::AMtimer].wrapping_sub(1);
+    let _v = cpu.mem[sym::AMtimer].wrapping_sub(1);
+    cpu.mem[sym::AMtimer] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     return;
 }
 
@@ -543,7 +552,10 @@ pub fn collide(cpu: &mut Cpu) {
                             }
                         }
                     }
-                    cpu.mem[sym::tempblockx] = cpu.mem[sym::tempblockx].wrapping_add(1);
+                    let _v = cpu.mem[sym::tempblockx].wrapping_add(1);
+                    cpu.mem[sym::tempblockx] = _v;
+                    cpu.flags.z = _v == 0;
+                    cpu.flags.n = (_v >> 7) != 0;
                     cpu.reg.a = cpu.mem[sym::tempscrn];
                     if cpu.reg.a != 0x00 {
                         break 'b16;
@@ -569,7 +581,10 @@ pub fn collide(cpu: &mut Cpu) {
                             break 'b13;
                         }
                     }
-                    cpu.mem[sym::tempblockx] = cpu.mem[sym::tempblockx].wrapping_sub(1);
+                    let _v = cpu.mem[sym::tempblockx].wrapping_sub(1);
+                    cpu.mem[sym::tempblockx] = _v;
+                    cpu.flags.z = _v == 0;
+                    cpu.flags.n = (_v >> 7) != 0;
                     break 'b16;
                 }
             }
@@ -1190,7 +1205,10 @@ pub fn ANIMCHAR(cpu: &mut Cpu) {
                 }
             }
             9 => {
-                cpu.mem[sym::CharBlockY] = cpu.mem[sym::CharBlockY].wrapping_sub(1);
+                let _v = cpu.mem[sym::CharBlockY].wrapping_sub(1);
+                cpu.mem[sym::CharBlockY] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 crate::ext::addslicers(cpu);
                 ANIMCHAR(cpu);
                 return;
@@ -1207,7 +1225,10 @@ pub fn ANIMCHAR(cpu: &mut Cpu) {
                 }
             }
             11 => {
-                cpu.mem[sym::CharBlockY] = cpu.mem[sym::CharBlockY].wrapping_add(1);
+                let _v = cpu.mem[sym::CharBlockY].wrapping_add(1);
+                cpu.mem[sym::CharBlockY] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 crate::ext::addslicers(cpu);
                 ANIMCHAR(cpu);
                 return;
@@ -1467,7 +1488,10 @@ pub fn GoneUpstairs(cpu: &mut Cpu) {
         cpu.reg.x = 0x19;
         crate::ext::cuesong(cpu);
     }
-    cpu.mem[sym::NextLevel] = cpu.mem[sym::NextLevel].wrapping_add(1);
+    let _v = cpu.mem[sym::NextLevel].wrapping_add(1);
+    cpu.mem[sym::NextLevel] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     return;
 }
 
@@ -1523,7 +1547,10 @@ pub fn CHECKSLICE(cpu: &mut Cpu) {
             }
             4 => {
                 cpu.reg.x = cpu.mem[sym::tempblockx];
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.x as i8) >= 0 {
                     pc = 1;
                 } else {
@@ -1566,7 +1593,10 @@ pub fn CHECKSLICE(cpu: &mut Cpu) {
                 crate::ext::addcharx(cpu);
                 cpu.mem[sym::CharX] = cpu.reg.a;
                 cpu.reg.x = cpu.mem[sym::CharBlockY];
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_add(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.a = cpu.mem[sym::FloorY + cpu.reg.x as usize];
                 cpu.mem[sym::CharY] = cpu.reg.a;
                 cpu.reg.a = 0x64;
@@ -1589,7 +1619,10 @@ pub fn CHECKSLICE2(cpu: &mut Cpu) {
     if cpu.flags.c {
         return;
     }
-    cpu.mem[sym::tempblockx] = cpu.mem[sym::tempblockx].wrapping_add(1);
+    let _v = cpu.mem[sym::tempblockx].wrapping_add(1);
+    cpu.mem[sym::tempblockx] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     crate::ext::rdblock1(cpu);
     if cpu.reg.a == 0x12 {
         cpu.reg.a = cpu.mem[(cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize];
@@ -1643,7 +1676,10 @@ pub fn CHECKGATE(cpu: &mut Cpu) {
     }
     crate::ext::getunderft(cpu);
     if cpu.reg.a != 0x04 {
-        cpu.mem[sym::tempblockx] = cpu.mem[sym::tempblockx].wrapping_sub(1);
+        let _v = cpu.mem[sym::tempblockx].wrapping_sub(1);
+        cpu.mem[sym::tempblockx] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         crate::ext::rdblock1(cpu);
         if cpu.reg.a != 0x04 {
             return;
@@ -1758,7 +1794,10 @@ pub fn ENEMYCOLL(cpu: &mut Cpu) {
                 if (cpu.reg.a as i8) < 0 {
                     return;
                 }
-                cpu.mem[sym::tempblockx] = cpu.mem[sym::tempblockx].wrapping_sub(1);
+                let _v = cpu.mem[sym::tempblockx].wrapping_sub(1);
+                cpu.mem[sym::tempblockx] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 crate::ext::rdblock1(cpu);
                 let _o: u8 = 0x07;
                 cpu.flags.c = cpu.reg.a >= _o;
@@ -1916,7 +1955,10 @@ pub fn _3aslice(cpu: &mut Cpu) {
     crate::ext::addcharx(cpu);
     cpu.mem[sym::CharX] = cpu.reg.a;
     cpu.reg.x = cpu.mem[sym::CharBlockY];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::CharY] = cpu.mem[sym::FloorY + cpu.reg.x as usize];
     cpu.reg.a = 0x64;
     crate::ext::decstr(cpu);

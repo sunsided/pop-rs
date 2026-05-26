@@ -134,10 +134,15 @@ def test_local_ops_lower_to_self_local():
 
 
 def test_inc_indexed_lowers_to_indexed_mem():
+    # Indexed inc lowers to an indexed RMW and sets Z/N from the result
+    # (6502 semantics; matches the interpreter) so `inc t,x ; bne` works.
     out = _emit_raw(IncTarget(
         target=IndexedAbs(base=Abs(name="joyX", addr=0x40), index=Reg.X), src=_SRC,
     ))
+    place = "self.mem[0x0040 + self.reg.x as usize]"
     assert out == [
-        "self.mem[0x0040 + self.reg.x as usize] = "
-        "self.mem[0x0040 + self.reg.x as usize].wrapping_add(1);"
+        f"let _v = {place}.wrapping_add(1);",
+        f"{place} = _v;",
+        "self.flags.z = _v == 0;",
+        "self.flags.n = (_v >> 7) != 0;",
     ]

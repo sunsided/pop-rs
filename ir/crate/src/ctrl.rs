@@ -8,7 +8,10 @@ use crate::sym;
 pub fn falling(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::CharY];
     cpu.reg.x = cpu.mem[sym::CharBlockY];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     let _o: u8 = cpu.mem[sym::FloorY + cpu.reg.x as usize];
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
@@ -23,7 +26,10 @@ pub fn falling(cpu: &mut Cpu) {
             hitflr(cpu);
             return;
         }
-        cpu.mem[sym::CharBlockY] = cpu.mem[sym::CharBlockY].wrapping_add(1);
+        let _v = cpu.mem[sym::CharBlockY].wrapping_add(1);
+        cpu.mem[sym::CharBlockY] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         return;
     }
     fallon(cpu);
@@ -75,7 +81,10 @@ pub fn hitflr(cpu: &mut Cpu) {
         match pc {
             0 => {
                 cpu.reg.x = cpu.mem[sym::CharBlockY];
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_add(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.a = cpu.mem[sym::FloorY + cpu.reg.x as usize];
                 cpu.mem[sym::CharY] = cpu.reg.a;
                 crate::ext::getunderft(cpu);
@@ -326,7 +335,10 @@ pub fn fallon(cpu: &mut Cpu) {
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
     cpu.reg.x = cpu.mem[sym::CharBlockY];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     let _o: u8 = cpu.mem[sym::FloorY + cpu.reg.x as usize];
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
@@ -345,7 +357,10 @@ pub fn fallon(cpu: &mut Cpu) {
         crate::ext::addcharx(cpu);
         cpu.mem[sym::CharX] = cpu.reg.a;
         cpu.reg.x = cpu.mem[sym::CharBlockY];
-        cpu.reg.x = cpu.reg.x.wrapping_add(1);
+        let _v = cpu.reg.x.wrapping_add(1);
+        cpu.reg.x = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         cpu.mem[sym::CharY] = cpu.mem[sym::FloorY + cpu.reg.x as usize];
         cpu.mem[sym::CharYVel] = 0x00;
         cpu.reg.a = 0x0f;
@@ -467,7 +482,10 @@ pub fn onground(cpu: &mut Cpu) {
                 crate::ext::indexblock(cpu);
                 cpu.reg.a = 0x02;
                 _3asub(cpu);
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 11;
             }
             11 => {
@@ -482,7 +500,10 @@ pub fn onground(cpu: &mut Cpu) {
                 cpu.reg.a = 0x00;
                 cpu.mem[sym::rjumpflag] = cpu.reg.a;
                 cpu.mem[sym::CharSword] = cpu.reg.a;
-                cpu.mem[sym::CharBlockY] = cpu.mem[sym::CharBlockY].wrapping_add(1);
+                let _v = cpu.mem[sym::CharBlockY].wrapping_add(1);
+                cpu.mem[sym::CharBlockY] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 crate::ext::addslicers(cpu);
                 cpu.reg.a = cpu.mem[sym::CharPosn];
                 cpu.mem[sym::rjumpflag] = cpu.reg.a;
@@ -709,7 +730,10 @@ pub fn _3ano(cpu: &mut Cpu) {
                 cpu.reg.a = 0x00;
                 cpu.mem[sym::rjumpflag] = cpu.reg.a;
                 cpu.mem[sym::CharSword] = cpu.reg.a;
-                cpu.mem[sym::CharBlockY] = cpu.mem[sym::CharBlockY].wrapping_add(1);
+                let _v = cpu.mem[sym::CharBlockY].wrapping_add(1);
+                cpu.mem[sym::CharBlockY] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 crate::ext::addslicers(cpu);
                 cpu.reg.a = cpu.mem[sym::CharPosn];
                 cpu.mem[sym::rjumpflag] = cpu.reg.a;
@@ -1049,7 +1073,10 @@ pub fn PLAYERCTRL(cpu: &mut Cpu) {
     }
     cpu.reg.a = cpu.mem[sym::stunned];
     if cpu.reg.a != 0x00 {
-        cpu.mem[sym::stunned] = cpu.mem[sym::stunned].wrapping_sub(1);
+        let _v = cpu.mem[sym::stunned].wrapping_sub(1);
+        cpu.mem[sym::stunned] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
     }
     cpu.reg.a = cpu.mem[sym::level];
     if cpu.reg.a != 0x00 {
@@ -2319,7 +2346,10 @@ pub fn DoRunjump(cpu: &mut Cpu) {
             2 => {
                 cpu.reg.a = cpu.mem[sym::blockx];
                 cpu.reg.x = cpu.mem[sym::CharFace];
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_add(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.flags.c = false;
                 let _r = (cpu.reg.a as u16) + cpu.mem[sym::plus1 + cpu.reg.x as usize] as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
@@ -2348,7 +2378,10 @@ pub fn DoRunjump(cpu: &mut Cpu) {
                 }
             }
             4 => {
-                cpu.mem[sym::bufindex] = cpu.mem[sym::bufindex].wrapping_add(1);
+                let _v = cpu.mem[sym::bufindex].wrapping_add(1);
+                cpu.mem[sym::bufindex] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.a = cpu.mem[sym::bufindex];
                 let _o: u8 = 0x02;
                 cpu.flags.c = cpu.reg.a >= _o;
@@ -2517,7 +2550,10 @@ pub fn DoJumphigh(cpu: &mut Cpu) {
     crate::ext::getblockx(cpu);
     cpu.reg.x = cpu.reg.a;
     cpu.reg.y = cpu.mem[sym::CharBlockY];
-    cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+    let _v = cpu.reg.y.wrapping_sub(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::CharScrn];
     crate::ext::rdblock(cpu);
     if cpu.reg.a != 0x14 {
@@ -2712,7 +2748,10 @@ pub fn CHECKIMPALE(cpu: &mut Cpu) {
 pub fn DOIMPALE(cpu: &mut Cpu) {
     crate::ext::jamspikes(cpu);
     cpu.reg.x = cpu.mem[sym::CharBlockY];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::CharY] = cpu.mem[sym::FloorY + cpu.reg.x as usize];
     cpu.reg.a = cpu.mem[sym::tempblockx];
     crate::ext::getblockej(cpu);

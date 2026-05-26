@@ -181,11 +181,20 @@ pub fn setupimage(cpu: &mut Cpu) {
     cpu.mem[sym::addr + 1] = cpu.reg.x;
     cpu.reg.y = 0x00;
     cpu.mem[sym::YCO] = cpu.mem[(cpu.mem[sym::addr] as usize | (cpu.mem[sym::addr + 1] as usize) << 8) + cpu.reg.y as usize];
-    cpu.reg.y = cpu.reg.y.wrapping_add(1);
+    let _v = cpu.reg.y.wrapping_add(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::XCO] = cpu.mem[(cpu.mem[sym::addr] as usize | (cpu.mem[sym::addr + 1] as usize) << 8) + cpu.reg.y as usize];
-    cpu.reg.y = cpu.reg.y.wrapping_add(1);
+    let _v = cpu.reg.y.wrapping_add(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::OFFSET] = cpu.mem[(cpu.mem[sym::addr] as usize | (cpu.mem[sym::addr + 1] as usize) << 8) + cpu.reg.y as usize];
-    cpu.reg.y = cpu.reg.y.wrapping_add(1);
+    let _v = cpu.reg.y.wrapping_add(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[(cpu.mem[sym::addr] as usize | (cpu.mem[sym::addr + 1] as usize) << 8) + cpu.reg.y as usize];
     cpu.mem[sym::IMAGE] = cpu.reg.a;
     return;
@@ -252,7 +261,10 @@ pub fn chgoffset(cpu: &mut Cpu) {
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
     if cpu.reg.a >= 0x07 {
-        cpu.mem[sym::XCO] = cpu.mem[sym::XCO].wrapping_add(1);
+        let _v = cpu.mem[sym::XCO].wrapping_add(1);
+        cpu.mem[sym::XCO] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         cpu.flags.c = true;
         let _r = (cpu.reg.a as u16) + (!0x07_u8) as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;
@@ -439,7 +451,10 @@ pub fn DRAWKIDMETER(cpu: &mut Cpu) {
             }
             18 => {
                 _3adrawimg(cpu);
-                cpu.mem[sym::xsave] = cpu.mem[sym::xsave].wrapping_add(1);
+                let _v = cpu.mem[sym::xsave].wrapping_add(1);
+                cpu.mem[sym::xsave] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if !cpu.flags.z {
                     pc = 17;
                 } else {
@@ -682,7 +697,10 @@ pub fn SETUPFLASK(cpu: &mut Cpu) {
                 return;
             }
             cpu.mem[sym::IMAGE] = cpu.mem[sym::torchflame + cpu.reg.x as usize];
-            cpu.mem[sym::XCO] = cpu.mem[sym::XCO].wrapping_add(1);
+            let _v = cpu.mem[sym::XCO].wrapping_add(1);
+            cpu.mem[sym::XCO] = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
             cpu.reg.a = cpu.mem[sym::YCO];
             cpu.flags.c = true;
             let _r = (cpu.reg.a as u16) + (!0x2b_u8) as u16 + (cpu.flags.c as u16);
@@ -705,7 +723,10 @@ pub fn SETUPFLASK(cpu: &mut Cpu) {
                 if !cpu.flags.c {
                     break 'b5;
                 } else {
-                    cpu.mem[sym::OFFSET] = cpu.mem[sym::OFFSET].wrapping_add(1);
+                    let _v = cpu.mem[sym::OFFSET].wrapping_add(1);
+                    cpu.mem[sym::OFFSET] = _v;
+                    cpu.flags.z = _v == 0;
+                    cpu.flags.n = (_v >> 7) != 0;
                 }
             }
             cpu.reg.a = cpu.mem[sym::YCO];
@@ -727,8 +748,14 @@ pub fn SETUPFLASK(cpu: &mut Cpu) {
         }
     }
     cpu.mem[sym::IMAGE] = cpu.mem[sym::bubble + cpu.reg.x as usize];
-    cpu.mem[sym::XCO] = cpu.mem[sym::XCO].wrapping_add(1);
-    cpu.mem[sym::XCO] = cpu.mem[sym::XCO].wrapping_add(1);
+    let _v = cpu.mem[sym::XCO].wrapping_add(1);
+    cpu.mem[sym::XCO] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
+    let _v = cpu.mem[sym::XCO].wrapping_add(1);
+    cpu.mem[sym::XCO] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::YCO];
     cpu.flags.c = true;
     let _r = (cpu.reg.a as u16) + (!0x0e_u8) as u16 + (cpu.flags.c as u16);
@@ -747,7 +774,10 @@ pub fn SETUPFLAME(cpu: &mut Cpu) {
         return;
     }
     cpu.mem[sym::IMAGE] = cpu.mem[sym::torchflame + cpu.reg.x as usize];
-    cpu.mem[sym::XCO] = cpu.mem[sym::XCO].wrapping_add(1);
+    let _v = cpu.mem[sym::XCO].wrapping_add(1);
+    cpu.mem[sym::XCO] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::YCO];
     cpu.flags.c = true;
     let _r = (cpu.reg.a as u16) + (!0x2b_u8) as u16 + (cpu.flags.c as u16);
@@ -919,7 +949,10 @@ pub fn SETUPCOMIX(cpu: &mut Cpu) {
 
 pub fn ADDCHAROBJ(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::objX];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     if cpu.reg.x >= 0x14 {
         return;
     }
@@ -997,7 +1030,10 @@ pub fn prchar(cpu: &mut Cpu) {
     cpu.reg.a = 0x01;
     cpu.mem[sym::OPACITY] = cpu.reg.a;
     crate::hires::lay(cpu);
-    cpu.mem[sym::XCO] = cpu.mem[sym::XCO].wrapping_add(1);
+    let _v = cpu.mem[sym::XCO].wrapping_add(1);
+    cpu.mem[sym::XCO] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     return;
 }
 
@@ -1092,9 +1128,15 @@ pub fn _3asub(cpu: &mut Cpu) {
     cpu.reg.a ^= cpu.mem[sym::FCharFace];
     cpu.reg.a &= 0x01;
     if cpu.reg.a == 0x00 {
-        cpu.mem[sym::FCharX] = cpu.mem[sym::FCharX].wrapping_add(1);
+        let _v = cpu.mem[sym::FCharX].wrapping_add(1);
+        cpu.mem[sym::FCharX] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         if cpu.flags.z {
-            cpu.mem[sym::FCharX + 1] = cpu.mem[sym::FCharX + 1].wrapping_add(1);
+            let _v = cpu.mem[sym::FCharX + 1].wrapping_add(1);
+            cpu.mem[sym::FCharX + 1] = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
         }
     }
     cpu.mem[sym::FCharImage] = 0x41;

@@ -167,7 +167,10 @@ impl Cpu {
                     self.mem[sym::tempblockx] = self.reg.x;
                     self._3atrigloose();
                     self.reg.x = self.mem[sym::tempblockx];
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    let _v = self.reg.x.wrapping_sub(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     let _o: u8 = 0x02;
                     self.flags.c = self.reg.x >= _o;
                     self.flags.z = self.reg.x == _o;
@@ -191,7 +194,10 @@ impl Cpu {
                         self.mem[sym::tempblockx] = self.reg.x;
                         self._3atrigloose();
                         self.reg.x = self.mem[sym::tempblockx];
-                        self.reg.x = self.reg.x.wrapping_sub(1);
+                        let _v = self.reg.x.wrapping_sub(1);
+                        self.reg.x = _v;
+                        self.flags.z = _v == 0;
+                        self.flags.n = (_v >> 7) != 0;
                         let _o: u8 = 0x02;
                         self.flags.c = self.reg.x >= _o;
                         self.flags.z = self.reg.x == _o;
@@ -313,7 +319,10 @@ impl Cpu {
                     }
                 }
             }
-            self.reg.y = self.reg.y.wrapping_sub(1);
+            let _v = self.reg.y.wrapping_sub(1);
+            self.reg.y = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             if !((self.reg.y as i8) >= 0) {
                 break;
             }
@@ -419,7 +428,10 @@ impl Cpu {
                         }
                     }
                 }
-                self.reg.y = self.reg.y.wrapping_add(1);
+                let _v = self.reg.y.wrapping_add(1);
+                self.reg.y = _v;
+                self.flags.z = _v == 0;
+                self.flags.n = (_v >> 7) != 0;
                 let _o: u8 = self.smc.sm;
                 self.flags.c = self.reg.y >= _o;
                 self.flags.z = self.reg.y == _o;
@@ -450,7 +462,10 @@ impl Cpu {
 
     fn pburn(&mut self) {
         self.reg.x = self.mem[sym::ptorchcount];
-        self.reg.x = self.reg.x.wrapping_add(1);
+        let _v = self.reg.x.wrapping_add(1);
+        self.reg.x = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         self.reg.a = self.mem[sym::ptorchx + self.reg.x as usize];
         if (self.reg.a as i8) < 0 {
             self.reg.x = 0x00;
@@ -473,7 +488,10 @@ impl Cpu {
         if (self.reg.x as i8) < 0 {
             return;
         }
-        self.reg.x = self.reg.x.wrapping_add(1);
+        let _v = self.reg.x.wrapping_add(1);
+        self.reg.x = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         if self.reg.x >= 0x03 {
             self.reg.x = 0x00;
         }
@@ -489,7 +507,10 @@ impl Cpu {
             self.reg.a = self.mem[sym::pstarcount + self.reg.x as usize];
             if self.reg.a == 0x00 {
             } else {
-                self.mem[sym::pstarcount + self.reg.x as usize] = self.mem[sym::pstarcount + self.reg.x as usize].wrapping_sub(1);
+                let _v = self.mem[sym::pstarcount + self.reg.x as usize].wrapping_sub(1);
+                self.mem[sym::pstarcount + self.reg.x as usize] = _v;
+                self.flags.z = _v == 0;
+                self.flags.n = (_v >> 7) != 0;
                 if !self.flags.z {
                 } else {
                     self.reg.a = self.reg.x;
@@ -499,7 +520,10 @@ impl Cpu {
                     self.reg.x = self.reg.a;
                 }
             }
-            self.reg.x = self.reg.x.wrapping_sub(1);
+            let _v = self.reg.x.wrapping_sub(1);
+            self.reg.x = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             if !((self.reg.x as i8) >= 0) {
                 break;
             }
@@ -1015,7 +1039,10 @@ impl Cpu {
         if self.reg.a == 0x00 {
             return;
         }
-        self.mem[sym::lightning] = self.mem[sym::lightning].wrapping_sub(1);
+        let _v = self.mem[sym::lightning].wrapping_sub(1);
+        self.mem[sym::lightning] = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         self.doflashoff();
         return;
     }
@@ -1081,7 +1108,10 @@ impl Cpu {
                     pc = 7;
                 }
                 7 => {
-                    self.mem[sym::SceneCount] = self.mem[sym::SceneCount].wrapping_sub(1);
+                    let _v = self.mem[sym::SceneCount].wrapping_sub(1);
+                    self.mem[sym::SceneCount] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if !self.flags.z {
                         pc = 1;
                     } else {
@@ -1129,7 +1159,10 @@ impl Cpu {
             self.playback();
             self.zerosound();
         }
-        self.mem[sym::SceneCount] = self.mem[sym::SceneCount].wrapping_sub(1);
+        let _v = self.mem[sym::SceneCount].wrapping_sub(1);
+        self.mem[sym::SceneCount] = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         if !self.flags.z {
             self.playloop();
             return;
@@ -1186,7 +1219,10 @@ impl Cpu {
         self.zerolsts();
         self.reg.a = self.mem[sym::redrawglass];
         if self.reg.a != 0x00 {
-            self.mem[sym::redrawglass] = self.mem[sym::redrawglass].wrapping_sub(1);
+            let _v = self.mem[sym::redrawglass].wrapping_sub(1);
+            self.mem[sym::redrawglass] = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             self.reg.x = self.mem[sym::GlassState];
             self.drawglass();
         }
@@ -1391,13 +1427,25 @@ impl Cpu {
         self.reg.x = 0x07;
         self.reg.a = self.mem[sym::MinLeft];
         if self.reg.a >= 0x06 {
-            self.reg.x = self.reg.x.wrapping_sub(1);
+            let _v = self.reg.x.wrapping_sub(1);
+            self.reg.x = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             if self.reg.a >= 0x11 {
-                self.reg.x = self.reg.x.wrapping_sub(1);
+                let _v = self.reg.x.wrapping_sub(1);
+                self.reg.x = _v;
+                self.flags.z = _v == 0;
+                self.flags.n = (_v >> 7) != 0;
                 if self.reg.a >= 0x21 {
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    let _v = self.reg.x.wrapping_sub(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if self.reg.a >= 0x41 {
-                        self.reg.x = self.reg.x.wrapping_sub(1);
+                        let _v = self.reg.x.wrapping_sub(1);
+                        self.reg.x = _v;
+                        self.flags.z = _v == 0;
+                        self.flags.n = (_v >> 7) != 0;
                     }
                 }
             }
@@ -1602,7 +1650,10 @@ impl Cpu {
         self.mem[sym::SCRNUM] = self.reg.a;
         loop {
             self.DoScrn();
-            self.mem[sym::SCRNUM] = self.mem[sym::SCRNUM].wrapping_sub(1);
+            let _v = self.mem[sym::SCRNUM].wrapping_sub(1);
+            self.mem[sym::SCRNUM] = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             if self.flags.z {
                 break;
             }
@@ -1620,7 +1671,10 @@ impl Cpu {
             } else {
                 self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
             }
-            self.reg.y = self.reg.y.wrapping_sub(1);
+            let _v = self.reg.y.wrapping_sub(1);
+            self.reg.y = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             if !((self.reg.y as i8) >= 0) {
                 break;
             }
@@ -1836,7 +1890,10 @@ impl Cpu {
                 self.reg.a = 0x00;
                 self.mem[sym::GdStartSeqH - 1 + self.reg.y as usize] = self.reg.a;
             }
-            self.reg.y = self.reg.y.wrapping_sub(1);
+            let _v = self.reg.y.wrapping_sub(1);
+            self.reg.y = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             if !(self.reg.y != 0x00) {
                 break;
             }

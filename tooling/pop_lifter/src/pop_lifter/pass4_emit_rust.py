@@ -606,24 +606,32 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         method = "wrapping_add" if isinstance(item, IncTarget) else "wrapping_sub"
         target = item.target
         if isinstance(target, Reg):
-            return [f"self.reg.{target} = self.reg.{target}.{method}(1);"]
-        if isinstance(target, Abs):
+            place = f"self.reg.{target}"
+        elif isinstance(target, Abs):
             place = f"self.mem[{_abs_index(target, syms)}]"
-            return [f"{place} = {place}.{method}(1);"]
-        if isinstance(target, IndexedAbs):
+        elif isinstance(target, IndexedAbs):
             place = (
                 f"self.mem[{_abs_index(target.base, syms)} "
                 f"+ self.reg.{target.index} as usize]"
             )
-            return [f"{place} = {place}.{method}(1);"]
-        if isinstance(target, OpVarRef):
+        elif isinstance(target, OpVarRef):
             # Recognised SMC operand bump: read-modify-write the operand
             # variable the matching store wrote and the patched instruction
             # reads. `half` picks the immediate byte or an address byte.
             suffix = f"_{target.half}" if target.half else ""
             place = f"self.smc.{_mangle(target.name)}{suffix}"
-            return [f"{place} = {place}.{method}(1);"]
-        return None  # unrecognised LocalRef bump — deferred
+        else:
+            return None  # unrecognised LocalRef bump — deferred
+        # inc/dec set Z/N from the post-update value (6502 semantics,
+        # matching exec_atom). A memory inc/dec branch (`dec foo ; bne`)
+        # is unfused, so the flags must be written here or it reads stale
+        # Z. The temp keeps an indexed place from being recomputed.
+        return [
+            f"let _v = {place}.{method}(1);",
+            f"{place} = _v;",
+            "self.flags.z = _v == 0;",
+            "self.flags.n = (_v >> 7) != 0;",
+        ]
 
     # ---- carry / flag operations ----------------------------------------
 

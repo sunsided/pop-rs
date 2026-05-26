@@ -164,15 +164,24 @@ impl Cpu {
         }
         self.reg.a = self.mem[sym::justblocked];
         if self.reg.a != 0x00 {
-            self.mem[sym::justblocked] = self.mem[sym::justblocked].wrapping_sub(1);
+            let _v = self.mem[sym::justblocked].wrapping_sub(1);
+            self.mem[sym::justblocked] = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
         }
         self.reg.a = self.mem[sym::gdtimer];
         if self.reg.a != 0x00 {
-            self.mem[sym::gdtimer] = self.mem[sym::gdtimer].wrapping_sub(1);
+            let _v = self.mem[sym::gdtimer].wrapping_sub(1);
+            self.mem[sym::gdtimer] = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
         }
         self.reg.a = self.mem[sym::refract];
         if self.reg.a != 0x00 {
-            self.mem[sym::refract] = self.mem[sym::refract].wrapping_sub(1);
+            let _v = self.mem[sym::refract].wrapping_sub(1);
+            self.mem[sym::refract] = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
         }
         self.reg.a = self.mem[sym::CharID];
         match self.reg.a {
@@ -691,7 +700,10 @@ impl Cpu {
             self.cmpspace();
             if self.flags.z {
                 self.getinfront();
-                self.mem[sym::tempblocky] = self.mem[sym::tempblocky].wrapping_add(1);
+                let _v = self.mem[sym::tempblocky].wrapping_add(1);
+                self.mem[sym::tempblocky] = _v;
+                self.flags.z = _v == 0;
+                self.flags.n = (_v >> 7) != 0;
                 self.rdblock1();
                 self.mem[sym::ztemp] = self.reg.a;
                 if self.reg.a != 0x02 {
@@ -1124,7 +1136,10 @@ impl Cpu {
             self.flags.z = self.reg.a == _o;
             self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
             if self.reg.a < 0xfe {
-                self.mem[sym::PlayCount] = self.mem[sym::PlayCount].wrapping_add(1);
+                let _v = self.mem[sym::PlayCount].wrapping_add(1);
+                self.mem[sym::PlayCount] = _v;
+                self.flags.z = _v == 0;
+                self.flags.n = (_v >> 7) != 0;
                 self.reg.y = self.mem[sym::PreRecPtr];
                 self.reg.a = self.mem[sym::PlayCount];
                 let _o: u8 = self.mem[(self.mem[sym::ProgStart] as usize | (self.mem[sym::ProgStart + 1] as usize) << 8) + self.reg.y as usize];
@@ -1132,12 +1147,21 @@ impl Cpu {
                 self.flags.z = self.reg.a == _o;
                 self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if self.flags.c {
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.a = self.mem[(self.mem[sym::ProgStart] as usize | (self.mem[sym::ProgStart + 1] as usize) << 8) + self.reg.y as usize];
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.mem[sym::PreRecPtr] = self.reg.y;
                 } else {
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.a = self.mem[(self.mem[sym::ProgStart] as usize | (self.mem[sym::ProgStart + 1] as usize) << 8) + self.reg.y as usize];
                 }
                 let _o: u8 = 0xff;
@@ -1372,7 +1396,10 @@ impl Cpu {
             self.transferguard();
             return;
         }
-        self.mem[sym::CUTTIMER] = self.mem[sym::CUTTIMER].wrapping_sub(1);
+        let _v = self.mem[sym::CUTTIMER].wrapping_sub(1);
+        self.mem[sym::CUTTIMER] = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         return;
     }
 

@@ -17,7 +17,10 @@ pub fn ADDSOUND(cpu: &mut Cpu) {
     cpu.mem[sym::savex] = cpu.reg.x;
     cpu.reg.x = cpu.mem[sym::soundtable];
     if cpu.reg.x < 0x20 {
-        cpu.reg.x = cpu.reg.x.wrapping_add(1);
+        let _v = cpu.reg.x.wrapping_add(1);
+        cpu.reg.x = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         cpu.mem[sym::soundtable + cpu.reg.x as usize] = cpu.reg.a;
         cpu.mem[sym::soundtable] = cpu.reg.x;
     }
@@ -37,7 +40,10 @@ pub fn PLAYBACK(cpu: &mut Cpu) {
                 cpu.mem[sym::savex] = cpu.reg.x;
                 makesound(cpu);
                 cpu.reg.x = cpu.mem[sym::savex];
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if !(cpu.reg.x != 0x00) {
                     break;
                 }
@@ -227,7 +233,10 @@ pub fn tone(cpu: &mut Cpu) {
                 pc = 3;
             }
             3 => {
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = cpu.local.get(&(":pitch", 0)).copied().unwrap_or(0);
                 cpu.flags.c = cpu.reg.y >= _o;
                 cpu.flags.z = cpu.reg.y == _o;
@@ -239,7 +248,10 @@ pub fn tone(cpu: &mut Cpu) {
                 }
             }
             4 => {
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_add(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = cpu.local.get(&(":pitch", 1)).copied().unwrap_or(0);
                 cpu.flags.c = cpu.reg.x >= _o;
                 cpu.flags.z = cpu.reg.x == _o;

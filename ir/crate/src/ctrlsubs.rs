@@ -280,7 +280,10 @@ pub fn GETUNDERFT(cpu: &mut Cpu) {
 
 pub fn GETINFRONT(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::CharFace];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::CharBlockX];
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + cpu.mem[sym::plus1 + cpu.reg.x as usize] as u16 + (cpu.flags.c as u16);
@@ -296,7 +299,10 @@ pub fn GETINFRONT(cpu: &mut Cpu) {
 
 pub fn GET2INFRONT(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::CharFace];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::CharBlockX];
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + cpu.mem[sym::plus1 + cpu.reg.x as usize] as u16 + (cpu.flags.c as u16);
@@ -315,7 +321,10 @@ pub fn GET2INFRONT(cpu: &mut Cpu) {
 
 pub fn GETBEHIND(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::CharFace];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::CharBlockX];
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + cpu.mem[sym::minus1 + cpu.reg.x as usize] as u16 + (cpu.flags.c as u16);
@@ -331,7 +340,10 @@ pub fn GETBEHIND(cpu: &mut Cpu) {
 
 pub fn GETABOVE(cpu: &mut Cpu) {
     cpu.reg.y = cpu.mem[sym::CharBlockY];
-    cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+    let _v = cpu.reg.y.wrapping_sub(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::abovey] = cpu.reg.y;
     cpu.reg.x = cpu.mem[sym::CharBlockX];
     cpu.reg.a = cpu.mem[sym::CharScrn];
@@ -341,7 +353,10 @@ pub fn GETABOVE(cpu: &mut Cpu) {
 
 pub fn GETABOVEINF(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::CharFace];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::CharBlockX];
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + cpu.mem[sym::plus1 + cpu.reg.x as usize] as u16 + (cpu.flags.c as u16);
@@ -350,7 +365,10 @@ pub fn GETABOVEINF(cpu: &mut Cpu) {
     cpu.mem[sym::infrontx] = cpu.reg.a;
     cpu.reg.x = cpu.reg.a;
     cpu.reg.y = cpu.mem[sym::CharBlockY];
-    cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+    let _v = cpu.reg.y.wrapping_sub(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::abovey] = cpu.reg.y;
     cpu.reg.a = cpu.mem[sym::CharScrn];
     RDBLOCK(cpu);
@@ -359,7 +377,10 @@ pub fn GETABOVEINF(cpu: &mut Cpu) {
 
 pub fn GETABOVEBEH(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::CharFace];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::CharBlockX];
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + cpu.mem[sym::minus1 + cpu.reg.x as usize] as u16 + (cpu.flags.c as u16);
@@ -368,7 +389,10 @@ pub fn GETABOVEBEH(cpu: &mut Cpu) {
     cpu.mem[sym::behindx] = cpu.reg.a;
     cpu.reg.x = cpu.reg.a;
     cpu.reg.y = cpu.mem[sym::CharBlockY];
-    cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+    let _v = cpu.reg.y.wrapping_sub(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::abovey] = cpu.reg.y;
     cpu.reg.a = cpu.mem[sym::CharScrn];
     RDBLOCK(cpu);
@@ -454,7 +478,10 @@ pub fn GETBLOCKY(cpu: &mut Cpu) {
                 }
             }
             2 => {
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.x as i8) >= 0 {
                     pc = 1;
                 } else {
@@ -490,7 +517,10 @@ pub fn GETBLOCKYP(cpu: &mut Cpu) {
                 }
             }
             2 => {
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.x as i8) >= 0 {
                     pc = 1;
                 } else {
@@ -554,7 +584,10 @@ pub fn UNINDEX(cpu: &mut Cpu) {
                 let _r = (cpu.reg.a as u16) + (!0x0a_u8) as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_add(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.x != 0x00 {
                     pc = 1;
                 } else {
@@ -675,7 +708,10 @@ pub fn INDEXCHAR(cpu: &mut Cpu) {
                 }
             }
         }
-        cpu.mem[sym::tempblockx] = cpu.mem[sym::tempblockx].wrapping_sub(1);
+        let _v = cpu.mem[sym::tempblockx].wrapping_sub(1);
+        cpu.mem[sym::tempblockx] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
     }
     crate::ext::indexblock(cpu);
     cpu.mem[sym::FCharIndex] = cpu.reg.y;
@@ -727,7 +763,10 @@ pub fn SETUPCHAR(cpu: &mut Cpu) {
         cpu.flags.c = (_r >> 8) != 0;
         cpu.mem[sym::FCharX] = cpu.reg.a;
         if cpu.flags.c {
-            cpu.mem[sym::FCharX + 1] = cpu.mem[sym::FCharX + 1].wrapping_add(1);
+            let _v = cpu.mem[sym::FCharX + 1].wrapping_add(1);
+            cpu.mem[sym::FCharX + 1] = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
         }
     }
     return;
@@ -765,9 +804,15 @@ pub fn SETUPSWORD(cpu: &mut Cpu) {
         return;
     }
     decodeswim(cpu);
-    cpu.reg.y = cpu.reg.y.wrapping_add(1);
+    let _v = cpu.reg.y.wrapping_add(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::Fdx] = cpu.mem[(cpu.mem[sym::framepoint] as usize | (cpu.mem[sym::framepoint + 1] as usize) << 8) + cpu.reg.y as usize];
-    cpu.reg.y = cpu.reg.y.wrapping_add(1);
+    let _v = cpu.reg.y.wrapping_add(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::Fdy] = cpu.mem[(cpu.mem[sym::framepoint] as usize | (cpu.mem[sym::framepoint + 1] as usize) << 8) + cpu.reg.y as usize];
     cpu.reg.a = cpu.mem[sym::Fdx];
     ADDFCHARX(cpu);
@@ -1213,11 +1258,17 @@ pub fn QUICKFG(cpu: &mut Cpu) {
                 }
             }
             2 => {
-                cpu.mem[sym::leftblock] = cpu.mem[sym::leftblock].wrapping_sub(1);
+                let _v = cpu.mem[sym::leftblock].wrapping_sub(1);
+                cpu.mem[sym::leftblock] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 4;
             }
             3 => {
-                cpu.mem[sym::rightblock] = cpu.mem[sym::rightblock].wrapping_add(1);
+                let _v = cpu.mem[sym::rightblock].wrapping_add(1);
+                cpu.mem[sym::rightblock] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 4;
             }
             4 => {
@@ -1353,7 +1404,10 @@ pub fn CROPCHAR(cpu: &mut Cpu) {
             }
         }
         cpu.reg.x = cpu.mem[sym::CharBlockY];
-        cpu.reg.x = cpu.reg.x.wrapping_add(1);
+        let _v = cpu.reg.x.wrapping_add(1);
+        cpu.reg.x = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         if cpu.reg.x != 0x01 {
             cpu.reg.a = cpu.mem[sym::BlockTop + cpu.reg.x as usize];
             if cpu.reg.a >= cpu.mem[sym::FCharY] {
@@ -1550,9 +1604,15 @@ pub fn GETSEQ(cpu: &mut Cpu) {
     cpu.reg.y = 0x00;
     cpu.reg.a = cpu.mem[(cpu.mem[sym::CharSeq] as usize | (cpu.mem[sym::CharSeq + 1] as usize) << 8) + cpu.reg.y as usize];
     cpu.stack.push(cpu.reg.a);
-    cpu.mem[sym::CharSeq] = cpu.mem[sym::CharSeq].wrapping_add(1);
+    let _v = cpu.mem[sym::CharSeq].wrapping_add(1);
+    cpu.mem[sym::CharSeq] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     if cpu.flags.z {
-        cpu.mem[sym::CharSeq + 1] = cpu.mem[sym::CharSeq + 1].wrapping_add(1);
+        let _v = cpu.mem[sym::CharSeq + 1].wrapping_add(1);
+        cpu.mem[sym::CharSeq + 1] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
     }
     cpu.reg.a = cpu.stack.pop().expect("pla on empty stack");
     cpu.flags.z = cpu.reg.a == 0;
@@ -1566,13 +1626,25 @@ pub fn GETFRAMEINFO(cpu: &mut Cpu) {
     usealtsets(cpu);
     cpu.reg.y = 0x00;
     cpu.mem[sym::Fimage] = cpu.mem[(cpu.mem[sym::framepoint] as usize | (cpu.mem[sym::framepoint + 1] as usize) << 8) + cpu.reg.y as usize];
-    cpu.reg.y = cpu.reg.y.wrapping_add(1);
+    let _v = cpu.reg.y.wrapping_add(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::Fsword] = cpu.mem[(cpu.mem[sym::framepoint] as usize | (cpu.mem[sym::framepoint + 1] as usize) << 8) + cpu.reg.y as usize];
-    cpu.reg.y = cpu.reg.y.wrapping_add(1);
+    let _v = cpu.reg.y.wrapping_add(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::Fdx] = cpu.mem[(cpu.mem[sym::framepoint] as usize | (cpu.mem[sym::framepoint + 1] as usize) << 8) + cpu.reg.y as usize];
-    cpu.reg.y = cpu.reg.y.wrapping_add(1);
+    let _v = cpu.reg.y.wrapping_add(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::Fdy] = cpu.mem[(cpu.mem[sym::framepoint] as usize | (cpu.mem[sym::framepoint + 1] as usize) << 8) + cpu.reg.y as usize];
-    cpu.reg.y = cpu.reg.y.wrapping_add(1);
+    let _v = cpu.reg.y.wrapping_add(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[(cpu.mem[sym::framepoint] as usize | (cpu.mem[sym::framepoint + 1] as usize) << 8) + cpu.reg.y as usize];
     cpu.mem[sym::Fcheck] = cpu.reg.a;
     return;
@@ -1865,7 +1937,10 @@ pub fn sub(cpu: &mut Cpu) {
                 }
             }
             6 => {
-                cpu.mem[sym::tempblocky] = cpu.mem[sym::tempblocky].wrapping_add(1);
+                let _v = cpu.mem[sym::tempblocky].wrapping_add(1);
+                cpu.mem[sym::tempblocky] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 1;
             }
             7 => {
@@ -2076,6 +2151,9 @@ pub fn UNEVENFLOOR(cpu: &mut Cpu) {
     if cpu.reg.a != 0x05 {
         return;
     }
-    cpu.mem[sym::CharY] = cpu.mem[sym::CharY].wrapping_add(1);
+    let _v = cpu.mem[sym::CharY].wrapping_add(1);
+    cpu.mem[sym::CharY] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     return;
 }
