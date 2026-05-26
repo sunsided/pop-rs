@@ -1057,6 +1057,10 @@ def test_raw_adc_imm():
     assert lines[0] == "let _r = (self.reg.a as u16) + (0xbd) as u16 + (self.flags.c as u16);"
     assert lines[1] == "self.reg.a = _r as u8;"
     assert lines[2] == "self.flags.c = (_r >> 8) != 0;"
+    # adc/sbc set Z/N from the result, like loads — needed when a branch
+    # on Z/N follows across an intervening store the fuser can't span.
+    assert lines[3] == "self.flags.z = self.reg.a == 0;"
+    assert lines[4] == "self.flags.n = (self.reg.a >> 7) != 0;"
 
 
 def test_raw_asl_and_lsr():

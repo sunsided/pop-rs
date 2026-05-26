@@ -30,6 +30,7 @@ from pathlib import Path
 import pytest
 
 from pop_lifter.cli import lift_all_modules
+from pop_lifter.interp_ir1 import InterpError
 from pop_lifter.interp_ir3 import run as ir3_run
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -86,7 +87,7 @@ def ir3_modules(source_dir):
     return lift_all_modules(source_dir)
 
 
-def _interp(ir3_modules, module: str, name: str):
+def _interp(ir3_modules, module: str, name: str, regs=(0, 0, 0, 0)):
     """Run `name` in the interpreter, resolving it in the *target* segment.
     Routine names aren't globally unique (e.g. `ADDSOUND` is in both
     `sound` and `specialk`), and the interpreter resolves an entry by the
@@ -95,12 +96,13 @@ def _interp(ir3_modules, module: str, name: str):
     target = next((m for m in ir3_modules if m.name.lower() == module), None)
     assert target is not None, f"no segment module {module!r} in IR3 set"
     ordered = [target] + [m for m in ir3_modules if m is not target]
-    return ir3_run(ordered, name, ram=bytearray(0x10000))
+    a, x, y, c = regs
+    return ir3_run(ordered, name, ram=bytearray(0x10000), a=a, x=x, y=y, c=c)
 
 
-def _run_crate(diffrun_bin: str, module: str, name: str) -> tuple[int, int, int, bytes]:
+def _run_crate(diffrun_bin, module, name, regs=(0, 0, 0, 0)) -> tuple[int, int, int, bytes]:
     p = subprocess.run(
-        [diffrun_bin, module, name, "0", "0", "0", "0"],
+        [diffrun_bin, module, name, *(str(v) for v in regs)],
         input=b"", capture_output=True, timeout=15,
     )
     assert p.returncode == 0, (
@@ -113,10 +115,9 @@ def _run_crate(diffrun_bin: str, module: str, name: str) -> tuple[int, int, int,
     return out[0], out[1], out[2], bytes(out[4:])
 
 
-@pytest.mark.parametrize("module,name", _PILOTS, ids=[f"{m}/{n}" for m, n in _PILOTS])
-def test_emitted_routine_matches_interpreter(module, name, diffrun_bin, ir3_modules):
-    trace = _interp(ir3_modules, module, name)
-    a, x, y, ram = _run_crate(diffrun_bin, module, name)
+def _assert_match(diffrun_bin, ir3_modules, module, name, regs):
+    trace = _interp(ir3_modules, module, name, regs)
+    a, x, y, ram = _run_crate(diffrun_bin, module, name, regs)
 
     # Compare registers and RAM but NOT the status flags. The emitter
     # elides flag writes that are dead within a routine (sound under
@@ -124,13 +125,35 @@ def test_emitted_routine_matches_interpreter(module, name, diffrun_bin, ir3_modu
     # so exit-time carry/Z/N can legitimately differ from the interpreter,
     # which always computes them. Registers and RAM are never elided.
     assert (a, x, y) == (trace.a, trace.x, trace.y), (
-        f"{module}/{name}: final registers diverge — "
+        f"{module}/{name} regs={regs}: final registers diverge — "
         f"interp=({trace.a},{trace.x},{trace.y}) crate=({a},{x},{y})"
     )
     if ram != bytes(trace.ram):
         ndiff = sum(1 for i in range(0x10000) if ram[i] != trace.ram[i])
         first = next(i for i in range(0x10000) if ram[i] != trace.ram[i])
         pytest.fail(
-            f"{module}/{name}: RAM diverges at {ndiff} address(es); "
+            f"{module}/{name} regs={regs}: RAM diverges at {ndiff} address(es); "
             f"first ${first:04x}: interp={trace.ram[first]} crate={ram[first]}"
         )
+
+
+@pytest.mark.parametrize("module,name", _PILOTS, ids=[f"{m}/{n}" for m, n in _PILOTS])
+def test_emitted_routine_matches_interpreter(module, name, diffrun_bin, ir3_modules):
+    _assert_match(diffrun_bin, ir3_modules, module, name, (0, 0, 0, 0))
+
+
+# Non-zero initial registers (incl. edge values) exercise register-
+# dependent paths and indexed addressing the zero state can't reach.
+_REG_SEEDS = [(0x01, 0x02, 0x03, 1), (0xff, 0xff, 0xff, 0), (0x80, 0x7f, 0x01, 1)]
+
+
+@pytest.mark.parametrize("module,name", _PILOTS, ids=[f"{m}/{n}" for m, n in _PILOTS])
+@pytest.mark.parametrize("regs", _REG_SEEDS, ids=lambda r: "a%02x_x%02x_y%02x_c%d" % r)
+def test_emitted_routine_matches_interpreter_seeded(module, name, regs, diffrun_bin, ir3_modules):
+    # Some routines aren't runnable for a given start state (a seeded
+    # index reaches a synthetic-label address the interpreter rejects);
+    # skip those combos and compare the rest.
+    try:
+        _assert_match(diffrun_bin, ir3_modules, module, name, regs)
+    except InterpError as e:
+        pytest.skip(f"{module}/{name} not interpretable for regs={regs}: {e}")
