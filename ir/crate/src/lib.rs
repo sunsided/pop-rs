@@ -5,11 +5,12 @@
 // functions over `&mut Cpu`. A `jsr`/`jmp` binds to the segment that
 // owns the target (overlay name reuse is resolved per calling
 // module); calls to ROM / firmware / unlifted targets go to `ext`.
-#![allow(non_snake_case, non_upper_case_globals, dead_code, unused_variables, unused_mut, unused_parens, unused_assignments, unused_comparisons)]
+#![allow(non_snake_case, non_upper_case_globals, dead_code, unused_variables, unused_mut, unused_parens, unused_assignments, unused_comparisons, clippy::all, clippy::pedantic)]
 
 pub mod cpu;
 pub mod sym;
 pub mod ext;
+pub mod dispatch;
 
 pub mod auto;
 pub mod boot;
