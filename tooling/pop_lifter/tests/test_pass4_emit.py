@@ -664,6 +664,12 @@ def _raw(item) -> str:
     return _emit_one(RawStmt(item=item))
 
 
+def _zn(reg: str) -> str:
+    """The trailing Z/N flag-update lines an op that sets Z/N from `reg`
+    emits after its result line."""
+    return f"\nself.flags.z = self.reg.{reg} == 0;\nself.flags.n = (self.reg.{reg} >> 7) != 0;"
+
+
 def _loaded(reg: str, rvalue: str, comment: str = "") -> str:
     """Expected emit for a register load: the assignment plus its Z/N
     update (every 6502 load sets Z/N from the loaded byte)."""
@@ -751,21 +757,21 @@ def test_raw_store_indexed():
 
 
 def test_raw_transfer():
-    assert _raw(Transfer(src_reg=Reg.A, dst_reg=Reg.X, src=SRC)) == "self.reg.x = self.reg.a;"
+    assert _raw(Transfer(src_reg=Reg.A, dst_reg=Reg.X, src=SRC)) == "self.reg.x = self.reg.a;" + _zn("x")
 
 
 def test_raw_bitwise_and_or_eor():
-    assert _raw(Bitwise(op="and", source=_imm(0x0f), src=SRC)) == "self.reg.a &= 0x0f;"
-    assert _raw(Bitwise(op="or", source=_abs("M", 0x40), src=SRC)) == "self.reg.a |= self.mem[0x0040];"
+    assert _raw(Bitwise(op="and", source=_imm(0x0f), src=SRC)) == "self.reg.a &= 0x0f;" + _zn("a")
+    assert _raw(Bitwise(op="or", source=_abs("M", 0x40), src=SRC)) == "self.reg.a |= self.mem[0x0040];" + _zn("a")
     eor_indexed = Bitwise(op="eor", source=IndexedAbs(base=_abs("t", 0x0200), index=Reg.X), src=SRC)
-    assert _raw(eor_indexed) == "self.reg.a ^= self.mem[(0x0200 + self.reg.x as usize) & 0xffff];"
+    assert _raw(eor_indexed) == "self.reg.a ^= self.mem[(0x0200 + self.reg.x as usize) & 0xffff];" + _zn("a")
 
 
 def test_raw_bitwise_indirect():
     item = Bitwise(op="and", source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
     assert _raw(item) == (
         "self.reg.a &= self.mem[((self.mem[0x0020] as usize "
-        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize) & 0xffff];"
+        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize) & 0xffff];" + _zn("a")
     )
 
 

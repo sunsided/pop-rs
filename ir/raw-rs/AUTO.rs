@@ -1703,6 +1703,8 @@ impl Cpu {
             self.mem[sym::tempblocky] = self.reg.a;
             self.indexblock();
             self.reg.a = self.reg.y;
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.reg.x = self.mem[sym::ShadScrn];
             self.flags.z = self.reg.x == 0;
             self.flags.n = (self.reg.x >> 7) != 0;
@@ -2636,6 +2638,8 @@ impl Cpu {
         self.flags.z = self.reg.x == 0;
         self.flags.n = (self.reg.x >> 7) != 0;
         self.reg.a ^= self.mem[(sym::specialcolor + self.reg.x as usize) & 0xffff];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::GuardColor] = self.reg.a;
         self.SaveShad();
         return;
@@ -2785,6 +2789,8 @@ impl Cpu {
         self.flags.z = self.reg.x == 0;
         self.flags.n = (self.reg.x >> 7) != 0;
         self.reg.a ^= self.mem[(sym::specialcolor + self.reg.x as usize) & 0xffff];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::GuardColor] = self.reg.a;
         self.SaveShad();
         return;

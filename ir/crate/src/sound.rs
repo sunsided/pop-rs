@@ -70,10 +70,14 @@ pub fn PLAYBACK(cpu: &mut Cpu) {
 pub fn makesound(cpu: &mut Cpu) {
     cpu.flags.c = (cpu.reg.a >> 7) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shl(1);
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a >= 0x28 {
         return;
     }
     cpu.reg.x = cpu.reg.a;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = cpu.mem[(sym::lookup + cpu.reg.x as usize) & 0xffff];
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;

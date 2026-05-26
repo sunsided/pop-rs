@@ -1446,10 +1446,14 @@ impl Cpu {
                 }
                 1 => {
                     self.reg.y = self.reg.a;
+                    self.flags.z = self.reg.y == 0;
+                    self.flags.n = (self.reg.y >> 7) != 0;
                     self.reg.a = self.mem[sym::musicon];
                     self.flags.z = self.reg.a == 0;
                     self.flags.n = (self.reg.a >> 7) != 0;
                     self.reg.a &= self.mem[sym::soundon];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     if self.reg.a == 0x00 {
                         pc = 5;
                     } else {
@@ -1458,6 +1462,8 @@ impl Cpu {
                 }
                 2 => {
                     self.reg.a = self.reg.y;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.xminit();
                     pc = 7;
                 }
@@ -1479,6 +1485,8 @@ impl Cpu {
                 }
                 5 => {
                     self.reg.a = self.reg.x;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     pc = 6;
                 }
                 6 => {

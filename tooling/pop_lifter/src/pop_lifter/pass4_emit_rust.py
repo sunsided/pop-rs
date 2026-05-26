@@ -409,6 +409,13 @@ def _indexed_place(base: str, idx) -> str:
     return f"self.mem[({base} + self.reg.{idx} as usize) & 0xffff]"
 
 
+def _set_zn_lines(place: str) -> list[str]:
+    """The two `flags.z`/`flags.n` updates for an op that sets Z/N from
+    `place` (a register or memory r-value), matching the interpreter's
+    `_set_zn`."""
+    return [f"self.flags.z = {place} == 0;", f"self.flags.n = ({place} >> 7) != 0;"]
+
+
 def _load_with_flags(reg, rvalue: str, comment: str = "") -> list[str]:
     """A register load and its Z/N update. On the 6502 every register load
     sets Z/N from the loaded byte; the emitter writes them unconditionally
@@ -416,11 +423,7 @@ def _load_with_flags(reg, rvalue: str, comment: str = "") -> list[str]:
     branch — which fusion can't bridge across a `jsr`/`rts` — stays
     correct. `comment` is an optional trailing `// …` on the load line."""
     place = f"self.reg.{reg}"
-    return [
-        f"{place} = {rvalue};{comment}",
-        f"self.flags.z = {place} == 0;",
-        f"self.flags.n = ({place} >> 7) != 0;",
-    ]
+    return [f"{place} = {rvalue};{comment}", *_set_zn_lines(place)]
 
 
 def _local_key(label: str, offset: int) -> str:
@@ -617,13 +620,17 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         return [f"self.mem[{_indirect_index(item.target, syms)}] = self.reg.{item.reg};"]
 
     if isinstance(item, Transfer):
-        return [f"self.reg.{item.dst_reg} = self.reg.{item.src_reg};"]
+        dst = f"self.reg.{item.dst_reg}"
+        return [f"{dst} = self.reg.{item.src_reg};", *_set_zn_lines(dst)]
 
     if isinstance(item, Bitwise):
         op = _BITWISE_OPS.get(item.op)
         if op is None or not isinstance(item.source, (Imm, Abs, IndexedAbs, IndirectY)):
             return None
-        return [f"self.reg.a {op}= {_emit_value(item.source, syms)};"]
+        return [
+            f"self.reg.a {op}= {_emit_value(item.source, syms)};",
+            *_set_zn_lines("self.reg.a"),
+        ]
 
     if isinstance(item, (IncTarget, DecTarget)):
         method = "wrapping_add" if isinstance(item, IncTarget) else "wrapping_sub"
@@ -706,12 +713,14 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         return [
             "self.flags.c = (self.reg.a >> 7) != 0;",
             "self.reg.a = self.reg.a.wrapping_shl(1);",
+            *_set_zn_lines("self.reg.a"),
         ]
 
     if isinstance(item, Lsr):
         return [
             "self.flags.c = (self.reg.a & 1) != 0;",
             "self.reg.a = self.reg.a.wrapping_shr(1);",
+            *_set_zn_lines("self.reg.a"),
         ]
 
     if isinstance(item, Rol):
@@ -719,6 +728,7 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             "let _c = self.reg.a >> 7;",
             "self.reg.a = self.reg.a.wrapping_shl(1) | (self.flags.c as u8);",
             "self.flags.c = _c != 0;",
+            *_set_zn_lines("self.reg.a"),
         ]
 
     if isinstance(item, Ror):
@@ -726,6 +736,7 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             "let _c = self.reg.a & 1;",
             "self.reg.a = self.reg.a.wrapping_shr(1) | ((self.flags.c as u8) << 7);",
             "self.flags.c = _c != 0;",
+            *_set_zn_lines("self.reg.a"),
         ]
 
     if isinstance(item, ShiftMem):
@@ -734,23 +745,27 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             return [
                 f"self.flags.c = ({place} >> 7) != 0;",
                 f"{place} = {place}.wrapping_shl(1);",
+                *_set_zn_lines(place),
             ]
         if item.op == "lsr":
             return [
                 f"self.flags.c = ({place} & 1) != 0;",
                 f"{place} = {place}.wrapping_shr(1);",
+                *_set_zn_lines(place),
             ]
         if item.op == "rol":
             return [
                 f"let _c = {place} >> 7;",
                 f"{place} = {place}.wrapping_shl(1) | (self.flags.c as u8);",
                 "self.flags.c = _c != 0;",
+                *_set_zn_lines(place),
             ]
         if item.op == "ror":
             return [
                 f"let _c = {place} & 1;",
                 f"{place} = {place}.wrapping_shr(1) | ((self.flags.c as u8) << 7);",
                 "self.flags.c = _c != 0;",
+                *_set_zn_lines(place),
             ]
 
     # ---- flag-only comparisons ------------------------------------------

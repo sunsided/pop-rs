@@ -94,15 +94,27 @@ impl Cpu {
         self.flags.z = self.reg.x == 0;
         self.flags.n = (self.reg.x >> 7) != 0;
         self.reg.a = self.reg.x;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.flags.c = (self.reg.a & 1) != 0;
         self.reg.a = self.reg.a.wrapping_shr(1);
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.flags.c = (self.reg.a & 1) != 0;
         self.reg.a = self.reg.a.wrapping_shr(1);
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.flags.c = (self.reg.a & 1) != 0;
         self.reg.a = self.reg.a.wrapping_shr(1);
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.flags.c = (self.reg.a & 1) != 0;
         self.reg.a = self.reg.a.wrapping_shr(1);
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.reg.a |= 0xc0;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.local.insert((":rdsect", 2), self.reg.a);
         self.reg.a = 0x0f;
         self.flags.z = self.reg.a == 0;
@@ -168,6 +180,8 @@ impl Cpu {
             if self.reg.a == 0xee {
                 self.flags.c = (self.mem[0x0c00] >> 7) != 0;
                 self.mem[0x0c00] = self.mem[0x0c00].wrapping_shl(1);
+                self.flags.z = self.mem[0x0c00] == 0;
+                self.flags.n = (self.mem[0x0c00] >> 7) != 0;
                 self.reg.a = self.mem[0x0800];
                 self.flags.z = self.reg.a == 0;
                 self.flags.n = (self.reg.a >> 7) != 0;

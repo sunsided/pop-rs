@@ -71,14 +71,24 @@ pub fn TIMELEFTMSG(cpu: &mut Cpu) {
     cpu.mem[sym::temp] = cpu.reg.a;
     cpu.flags.c = (cpu.reg.a & 1) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = (cpu.reg.a & 1) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = (cpu.reg.a & 1) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = (cpu.reg.a & 1) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x00 {
         cpu.reg.x = cpu.reg.a;
+        cpu.flags.z = cpu.reg.x == 0;
+        cpu.flags.n = (cpu.reg.x >> 7) != 0;
         cpu.reg.a = cpu.mem[(sym::digit2 + cpu.reg.x as usize) & 0xffff];
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
@@ -99,7 +109,11 @@ pub fn TIMELEFTMSG(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.a &= 0x0f;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.x = cpu.reg.a;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = cpu.mem[(sym::digit2 + cpu.reg.x as usize) & 0xffff];
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
@@ -225,6 +239,8 @@ pub fn CONTINUEMSG(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.a &= 0x01;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x00 {
         superim1(cpu);
         return;
@@ -312,6 +328,8 @@ pub fn DRAWKID(cpu: &mut Cpu) {
         return;
     }
     cpu.reg.a &= 0x01;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x00 {
         DrawNormal(cpu);
         return;
@@ -559,6 +577,8 @@ pub fn DRAWKIDMETER(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.x == 0;
                 cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 cpu.reg.a = cpu.reg.y;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.flags.c = false;
                 let _r = (cpu.reg.a as u16) + cpu.mem[sym::xsave] as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
@@ -839,6 +859,8 @@ pub fn DRAWOPPMETER(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.x == 0;
                 cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 cpu.reg.a = cpu.reg.y;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.flags.c = false;
                 let _r = (cpu.reg.a as u16) + cpu.mem[sym::xsave] as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
@@ -885,7 +907,11 @@ pub fn DRAWOPPMETER(cpu: &mut Cpu) {
 pub fn SETUPFLASK(cpu: &mut Cpu) {
     cpu.mem[sym::OFFSET] = 0x02;
     cpu.reg.a = cpu.reg.x;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.a &= 0xe0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     let _o: u8 = 0x00;
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
@@ -953,8 +979,14 @@ pub fn SETUPFLASK(cpu: &mut Cpu) {
             cpu.mem[sym::YCO] = cpu.reg.a;
         }
         cpu.reg.a = cpu.reg.x;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.a &= 0x1f;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.x = cpu.reg.a;
+        cpu.flags.z = cpu.reg.x == 0;
+        cpu.flags.n = (cpu.reg.x >> 7) != 0;
         let _o: u8 = 0x09;
         cpu.flags.c = cpu.reg.x >= _o;
         cpu.flags.z = cpu.reg.x == _o;
@@ -1050,12 +1082,16 @@ pub fn TWINKLE(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.a ^= 0x20;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::PAGE] = cpu.reg.a;
     crate::hires::fastlay(cpu);
     cpu.reg.a = cpu.mem[sym::PAGE];
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.a ^= 0x20;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::PAGE] = cpu.reg.a;
     return;
 }
@@ -1227,10 +1263,14 @@ pub fn ADDCHAROBJ(cpu: &mut Cpu) {
     cpu.mem[sym::XCO] = cpu.mem[sym::FCharX];
     cpu.mem[sym::OFFSET] = cpu.mem[sym::FCharX + 1];
     cpu.reg.a = cpu.reg.x;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     let tmp0 = cpu.reg.a;
     crate::ext::cvtx(cpu);
     cpu.reg.a = tmp0;
     cpu.reg.x = cpu.reg.a;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.mem[(sym::objX + cpu.reg.x as usize) & 0xffff] = cpu.mem[sym::XCO];
     cpu.mem[(sym::objOFF + cpu.reg.x as usize) & 0xffff] = cpu.mem[sym::OFFSET];
     cpu.mem[(sym::objY + cpu.reg.x as usize) & 0xffff] = cpu.mem[sym::FCharY];
@@ -1254,6 +1294,8 @@ pub fn SETOBJINDX(cpu: &mut Cpu) {
         return;
     }
     cpu.reg.x = cpu.reg.a;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x01;
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
@@ -1323,6 +1365,8 @@ pub fn _3adraw(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.x == 0;
     cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = cpu.reg.y;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + cpu.mem[sym::xsave] as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
@@ -1435,8 +1479,14 @@ pub fn _3asub(cpu: &mut Cpu) {
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
     }
     cpu.reg.a ^= cpu.mem[sym::FCharX];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.a ^= cpu.mem[sym::FCharFace];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.a &= 0x01;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x00 {
         let _v = cpu.mem[sym::FCharX].wrapping_add(1);
         cpu.mem[sym::FCharX] = _v;

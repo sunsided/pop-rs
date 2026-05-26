@@ -312,6 +312,8 @@ pub fn POTIONEFFECT(cpu: &mut Cpu) {
                     cpu.flags.z = cpu.reg.a == 0;
                     cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     cpu.reg.a ^= 0xff;
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     cpu.mem[sym::invert] = cpu.reg.a;
                     cpu.reg.a = 0x02;
                     cpu.flags.z = cpu.reg.a == 0;
@@ -547,6 +549,8 @@ pub fn UNHOLY(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.a |= cpu.mem[sym::CharID];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     let _o: u8 = 0x01;
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
@@ -620,8 +624,12 @@ pub fn REFLECTION(cpu: &mut Cpu) {
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = (cpu.reg.a >> 7) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shl(1);
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = (cpu.reg.a >> 7) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shl(1);
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + (0x01) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
@@ -753,6 +761,8 @@ pub fn getreflect(cpu: &mut Cpu) {
     cpu.flags.n = (cpu.reg.x >> 7) != 0;
     if (cpu.reg.x as i8) >= 0 {
         cpu.reg.a ^= 0xff;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.flags.c = false;
         let _r = (cpu.reg.a as u16) + (0x0e) as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;
@@ -772,6 +782,8 @@ pub fn getreflect(cpu: &mut Cpu) {
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = (cpu.reg.a >> 7) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shl(1);
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = true;
     let _r = (cpu.reg.a as u16) + (!cpu.mem[sym::CharX]) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
@@ -783,6 +795,8 @@ pub fn getreflect(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.a ^= 0xff;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::CharFace] = cpu.reg.a;
     return;
 }
@@ -816,6 +830,8 @@ pub fn DECSTR(cpu: &mut Cpu) {
             return;
         }
         cpu.reg.a ^= 0xff;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.flags.c = false;
         let _r = (cpu.reg.a as u16) + (0x01) as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;
@@ -830,6 +846,8 @@ pub fn DECSTR(cpu: &mut Cpu) {
         return;
     }
     cpu.reg.a ^= 0xff;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + (0x01) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
@@ -910,6 +928,8 @@ pub fn LOADLEVELX(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.y == 0;
     cpu.flags.n = (cpu.reg.y >> 7) != 0;
     cpu.reg.x = cpu.reg.a;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = tmp0;
     crate::ext::loadlevel(cpu);
     return;
@@ -1013,6 +1033,8 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a &= cpu.mem[sym::ShadLife];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if (cpu.reg.a as i8) >= 0 {
                     crate::ext::_5dsafe(cpu);
                     return;
@@ -1108,6 +1130,8 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
             }
             11 => {
                 cpu.reg.x = cpu.reg.a;
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 cpu.reg.a = cpu.mem[0x00f0];
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
@@ -1348,6 +1372,8 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
             35 => {
                 crate::ext::getblockxp(cpu);
                 cpu.reg.x = cpu.reg.a;
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 cpu.reg.y = cpu.mem[sym::KidBlockY];
                 cpu.flags.z = cpu.reg.y == 0;
                 cpu.flags.n = (cpu.reg.y >> 7) != 0;
@@ -1463,6 +1489,8 @@ pub fn DISPVERSION(cpu: &mut Cpu) {
 pub fn _3ardblock(cpu: &mut Cpu) {
     crate::ext::getblockxp(cpu);
     cpu.reg.x = cpu.reg.a;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.y = cpu.mem[sym::KidBlockY];
     cpu.flags.z = cpu.reg.y == 0;
     cpu.flags.n = (cpu.reg.y >> 7) != 0;

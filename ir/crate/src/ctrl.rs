@@ -370,6 +370,8 @@ pub fn fallon(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.a &= cpu.mem[sym::CharLife];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if (cpu.reg.a as i8) >= 0 {
         return;
     }
@@ -451,6 +453,8 @@ pub fn onground(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a &= 0x40;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a == 0x00 {
                     pc = 27;
                 } else {
@@ -1146,6 +1150,8 @@ pub fn InsideBlock(cpu: &mut Cpu) {
         if cpu.reg.a != 0x14 {
             crate::ext::getdist(cpu);
             cpu.reg.a ^= 0xff;
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             cpu.flags.c = false;
             let _r = (cpu.reg.a as u16) + (0x08) as u16 + (cpu.flags.c as u16);
             cpu.reg.a = _r as u8;
@@ -1161,6 +1167,8 @@ pub fn InsideBlock(cpu: &mut Cpu) {
             cpu.flags.z = cpu.reg.a == 0;
             cpu.flags.n = (cpu.reg.a >> 7) != 0;
             cpu.reg.a ^= 0xff;
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             cpu.flags.c = false;
             let _r = (cpu.reg.a as u16) + (0x08) as u16 + (cpu.flags.c as u16);
             cpu.reg.a = _r as u8;
@@ -2149,8 +2157,12 @@ pub fn standing(cpu: &mut Cpu) {
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.flags.c = (cpu.reg.a & 1) != 0;
                 cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.flags.c = (cpu.reg.a & 1) != 0;
                 cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 let _o: u8 = 0x06;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -2204,8 +2216,12 @@ pub fn standing(cpu: &mut Cpu) {
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.flags.c = (cpu.reg.a & 1) != 0;
         cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.flags.c = (cpu.reg.a & 1) != 0;
         cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = 0x1e;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -2450,8 +2466,12 @@ pub fn hanging(cpu: &mut Cpu) {
                             cpu.flags.n = (cpu.reg.a >> 7) != 0;
                             cpu.flags.c = (cpu.reg.a & 1) != 0;
                             cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+                            cpu.flags.z = cpu.reg.a == 0;
+                            cpu.flags.n = (cpu.reg.a >> 7) != 0;
                             cpu.flags.c = (cpu.reg.a & 1) != 0;
                             cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+                            cpu.flags.z = cpu.reg.a == 0;
+                            cpu.flags.n = (cpu.reg.a >> 7) != 0;
                             let _o: u8 = 0x06;
                             cpu.flags.c = cpu.reg.a >= _o;
                             cpu.flags.z = cpu.reg.a == _o;
@@ -2856,6 +2876,8 @@ pub fn DoRunjump(cpu: &mut Cpu) {
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::blockx] = cpu.reg.a;
                 cpu.reg.x = cpu.reg.a;
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 cpu.reg.y = cpu.mem[sym::CharBlockY];
                 cpu.flags.z = cpu.reg.y == 0;
                 cpu.flags.n = (cpu.reg.y >> 7) != 0;
@@ -3087,6 +3109,8 @@ pub fn DoJumphigh(cpu: &mut Cpu) {
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::getblockx(cpu);
     cpu.reg.x = cpu.reg.a;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.y = cpu.mem[sym::CharBlockY];
     cpu.flags.z = cpu.reg.y == 0;
     cpu.flags.n = (cpu.reg.y >> 7) != 0;
@@ -3202,6 +3226,8 @@ pub fn CHECKPRESS(cpu: &mut Cpu) {
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.a &= 0x40;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if cpu.reg.a == 0x00 {
             return;
         }
@@ -3418,14 +3444,24 @@ pub fn PickItUp(cpu: &mut Cpu) {
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.flags.c = (cpu.reg.a & 1) != 0;
         cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.flags.c = (cpu.reg.a & 1) != 0;
         cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.flags.c = (cpu.reg.a & 1) != 0;
         cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.flags.c = (cpu.reg.a & 1) != 0;
         cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.flags.c = (cpu.reg.a & 1) != 0;
         cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         crate::ext::RemoveObj(cpu);
         cpu.reg.a = 0x4e;  // pick up & drink potion
         cpu.flags.z = cpu.reg.a == 0;

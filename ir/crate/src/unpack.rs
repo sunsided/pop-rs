@@ -319,6 +319,8 @@ pub fn SNGEXPAND(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a |= 0x80;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[((cpu.mem[sym::PIC] as usize | (cpu.mem[sym::PIC + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
                 let _v = cpu.mem[sym::PAC].wrapping_add(1);
                 cpu.mem[sym::PAC] = _v;
@@ -350,6 +352,8 @@ pub fn SNGEXPAND(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a |= 0x80;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[((cpu.mem[sym::PIC] as usize | (cpu.mem[sym::PIC + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
                 let _v = cpu.mem[sym::V9].wrapping_sub(1);
                 cpu.mem[sym::V9] = _v;
@@ -455,6 +459,8 @@ pub fn DeltaExp(cpu: &mut Cpu) {
             2 => {
                 cpu.mem[sym::ByteHld] = cpu.reg.a;
                 cpu.reg.a &= 0x80;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a == 0x00 {
                     pc = 10;
                 } else {
@@ -466,6 +472,8 @@ pub fn DeltaExp(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a &= 0x7f;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a == 0x00 {
                     pc = 7;
                 } else {
@@ -474,6 +482,8 @@ pub fn DeltaExp(cpu: &mut Cpu) {
             }
             4 => {
                 cpu.reg.x = cpu.reg.a;
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 cpu.reg.y = 0x01;
                 cpu.flags.z = cpu.reg.y == 0;
                 cpu.flags.n = (cpu.reg.y >> 7) != 0;
@@ -612,6 +622,8 @@ pub fn ExpandClm(cpu: &mut Cpu) {
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::ByteHld] = cpu.reg.a;
     cpu.reg.a &= 0x80;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x00 {
         cpu.reg.a = cpu.mem[sym::ByteHld];
         cpu.flags.z = cpu.reg.a == 0;
@@ -638,10 +650,14 @@ pub fn ExpandClm(cpu: &mut Cpu) {
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.x = cpu.reg.a;
+        cpu.flags.z = cpu.reg.x == 0;
+        cpu.flags.n = (cpu.reg.x >> 7) != 0;
         cpu.reg.a = cpu.mem[sym::ByteHld];
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.a &= 0x7f;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         ExpClmSeq(cpu);
         cpu.flags.c = false;
         cpu.reg.a = cpu.mem[sym::CrnDatPtr];
@@ -762,11 +778,19 @@ pub fn PutScrByte(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.a |= 0x20;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::ScrBasPtr + 1] = cpu.reg.a;
     cpu.reg.a = cpu.reg.x;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = (cpu.reg.a & 1) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.y = cpu.reg.a;
+    cpu.flags.z = cpu.reg.y == 0;
+    cpu.flags.n = (cpu.reg.y >> 7) != 0;
     if !cpu.flags.c {
         cpu.mem[sym::RAMWRTaux] = cpu.reg.a;
     }
@@ -941,7 +965,11 @@ pub fn INVERTY(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a |= cpu.mem[0xc061];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a |= cpu.mem[0xc062];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if (cpu.reg.a as i8) >= 0 {
                     pc = 9;
                 } else {
@@ -1030,7 +1058,11 @@ pub fn PROMPT(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a |= cpu.mem[0xc061];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a |= cpu.mem[0xc062];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if (cpu.reg.a as i8) >= 0 {
                     pc = 6;
                 } else {

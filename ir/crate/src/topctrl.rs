@@ -32,6 +32,8 @@ pub fn INITSYSTEM(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.x == 0;
     cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = cpu.reg.x;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     loop {
         cpu.mem[(0x0000 + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
         let _v = cpu.reg.x.wrapping_add(1);
@@ -462,8 +464,12 @@ pub fn setupshad(cpu: &mut Cpu) {
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = (cpu.reg.a >> 7) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shl(1);
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = (cpu.reg.a >> 7) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shl(1);
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + (0x01) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
@@ -719,6 +725,8 @@ pub fn ctrlplayer(cpu: &mut Cpu) {
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.a |= cpu.mem[sym::SecLeft];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if cpu.reg.a != 0x00 {
             cpu.reg.a = cpu.mem[sym::message];
             cpu.flags.z = cpu.reg.a == 0;
@@ -766,6 +774,8 @@ pub fn ctrlplayer(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a |= cpu.mem[sym::BTN1];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if (cpu.reg.a as i8) >= 0 {
                     return;
                 }
@@ -916,6 +926,8 @@ pub fn chgmeters(cpu: &mut Cpu) {
             cpu.flags.z = cpu.reg.a == 0;
             cpu.flags.n = (cpu.reg.a >> 7) != 0;
             cpu.reg.a |= cpu.mem[sym::CharID];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             if cpu.reg.a == 0x01 {
                 cpu.reg.a = cpu.mem[sym::ChgKidStr];
                 cpu.flags.z = cpu.reg.a == 0;
@@ -991,6 +1003,8 @@ pub fn entrance(cpu: &mut Cpu) {
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.a &= 0x1f;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = 0x10;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -1081,6 +1095,8 @@ pub fn dispmsg(cpu: &mut Cpu) {
         return;
     }
     cpu.reg.a &= 0x07;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a >= 0x03 {
         return;
     }
@@ -1237,7 +1253,11 @@ pub fn wtlessflash(cpu: &mut Cpu) {
             cpu.flags.z = cpu.reg.a == 0;
             cpu.flags.n = (cpu.reg.a >> 7) != 0;
             cpu.reg.a ^= 0xff;
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             cpu.reg.x = cpu.reg.a;
+            cpu.flags.z = cpu.reg.x == 0;
+            cpu.flags.n = (cpu.reg.x >> 7) != 0;
         }
     }
     cpu.mem[sym::vibes] = cpu.reg.x;

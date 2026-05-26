@@ -643,6 +643,8 @@ impl Cpu {
                 }
                 6 => {
                     self.reg.a |= 0x20;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     let _o: u8 = self.mem[(sym::keybuf + self.reg.x as usize) & 0xffff];
                     self.flags.c = self.reg.a >= _o;
                     self.flags.z = self.reg.a == _o;
@@ -706,6 +708,8 @@ impl Cpu {
                 return;
             }
             self.reg.a |= 0x80;
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
         }
         'b6: {
             let _o: u8 = 0x6a;
@@ -1117,6 +1121,8 @@ impl Cpu {
                 self.flags.z = self.reg.a == 0;
                 self.flags.n = (self.reg.a >> 7) != 0;
                 self.reg.a |= self.mem[0xc062];
+                self.flags.z = self.reg.a == 0;
+                self.flags.n = (self.reg.a >> 7) != 0;
                 if (self.reg.a as i8) >= 0 {
                     self.reg.a = self.mem[sym::keypress];
                     self.flags.z = self.reg.a == 0;
@@ -1211,6 +1217,8 @@ impl Cpu {
                     self.flags.z = self.reg.a == 0;
                     self.flags.n = (self.reg.a >> 7) != 0;
                     self.reg.a &= 0x1f;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     let _o: u8 = 0x13;
                     self.flags.c = self.reg.a >= _o;
                     self.flags.z = self.reg.a == _o;
@@ -1227,14 +1235,20 @@ impl Cpu {
                     self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::BOTCUT] = self.reg.a;
                     self.reg.a = self.reg.y;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.stack.push(self.reg.a);
                     self.unindex();
                     self.stack.push(self.reg.a);
                     self.reg.a = self.reg.x;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.reg.x = self.mem[0x00f0];
                     self.flags.z = self.reg.x == 0;
                     self.flags.n = (self.reg.x >> 7) != 0;
                     self.reg.y = self.reg.a;
+                    self.flags.z = self.reg.y == 0;
+                    self.flags.n = (self.reg.y >> 7) != 0;
                     self.reg.a = self.mem[(sym::BlockBot + 1 + self.reg.y as usize) & 0xffff];
                     self.flags.z = self.reg.a == 0;
                     self.flags.n = (self.reg.a >> 7) != 0;
@@ -1271,13 +1285,19 @@ impl Cpu {
                 8 => {
                     self.flags.c = (self.reg.a >> 7) != 0;
                     self.reg.a = self.reg.a.wrapping_shl(1);
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.flags.c = (self.reg.a >> 7) != 0;
                     self.reg.a = self.reg.a.wrapping_shl(1);
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[(sym::torchx + self.reg.x as usize) & 0xffff] = self.reg.a;
                     self.reg.a = self.stack.pop().expect("pla on empty stack");
                     self.flags.z = self.reg.a == 0;
                     self.flags.n = (self.reg.a >> 7) != 0;
                     self.reg.y = self.reg.a;
+                    self.flags.z = self.reg.y == 0;
+                    self.flags.n = (self.reg.y >> 7) != 0;
                     self.reg.a = self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff];
                     self.flags.z = self.reg.a == 0;
                     self.flags.n = (self.reg.a >> 7) != 0;
@@ -1328,6 +1348,8 @@ impl Cpu {
         self.getflameframe();
         self.mem[(sym::torchstate + self.reg.x as usize) & 0xffff] = self.reg.a;
         self.reg.x = self.reg.a;
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         self.setupflame();
         self.reg.a = self.mem[sym::BOTCUT];
         self.flags.z = self.reg.a == 0;
@@ -1672,6 +1694,8 @@ impl Cpu {
                                                             self.flags.z = self.reg.a == 0;
                                                             self.flags.n = (self.reg.a >> 7) != 0;
                                                             self.reg.a ^= 0xff;
+                                                            self.flags.z = self.reg.a == 0;
+                                                            self.flags.n = (self.reg.a >> 7) != 0;
                                                             self.mem[sym::ManCtrl] = self.reg.a;
                                                             return;
                                                         }
@@ -1790,6 +1814,8 @@ impl Cpu {
             self.flags.z = self.reg.a == 0;
             self.flags.n = (self.reg.a >> 7) != 0;
             self.reg.a ^= 0xff;
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.mem[sym::blackflag] = self.reg.a;
             return;
         }
@@ -1878,6 +1904,8 @@ impl Cpu {
                     self.mem[0x00f2] = self.reg.a;
                     self.flags.d = true;
                     self.reg.a = self.reg.y;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.flags.c = true;
                     let _r = (self.reg.a as u16) + (!0x01_u8) as u16 + (self.flags.c as u16);
                     self.reg.a = _r as u8;
@@ -1886,6 +1914,8 @@ impl Cpu {
                     self.flags.n = (self.reg.a >> 7) != 0;
                     self.flags.d = false;
                     self.reg.y = self.reg.a;
+                    self.flags.z = self.reg.y == 0;
+                    self.flags.n = (self.reg.y >> 7) != 0;
                     if (self.reg.y as i8) >= 0 {
                         pc = 1;
                     } else {

@@ -527,6 +527,8 @@ pub fn checkcode(cpu: &mut Cpu) {
             }
             6 => {
                 cpu.reg.a |= 0x20;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 let _o: u8 = cpu.mem[(sym::keybuf + cpu.reg.x as usize) & 0xffff];
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -590,6 +592,8 @@ pub fn KREAD(cpu: &mut Cpu) {
             return;
         }
         cpu.reg.a |= 0x80;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
     }
     'b6: {
         let _o: u8 = 0x6a;
@@ -1001,6 +1005,8 @@ pub fn DEMOKEYS(cpu: &mut Cpu) {
             cpu.flags.z = cpu.reg.a == 0;
             cpu.flags.n = (cpu.reg.a >> 7) != 0;
             cpu.reg.a |= cpu.mem[0xc062];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             if (cpu.reg.a as i8) >= 0 {
                 cpu.reg.a = cpu.mem[sym::keypress];
                 cpu.flags.z = cpu.reg.a == 0;
@@ -1095,6 +1101,8 @@ pub fn LISTTORCHES(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a &= 0x1f;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 let _o: u8 = 0x13;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -1111,14 +1119,20 @@ pub fn LISTTORCHES(cpu: &mut Cpu) {
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::BOTCUT] = cpu.reg.a;
                 cpu.reg.a = cpu.reg.y;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.stack.push(cpu.reg.a);
                 crate::ext::unindex(cpu);
                 cpu.stack.push(cpu.reg.a);
                 cpu.reg.a = cpu.reg.x;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.x = cpu.mem[0x00f0];
                 cpu.flags.z = cpu.reg.x == 0;
                 cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 cpu.reg.y = cpu.reg.a;
+                cpu.flags.z = cpu.reg.y == 0;
+                cpu.flags.n = (cpu.reg.y >> 7) != 0;
                 cpu.reg.a = cpu.mem[(sym::BlockBot + 1 + cpu.reg.y as usize) & 0xffff];
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
@@ -1155,13 +1169,19 @@ pub fn LISTTORCHES(cpu: &mut Cpu) {
             8 => {
                 cpu.flags.c = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a = cpu.reg.a.wrapping_shl(1);
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.flags.c = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a = cpu.reg.a.wrapping_shl(1);
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[(sym::torchx + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
                 cpu.reg.a = cpu.stack.pop().expect("pla on empty stack");
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.y = cpu.reg.a;
+                cpu.flags.z = cpu.reg.y == 0;
+                cpu.flags.n = (cpu.reg.y >> 7) != 0;
                 cpu.reg.a = cpu.mem[((cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff];
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
@@ -1212,6 +1232,8 @@ pub fn BURN(cpu: &mut Cpu) {
     crate::ext::getflameframe(cpu);
     cpu.mem[(sym::torchstate + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
     cpu.reg.x = cpu.reg.a;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     crate::ext::setupflame(cpu);
     cpu.reg.a = cpu.mem[sym::BOTCUT];
     cpu.flags.z = cpu.reg.a == 0;
@@ -1556,6 +1578,8 @@ pub fn TempDevel(cpu: &mut Cpu) {
                                                         cpu.flags.z = cpu.reg.a == 0;
                                                         cpu.flags.n = (cpu.reg.a >> 7) != 0;
                                                         cpu.reg.a ^= 0xff;
+                                                        cpu.flags.z = cpu.reg.a == 0;
+                                                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                                                         cpu.mem[sym::ManCtrl] = cpu.reg.a;
                                                         return;
                                                     }
@@ -1674,6 +1698,8 @@ pub fn TempDevel(cpu: &mut Cpu) {
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.a ^= 0xff;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::blackflag] = cpu.reg.a;
         return;
     }
@@ -1762,6 +1788,8 @@ pub fn _3asub(cpu: &mut Cpu) {
                 cpu.mem[0x00f2] = cpu.reg.a;
                 cpu.flags.d = true;
                 cpu.reg.a = cpu.reg.y;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.flags.c = true;
                 let _r = (cpu.reg.a as u16) + (!0x01_u8) as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
@@ -1770,6 +1798,8 @@ pub fn _3asub(cpu: &mut Cpu) {
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.flags.d = false;
                 cpu.reg.y = cpu.reg.a;
+                cpu.flags.z = cpu.reg.y == 0;
+                cpu.flags.n = (cpu.reg.y >> 7) != 0;
                 if (cpu.reg.y as i8) >= 0 {
                     pc = 1;
                 } else {

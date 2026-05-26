@@ -1553,6 +1553,8 @@ pub fn updateguard(cpu: &mut Cpu) {
         cpu.mem[sym::tempblocky] = cpu.reg.a;
         crate::ext::indexblock(cpu);
         cpu.reg.a = cpu.reg.y;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.x = cpu.mem[sym::ShadScrn];
         cpu.flags.z = cpu.reg.x == 0;
         cpu.flags.n = (cpu.reg.x >> 7) != 0;
@@ -2486,6 +2488,8 @@ pub fn ADDGUARD(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.x == 0;
     cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a ^= cpu.mem[(sym::specialcolor + cpu.reg.x as usize) & 0xffff];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::GuardColor] = cpu.reg.a;
     crate::ext::SaveShad(cpu);
     return;
@@ -2635,6 +2639,8 @@ pub fn _3anot5(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.x == 0;
     cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a ^= cpu.mem[(sym::specialcolor + cpu.reg.x as usize) & 0xffff];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::GuardColor] = cpu.reg.a;
     crate::ext::SaveShad(cpu);
     return;

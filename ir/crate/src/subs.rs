@@ -101,6 +101,8 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.a &= 0x1f;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = 0x13;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -118,6 +120,8 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                 if cpu.reg.a != 0x16 {
                 } else {
                     cpu.reg.a = cpu.reg.y;
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     let tmp0 = cpu.reg.a;
                     cpu.reg.a = cpu.mem[sym::VisScrn];
                     cpu.flags.z = cpu.reg.a == 0;
@@ -125,9 +129,13 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                     crate::ext::trigsword(cpu);
                     cpu.reg.a = tmp0;
                     cpu.reg.y = cpu.reg.a;
+                    cpu.flags.z = cpu.reg.y == 0;
+                    cpu.flags.n = (cpu.reg.y >> 7) != 0;
                 }
             } else {
                 cpu.reg.a = cpu.reg.y;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 let tmp2 = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::VisScrn];
                 cpu.flags.z = cpu.reg.a == 0;
@@ -135,6 +143,8 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                 crate::ext::trigflask(cpu);
                 cpu.reg.a = tmp2;
                 cpu.reg.y = cpu.reg.a;
+                cpu.flags.z = cpu.reg.y == 0;
+                cpu.flags.n = (cpu.reg.y >> 7) != 0;
                 if (cpu.reg.y as i8) >= 0 {
                 } else {
                     let _o: u8 = 0x16;
@@ -144,6 +154,8 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                     if cpu.reg.a != 0x16 {
                     } else {
                         cpu.reg.a = cpu.reg.y;
+                        cpu.flags.z = cpu.reg.a == 0;
+                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                         let tmp1 = cpu.reg.a;
                         cpu.reg.a = cpu.mem[sym::VisScrn];
                         cpu.flags.z = cpu.reg.a == 0;
@@ -151,11 +163,15 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                         crate::ext::trigsword(cpu);
                         cpu.reg.a = tmp1;
                         cpu.reg.y = cpu.reg.a;
+                        cpu.flags.z = cpu.reg.y == 0;
+                        cpu.flags.n = (cpu.reg.y >> 7) != 0;
                     }
                 }
             }
         } else {
             cpu.reg.a = cpu.reg.y;
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             let tmp6 = cpu.reg.a;
             cpu.reg.a = cpu.mem[sym::VisScrn];
             cpu.flags.z = cpu.reg.a == 0;
@@ -163,6 +179,8 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
             crate::ext::trigtorch(cpu);
             cpu.reg.a = tmp6;
             cpu.reg.y = cpu.reg.a;
+            cpu.flags.z = cpu.reg.y == 0;
+            cpu.flags.n = (cpu.reg.y >> 7) != 0;
             if (cpu.reg.y as i8) >= 0 {
             } else {
                 let _o: u8 = 0x0a;
@@ -177,6 +195,8 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                     if cpu.reg.a != 0x16 {
                     } else {
                         cpu.reg.a = cpu.reg.y;
+                        cpu.flags.z = cpu.reg.a == 0;
+                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                         let tmp3 = cpu.reg.a;
                         cpu.reg.a = cpu.mem[sym::VisScrn];
                         cpu.flags.z = cpu.reg.a == 0;
@@ -184,9 +204,13 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                         crate::ext::trigsword(cpu);
                         cpu.reg.a = tmp3;
                         cpu.reg.y = cpu.reg.a;
+                        cpu.flags.z = cpu.reg.y == 0;
+                        cpu.flags.n = (cpu.reg.y >> 7) != 0;
                     }
                 } else {
                     cpu.reg.a = cpu.reg.y;
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     let tmp5 = cpu.reg.a;
                     cpu.reg.a = cpu.mem[sym::VisScrn];
                     cpu.flags.z = cpu.reg.a == 0;
@@ -194,6 +218,8 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                     crate::ext::trigflask(cpu);
                     cpu.reg.a = tmp5;
                     cpu.reg.y = cpu.reg.a;
+                    cpu.flags.z = cpu.reg.y == 0;
+                    cpu.flags.n = (cpu.reg.y >> 7) != 0;
                     if (cpu.reg.y as i8) >= 0 {
                     } else {
                         let _o: u8 = 0x16;
@@ -203,6 +229,8 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                         if cpu.reg.a != 0x16 {
                         } else {
                             cpu.reg.a = cpu.reg.y;
+                            cpu.flags.z = cpu.reg.a == 0;
+                            cpu.flags.n = (cpu.reg.a >> 7) != 0;
                             let tmp4 = cpu.reg.a;
                             cpu.reg.a = cpu.mem[sym::VisScrn];
                             cpu.flags.z = cpu.reg.a == 0;
@@ -210,6 +238,8 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                             crate::ext::trigsword(cpu);
                             cpu.reg.a = tmp4;
                             cpu.reg.y = cpu.reg.a;
+                            cpu.flags.z = cpu.reg.y == 0;
+                            cpu.flags.n = (cpu.reg.y >> 7) != 0;
                         }
                     }
                 }
@@ -304,6 +334,8 @@ pub fn ADDSLICERS(cpu: &mut Cpu) {
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.y = cpu.reg.a;
+        cpu.flags.z = cpu.reg.y == 0;
+        cpu.flags.n = (cpu.reg.y >> 7) != 0;
         cpu.flags.c = false;
         let _r = (cpu.reg.a as u16) + (0x0a) as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;
@@ -316,6 +348,8 @@ pub fn ADDSLICERS(cpu: &mut Cpu) {
             cpu.flags.z = cpu.reg.a == 0;
             cpu.flags.n = (cpu.reg.a >> 7) != 0;
             cpu.reg.a &= 0x1f;
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             let _o: u8 = 0x12;
             cpu.flags.c = cpu.reg.a >= _o;
             cpu.flags.z = cpu.reg.a == _o;
@@ -326,11 +360,21 @@ pub fn ADDSLICERS(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.x = cpu.reg.a;
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 cpu.reg.a &= 0x7f;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a == 0x00 {
                     cpu.reg.a = cpu.reg.x;
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     cpu.reg.a &= 0x80;
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     cpu.reg.a |= cpu.mem[sym::tempstate];
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     crate::ext::trigslicer(cpu);
                     getnextstate(cpu);
                 } else {
@@ -341,8 +385,14 @@ pub fn ADDSLICERS(cpu: &mut Cpu) {
                     if cpu.reg.a < 0x06 {
                     } else {
                         cpu.reg.a = cpu.reg.x;
+                        cpu.flags.z = cpu.reg.a == 0;
+                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                         cpu.reg.a &= 0x80;
+                        cpu.flags.z = cpu.reg.a == 0;
+                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                         cpu.reg.a |= cpu.mem[sym::tempstate];
+                        cpu.flags.z = cpu.reg.a == 0;
+                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                         crate::ext::trigslicer(cpu);
                         getnextstate(cpu);
                     }
@@ -412,6 +462,8 @@ pub fn pburn(cpu: &mut Cpu) {
     crate::ext::getflameframe(cpu);
     cpu.mem[(sym::ptorchstate + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
     cpu.reg.x = cpu.reg.a;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     crate::ext::psetupflame(cpu);
     crate::hires::lay(cpu);
     return;
@@ -458,10 +510,14 @@ pub fn pstars(cpu: &mut Cpu) {
             if !cpu.flags.z {
             } else {
                 cpu.reg.a = cpu.reg.x;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 let tmp0 = cpu.reg.a;
                 crate::ext::twinkle(cpu);
                 cpu.reg.a = tmp0;
                 cpu.reg.x = cpu.reg.a;
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
             }
         }
         let _v = cpu.reg.x.wrapping_sub(1);
@@ -482,6 +538,8 @@ pub fn pstars(cpu: &mut Cpu) {
     }
     crate::ext::rnd(cpu);
     cpu.reg.a &= 0x03;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + (0x05) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
@@ -492,7 +550,11 @@ pub fn pstars(cpu: &mut Cpu) {
     crate::ext::rnd(cpu);
     crate::ext::rnd(cpu);
     cpu.reg.a &= 0x03;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.x = cpu.reg.a;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = tmp1;
     cpu.mem[(sym::pstarcount + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
     crate::ext::twinkle(cpu);
@@ -541,6 +603,8 @@ pub fn PLAYCUT(cpu: &mut Cpu) {
     initit(cpu);
     cpu.reg.a = tmp0;
     cpu.reg.x = cpu.reg.a;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     PlayCut4(cpu);
     return;
 }
@@ -961,10 +1025,14 @@ pub fn PlaySongX(cpu: &mut Cpu) {
         match pc {
             0 => {
                 cpu.reg.y = cpu.reg.a;
+                cpu.flags.z = cpu.reg.y == 0;
+                cpu.flags.n = (cpu.reg.y >> 7) != 0;
                 cpu.reg.a = cpu.mem[sym::soundon];
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a &= cpu.mem[sym::musicon];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a != 0x00 {
                     pc = 2;
                 } else {
@@ -973,11 +1041,15 @@ pub fn PlaySongX(cpu: &mut Cpu) {
             }
             1 => {
                 cpu.reg.a = cpu.reg.x;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 play(cpu);
                 return;
             }
             2 => {
                 cpu.reg.a = cpu.reg.y;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 pc = 3;
             }
             3 => {
@@ -994,7 +1066,11 @@ pub fn PlaySongX(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a |= cpu.mem[0xc062];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a |= cpu.mem[sym::keypress];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if (cpu.reg.a as i8) < 0 {
                     pc = 6;
                 } else {
@@ -1043,7 +1119,11 @@ pub fn PlaySong(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a |= cpu.mem[0xc062];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a |= cpu.mem[sym::keypress];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if (cpu.reg.a as i8) < 0 {
                     pc = 3;
                 } else {
@@ -1080,10 +1160,14 @@ pub fn PlaySongI(cpu: &mut Cpu) {
         match pc {
             0 => {
                 cpu.reg.y = cpu.reg.a;
+                cpu.flags.z = cpu.reg.y == 0;
+                cpu.flags.n = (cpu.reg.y >> 7) != 0;
                 cpu.reg.a = cpu.mem[sym::soundon];
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a &= cpu.mem[sym::musicon];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a != 0x00 {
                     pc = 3;
                 } else {
@@ -1092,6 +1176,8 @@ pub fn PlaySongI(cpu: &mut Cpu) {
             }
             1 => {
                 cpu.reg.a = cpu.reg.x;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a == 0x00 {
                     pc = 8;
                 } else {
@@ -1104,6 +1190,8 @@ pub fn PlaySongI(cpu: &mut Cpu) {
             }
             3 => {
                 cpu.reg.a = cpu.reg.y;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 crate::ext::minit(cpu);
                 swpage(cpu);
                 pc = 4;
@@ -1156,6 +1244,8 @@ pub fn swpage(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.a ^= 0x20;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::PAGE] = cpu.reg.a;
     return;
 }
@@ -1233,7 +1323,11 @@ pub fn play(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a |= cpu.mem[0xc062];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a |= cpu.mem[sym::keypress];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if (cpu.reg.a as i8) < 0 {
                     pc = 9;
                 } else {
@@ -1296,7 +1390,11 @@ pub fn playloop(cpu: &mut Cpu) {
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.a |= cpu.mem[0xc062];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.a |= cpu.mem[sym::keypress];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if (cpu.reg.a as i8) < 0 {
             return;
         }
@@ -1801,6 +1899,8 @@ pub fn SHOWTIME(cpu: &mut Cpu) {
 pub fn ADDLOWERSOUND(cpu: &mut Cpu) {
     cpu.flags.c = (cpu.reg.a & 1) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if !cpu.flags.c {
         return;
     }
@@ -2011,6 +2111,8 @@ pub fn STARTKID(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.a ^= 0xff;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::CharFace] = cpu.reg.a;
     cpu.reg.a = cpu.mem[sym::origstrength];
     cpu.flags.z = cpu.reg.a == 0;
@@ -2336,7 +2438,11 @@ pub fn _3atrigloose(cpu: &mut Cpu) {
     }
     crate::ext::rnd(cpu);
     cpu.reg.a &= 0x0f;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.a ^= 0xff;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + (0x01) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;

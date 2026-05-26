@@ -28,15 +28,27 @@ pub fn entry(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.x == 0;
     cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = cpu.reg.x;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = (cpu.reg.a & 1) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = (cpu.reg.a & 1) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = (cpu.reg.a & 1) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = (cpu.reg.a & 1) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shr(1);
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.a |= 0xc0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.local.insert((":rdsect", 2), cpu.reg.a);
     cpu.reg.a = 0x0f;
     cpu.flags.z = cpu.reg.a == 0;
@@ -102,6 +114,8 @@ pub fn CHECKER(cpu: &mut Cpu) {
         if cpu.reg.a == 0xee {
             cpu.flags.c = (cpu.mem[0x0c00] >> 7) != 0;
             cpu.mem[0x0c00] = cpu.mem[0x0c00].wrapping_shl(1);
+            cpu.flags.z = cpu.mem[0x0c00] == 0;
+            cpu.flags.n = (cpu.mem[0x0c00] >> 7) != 0;
             cpu.reg.a = cpu.mem[0x0800];
             cpu.flags.z = cpu.reg.a == 0;
             cpu.flags.n = (cpu.reg.a >> 7) != 0;

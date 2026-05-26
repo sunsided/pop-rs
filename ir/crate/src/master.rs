@@ -1356,10 +1356,14 @@ pub fn PlaySongI(cpu: &mut Cpu) {
             }
             1 => {
                 cpu.reg.y = cpu.reg.a;
+                cpu.flags.z = cpu.reg.y == 0;
+                cpu.flags.n = (cpu.reg.y >> 7) != 0;
                 cpu.reg.a = cpu.mem[sym::musicon];
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a &= cpu.mem[sym::soundon];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a == 0x00 {
                     pc = 5;
                 } else {
@@ -1368,6 +1372,8 @@ pub fn PlaySongI(cpu: &mut Cpu) {
             }
             2 => {
                 cpu.reg.a = cpu.reg.y;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 crate::ext::xminit(cpu);
                 pc = 7;
             }
@@ -1389,6 +1395,8 @@ pub fn PlaySongI(cpu: &mut Cpu) {
             }
             5 => {
                 cpu.reg.a = cpu.reg.x;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 pc = 6;
             }
             6 => {
