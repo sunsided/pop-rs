@@ -1,0 +1,21 @@
+# Differential-test harness: runs a lifted routine from the generated
+# `pop` crate so its final CPU state can be compared against the IR
+# interpreter. Not part of the game; a tooling/validation crate.
+[package]
+name = "pop-difftest"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Differential-test harness for the lifted POP crate."
+
+[lints]
+workspace = true
+
+[dependencies]
+pop = { path = "../../ir/crate" }
+
+[[bin]]
+name = "diffrun"
+path = "src/main.rs"

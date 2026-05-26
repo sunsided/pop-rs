@@ -3,5 +3,16 @@
 version = 3
 
 [[package]]
+name = "pop"
+version = "0.0.0"
+
+[[package]]
+name = "pop-difftest"
+version = "0.0.0"
+dependencies = [
+ "pop",
+]
+
+[[package]]
 name = "pop-rs"
 version = "0.0.0"
