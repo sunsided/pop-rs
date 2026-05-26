@@ -335,7 +335,21 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
         callee = _resolve(modules, aliases, stmt.target)
         if callee is None:
             raise InterpError(f"call target {stmt.target!r} not found")
-        _exec_routine(callee, modules, aliases, trace)
+        # A `jsr` establishes a return boundary. If the callee tail-calls
+        # (`jmp X`), X's `rts` returns to *this* caller — not further up —
+        # so resolve the tail-call chain inside the call frame rather than
+        # letting the signal unwind to the top-level loop (which would
+        # abandon the rest of this routine). Mirrors `run`'s tail loop.
+        while True:
+            try:
+                _exec_routine(callee, modules, aliases, trace)
+                break
+            except _TailCallSignal as tc:
+                callee = _resolve(modules, aliases, tc.target)
+                if callee is None:
+                    raise InterpError(
+                        f"tail-call target {tc.target!r} not found in any module"
+                    )
         return
     if isinstance(stmt, TailCallStmt):
         raise _TailCallSignal(stmt.target)
