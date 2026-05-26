@@ -43,6 +43,7 @@ _PILOTS = [
     ("ctrl", "CHECKFLOOR"),
     ("ctrlsubs", "GETLEFT"),
     ("ctrlsubs", "INDEXBLOCK"),
+    ("ctrlsubs", "GETDIST"),  # exercises jsr-then-callee-tail-call
     ("frameadv", "getprev"),
     ("gamebg", "getlevelno"),
     ("grafix", "RND"),
