@@ -6,17 +6,14 @@ from __future__ import annotations
 from pop_lifter.pass0_parse import parse_files
 
 
-# Reasons we expect a Pass 0 diagnostic on a given source location. All
-# of these are deferred to a later pass that tracks the location counter
-# and parses code-label declarations, or describe conditional includes
-# that are not present in this build configuration.
+# Reasons we expect a Pass 0 diagnostic on a given source location. The
+# location-counter equates (`*`-relative / label-difference table sizes)
+# that used to land here now resolve via PC tracking; what remains is one
+# genuinely-undefined symbol and two conditional `put` includes that are
+# not present in this build configuration.
 _EXPECTED_DIAGNOSTICS = {
-    ("BOOT.S", 138, "equate eval failed: current-PC operator `*` not resolvable in pass 0"),
     ("GAMEBG.S", 0, "could not resolve `put ryellow1`"),
     ("MISC.S", 150, "equate eval failed: undefined symbol: MOVEMEM"),
-    ("MOVER.S", 56, "equate eval failed: current-PC operator `*` not resolvable in pass 0"),
-    ("SOUND.S", 55, "equate eval failed: undefined symbol: endlook"),
-    ("SPECIALK.S", 1253, "equate eval failed: current-PC operator `*` not resolvable in pass 0"),
     ("UNPACK.S", 0, "could not resolve `put purple`"),
 }
 

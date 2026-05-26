@@ -1097,8 +1097,11 @@ impl Cpu {
         self.flags.z = self.reg.x == _o;
         self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
         if self.reg.x >= 0x03 {
-            // raw: ??? cpx #maxgatevel            ; MOVER.S:811
-            if !self.flags.c {
+            let _o: u8 = 0x08;
+            self.flags.c = self.reg.x >= _o;
+            self.flags.z = self.reg.x == _o;
+            self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
+            if self.reg.x < 0x08 {
                 let _v = self.reg.x.wrapping_add(1);
                 self.reg.x = _v;
                 self.flags.z = _v == 0;
@@ -1166,8 +1169,11 @@ impl Cpu {
         self.flags.z = self.reg.x == _o;
         self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
         if self.reg.x >= 0x03 {
-            // raw: ??? cpx #maxgatevel            ; MOVER.S:901
-            if !self.flags.c {
+            let _o: u8 = 0x08;
+            self.flags.c = self.reg.x >= _o;
+            self.flags.z = self.reg.x == _o;
+            self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
+            if self.reg.x < 0x08 {
                 let _v = self.reg.x.wrapping_add(1);
                 self.reg.x = _v;
                 self.flags.z = _v == 0;

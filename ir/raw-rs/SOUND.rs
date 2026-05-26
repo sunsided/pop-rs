@@ -114,8 +114,7 @@ impl Cpu {
     fn makesound(&mut self) {
         self.flags.c = (self.reg.a >> 7) != 0;
         self.reg.a = self.reg.a.wrapping_shl(1);
-        // raw: ??? cmp #maxaddr            ; SOUND.S:129
-        if self.flags.c {
+        if self.reg.a >= 0x28 {
             return;
         }
         self.reg.x = self.reg.a;

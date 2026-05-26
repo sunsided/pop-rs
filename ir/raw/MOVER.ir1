@@ -657,7 +657,7 @@ fn animexit {
   call mirappear                  ; MOVER.S:805
   goto :cont                ; MOVER.S:806
 :downfast:
-  ??? cpx #maxgatevel            ; MOVER.S:811
+  cmp x, #maxgatevel              ; MOVER.S:811
   if cs goto :2       ; MOVER.S:812
   x += 1                         ; MOVER.S:813
   *trdirec@0xb640 = x            ; MOVER.S:814
@@ -722,7 +722,7 @@ fn animgate {
 ]rts:
   return                           ; MOVER.S:896
 :downfast:
-  ??? cpx #maxgatevel            ; MOVER.S:901
+  cmp x, #maxgatevel              ; MOVER.S:901
   if cs goto :2       ; MOVER.S:902
   x += 1                         ; MOVER.S:904
   *trdirec@0xb640 = x            ; MOVER.S:905

@@ -56,8 +56,7 @@ pub fn PLAYBACK(cpu: &mut Cpu) {
 pub fn makesound(cpu: &mut Cpu) {
     cpu.flags.c = (cpu.reg.a >> 7) != 0;
     cpu.reg.a = cpu.reg.a.wrapping_shl(1);
-    // raw: ??? cmp #maxaddr            ; SOUND.S:129
-    if cpu.flags.c {
+    if cpu.reg.a >= 0x28 {
         return;
     }
     cpu.reg.x = cpu.reg.a;

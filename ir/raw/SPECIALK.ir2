@@ -742,8 +742,7 @@ fn KEEPTIME {
   *FrameCount+1@0x0307 = a            ; SPECIALK.S:1278
 :2:
   y = *NextTimeMsg@0x0301        ; SPECIALK.S:1282
-  ??? cpy #nummsg            ; SPECIALK.S:1283
-  if cs goto ]rts       ; SPECIALK.S:1284
+  if y >= #nummsg goto ]rts  ; SPECIALK.S:1284
   a = *FrameCount+1@0x0307        ; SPECIALK.S:1285
   cmp a, *(timetable+1@0x0333 + y)   ; SPECIALK.S:1286
   if a < *(timetable+1@0x0333 + y) goto ]rts  ; SPECIALK.S:1287

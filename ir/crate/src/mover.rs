@@ -986,8 +986,11 @@ pub fn animexit(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.x == _o;
     cpu.flags.n = (cpu.reg.x.wrapping_sub(_o) >> 7) != 0;
     if cpu.reg.x >= 0x03 {
-        // raw: ??? cpx #maxgatevel            ; MOVER.S:811
-        if !cpu.flags.c {
+        let _o: u8 = 0x08;
+        cpu.flags.c = cpu.reg.x >= _o;
+        cpu.flags.z = cpu.reg.x == _o;
+        cpu.flags.n = (cpu.reg.x.wrapping_sub(_o) >> 7) != 0;
+        if cpu.reg.x < 0x08 {
             let _v = cpu.reg.x.wrapping_add(1);
             cpu.reg.x = _v;
             cpu.flags.z = _v == 0;
@@ -1055,8 +1058,11 @@ pub fn animgate(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.x == _o;
     cpu.flags.n = (cpu.reg.x.wrapping_sub(_o) >> 7) != 0;
     if cpu.reg.x >= 0x03 {
-        // raw: ??? cpx #maxgatevel            ; MOVER.S:901
-        if !cpu.flags.c {
+        let _o: u8 = 0x08;
+        cpu.flags.c = cpu.reg.x >= _o;
+        cpu.flags.z = cpu.reg.x == _o;
+        cpu.flags.n = (cpu.reg.x.wrapping_sub(_o) >> 7) != 0;
+        if cpu.reg.x < 0x08 {
             let _v = cpu.reg.x.wrapping_add(1);
             cpu.reg.x = _v;
             cpu.flags.z = _v == 0;

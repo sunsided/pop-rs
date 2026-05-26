@@ -7,7 +7,7 @@ Lowered / Deferred count *top-level* statements that became real Rust vs. those 
 | File | Routines | Lowered | Deferred | Lowered % |
 |------|---------:|--------:|---------:|----------:|
 | `AUTO.S` | 56 | 393 | 0 | 100.0% |
-| `BOOT.S` | 7 | 58 | 1 | 98.3% |
+| `BOOT.S` | 7 | 58 | 0 | 100.0% |
 | `COLL.S` | 27 | 214 | 0 | 100.0% |
 | `CTRL.S` | 51 | 321 | 0 | 100.0% |
 | `CTRLSUBS.S` | 86 | 578 | 0 | 100.0% |
@@ -18,12 +18,12 @@ Lowered / Deferred count *top-level* statements that became real Rust vs. those 
 | `MASTER.S` | 60 | 391 | 0 | 100.0% |
 | `MISC.S` | 27 | 236 | 0 | 100.0% |
 | `MOVER.S` | 72 | 538 | 0 | 100.0% |
-| `SOUND.S` | 22 | 75 | 1 | 98.7% |
-| `SPECIALK.S` | 31 | 208 | 1 | 99.5% |
+| `SOUND.S` | 22 | 75 | 0 | 100.0% |
+| `SPECIALK.S` | 31 | 208 | 0 | 100.0% |
 | `SUBS.S` | 68 | 617 | 0 | 100.0% |
 | `TOPCTRL.S` | 52 | 425 | 0 | 100.0% |
 | `UNPACK.S` | 21 | 110 | 11 | 90.9% |
-| **total** | **828** | **5731** | **21** | **99.6%** |
+| **total** | **828** | **5731** | **18** | **99.7%** |
 
 ## Skipped (no liftable entry points)
 
