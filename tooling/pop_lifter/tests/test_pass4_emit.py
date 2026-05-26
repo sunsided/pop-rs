@@ -933,8 +933,10 @@ def test_wide16_add():
         "self.mem[0x0030] = _lo as u8;",
         "let _hi = (self.mem[0x0021] as u16) + (0x33 as u16) + (_lo >> 8);",
         "self.mem[0x0031] = _hi as u8;",
-        "self.reg.a = _hi as u8;",
+        # high-byte result + carry, with Z/N from the high byte (a
+        # following `bne`/`beq` reads them — see grafix/CVTX).
         "self.flags.c = (_hi >> 8) != 0;",
+        "self.set_a(_hi as u8);",
     ]
 
 
@@ -944,7 +946,7 @@ def test_wide16_subtract_uses_complement_identity():
     lines = _emit_stmt(_wide16("-"), 0)
     assert lines[0] == "let _lo = (self.mem[0x0020] as u16) + (!0x44_u8 as u16) + 1;"
     assert lines[2] == "let _hi = (self.mem[0x0021] as u16) + (!0x33_u8 as u16) + (_lo >> 8);"
-    assert lines[4:] == ["self.reg.a = _hi as u8;", "self.flags.c = (_hi >> 8) != 0;"]
+    assert lines[4:] == ["self.flags.c = (_hi >> 8) != 0;", "self.set_a(_hi as u8);"]
 
 
 def test_wide16_memory_operand_not_u8_suffixed():

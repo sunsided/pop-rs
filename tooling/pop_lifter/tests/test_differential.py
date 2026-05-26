@@ -13,9 +13,10 @@ never elided.
 
 Pilots are routines confirmed to run to completion in the interpreter
 (no external calls / synthetic-label access); one or more per segment,
-plus a few that previously exposed emitter bugs. A broader sweep now
-finds *all* ~426 runnable routines match the crate exactly from the zero
-state.
+plus a few that previously exposed emitter bugs. The seeded *sweep*
+(`test_seeded_sweep_no_divergence`) then exercises every routine from
+deterministic random register+RAM states and asserts the crate matches
+the interpreter wherever the interpreter runs to completion.
 
 Skipped when `cargo` is absent (e.g. minimal CI images), mirroring the
 `rustc` compile-check test.
@@ -23,7 +24,9 @@ Skipped when `cargo` is absent (e.g. minimal CI images), mirroring the
 
 from __future__ import annotations
 
+import random
 import shutil
+import signal
 import subprocess
 from pathlib import Path
 
@@ -157,3 +160,91 @@ def test_emitted_routine_matches_interpreter_seeded(module, name, regs, diffrun_
         _assert_match(diffrun_bin, ir3_modules, module, name, regs)
     except InterpError as e:
         pytest.skip(f"{module}/{name} not interpretable for regs={regs}: {e}")
+
+
+# ---- seeded sweep over every routine -----------------------------------
+
+_SWEEP_RNG_SEED = 0xC0FFEE
+_SWEEP_SEEDS_PER_ROUTINE = 2
+_INTERP_TIMEOUT_S = 0.5  # skip routines that loop on a wild RAM seed
+
+
+class _Timeout(Exception):
+    pass
+
+
+def _on_alarm(signum, frame):
+    raise _Timeout()
+
+
+def test_seeded_sweep_no_divergence(diffrun_bin, ir3_modules):
+    """Property check: from deterministic random register+RAM start states,
+    the emitted crate matches the IR3 interpreter for *every* routine the
+    interpreter runs to completion.
+
+    Per (routine, seed) we skip combos the interpreter can't run — a wild
+    RAM seed often steers it into a synthetic-label address or an
+    unresolved (vector-dispatched) call, or an unterminating loop (cut off
+    by `_INTERP_TIMEOUT_S`). Those aren't statically runnable, so they're
+    out of scope. But any *completed* comparison that diverges — or a crate
+    panic / hang where the interpreter finished — fails the test. The
+    skip set may shift with machine speed; the 0-divergence assertion does
+    not.
+    """
+    if not hasattr(signal, "setitimer"):
+        pytest.skip("signal.setitimer unavailable (non-POSIX)")
+
+    rng = random.Random(_SWEEP_RNG_SEED)
+    prev = signal.signal(signal.SIGALRM, _on_alarm)
+    divergences: list[str] = []
+    compared = 0
+    try:
+        for module in ir3_modules:
+            seg = module.name.lower()
+            ordered = [module] + [m for m in ir3_modules if m is not module]
+            for r in module.routines:
+                for _ in range(_SWEEP_SEEDS_PER_ROUTINE):
+                    a, x, y, c = (rng.randrange(256), rng.randrange(256),
+                                  rng.randrange(256), rng.randrange(2))
+                    ram0 = rng.randbytes(0x10000)
+                    signal.setitimer(signal.ITIMER_REAL, _INTERP_TIMEOUT_S)
+                    try:
+                        trace = ir3_run(ordered, r.name, ram=bytearray(ram0),
+                                        a=a, x=x, y=y, c=c)
+                    except Exception:
+                        # Interpreter can't run this routine from this state
+                        # (synthetic-label access, unresolved vector call,
+                        # loop past the timeout, ...). Out of scope.
+                        continue
+                    finally:
+                        signal.setitimer(signal.ITIMER_REAL, 0)
+
+                    tag = f"{seg}/{r.name} a={a} x={x} y={y} c={c}"
+                    try:
+                        p = subprocess.run(
+                            [diffrun_bin, seg, r.name, str(a), str(x), str(y), str(c)],
+                            input=ram0, capture_output=True, timeout=5,
+                        )
+                    except subprocess.TimeoutExpired:
+                        # Crate looped where the interpreter finished — a
+                        # termination divergence.
+                        divergences.append(f"{tag}: crate hang (interp completed)")
+                        continue
+                    if p.returncode != 0:
+                        # 3 = panic (e.g. an OOB index the interp wrapped),
+                        # 2 = unknown dispatch; both are real divergences.
+                        divergences.append(f"{tag}: diffrun exit {p.returncode}")
+                        continue
+                    out = p.stdout
+                    compared += 1
+                    if ((out[0], out[1], out[2]) != (trace.a, trace.x, trace.y)
+                            or bytes(out[4:]) != bytes(trace.ram)):
+                        divergences.append(f"{tag}: state diverges")
+    finally:
+        signal.signal(signal.SIGALRM, prev)
+
+    assert compared > 0, "seeded sweep compared nothing — harness/lift broken?"
+    assert not divergences, (
+        f"{len(divergences)} seeded divergence(s) over {compared} comparisons:\n"
+        + "\n".join(divergences[:25])
+    )

@@ -425,16 +425,16 @@ impl Cpu {
             self.mem[sym::FCharX] = _lo as u8;
             let _hi = (self.mem[sym::FCharX + 1] as u16) + (!0x00_u8 as u16) + (_lo >> 8);
             self.mem[sym::FCharX + 1] = _hi as u8;
-            self.reg.a = _hi as u8;
             self.flags.c = (_hi >> 8) != 0;
+            self.set_a(_hi as u8);
             return;
         }
         let _lo = (self.mem[sym::ztemp] as u16) + (self.mem[sym::FCharX] as u16);
         self.mem[sym::FCharX] = _lo as u8;
         let _hi = (self.mem[sym::FCharX + 1] as u16) + (0x00 as u16) + (_lo >> 8);
         self.mem[sym::FCharX + 1] = _hi as u8;
-        self.reg.a = _hi as u8;
         self.flags.c = (_hi >> 8) != 0;
+        self.set_a(_hi as u8);
         return;
     }
 
@@ -961,8 +961,8 @@ impl Cpu {
         self.mem[sym::framepoint] = _lo as u8;
         let _hi = (self.mem[sym::framepoint + 1] as u16) + (0x28 as u16) + (_lo >> 8);
         self.mem[sym::framepoint + 1] = _hi as u8;
-        self.reg.a = _hi as u8;
         self.flags.c = (_hi >> 8) != 0;
+        self.set_a(_hi as u8);
         return;
     }
 
@@ -972,8 +972,8 @@ impl Cpu {
         self.mem[sym::framepoint] = _lo as u8;
         let _hi = (self.mem[sym::framepoint + 1] as u16) + (0x2c as u16) + (_lo >> 8);
         self.mem[sym::framepoint + 1] = _hi as u8;
-        self.reg.a = _hi as u8;
         self.flags.c = (_hi >> 8) != 0;
+        self.set_a(_hi as u8);
         return;
     }
 
@@ -983,8 +983,8 @@ impl Cpu {
         self.mem[sym::framepoint] = _lo as u8;
         let _hi = (self.mem[sym::framepoint + 1] as u16) + (0x2d as u16) + (_lo >> 8);
         self.mem[sym::framepoint + 1] = _hi as u8;
-        self.reg.a = _hi as u8;
         self.flags.c = (_hi >> 8) != 0;
+        self.set_a(_hi as u8);
         return;
     }
 
@@ -1015,8 +1015,8 @@ impl Cpu {
         self.mem[sym::framepoint] = _lo as u8;
         let _hi = (self.mem[sym::framepoint + 1] as u16) + (self.mem[sym::ztemp + 1] as u16) + (_lo >> 8);
         self.mem[sym::framepoint + 1] = _hi as u8;
-        self.reg.a = _hi as u8;
         self.flags.c = (_hi >> 8) != 0;
+        self.set_a(_hi as u8);
         return;
     }
 
@@ -1040,14 +1040,14 @@ impl Cpu {
         self.mem[sym::framepoint] = _lo as u8;
         let _hi = (self.mem[sym::framepoint + 1] as u16) + (self.mem[sym::ztemp + 1] as u16) + (_lo >> 8);
         self.mem[sym::framepoint + 1] = _hi as u8;
-        self.reg.a = _hi as u8;
         self.flags.c = (_hi >> 8) != 0;
+        self.set_a(_hi as u8);
         let _lo = (self.mem[sym::framepoint] as u16) + (0x3a as u16);
         self.mem[sym::framepoint] = _lo as u8;
         let _hi = (self.mem[sym::framepoint + 1] as u16) + (0x2f as u16) + (_lo >> 8);
         self.mem[sym::framepoint + 1] = _hi as u8;
-        self.reg.a = _hi as u8;
         self.flags.c = (_hi >> 8) != 0;
+        self.set_a(_hi as u8);
         return;
     }
 

@@ -887,8 +887,8 @@ impl Cpu {
                 self.mem[0x0001] = _lo as u8;
                 let _hi = (self.mem[0x0003] as u16) + (0x00 as u16) + (_lo >> 8);
                 self.mem[0x0003] = _hi as u8;
-                self.reg.a = _hi as u8;
                 self.flags.c = (_hi >> 8) != 0;
+                self.set_a(_hi as u8);
                 if self.flags.z {
                     break;
                 }
@@ -915,8 +915,8 @@ impl Cpu {
                 self.mem[0x0001] = _lo as u8;
                 let _hi = (self.mem[0x0003] as u16) + (!0x00_u8 as u16) + (_lo >> 8);
                 self.mem[0x0003] = _hi as u8;
-                self.reg.a = _hi as u8;
                 self.flags.c = (_hi >> 8) != 0;
+                self.set_a(_hi as u8);
                 if self.flags.z {
                     break;
                 }
@@ -1860,14 +1860,14 @@ impl Cpu {
         self.mem[sym::BlueType] = _lo as u8;
         let _hi = (self.mem[(sym::Mult30 + 1 + self.reg.x as usize) & 0xffff] as u16) + (0xb7 as u16) + (_lo >> 8);
         self.mem[sym::BlueType + 1] = _hi as u8;
-        self.reg.a = _hi as u8;
         self.flags.c = (_hi >> 8) != 0;
+        self.set_a(_hi as u8);
         let _lo = (self.mem[sym::BlueType] as u16) + (0xd0 as u16);
         self.mem[sym::BlueSpec] = _lo as u8;
         let _hi = (self.mem[sym::BlueType + 1] as u16) + (0x02 as u16) + (_lo >> 8);
         self.mem[sym::BlueSpec + 1] = _hi as u8;
-        self.reg.a = _hi as u8;
         self.flags.c = (_hi >> 8) != 0;
+        self.set_a(_hi as u8);
         return;
     }
 
