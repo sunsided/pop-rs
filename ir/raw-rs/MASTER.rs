@@ -97,10 +97,14 @@ mod sym {
 impl Cpu {
     fn FIRSTBOOT(&mut self) {
         self.reg.a = self.mem[sym::MIXEDoff];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.setaux();
         self.mem[sym::BBundID] = 0xa9;
         self.mem[sym::RAMWRTmain] = 0xa9;
         self.reg.a = 0x02;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::track] = self.reg.a;
         self.rw18();
         self.loadperm();
@@ -116,6 +120,8 @@ impl Cpu {
     fn loadmusic1(&mut self) {
         self.setmain();
         self.reg.a = 0x22;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::track] = self.reg.a;
         self.rw18();
         self.setaux();
@@ -130,6 +136,8 @@ impl Cpu {
                 0 => {
                     self.setmain();
                     self.reg.a = 0x14;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::track] = self.reg.a;
                     self.rw18();
                     self._5dmm();
@@ -159,6 +167,8 @@ impl Cpu {
 
     fn driveon(&mut self) {
         self.reg.a = 0x00;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.local.insert((":delay", 0), self.reg.a);
         self.setaux();
         let _o: u8 = self.mem[sym::RWBANK1];
@@ -168,6 +178,8 @@ impl Cpu {
         self.flags.z = (self.reg.a & _o) == 0;
         self.flags.n = (_o >> 7) != 0;
         self.reg.a = self.mem[sym::BBundID];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.local.insert((":IDbyte", 0), self.reg.a);
         self.rw18();
         self.rw18();
@@ -184,6 +196,8 @@ impl Cpu {
         self.flags.z = (self.reg.a & _o) == 0;
         self.flags.n = (_o >> 7) != 0;
         self.reg.a = self.mem[sym::BBundID];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.local.insert((":IDbyte", 0), self.reg.a);
         self.rw18();
         self.rw18();
@@ -205,7 +219,11 @@ impl Cpu {
 
     fn set1stlevel(&mut self) {
         self.reg.a = self.mem[sym::firstlevel];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.reg.x = self.mem[sym::firstlevel + 1];
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         self.mem[sym::params] = self.reg.a;
         self.mem[sym::params + 1] = self.reg.x;
         return;
@@ -219,7 +237,11 @@ impl Cpu {
 
     fn setdemolevel(&mut self) {
         self.reg.a = self.mem[sym::demolevel];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.reg.x = self.mem[sym::demolevel + 1];
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         self.SetLevel();
         return;
     }
@@ -231,6 +253,8 @@ impl Cpu {
                 0 => {
                     self.setaux();
                     self.reg.x = 0xad;
+                    self.flags.z = self.reg.x == 0;
+                    self.flags.n = (self.reg.x >> 7) != 0;
                     self.mem[sym::BBundID] = self.reg.x;
                     self.driveon();
                     pc = 1;
@@ -238,6 +262,8 @@ impl Cpu {
                 1 => {
                     self.setmain();
                     self.reg.a = 0x16;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::track] = self.reg.a;
                     self.rw18();
                     if !self.flags.c {
@@ -264,6 +290,8 @@ impl Cpu {
         self.reg.x = 0x0f;
         loop {
             self.reg.a = self.mem[sym::savedgame + self.reg.x as usize];
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.mem[0x0200 + self.reg.x as usize] = self.reg.a;
             self.reg.x = self.reg.x.wrapping_sub(0x01);
             if !((self.reg.x as i8) >= 0) {
@@ -272,6 +300,8 @@ impl Cpu {
         }
         self.mem[sym::RAMRDmain] = self.reg.a;
         self.reg.a = 0x17;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::track] = self.reg.a;
         self.rw18();
         if !self.flags.c {
@@ -285,12 +315,16 @@ impl Cpu {
     fn LOADGAME(&mut self) {
         self.checkdisk();
         self.reg.a = 0x17;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::track] = self.reg.a;
         self.rw18();
         self.mem[sym::RAMWRTaux] = self.reg.a;
         self.reg.x = 0x0f;
         loop {
             self.reg.a = self.mem[0x0200 + self.reg.x as usize];
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.mem[sym::savedgame + self.reg.x as usize] = self.reg.a;
             self.reg.x = self.reg.x.wrapping_sub(0x01);
             if !((self.reg.x as i8) >= 0) {
@@ -326,11 +360,15 @@ impl Cpu {
     fn setbluep(&mut self) {
         self.mem[sym::track] = self.mem[sym::bluepTRK];
         self.reg.a = self.mem[sym::bluepREG];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         return;
     }
 
     fn vidstuff(&mut self) {
         self.reg.a = self.mem[sym::BBundID];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         let _o: u8 = 0xad;
         self.flags.c = self.reg.a >= _o;
         self.flags.z = self.reg.a == _o;
@@ -339,6 +377,8 @@ impl Cpu {
             return;
         }
         self.reg.a = self.mem[0xc000];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         let _o: u8 = 0x5e;
         self.flags.c = self.reg.a >= _o;
         self.flags.z = self.reg.a == _o;
@@ -348,6 +388,8 @@ impl Cpu {
         }
         self.setmain();
         self.reg.a = 0x0c;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::track] = self.reg.a;
         self.rw18();
         loop {
@@ -376,11 +418,15 @@ impl Cpu {
 
     fn rdbg1(&mut self) {
         self.reg.x = self.mem[sym::newBGset1];
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         if self.reg.x == self.mem[sym::BGset1] {
             return;
         }
         self.mem[sym::BGset1] = self.reg.x;
         self.reg.a = self.mem[sym::bg1trk + self.reg.x as usize];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::track] = self.reg.a;
         self.rw18();
         self.rw18();
@@ -389,11 +435,15 @@ impl Cpu {
 
     fn rdbg2(&mut self) {
         self.reg.x = self.mem[sym::newBGset2];
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         if self.reg.x == self.mem[sym::BGset2] {
             return;
         }
         self.mem[sym::BGset2] = self.reg.x;
         self.reg.a = self.mem[sym::bg2trk + self.reg.x as usize];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::track] = self.reg.a;
         self.rw18();
         return;
@@ -401,12 +451,16 @@ impl Cpu {
 
     fn rdch4(&mut self) {
         self.reg.x = self.mem[sym::newCHset];
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         if self.reg.x == self.mem[sym::CHset] {
             return;
         }
         self.mem[sym::CHset] = self.reg.x;
         self.mem[sym::track] = self.mem[sym::ch4trk + self.reg.x as usize];
         self.reg.a = self.mem[sym::ch4off + self.reg.x as usize];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         match self.reg.a {
             0x00 => {
                 self.rw18();
@@ -474,10 +528,18 @@ impl Cpu {
 
     fn copy1to2(&mut self) {
         self.reg.a = 0x40;  // dest
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.reg.x = 0x20;  // org
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         if self.reg.x == 0x00 {
             self.reg.a = 0x20;
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.reg.x = 0x40;
+            self.flags.z = self.reg.x == 0;
+            self.flags.n = (self.reg.x >> 7) != 0;
         }
         self.mem[sym::IMAGE + 1] = self.reg.a;
         self.mem[sym::IMAGE] = self.reg.x;
@@ -488,7 +550,11 @@ impl Cpu {
 
     fn copy2to1(&mut self) {
         self.reg.a = 0x20;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.reg.x = 0x40;
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         self.mem[sym::IMAGE + 1] = self.reg.a;
         self.mem[sym::IMAGE] = self.reg.x;
         self._copy2000aux();
@@ -507,11 +573,17 @@ impl Cpu {
     fn CUTPRINCESS(&mut self) {
         self.blackout();
         self.reg.a = 0x01;  // seek track 0
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.LoadStage2();
         self.reg.a = 0x84;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.SngExpand();
         self.mem[sym::IMAGE + 1] = 0x40;
         self.reg.a = 0x20;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::IMAGE] = self.reg.a;
         self._copy2000();
         return;
@@ -520,9 +592,13 @@ impl Cpu {
     fn cutprincess1(&mut self) {
         self.LoadStage2();
         self.reg.a = 0x84;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.SngExpand();
         self.mem[sym::IMAGE + 1] = 0x40;
         self.reg.a = 0x20;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::IMAGE] = self.reg.a;
         self._copy2000();
         return;
@@ -530,21 +606,29 @@ impl Cpu {
 
     fn EPILOG(&mut self) {
         self.reg.a = 0x01;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::soundon] = self.reg.a;
         self.mem[sym::musicon] = self.reg.a;
         self.blackout();
         self.LoadStage1B();
         self.Epilog();
         self.reg.a = 0xa9;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::BBundID] = self.reg.a;
         self.mem[0xc010] = self.reg.a;
         loop {
             self.reg.a = self.mem[0xc000];
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             if !((self.reg.a as i8) >= 0) {
                 break;
             }
         }
         self.reg.a = 0x01;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::musicon] = self.reg.a;
         self.SetupDHires();
         self.PubCredit();
@@ -562,6 +646,8 @@ impl Cpu {
     // aliases: AttractLoop
     fn ATTRACTMODE(&mut self) {
         self.reg.a = 0x01;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::musicon] = self.reg.a;
         self.SetupDHires();
         self.PubCredit();
@@ -587,11 +673,19 @@ impl Cpu {
         self.setdhires();
         self.copy1to2();
         self.reg.a = 0x2c;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.tpause();
         self.reg.a = 0x70;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.DeltaExpPop();
         self.reg.x = 0x50;
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         self.reg.a = 0x01;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.PlaySongI();
         self.CleanScreen();
         return;
@@ -599,18 +693,30 @@ impl Cpu {
 
     fn CleanScreen(&mut self) {
         self.reg.a = self.mem[sym::PAGE2on];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.copy2to1();
         self.reg.a = self.mem[sym::PAGE2off];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         return;
     }
 
     fn AuthorCredit(&mut self) {
         self.reg.a = 0x2a;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.tpause();
         self.reg.a = 0x72;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.DeltaExpPop();
         self.reg.x = 0x50;
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         self.reg.a = 0x02;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.PlaySongI();
         self.CleanScreen();
         return;
@@ -620,21 +726,35 @@ impl Cpu {
         self.unpacksplash();
         self.copy1to2();
         self.reg.a = 0x14;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.tpause();
         self.reg.a = 0x74;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.DeltaExpPop();
         self.reg.a = 0xa0;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.tpause();
         return;
     }
 
     fn TitleScreen(&mut self) {
         self.reg.a = 0x26;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.tpause();
         self.reg.a = 0x74;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.DeltaExpPop();
         self.reg.x = 0x8c;
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         self.reg.a = 0x03;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.PlaySongI();
         self.CleanScreen();
         return;
@@ -642,10 +762,16 @@ impl Cpu {
 
     fn Prolog1(&mut self) {
         self.reg.a = 0x7c;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::RAMRDaux] = self.reg.a;
         self.DblExpand();
         self.reg.x = 0xfa;
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         self.reg.a = 0x04;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.PlaySongI();
         return;
     }
@@ -654,43 +780,67 @@ impl Cpu {
         self.blackout();
         self.ReloadStuff();
         self.reg.a = 0x00;  // don't seek track 0
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.cutprincess1();
         self.reg.a = 0x00;  // cut #0 (intro)
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.xplaycut();
         return;
     }
 
     fn Prolog2(&mut self) {
         self.reg.a = 0x60;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::RAMRDmain] = self.reg.a;
         self.DblExpand();
         self.setdhires();
         self.reg.x = 0xfa;
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         self.reg.a = 0x05;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.PlaySongI();
         return;
     }
 
     fn Epilog(&mut self) {
         self.reg.a = self.mem[sym::IIGS];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if self.reg.a != 0x00 {
             self.SuperEpilog();
             return;
         }
         self.reg.a = 0x76;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::RAMRDaux] = self.reg.a;
         self.DblExpand();
         self.setdhires();
         self.reg.a = 0x01;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.PlaySongNI();
         self.reg.a = 0x0f;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.pauseNI();
         self.unpacksplash();
         self.reg.a = 0x4b;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.pauseNI();
         self.reg.a = 0x02;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.PlaySongNI();
         self.reg.a = 0x3c;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.pauseNI();
         self.blackout();
         return;
@@ -698,6 +848,8 @@ impl Cpu {
 
     fn unpacksplash(&mut self) {
         self.reg.a = 0x40;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::RAMRDaux] = self.reg.a;
         self.DblExpand();
         return;
@@ -705,19 +857,31 @@ impl Cpu {
 
     fn SuperEpilog(&mut self) {
         self.reg.a = 0x01;  // aux
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.fadein();
         self.setaux();
         self.reg.a = 0x01;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.PlaySongNI();
         self.fadeout();
         self.reg.a = 0x00;  // main
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.fadein();
         self.setaux();
         self.reg.a = 0x50;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.pauseNI();
         self.reg.a = 0x02;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.PlaySongNI();
         self.reg.a = 0xff;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.pauseNI();
         self.fadeout();
         self._2a();
@@ -731,6 +895,8 @@ impl Cpu {
         self.rdbluep();
         self.driveoff();
         self.reg.a = 0x00;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.start();
         return;
     }
@@ -743,10 +909,14 @@ impl Cpu {
                 0 => {
                     self.mem[sym::pausetemp] = self.reg.a;
                     self.reg.y = 0x14;
+                    self.flags.z = self.reg.y == 0;
+                    self.flags.n = (self.reg.y >> 7) != 0;
                     pc = 1;
                 }
                 1 => {
                     self.reg.x = 0x00;
+                    self.flags.z = self.reg.x == 0;
+                    self.flags.n = (self.reg.x >> 7) != 0;
                     pc = 2;
                 }
                 2 => {
@@ -773,6 +943,8 @@ impl Cpu {
                 }
                 4 => {
                     self.reg.a = self.mem[sym::pausetemp];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.flags.c = true;
                     let _r = (self.reg.a as u16) + (!0x01_u8) as u16 + (self.flags.c as u16);
                     self.reg.a = _r as u8;
@@ -807,12 +979,18 @@ impl Cpu {
         self.driveoff();
         self.mem[sym::musicon] = 0x01;
         self.reg.a = self.mem[sym::keypress];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if self.reg.a != 0x0c {
             self.reg.a = 0x01;
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.start();
             return;
         }
         self.reg.a = 0x04;  // arbitrary
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.startresume();
         return;
     }
@@ -826,24 +1004,34 @@ impl Cpu {
         self.driveoff();
         self.mem[sym::musicon] = 0x01;
         self.reg.a = self.mem[sym::keypress];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if self.reg.a != 0x0c {
             self.reg.a = 0x01;
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.start();
             return;
         }
         self.reg.a = 0x04;  // arbitrary
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.startresume();
         return;
     }
 
     fn loadperm(&mut self) {
         self.reg.a = 0x03;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::track] = self.reg.a;
         self.setaux();
         self.rw18();
         self.rw18();
         self.setmain();
         self.reg.a = 0x09;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::track] = self.reg.a;
         self.rw18();
         self.rw18();
@@ -851,15 +1039,21 @@ impl Cpu {
         self.rw18();
         self.rw18();
         self.reg.a = 0x13;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::track] = self.reg.a;
         self.rw18();
         self.rw18();
         self.rw18();
         self.reg.a = 0x22;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::track] = self.reg.a;
         self.rw18();
         self.setaux();
         self.reg.a = 0x01;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::MSset] = self.reg.a;
         self.setmain();
         self.Tmoveauxlc();
@@ -869,6 +1063,8 @@ impl Cpu {
     fn LoadStage1A(&mut self) {
         self.driveon();
         self.reg.a = 0x16;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self._5dlsub();
         self.setmain();
         self.rw18();
@@ -876,6 +1072,8 @@ impl Cpu {
         self.loadmusic1();
         self.setaux();
         self.reg.a = 0xff;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::BGset1] = self.reg.a;
         self.mem[sym::BGset2] = self.reg.a;
         self.mem[sym::CHset] = self.reg.a;
@@ -887,12 +1085,16 @@ impl Cpu {
         self.driveon();
         self.loadmusic3();
         self.reg.a = self.mem[sym::IIGS];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if self.reg.a != 0x00 {
             self.loadsuper();
             self.driveoff();
             return;
         }
         self.reg.a = 0x12;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self._5dlsub();
         self.driveoff();
         return;
@@ -908,6 +1110,8 @@ impl Cpu {
                 }
                 1 => {
                     self.reg.a = 0x04;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::track] = self.reg.a;
                     self.rw18();
                     if !self.flags.c {
@@ -922,6 +1126,8 @@ impl Cpu {
                 }
                 3 => {
                     self.reg.a = 0x0f;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::track] = self.reg.a;
                     self.rw18();
                     self.rw18();
@@ -940,6 +1146,8 @@ impl Cpu {
             match pc {
                 0 => {
                     self.reg.x = self.mem[sym::BBundID];
+                    self.flags.z = self.reg.x == 0;
+                    self.flags.n = (self.reg.x >> 7) != 0;
                     let _o: u8 = 0xad;
                     self.flags.c = self.reg.x >= _o;
                     self.flags.z = self.reg.x == _o;
@@ -954,8 +1162,12 @@ impl Cpu {
                 1 => {
                     self.driveon();
                     self.reg.a = 0x00;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.loadch7();
                     self.reg.a = 0x1d;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     pc = 2;
                 }
                 2 => {
@@ -979,6 +1191,8 @@ impl Cpu {
                     self.rw18();
                     self.rw18();
                     self.reg.a = 0xff;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::BGset1] = self.reg.a;
                     self.mem[sym::BGset2] = self.reg.a;
                     self.mem[sym::CHset] = self.reg.a;
@@ -997,8 +1211,12 @@ impl Cpu {
                 0 => {
                     self.driveon();
                     self.reg.a = 0x00;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.loadch7();
                     self.reg.a = 0x1d;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     pc = 1;
                 }
                 1 => {
@@ -1022,6 +1240,8 @@ impl Cpu {
                     self.rw18();
                     self.rw18();
                     self.reg.a = 0xff;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::BGset1] = self.reg.a;
                     self.mem[sym::BGset2] = self.reg.a;
                     self.mem[sym::CHset] = self.reg.a;
@@ -1043,6 +1263,8 @@ impl Cpu {
                 }
                 1 => {
                     self.reg.a = 0x1c;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::track] = self.reg.a;
                     self.rw18();
                     if !self.flags.c {
@@ -1073,6 +1295,8 @@ impl Cpu {
                 0 => {
                     self.driveon();
                     self.reg.a = 0x18;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     if self.reg.a != 0x00 {
                         self._5dls2();
                         return;
@@ -1083,6 +1307,8 @@ impl Cpu {
                 1 => {
                     self.driveon();
                     self.reg.a = 0x04;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::track] = self.reg.a;
                     pc = 2;
                 }
@@ -1106,6 +1332,8 @@ impl Cpu {
                     self.rw18();
                     self.setaux();
                     self.reg.a = 0x0d;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::track] = self.reg.a;
                     self.rw18();
                     self.rw18();
@@ -1114,6 +1342,8 @@ impl Cpu {
                     self.rw18();
                     self.rw18();
                     self.reg.a = 0x00;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::BGset1] = self.reg.a;
                     self.mem[sym::BGset2] = self.reg.a;
                     self.mem[sym::CHset] = self.reg.a;
@@ -1133,6 +1363,8 @@ impl Cpu {
                 0 => {
                     self.driveon();
                     self.reg.a = 0x04;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::track] = self.reg.a;
                     pc = 1;
                 }
@@ -1156,6 +1388,8 @@ impl Cpu {
                     self.rw18();
                     self.setaux();
                     self.reg.a = 0x0d;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::track] = self.reg.a;
                     self.rw18();
                     self.rw18();
@@ -1164,6 +1398,8 @@ impl Cpu {
                     self.rw18();
                     self.rw18();
                     self.reg.a = 0x00;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::BGset1] = self.reg.a;
                     self.mem[sym::BGset2] = self.reg.a;
                     self.mem[sym::CHset] = self.reg.a;
@@ -1207,6 +1443,8 @@ impl Cpu {
                 1 => {
                     self.reg.y = self.reg.a;
                     self.reg.a = self.mem[sym::musicon];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.reg.a &= self.mem[sym::soundon];
                     if self.reg.a == 0x00 {
                         pc = 5;
@@ -1245,10 +1483,14 @@ impl Cpu {
                 7 => {
                     self.mem[sym::pausetemp] = self.reg.a;
                     self.reg.y = 0x02;
+                    self.flags.z = self.reg.y == 0;
+                    self.flags.n = (self.reg.y >> 7) != 0;
                     pc = 8;
                 }
                 8 => {
                     self.reg.x = 0x00;
+                    self.flags.z = self.reg.x == 0;
+                    self.flags.n = (self.reg.x >> 7) != 0;
                     pc = 9;
                 }
                 9 => {
@@ -1276,6 +1518,8 @@ impl Cpu {
                 }
                 11 => {
                     self.reg.a = self.mem[sym::pausetemp];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.flags.c = true;
                     let _r = (self.reg.a as u16) + (!0x01_u8) as u16 + (self.flags.c as u16);
                     self.reg.a = _r as u8;
@@ -1302,10 +1546,14 @@ impl Cpu {
                 0 => {
                     self.mem[sym::pausetemp] = self.reg.a;
                     self.reg.y = 0x02;
+                    self.flags.z = self.reg.y == 0;
+                    self.flags.n = (self.reg.y >> 7) != 0;
                     pc = 1;
                 }
                 1 => {
                     self.reg.x = 0x00;
+                    self.flags.z = self.reg.x == 0;
+                    self.flags.n = (self.reg.x >> 7) != 0;
                     pc = 2;
                 }
                 2 => {
@@ -1333,6 +1581,8 @@ impl Cpu {
                 }
                 4 => {
                     self.reg.a = self.mem[sym::pausetemp];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.flags.c = true;
                     let _r = (self.reg.a as u16) + (!0x01_u8) as u16 + (self.flags.c as u16);
                     self.reg.a = _r as u8;

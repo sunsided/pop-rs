@@ -8,11 +8,15 @@ use crate::sym;
 pub fn AUTOCTRL(cpu: &mut Cpu) {
     DoRelease(cpu);
     cpu.reg.a = cpu.mem[sym::CharID];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x00 {
         KidProg(cpu);
         return;
     }
     cpu.reg.a = cpu.mem[sym::justblocked];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x00 {
         let _v = cpu.mem[sym::justblocked].wrapping_sub(1);
         cpu.mem[sym::justblocked] = _v;
@@ -20,6 +24,8 @@ pub fn AUTOCTRL(cpu: &mut Cpu) {
         cpu.flags.n = (_v >> 7) != 0;
     }
     cpu.reg.a = cpu.mem[sym::gdtimer];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x00 {
         let _v = cpu.mem[sym::gdtimer].wrapping_sub(1);
         cpu.mem[sym::gdtimer] = _v;
@@ -27,6 +33,8 @@ pub fn AUTOCTRL(cpu: &mut Cpu) {
         cpu.flags.n = (_v >> 7) != 0;
     }
     cpu.reg.a = cpu.mem[sym::refract];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x00 {
         let _v = cpu.mem[sym::refract].wrapping_sub(1);
         cpu.mem[sym::refract] = _v;
@@ -34,6 +42,8 @@ pub fn AUTOCTRL(cpu: &mut Cpu) {
         cpu.flags.n = (_v >> 7) != 0;
     }
     cpu.reg.a = cpu.mem[sym::CharID];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     match cpu.reg.a {
         0x18 => {
             MouseProg(cpu);
@@ -50,6 +60,8 @@ pub fn AUTOCTRL(cpu: &mut Cpu) {
         return;
     }
     cpu.reg.a = cpu.mem[sym::level];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x0d {
         VizierProg(cpu);
         return;
@@ -60,16 +72,24 @@ pub fn AUTOCTRL(cpu: &mut Cpu) {
 
 pub fn MouseProg(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::CharFace];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x56 {
         return;
     }
     cpu.reg.a = cpu.mem[sym::CharAction];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x00 {
         cpu.reg.a = cpu.mem[sym::CharX];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if cpu.reg.a >= 0xa6 {
             return;
         }
         cpu.reg.a = 0x6b;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         crate::ext::jumpseq(cpu);
         crate::ext::animchar(cpu);
         return;
@@ -87,6 +107,8 @@ pub fn MouseProg(cpu: &mut Cpu) {
 
 pub fn ShadowProg(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::level];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x04 {
         if cpu.reg.a != 0x05 {
             if cpu.reg.a != 0x06 {
@@ -119,6 +141,8 @@ pub fn VizierProg(cpu: &mut Cpu) {
 
 pub fn ShadLevel6(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::CharScrn];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x01 {
         Shad6a(cpu);
         return;
@@ -128,10 +152,14 @@ pub fn ShadLevel6(cpu: &mut Cpu) {
 
 pub fn Shad6a(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::KidPosn];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x2b {
         return;
     }
     cpu.reg.a = cpu.mem[sym::KidX];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a >= 0x80 {
         return;
     }
@@ -142,6 +170,8 @@ pub fn Shad6a(cpu: &mut Cpu) {
 
 pub fn ShadLevel5(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::CharScrn];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x18 {
         Shad5(cpu);
         return;
@@ -151,22 +181,40 @@ pub fn ShadLevel5(cpu: &mut Cpu) {
 
 pub fn Shad5(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::PlayCount];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x00 {
         cpu.reg.a = 0x18;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.x = 0x01;  // x
+        cpu.flags.z = cpu.reg.x == 0;
+        cpu.flags.n = (cpu.reg.x >> 7) != 0;
         cpu.reg.y = 0x00;  // y
+        cpu.flags.z = cpu.reg.y == 0;
+        cpu.flags.n = (cpu.reg.y >> 7) != 0;
         crate::ext::rdblock(cpu);
         cpu.reg.a = cpu.mem[(cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if cpu.reg.a < 0x14 {
             return;
         }
         cpu.reg.a = 0x00;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::PreRecPtr] = cpu.reg.a;
     }
     cpu.reg.a = 0x3a;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.x = 0x00;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     crate::ext::AutoPlayback(cpu);
     cpu.reg.a = cpu.mem[sym::CharX];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a >= 0x0f {
         return;
     }
@@ -176,10 +224,14 @@ pub fn Shad5(cpu: &mut Cpu) {
 
 pub fn ShadLevel4(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::CharScrn];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x04 {
         return;
     }
     cpu.reg.a = cpu.mem[sym::CharX];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a < 0x50 {
         crate::ext::VanishChar(cpu);
         return;
@@ -191,32 +243,50 @@ pub fn ShadLevel4(cpu: &mut Cpu) {
 pub fn FinalShad(cpu: &mut Cpu) {
     'b6: {
         cpu.reg.a = cpu.mem[sym::CharScrn];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if cpu.reg.a == 0x0f {
             cpu.reg.a = cpu.mem[sym::shadowaction];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             if cpu.reg.a == 0x00 {
                 cpu.reg.a = cpu.mem[sym::OpX];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a < 0x96 {
                     cpu.reg.a = 0x01;
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     cpu.mem[sym::shadowaction] = cpu.reg.a;
                     if !cpu.flags.z {
                         break 'b6;
                     }
                 }
                 cpu.reg.a = 0x39;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.x = 0x00;
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 csps(cpu);
                 return;
             }
         }
     }
     cpu.reg.a = cpu.mem[sym::CharSword];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a >= 0x02 {
         cpu.reg.a = cpu.mem[sym::offguard];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if cpu.reg.a == 0x00 {
             EnGarde(cpu);
             return;
         }
         cpu.reg.a = cpu.mem[sym::refract];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if cpu.reg.a != 0x00 {
             EnGarde(cpu);
             return;
@@ -225,28 +295,44 @@ pub fn FinalShad(cpu: &mut Cpu) {
         return;
     }
     cpu.reg.a = cpu.mem[sym::OpSword];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a < 0x02 {
         cpu.reg.a = cpu.mem[sym::offguard];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if cpu.reg.a != 0x00 {
             crate::ext::getopdist(cpu);
             if cpu.flags.n {
                 cpu.mem[sym::lightcolor] = 0xff;
                 cpu.reg.a = 0x0a;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::lightning] = cpu.reg.a;
                 crate::ext::boostmeter(cpu);
                 cpu.reg.a = 0x05;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.x = 0x55;
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 crate::ext::cuesong(cpu);
                 cpu.mem[sym::mergetimer] = 0x2a;
                 cpu.reg.a = 0x00;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::CharID] = cpu.reg.a;
                 crate::ext::SaveKid(cpu);
                 crate::ext::VanishChar(cpu);
                 return;
             }
             cpu.reg.a = cpu.mem[sym::EnemyAlert];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             if cpu.reg.a == 0x02 {
                 cpu.reg.a = cpu.mem[sym::OpPosn];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a >= 0x03 {
                     if cpu.reg.a < 0x0f {
                         DoAdvance(cpu);
@@ -264,10 +350,14 @@ pub fn FinalShad(cpu: &mut Cpu) {
         }
     }
     cpu.reg.a = cpu.mem[sym::EnemyAlert];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a >= 0x02 {
         crate::ext::getopdist(cpu);
         if cpu.reg.a < 0x5a {
             cpu.reg.a = cpu.mem[sym::CharPosn];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             if cpu.reg.a != 0x0f {
                 return;
             }
@@ -290,6 +380,8 @@ pub fn KidProg(cpu: &mut Cpu) {
 
 pub fn GuardProg(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::CharSword];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a < 0x02 {
         Alert(cpu);
         return;
@@ -300,20 +392,28 @@ pub fn GuardProg(cpu: &mut Cpu) {
 
 pub fn Alert(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::KidLife];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if (cpu.reg.a as i8) >= 0 {
         return;
     }
     'b9: {
         crate::ext::getopdist(cpu);
         cpu.reg.x = cpu.mem[sym::OpBlockY];
+        cpu.flags.z = cpu.reg.x == 0;
+        cpu.flags.n = (cpu.reg.x >> 7) != 0;
         if cpu.reg.x == cpu.mem[sym::CharBlockY] {
             if cpu.reg.a >= 0xf8 {
                 break 'b9;
             }
         }
         cpu.reg.x = cpu.mem[sym::alertguard];
+        cpu.flags.z = cpu.reg.x == 0;
+        cpu.flags.n = (cpu.reg.x >> 7) != 0;
         if cpu.reg.x != 0x00 {
             cpu.reg.x = 0x00;
+            cpu.flags.z = cpu.reg.x == 0;
+            cpu.flags.n = (cpu.reg.x >> 7) != 0;
             cpu.mem[sym::alertguard] = cpu.reg.x;
             if cpu.reg.a < 0x80 {
                 break 'b9;
@@ -329,15 +429,21 @@ pub fn Alert(cpu: &mut Cpu) {
         }
     }
     cpu.reg.a = cpu.mem[sym::EnemyAlert];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x00 {
         return;
     }
     cpu.reg.a = cpu.mem[sym::level];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x0d {
         DoEngarde(cpu);
         return;
     }
     cpu.reg.a = cpu.mem[sym::SongCue];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x00 {
         return;
     }
@@ -347,6 +453,8 @@ pub fn Alert(cpu: &mut Cpu) {
 
 pub fn EnGarde(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::CharPosn];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     let _o: u8 = 0xa6;
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
@@ -362,6 +470,8 @@ pub fn EnGarde(cpu: &mut Cpu) {
         return;
     }
     cpu.reg.a = cpu.mem[sym::EnemyAlert];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     let _o: u8 = 0x02;
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
@@ -375,6 +485,8 @@ pub fn EnGarde(cpu: &mut Cpu) {
             cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
             if cpu.reg.a >= 0x0c {
                 cpu.reg.a = cpu.mem[sym::OpPosn];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 let _o: u8 = 0x66;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -386,6 +498,8 @@ pub fn EnGarde(cpu: &mut Cpu) {
                     cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if cpu.reg.a < 0x76 {
                         cpu.reg.a = cpu.mem[sym::OpAction];
+                        cpu.flags.z = cpu.reg.a == 0;
+                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                         let _o: u8 = 0x05;
                         cpu.flags.c = cpu.reg.a >= _o;
                         cpu.flags.z = cpu.reg.a == _o;
@@ -404,16 +518,22 @@ pub fn EnGarde(cpu: &mut Cpu) {
         cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
         if cpu.reg.a >= 0x23 {
             cpu.reg.a = cpu.mem[sym::refract];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             if cpu.reg.a != 0x00 {
                 return;
             }
             cpu.reg.a = cpu.mem[sym::CharFace];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             let _o: u8 = cpu.mem[sym::OpFace];
             cpu.flags.c = cpu.reg.a >= _o;
             cpu.flags.z = cpu.reg.a == _o;
             cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
             if cpu.reg.a != cpu.mem[sym::OpFace] {
                 cpu.reg.a = cpu.mem[sym::OpPosn];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 let _o: u8 = 0x07;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -475,6 +595,8 @@ pub fn EnGarde(cpu: &mut Cpu) {
             return;
         }
         cpu.reg.x = cpu.mem[sym::CharSword];
+        cpu.flags.z = cpu.reg.x == 0;
+        cpu.flags.n = (cpu.reg.x >> 7) != 0;
         let _o: u8 = 0x02;
         cpu.flags.c = cpu.reg.x >= _o;
         cpu.flags.z = cpu.reg.x == _o;
@@ -499,6 +621,8 @@ pub fn EnGarde(cpu: &mut Cpu) {
             }
         }
         cpu.reg.a = cpu.mem[sym::CharFace];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = cpu.mem[sym::OpFace];
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -518,8 +642,12 @@ pub fn EnGarde(cpu: &mut Cpu) {
         return;
     }
     cpu.reg.a = cpu.mem[sym::droppedout];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x00 {
         cpu.reg.a = cpu.mem[sym::CharID];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = 0x04;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -536,6 +664,8 @@ pub fn EnGarde(cpu: &mut Cpu) {
 
 pub fn FollowKid(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::OpAction];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     match cpu.reg.a {
         0x02 | 0x06 => {
             return;
@@ -547,6 +677,8 @@ pub fn FollowKid(cpu: &mut Cpu) {
     crate::ext::cmpbarr(cpu);
     if cpu.flags.z {
         cpu.reg.a = cpu.mem[sym::ztemp];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         crate::ext::cmpspace(cpu);
         if cpu.flags.z {
             crate::ext::getinfront(cpu);
@@ -561,9 +693,13 @@ pub fn FollowKid(cpu: &mut Cpu) {
                     crate::ext::cmpbarr(cpu);
                     if cpu.flags.z {
                         cpu.reg.a = cpu.mem[sym::ztemp];
+                        cpu.flags.z = cpu.reg.a == 0;
+                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                         crate::ext::cmpspace(cpu);
                         if !cpu.flags.z {
                             cpu.reg.a = cpu.mem[sym::CharBlockY];
+                            cpu.flags.z = cpu.reg.a == 0;
+                            cpu.flags.n = (cpu.reg.a >> 7) != 0;
                             cpu.flags.c = false;
                             let _r = (cpu.reg.a as u16) + (0x01) as u16 + (cpu.flags.c as u16);
                             cpu.reg.a = _r as u8;
@@ -588,11 +724,15 @@ pub fn FollowKid(cpu: &mut Cpu) {
 
 pub fn InRange(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::OpSword];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x02 {
         GenFight(cpu);
         return;
     }
     cpu.reg.a = cpu.mem[sym::refract];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x00 {
         return;
     }
@@ -617,6 +757,8 @@ pub fn GenFight(cpu: &mut Cpu) {
     }
     MaybeBlock(cpu);
     cpu.reg.a = cpu.mem[sym::refract];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x00 {
         return;
     }
@@ -635,8 +777,12 @@ pub fn GenFight(cpu: &mut Cpu) {
 
 pub fn MaybeAdvance(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::guardprog];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x00 {
         cpu.reg.a = cpu.mem[sym::gdtimer];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if cpu.reg.a != 0x00 {
             return;
         }
@@ -655,6 +801,8 @@ pub fn MaybeAdvance(cpu: &mut Cpu) {
 
 pub fn MaybeBlock(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::OpPosn];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     let _o: u8 = 0x98;
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
@@ -675,6 +823,8 @@ pub fn MaybeBlock(cpu: &mut Cpu) {
         }
     }
     cpu.reg.a = cpu.mem[sym::justblocked];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x00 {
         rndp(cpu);
         let _o: u8 = cpu.mem[sym::impblockprob + cpu.reg.x as usize];
@@ -701,6 +851,8 @@ pub fn MaybeBlock(cpu: &mut Cpu) {
 
 pub fn MaybeStrike(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::OpPosn];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     match cpu.reg.x {
         0xa9 | 0x97 => {
             return;
@@ -708,6 +860,8 @@ pub fn MaybeStrike(cpu: &mut Cpu) {
         _ => {}
     }
     cpu.reg.x = cpu.mem[sym::CharPosn];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     match cpu.reg.x {
         0xa1 | 0x96 => {
             rndp(cpu);
@@ -737,6 +891,8 @@ pub fn MaybeStrike(cpu: &mut Cpu) {
 
 pub fn DoRelease(cpu: &mut Cpu) {
     cpu.reg.a = 0x00;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::clrF] = cpu.reg.a;
     cpu.mem[sym::clrB] = cpu.reg.a;
     cpu.mem[sym::clrU] = cpu.reg.a;
@@ -751,6 +907,8 @@ pub fn DoRelease(cpu: &mut Cpu) {
 #[doc(alias = "DoFwd")]
 pub fn DoAdvance(cpu: &mut Cpu) {
     cpu.reg.a = 0xff;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::clrF] = cpu.reg.a;
     cpu.mem[sym::JSTKX] = cpu.reg.a;
     return;
@@ -760,6 +918,8 @@ pub fn DoAdvance(cpu: &mut Cpu) {
 pub fn DoRetreat(cpu: &mut Cpu) {
     cpu.mem[sym::clrB] = 0xff;
     cpu.reg.a = 0x01;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::JSTKX] = cpu.reg.a;
     return;
 }
@@ -767,6 +927,8 @@ pub fn DoRetreat(cpu: &mut Cpu) {
 #[doc(alias = "DoUp")]
 pub fn DoBlock(cpu: &mut Cpu) {
     cpu.reg.a = 0xff;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::clrU] = cpu.reg.a;
     cpu.mem[sym::JSTKY] = cpu.reg.a;
     return;
@@ -776,6 +938,8 @@ pub fn DoBlock(cpu: &mut Cpu) {
 pub fn DoTurn(cpu: &mut Cpu) {
     cpu.mem[sym::clrD] = 0xff;
     cpu.reg.a = 0x01;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::JSTKY] = cpu.reg.a;
     return;
 }
@@ -802,6 +966,8 @@ pub fn DoEngarde(cpu: &mut Cpu) {
 #[doc(alias = "DoPress")]
 pub fn DoStrike(cpu: &mut Cpu) {
     cpu.reg.a = 0xff;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::clrbtn] = cpu.reg.a;
     cpu.mem[sym::btn] = cpu.reg.a;
     return;
@@ -809,18 +975,24 @@ pub fn DoStrike(cpu: &mut Cpu) {
 
 pub fn DoRelBtn(cpu: &mut Cpu) {
     cpu.reg.a = 0x00;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::btn] = cpu.reg.a;
     return;
 }
 
 pub fn rndp(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::guardprog];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     crate::ext::rnd(cpu);
     return;
 }
 
 pub fn CHECKSTRIKE(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::KidPosn];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x00 {
         return;
     }
@@ -840,14 +1012,20 @@ pub fn CHECKSTRIKE(cpu: &mut Cpu) {
 
 pub fn TestStrike(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::CharSword];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x02 {
         return;
     }
     cpu.reg.a = cpu.mem[sym::CharBlockY];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != cpu.mem[sym::OpBlockY] {
         return;
     }
     cpu.reg.a = cpu.mem[sym::CharPosn];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     match cpu.reg.a {
         0x99 | 0x9a => {
             'b12: {
@@ -855,20 +1033,30 @@ pub fn TestStrike(cpu: &mut Cpu) {
                 if cpu.reg.a >= 0x00 {
                     if cpu.reg.a < 0x1d {
                         cpu.reg.a = cpu.mem[sym::OpPosn];
+                        cpu.flags.z = cpu.reg.a == 0;
+                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                         if cpu.reg.a != 0xa1 {
                             if cpu.reg.a != 0x96 {
                                 break 'b12;
                             } else {
                                 cpu.reg.a = 0xa1;
+                                cpu.flags.z = cpu.reg.a == 0;
+                                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                                 cpu.mem[sym::OpPosn] = cpu.reg.a;
                             }
                         }
                         cpu.reg.a = cpu.mem[sym::CharID];
+                        cpu.flags.z = cpu.reg.a == 0;
+                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                         if cpu.reg.a != 0x00 {
                             cpu.reg.a = 0x04;  // yes--impair my blocking ability for a while
+                            cpu.flags.z = cpu.reg.a == 0;
+                            cpu.flags.n = (cpu.reg.a >> 7) != 0;
                             cpu.mem[sym::justblocked] = cpu.reg.a;
                         }
                         cpu.reg.a = 0x45;
+                        cpu.flags.z = cpu.reg.a == 0;
+                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                         crate::ext::jumpseq(cpu);
                         crate::ext::animchar(cpu);
                         return;
@@ -876,11 +1064,15 @@ pub fn TestStrike(cpu: &mut Cpu) {
                 }
             }
             cpu.reg.a = cpu.mem[sym::CharPosn];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             if cpu.reg.a != 0x9a {
                 return;
             }
             crate::ext::getopdist(cpu);
             cpu.reg.x = cpu.mem[sym::OpSword];
+            cpu.flags.z = cpu.reg.x == 0;
+            cpu.flags.n = (cpu.reg.x >> 7) != 0;
             if cpu.reg.x >= 0x02 {
                 if cpu.reg.a < 0x0c {
                     return;
@@ -894,6 +1086,8 @@ pub fn TestStrike(cpu: &mut Cpu) {
                 return;
             }
             cpu.reg.a = 0x63;  // "stabbed"
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             cpu.mem[sym::OpAction] = cpu.reg.a;
             return;
         }
@@ -904,18 +1098,24 @@ pub fn TestStrike(cpu: &mut Cpu) {
 
 pub fn CHECKSTAB(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::ShadAction];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     let _o: u8 = 0x63;
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
     cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
     if cpu.reg.a == 0x63 {
         cpu.reg.a = cpu.mem[sym::KidAction];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = 0x63;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
         cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
         if cpu.reg.a == 0x63 {
             cpu.reg.a = 0x01;
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             cpu.mem[sym::KidAction] = cpu.reg.a;
             if cpu.flags.z {
                 return;
@@ -926,9 +1126,13 @@ pub fn CHECKSTAB(cpu: &mut Cpu) {
         crate::ext::SaveShad(cpu);
         rndp(cpu);
         cpu.reg.a = cpu.mem[sym::refractimer + cpu.reg.x as usize];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::refract] = cpu.reg.a;
     }
     cpu.reg.a = cpu.mem[sym::KidAction];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     let _o: u8 = 0x63;
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
@@ -954,10 +1158,16 @@ pub fn chgshadposn(cpu: &mut Cpu) {
         }
     }
     cpu.reg.y = 0x07;
+    cpu.flags.z = cpu.reg.y == 0;
+    cpu.flags.n = (cpu.reg.y >> 7) != 0;
     cpu.reg.a = cpu.mem[(cpu.mem[sym::ztemp] as usize | (cpu.mem[sym::ztemp + 1] as usize) << 8) + cpu.reg.y as usize];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::jumpseq(cpu);
     cpu.mem[sym::CharID] = 0x01;
     cpu.reg.a = 0x00;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::PlayCount] = cpu.reg.a;
     return;
 }
@@ -966,6 +1176,8 @@ pub fn csps(cpu: &mut Cpu) {
     chgshadposn(cpu);
     cpu.mem[sym::guardprog] = 0x03;
     cpu.reg.a = 0x04;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::MaxOppStr] = cpu.reg.a;
     cpu.mem[sym::OppStrength] = cpu.reg.a;
     crate::ext::SaveShad(cpu);
@@ -977,6 +1189,8 @@ pub fn AUTOPLAYBACK(cpu: &mut Cpu) {
         cpu.mem[sym::ProgStart] = cpu.reg.a;
         cpu.mem[sym::ProgStart + 1] = cpu.reg.x;
         cpu.reg.a = cpu.mem[sym::PlayCount];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = 0xfe;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -987,7 +1201,11 @@ pub fn AUTOPLAYBACK(cpu: &mut Cpu) {
             cpu.flags.z = _v == 0;
             cpu.flags.n = (_v >> 7) != 0;
             cpu.reg.y = cpu.mem[sym::PreRecPtr];
+            cpu.flags.z = cpu.reg.y == 0;
+            cpu.flags.n = (cpu.reg.y >> 7) != 0;
             cpu.reg.a = cpu.mem[sym::PlayCount];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             let _o: u8 = cpu.mem[(cpu.mem[sym::ProgStart] as usize | (cpu.mem[sym::ProgStart + 1] as usize) << 8) + cpu.reg.y as usize];
             cpu.flags.c = cpu.reg.a >= _o;
             cpu.flags.z = cpu.reg.a == _o;
@@ -998,6 +1216,8 @@ pub fn AUTOPLAYBACK(cpu: &mut Cpu) {
                 cpu.flags.z = _v == 0;
                 cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.a = cpu.mem[(cpu.mem[sym::ProgStart] as usize | (cpu.mem[sym::ProgStart + 1] as usize) << 8) + cpu.reg.y as usize];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 let _v = cpu.reg.y.wrapping_add(1);
                 cpu.reg.y = _v;
                 cpu.flags.z = _v == 0;
@@ -1009,6 +1229,8 @@ pub fn AUTOPLAYBACK(cpu: &mut Cpu) {
                 cpu.flags.z = _v == 0;
                 cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.a = cpu.mem[(cpu.mem[sym::ProgStart] as usize | (cpu.mem[sym::ProgStart + 1] as usize) << 8) + cpu.reg.y as usize];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
             }
             let _o: u8 = 0xff;
             cpu.flags.c = cpu.reg.a >= _o;
@@ -1080,6 +1302,8 @@ pub fn AUTOPLAYBACK(cpu: &mut Cpu) {
                     break 'b13;
                 }
                 cpu.reg.a = cpu.mem[sym::ShadBlockY];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 let _o: u8 = 0x03;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -1094,6 +1318,8 @@ pub fn AUTOPLAYBACK(cpu: &mut Cpu) {
                 }
             }
             cpu.reg.a = cpu.mem[sym::ShadBlockY];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             if (cpu.reg.a as i8) < 0 {
                 transferguard(cpu);
                 return;
@@ -1103,6 +1329,8 @@ pub fn AUTOPLAYBACK(cpu: &mut Cpu) {
                 return;
             }
             cpu.reg.a = cpu.mem[sym::ShadX];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             let _o: u8 = 0xa5;
             cpu.flags.c = cpu.reg.a >= _o;
             cpu.flags.z = cpu.reg.a == _o;
@@ -1116,6 +1344,8 @@ pub fn AUTOPLAYBACK(cpu: &mut Cpu) {
                 return;
             }
             cpu.reg.a = cpu.mem[sym::ShadX];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             let _o: u8 = 0x5b;
             cpu.flags.c = cpu.reg.a >= _o;
             cpu.flags.z = cpu.reg.a == _o;
@@ -1134,6 +1364,8 @@ pub fn AUTOPLAYBACK(cpu: &mut Cpu) {
 #[doc(alias = "CUTCHECK")]
 pub fn _3aendpb(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::CUTTIMER];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x00 {
         crate::ext::LoadKid(cpu);
         crate::ext::setupchar(cpu);
@@ -1146,6 +1378,8 @@ pub fn _3aendpb(cpu: &mut Cpu) {
         crate::ext::SaveKid(cpu);
         cpu.mem[sym::cutscrn] = cpu.mem[sym::CharScrn];
         cpu.reg.a = cpu.mem[sym::ShadFace];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = 0x56;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -1154,11 +1388,15 @@ pub fn _3aendpb(cpu: &mut Cpu) {
             return;
         }
         cpu.reg.a = cpu.mem[sym::ShadLife];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if (cpu.reg.a as i8) >= 0 {
             updateguard(cpu);
             return;
         }
         cpu.reg.a = cpu.mem[sym::ShadSword];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = 0x02;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -1168,19 +1406,27 @@ pub fn _3aendpb(cpu: &mut Cpu) {
             return;
         }
         cpu.reg.x = cpu.mem[sym::KidScrn];
+        cpu.flags.z = cpu.reg.x == 0;
+        cpu.flags.n = (cpu.reg.x >> 7) != 0;
         cpu.reg.a = cpu.mem[sym::GdStartBlock - 1 + cpu.reg.x as usize];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = 0x1e;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
         cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
         if cpu.reg.a < 0x1e {
             cpu.reg.a = cpu.mem[sym::GdStartSeqH - 1 + cpu.reg.x as usize];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             if cpu.reg.a == 0x00 {
                 updateguard(cpu);
                 return;
             }
         }
         cpu.reg.a = cpu.mem[0x00ec];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if cpu.reg.a != 0x00 {
             let _o: u8 = 0x01;
             cpu.flags.c = cpu.reg.a >= _o;
@@ -1193,6 +1439,8 @@ pub fn _3aendpb(cpu: &mut Cpu) {
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a != 0x02 {
                     cpu.reg.a = cpu.mem[sym::ShadBlockY];
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     let _o: u8 = 0x03;
                     cpu.flags.c = cpu.reg.a >= _o;
                     cpu.flags.z = cpu.reg.a == _o;
@@ -1207,6 +1455,8 @@ pub fn _3aendpb(cpu: &mut Cpu) {
                     }
                 }
                 cpu.reg.a = cpu.mem[sym::ShadBlockY];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if (cpu.reg.a as i8) < 0 {
                     transferguard(cpu);
                     return;
@@ -1217,6 +1467,8 @@ pub fn _3aendpb(cpu: &mut Cpu) {
                 }
             }
             cpu.reg.a = cpu.mem[sym::ShadX];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             let _o: u8 = 0xa5;
             cpu.flags.c = cpu.reg.a >= _o;
             cpu.flags.z = cpu.reg.a == _o;
@@ -1231,6 +1483,8 @@ pub fn _3aendpb(cpu: &mut Cpu) {
             }
         }
         cpu.reg.a = cpu.mem[sym::ShadX];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = 0x5b;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -1251,12 +1505,20 @@ pub fn _3aendpb(cpu: &mut Cpu) {
 
 pub fn transferguard(cpu: &mut Cpu) {
     cpu.reg.a = 0xff;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.x = cpu.mem[sym::KidScrn];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.mem[sym::GdStartBlock - 1 + cpu.reg.x as usize] = cpu.reg.a;
     cpu.reg.x = cpu.mem[sym::ShadScrn];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.mem[sym::GdStartBlock - 1 + cpu.reg.x as usize] = cpu.reg.a;
     crate::ext::LoadShad(cpu);
     cpu.reg.a = cpu.mem[0x00ec];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::cut(cpu);
     crate::ext::SaveShad(cpu);
     return;
@@ -1264,10 +1526,14 @@ pub fn transferguard(cpu: &mut Cpu) {
 
 pub fn updateguard(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::ShadFace];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x56 {
         return;
     }
     cpu.reg.a = cpu.mem[sym::ShadID];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     match cpu.reg.a {
         0x01 | 0x18 => {
             return;
@@ -1276,40 +1542,64 @@ pub fn updateguard(cpu: &mut Cpu) {
     }
     'b6: {
         cpu.reg.a = 0x00;  // arbitrary--ADDGUARD will reconstruct
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::tempblockx] = cpu.reg.a;
         cpu.reg.a = cpu.mem[sym::ShadBlockY];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::tempblocky] = cpu.reg.a;
         crate::ext::indexblock(cpu);
         cpu.reg.a = cpu.reg.y;
         cpu.reg.x = cpu.mem[sym::ShadScrn];
+        cpu.flags.z = cpu.reg.x == 0;
+        cpu.flags.n = (cpu.reg.x >> 7) != 0;
         cpu.mem[sym::GdStartBlock - 1 + cpu.reg.x as usize] = cpu.reg.a;
         cpu.reg.a = cpu.mem[sym::ShadX];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::GdStartX - 1 + cpu.reg.x as usize] = cpu.reg.a;
         cpu.reg.a = cpu.mem[sym::ShadFace];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::GdStartFace - 1 + cpu.reg.x as usize] = cpu.reg.a;
         cpu.reg.a = cpu.mem[sym::guardprog];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::GdStartProg - 1 + cpu.reg.x as usize] = cpu.reg.a;
         cpu.reg.a = cpu.mem[sym::ShadLife];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if (cpu.reg.a as i8) < 0 {
             cpu.reg.a = 0x00;
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             cpu.mem[sym::GdStartSeqH - 1 + cpu.reg.x as usize] = cpu.reg.a;
             if cpu.flags.z {
                 break 'b6;
             }
         }
         cpu.reg.a = cpu.mem[sym::ShadSeq];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::GdStartSeqL - 1 + cpu.reg.x as usize] = cpu.reg.a;
         cpu.reg.a = cpu.mem[sym::ShadSeq + 1];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::GdStartSeqH - 1 + cpu.reg.x as usize] = cpu.reg.a;
     }
     cpu.mem[sym::ShadFace] = 0x56;
     cpu.reg.a = 0x00;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::OppStrength] = cpu.reg.a;
     return;
 }
 
 pub fn CUTGUARD(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::ShadFace];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     let _o: u8 = 0x56;
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
@@ -1318,6 +1608,8 @@ pub fn CUTGUARD(cpu: &mut Cpu) {
         return;
     }
     cpu.reg.a = cpu.mem[sym::ShadY];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     let _o: u8 = 0xd7;
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
@@ -1326,12 +1618,16 @@ pub fn CUTGUARD(cpu: &mut Cpu) {
         return;
     }
     cpu.reg.a = cpu.mem[sym::ShadID];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     let _o: u8 = 0x04;
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
     cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
     if cpu.reg.a == 0x04 {
         cpu.reg.a = cpu.mem[sym::ShadScrn];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         crate::ext::getdown(cpu);
         cpu.mem[sym::ShadScrn] = cpu.reg.a;
         let _o: u8 = 0x03;
@@ -1340,6 +1636,8 @@ pub fn CUTGUARD(cpu: &mut Cpu) {
         cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
         if cpu.reg.a == 0x03 {
             cpu.reg.a = 0x05;
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             crate::ext::addsound(cpu);
             cpu.mem[sym::ShadX] = 0x85;
             cpu.mem[sym::ShadBlockY] = 0x01;
@@ -1355,6 +1653,8 @@ pub fn CUTGUARD(cpu: &mut Cpu) {
         cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
         if cpu.reg.a == 0x01 {
             cpu.reg.a = cpu.mem[sym::ShadAction];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             let _o: u8 = 0x04;
             cpu.flags.c = cpu.reg.a >= _o;
             cpu.flags.z = cpu.reg.a == _o;
@@ -1370,10 +1670,14 @@ pub fn CUTGUARD(cpu: &mut Cpu) {
     }
     crate::ext::deadenemy(cpu);
     cpu.reg.x = cpu.mem[sym::VisScrn];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.mem[sym::GdStartBlock - 1 + cpu.reg.x as usize] = 0xff;
     cpu.mem[sym::ShadFace] = 0x56;
     cpu.mem[sym::OppStrength] = 0x00;
     cpu.reg.a = 0xff;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::ChgOppStr] = cpu.reg.a;
     return;
 }
@@ -1384,7 +1688,11 @@ pub fn cutchar(cpu: &mut Cpu) {
             'b29: {
                 'b28: {
                     cpu.reg.a = cpu.mem[sym::CharY];
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     cpu.reg.x = cpu.mem[sym::CharAction];
+                    cpu.flags.z = cpu.reg.x == 0;
+                    cpu.flags.n = (cpu.reg.x >> 7) != 0;
                     let _o: u8 = 0x05;
                     cpu.flags.c = cpu.reg.x >= _o;
                     cpu.flags.z = cpu.reg.x == _o;
@@ -1426,6 +1734,8 @@ pub fn cutchar(cpu: &mut Cpu) {
                         break 'b29;
                     } else {
                         cpu.reg.x = cpu.mem[sym::CharPosn];
+                        cpu.flags.z = cpu.reg.x == 0;
+                        cpu.flags.n = (cpu.reg.x >> 7) != 0;
                         let _o: u8 = 0x87;
                         cpu.flags.c = cpu.reg.x >= _o;
                         cpu.flags.z = cpu.reg.x == _o;
@@ -1480,6 +1790,8 @@ pub fn cutchar(cpu: &mut Cpu) {
                             }
                         }
                         cpu.reg.a = cpu.mem[sym::CharAction];
+                        cpu.flags.z = cpu.reg.a == 0;
+                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                         let _o: u8 = 0x07;
                         cpu.flags.c = cpu.reg.a >= _o;
                         cpu.flags.z = cpu.reg.a == _o;
@@ -1490,8 +1802,12 @@ pub fn cutchar(cpu: &mut Cpu) {
                             'b27: {
                                 'b26: {
                                     cpu.reg.x = cpu.mem[sym::CharFace];
+                                    cpu.flags.z = cpu.reg.x == 0;
+                                    cpu.flags.n = (cpu.reg.x >> 7) != 0;
                                     if cpu.reg.x != 0x00 {
                                         cpu.reg.a = cpu.mem[sym::leftej];
+                                        cpu.flags.z = cpu.reg.a == 0;
+                                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                                         let _o: u8 = 0x36;
                                         cpu.flags.c = cpu.reg.a >= _o;
                                         cpu.flags.z = cpu.reg.a == _o;
@@ -1517,8 +1833,14 @@ pub fn cutchar(cpu: &mut Cpu) {
                                         }
                                     }
                                     cpu.reg.a = cpu.mem[sym::CharScrn];
+                                    cpu.flags.z = cpu.reg.a == 0;
+                                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                                     cpu.reg.x = 0x09;
+                                    cpu.flags.z = cpu.reg.x == 0;
+                                    cpu.flags.n = (cpu.reg.x >> 7) != 0;
                                     cpu.reg.y = cpu.mem[sym::CharBlockY];
+                                    cpu.flags.z = cpu.reg.y == 0;
+                                    cpu.flags.n = (cpu.reg.y >> 7) != 0;
                                     crate::ext::rdblock(cpu);
                                     let _o: u8 = 0x07;
                                     cpu.flags.c = cpu.reg.a >= _o;
@@ -1531,6 +1853,8 @@ pub fn cutchar(cpu: &mut Cpu) {
                                         cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                                         if cpu.reg.a != 0x0c {
                                             cpu.reg.a = cpu.mem[sym::rightej];
+                                            cpu.flags.z = cpu.reg.a == 0;
+                                            cpu.flags.n = (cpu.reg.a >> 7) != 0;
                                             let _o: u8 = 0xc9;
                                             cpu.flags.c = cpu.reg.a >= _o;
                                             cpu.flags.z = cpu.reg.a == _o;
@@ -1541,6 +1865,8 @@ pub fn cutchar(cpu: &mut Cpu) {
                                         }
                                     }
                                     cpu.reg.a = cpu.mem[sym::rightej];
+                                    cpu.flags.z = cpu.reg.a == 0;
+                                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                                     let _o: u8 = 0x39;
                                     cpu.flags.c = cpu.reg.a >= _o;
                                     cpu.flags.z = cpu.reg.a == _o;
@@ -1554,6 +1880,8 @@ pub fn cutchar(cpu: &mut Cpu) {
                                 mirrmusic(cpu);
                                 milestone3(cpu);
                                 cpu.reg.a = 0x00;
+                                cpu.flags.z = cpu.reg.a == 0;
+                                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                                 if (cpu.reg.a as i8) >= 0 {
                                     break 'b32;
                                 }
@@ -1561,6 +1889,8 @@ pub fn cutchar(cpu: &mut Cpu) {
                             stealsword(cpu);
                             jaffmusic(cpu);
                             cpu.reg.a = 0x01;
+                            cpu.flags.z = cpu.reg.a == 0;
+                            cpu.flags.n = (cpu.reg.a >> 7) != 0;
                             if (cpu.reg.a as i8) >= 0 {
                                 break 'b32;
                             }
@@ -1568,18 +1898,24 @@ pub fn cutchar(cpu: &mut Cpu) {
                     }
                 }
                 cpu.reg.a = 0x02;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if (cpu.reg.a as i8) >= 0 {
                     break 'b32;
                 }
             }
             infinity(cpu);
             cpu.reg.a = cpu.mem[sym::level];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             let _o: u8 = 0x06;
             cpu.flags.c = cpu.reg.a >= _o;
             cpu.flags.z = cpu.reg.a == _o;
             cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
             if cpu.reg.a == 0x06 {
                 cpu.reg.a = cpu.mem[sym::CharScrn];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 let _o: u8 = 0x01;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -1589,9 +1925,13 @@ pub fn cutchar(cpu: &mut Cpu) {
                 }
             }
             cpu.reg.a = 0x03;
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             break 'b32;
         }
         cpu.reg.a = 0xff;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         return;
     }
     let tmp0 = cpu.reg.a;
@@ -1606,58 +1946,88 @@ pub fn infinity(cpu: &mut Cpu) {
 
 pub fn milestone3(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::level];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x03 {
         return;
     }
     cpu.reg.a = 0x07;  // scrn to R of gate
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != cpu.mem[sym::CharScrn] {
         return;
     }
     cpu.mem[sym::milestone] = 0x01;
     cpu.reg.a = cpu.mem[sym::MaxKidStr];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::origstrength] = cpu.reg.a;
     return;
 }
 
 pub fn stealsword(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::level];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x0c {
         return;
     }
     cpu.reg.a = cpu.mem[sym::CharScrn];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x12 {
         return;
     }
     cpu.reg.a = 0x0f;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.x = 0x01;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.y = 0x00;
+    cpu.flags.z = cpu.reg.y == 0;
+    cpu.flags.n = (cpu.reg.y >> 7) != 0;
     crate::ext::rdblock(cpu);
     cpu.reg.a = 0x01;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[(cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
     return;
 }
 
 pub fn jaffmusic(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::level];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x0d {
         return;
     }
     cpu.reg.a = cpu.mem[sym::exitopen];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x00 {
         return;
     }
     cpu.reg.a = cpu.mem[sym::CharScrn];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x03 {
         return;
     }
     cpu.reg.a = 0x0a;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.x = 0x19;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     crate::ext::cuesong(cpu);
     return;
 }
 
 pub fn mirrmusic(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::exitopen];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     match cpu.reg.a {
         0x00 | 0x4d => {
             return;
@@ -1665,15 +2035,27 @@ pub fn mirrmusic(cpu: &mut Cpu) {
         _ => {}
     }
     cpu.reg.a = cpu.mem[sym::level];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x04 {
         cpu.reg.a = cpu.mem[sym::CharBlockY];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if cpu.reg.a == 0x00 {
             cpu.reg.a = cpu.mem[sym::CharScrn];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             if cpu.reg.a == 0x0b {
                 cpu.reg.a = 0x03;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.x = 0x32;
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 crate::ext::cuesong(cpu);
                 cpu.reg.a = 0x4d;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::exitopen] = cpu.reg.a;
             }
         }
@@ -1698,99 +2080,139 @@ pub fn CUT(cpu: &mut Cpu) {
         _ => {}
     }
     cpu.reg.a = cpu.mem[sym::CharScrn];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::getleft(cpu);
     cpu.mem[sym::CharScrn] = cpu.reg.a;
     cpu.reg.a = 0x8c;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + cpu.mem[sym::CharX] as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
     cpu.mem[sym::CharX] = cpu.reg.a;
     cpu.reg.x = 0x01;  // new FromDir
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     return;
 }
 
 pub fn Cleft(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::CharScrn];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::getleft(cpu);
     cpu.mem[sym::CharScrn] = cpu.reg.a;
     cpu.reg.a = 0x8c;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + cpu.mem[sym::CharX] as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
     cpu.mem[sym::CharX] = cpu.reg.a;
     cpu.reg.x = 0x01;  // new FromDir
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     return;
 }
 
 pub fn Cright(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::CharScrn];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::getright(cpu);
     cpu.mem[sym::CharScrn] = cpu.reg.a;
     cpu.reg.a = cpu.mem[sym::CharX];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = true;
     let _r = (cpu.reg.a as u16) + (!0x8c_u8) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
     cpu.mem[sym::CharX] = cpu.reg.a;
     cpu.reg.x = 0x00;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     return;
 }
 
 pub fn Cup(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::CharScrn];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::getup(cpu);
     cpu.mem[sym::CharScrn] = cpu.reg.a;
     cpu.mem[sym::CharBlockY] = (cpu.mem[sym::CharBlockY]).wrapping_add(0x03);
     cpu.reg.a = cpu.mem[sym::CharY];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + (0xbd) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
     cpu.mem[sym::CharY] = cpu.reg.a;
     cpu.reg.x = 0x03;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     return;
 }
 
 pub fn Cdown(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::CharScrn];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::getdown(cpu);
     cpu.mem[sym::CharScrn] = cpu.reg.a;
     cpu.mem[sym::CharBlockY] = (cpu.mem[sym::CharBlockY]).wrapping_sub(0x03);
     cpu.reg.a = cpu.mem[sym::CharY];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = true;
     let _r = (cpu.reg.a as u16) + (!0xbd_u8) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
     cpu.mem[sym::CharY] = cpu.reg.a;
     cpu.reg.x = 0x02;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     return;
 }
 
 pub fn ADDGUARD(cpu: &mut Cpu) {
     'b28: {
         cpu.reg.a = 0x00;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::offguard] = cpu.reg.a;
         cpu.reg.a = cpu.mem[sym::level];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = 0x0c;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
         cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
         if cpu.reg.a != 0x0c {
             cpu.reg.a = cpu.mem[sym::level];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             let _o: u8 = 0x06;
             cpu.flags.c = cpu.reg.a >= _o;
             cpu.flags.z = cpu.reg.a == _o;
             cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
             if cpu.reg.a != 0x06 {
                 cpu.reg.a = cpu.mem[sym::level];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 let _o: u8 = 0x05;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a == 0x05 {
                     cpu.reg.a = cpu.mem[sym::VisScrn];
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     cpu.mem[sym::CharScrn] = cpu.reg.a;
                     let _o: u8 = 0x18;
                     cpu.flags.c = cpu.reg.a >= _o;
@@ -1798,7 +2220,11 @@ pub fn ADDGUARD(cpu: &mut Cpu) {
                     cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if cpu.reg.a == 0x18 {
                         cpu.reg.x = 0x03;
+                        cpu.flags.z = cpu.reg.x == 0;
+                        cpu.flags.n = (cpu.reg.x >> 7) != 0;
                         cpu.reg.y = 0x00;
+                        cpu.flags.z = cpu.reg.y == 0;
+                        cpu.flags.n = (cpu.reg.y >> 7) != 0;
                         crate::ext::rdblock(cpu);
                         let _o: u8 = 0x0a;
                         cpu.flags.c = cpu.reg.a >= _o;
@@ -1808,13 +2234,19 @@ pub fn ADDGUARD(cpu: &mut Cpu) {
                             return;
                         }
                         cpu.reg.a = 0x38;
+                        cpu.flags.z = cpu.reg.a == 0;
+                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                         cpu.reg.x = 0x00;
+                        cpu.flags.z = cpu.reg.x == 0;
+                        cpu.flags.n = (cpu.reg.x >> 7) != 0;
                         csps(cpu);
                         return;
                     }
                 }
             } else {
                 cpu.reg.a = cpu.mem[sym::VisScrn];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::CharScrn] = cpu.reg.a;
                 let _o: u8 = 0x01;
                 cpu.flags.c = cpu.reg.a >= _o;
@@ -1822,25 +2254,41 @@ pub fn ADDGUARD(cpu: &mut Cpu) {
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a == 0x01 {
                     cpu.reg.a = cpu.mem[sym::exitopen];
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     let _o: u8 = 0x4d;
                     cpu.flags.c = cpu.reg.a >= _o;
                     cpu.flags.z = cpu.reg.a == _o;
                     cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if cpu.reg.a != 0x4d {
                         cpu.reg.a = 0x03;
+                        cpu.flags.z = cpu.reg.a == 0;
+                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                         cpu.reg.x = 0x32;
+                        cpu.flags.z = cpu.reg.x == 0;
+                        cpu.flags.n = (cpu.reg.x >> 7) != 0;
                         crate::ext::cuesong(cpu);
                         cpu.reg.a = 0x4d;
+                        cpu.flags.z = cpu.reg.a == 0;
+                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                         cpu.mem[sym::exitopen] = cpu.reg.a;
                     }
                     cpu.reg.a = 0x37;
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     cpu.reg.x = 0x00;
+                    cpu.flags.z = cpu.reg.x == 0;
+                    cpu.flags.n = (cpu.reg.x >> 7) != 0;
                     csps(cpu);
                     return;
                 }
             }
             cpu.reg.x = cpu.mem[sym::VisScrn];
+            cpu.flags.z = cpu.reg.x == 0;
+            cpu.flags.n = (cpu.reg.x >> 7) != 0;
             cpu.reg.a = cpu.mem[sym::GdStartBlock - 1 + cpu.reg.x as usize];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             let _o: u8 = 0x1e;
             cpu.flags.c = cpu.reg.a >= _o;
             cpu.flags.z = cpu.reg.a == _o;
@@ -1853,60 +2301,94 @@ pub fn ADDGUARD(cpu: &mut Cpu) {
                 crate::ext::unindex(cpu);
                 cpu.mem[sym::CharBlockY] = cpu.reg.x;
                 cpu.reg.a = cpu.mem[sym::FloorY + 1 + cpu.reg.x as usize];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::CharY] = cpu.reg.a;
                 cpu.reg.x = cpu.mem[sym::VisScrn];
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 cpu.reg.a = cpu.mem[sym::GdStartX - 1 + cpu.reg.x as usize];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::CharX] = cpu.reg.a;
                 crate::ext::getblockxp(cpu);
                 cpu.mem[sym::CharBlockX] = cpu.reg.a;
                 cpu.reg.x = cpu.mem[sym::VisScrn];
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 cpu.reg.a = cpu.mem[sym::GdStartFace - 1 + cpu.reg.x as usize];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::CharFace] = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::level];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 let _o: u8 = 0x03;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a == 0x03 {
                     cpu.reg.a = 0x04;  // skel
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     if cpu.reg.a != 0x00 {
                         break 'b22;
                     }
                 }
                 cpu.reg.a = 0x02;  // guard
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
             }
             cpu.mem[sym::CharID] = cpu.reg.a;
             cpu.reg.a = cpu.mem[sym::GdStartSeqH - 1 + cpu.reg.x as usize];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             if cpu.reg.a == 0x00 {
                 'b26: {
                     cpu.reg.a = cpu.mem[sym::CharID];
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     let _o: u8 = 0x04;
                     cpu.flags.c = cpu.reg.a >= _o;
                     cpu.flags.z = cpu.reg.a == _o;
                     cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if cpu.reg.a == 0x04 {
                         cpu.reg.a = 0x02;
+                        cpu.flags.z = cpu.reg.a == 0;
+                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                         cpu.mem[sym::CharSword] = cpu.reg.a;
                         cpu.reg.a = 0x3f;  // skel (ready)
+                        cpu.flags.z = cpu.reg.a == 0;
+                        cpu.flags.n = (cpu.reg.a >> 7) != 0;
                         if cpu.reg.a != 0x00 {
                             break 'b26;
                         }
                     }
                     cpu.reg.a = 0x00;
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     cpu.mem[sym::CharSword] = cpu.reg.a;
                     cpu.reg.a = 0x4d;  // guard
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 }
                 crate::ext::jumpseq(cpu);
                 break 'b28;
             }
         } else {
             cpu.reg.a = cpu.mem[sym::exitopen];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             if cpu.reg.a != 0x00 {
                 return;
             }
             cpu.reg.a = cpu.mem[sym::mergetimer];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             if cpu.reg.a == 0x00 {
                 cpu.reg.a = cpu.mem[sym::VisScrn];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 let _o: u8 = 0x0f;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -1915,11 +2397,15 @@ pub fn ADDGUARD(cpu: &mut Cpu) {
         }
         cpu.mem[sym::CharSeq + 1] = cpu.reg.a;
         cpu.reg.a = cpu.mem[sym::GdStartSeqL - 1 + cpu.reg.x as usize];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::CharSeq] = cpu.reg.a;
     }
     'b33: {
         crate::ext::animchar(cpu);
         cpu.reg.a = cpu.mem[sym::CharPosn];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = 0xb9;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -1936,8 +2422,12 @@ pub fn ADDGUARD(cpu: &mut Cpu) {
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a != 0xb2 {
                     cpu.reg.a = 0xff;
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     cpu.mem[sym::CharLife] = cpu.reg.a;
                     cpu.reg.a = 0x00;
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     cpu.mem[sym::alertguard] = cpu.reg.a;
                     cpu.mem[sym::refract] = cpu.reg.a;
                     cpu.mem[sym::justblocked] = cpu.reg.a;
@@ -1947,26 +2437,42 @@ pub fn ADDGUARD(cpu: &mut Cpu) {
             }
         }
         cpu.reg.a = 0x01;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::CharLife] = cpu.reg.a;
         cpu.reg.a = 0x00;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::OppStrength] = cpu.reg.a;
     }
     cpu.mem[sym::CharXVel] = 0x00;
     cpu.mem[sym::CharYVel] = 0x00;
     cpu.mem[sym::CharAction] = 0x01;
     cpu.reg.x = cpu.mem[sym::VisScrn];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::GdStartProg - 1 + cpu.reg.x as usize];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     let _o: u8 = 0x0c;
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
     cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
     if cpu.reg.a >= 0x0c {
         cpu.reg.a = 0x03;  // default
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
     }
     cpu.mem[sym::guardprog] = cpu.reg.a;
     cpu.reg.x = cpu.mem[sym::level];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::basiccolor + cpu.reg.x as usize];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.x = cpu.mem[sym::guardprog];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a ^= cpu.mem[sym::specialcolor + cpu.reg.x as usize];
     cpu.mem[sym::GuardColor] = cpu.reg.a;
     crate::ext::SaveShad(cpu);
@@ -1976,7 +2482,11 @@ pub fn ADDGUARD(cpu: &mut Cpu) {
 #[doc(alias = "AddNormalGd")]
 pub fn _3anot5(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::VisScrn];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::GdStartBlock - 1 + cpu.reg.x as usize];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a >= 0x1e {
         return;
     }
@@ -1985,56 +2495,92 @@ pub fn _3anot5(cpu: &mut Cpu) {
         crate::ext::unindex(cpu);
         cpu.mem[sym::CharBlockY] = cpu.reg.x;
         cpu.reg.a = cpu.mem[sym::FloorY + 1 + cpu.reg.x as usize];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::CharY] = cpu.reg.a;
         cpu.reg.x = cpu.mem[sym::VisScrn];
+        cpu.flags.z = cpu.reg.x == 0;
+        cpu.flags.n = (cpu.reg.x >> 7) != 0;
         cpu.reg.a = cpu.mem[sym::GdStartX - 1 + cpu.reg.x as usize];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::CharX] = cpu.reg.a;
         crate::ext::getblockxp(cpu);
         cpu.mem[sym::CharBlockX] = cpu.reg.a;
         cpu.reg.x = cpu.mem[sym::VisScrn];
+        cpu.flags.z = cpu.reg.x == 0;
+        cpu.flags.n = (cpu.reg.x >> 7) != 0;
         cpu.reg.a = cpu.mem[sym::GdStartFace - 1 + cpu.reg.x as usize];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::CharFace] = cpu.reg.a;
         cpu.reg.a = cpu.mem[sym::level];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if cpu.reg.a == 0x03 {
             cpu.reg.a = 0x04;  // skel
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             if cpu.reg.a != 0x00 {
                 break 'b4;
             }
         }
         cpu.reg.a = 0x02;  // guard
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
     }
     cpu.mem[sym::CharID] = cpu.reg.a;
     cpu.reg.a = cpu.mem[sym::GdStartSeqH - 1 + cpu.reg.x as usize];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x00 {
         cpu.mem[sym::CharSeq + 1] = cpu.reg.a;
         cpu.reg.a = cpu.mem[sym::GdStartSeqL - 1 + cpu.reg.x as usize];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::CharSeq] = cpu.reg.a;
     } else {
         'b8: {
             cpu.reg.a = cpu.mem[sym::CharID];
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             if cpu.reg.a == 0x04 {
                 cpu.reg.a = 0x02;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::CharSword] = cpu.reg.a;
                 cpu.reg.a = 0x3f;  // skel (ready)
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a != 0x00 {
                     break 'b8;
                 }
             }
             cpu.reg.a = 0x00;
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             cpu.mem[sym::CharSword] = cpu.reg.a;
             cpu.reg.a = 0x4d;  // guard
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
         }
         crate::ext::jumpseq(cpu);
     }
     'b15: {
         crate::ext::animchar(cpu);
         cpu.reg.a = cpu.mem[sym::CharPosn];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if cpu.reg.a != 0xb9 {
             if cpu.reg.a != 0xb1 {
                 if cpu.reg.a != 0xb2 {
                     cpu.reg.a = 0xff;
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     cpu.mem[sym::CharLife] = cpu.reg.a;
                     cpu.reg.a = 0x00;
+                    cpu.flags.z = cpu.reg.a == 0;
+                    cpu.flags.n = (cpu.reg.a >> 7) != 0;
                     cpu.mem[sym::alertguard] = cpu.reg.a;
                     cpu.mem[sym::refract] = cpu.reg.a;
                     cpu.mem[sym::justblocked] = cpu.reg.a;
@@ -2044,22 +2590,38 @@ pub fn _3anot5(cpu: &mut Cpu) {
             }
         }
         cpu.reg.a = 0x01;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::CharLife] = cpu.reg.a;
         cpu.reg.a = 0x00;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::OppStrength] = cpu.reg.a;
     }
     cpu.mem[sym::CharXVel] = 0x00;
     cpu.mem[sym::CharYVel] = 0x00;
     cpu.mem[sym::CharAction] = 0x01;
     cpu.reg.x = cpu.mem[sym::VisScrn];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::GdStartProg - 1 + cpu.reg.x as usize];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a >= 0x0c {
         cpu.reg.a = 0x03;  // default
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
     }
     cpu.mem[sym::guardprog] = cpu.reg.a;
     cpu.reg.x = cpu.mem[sym::level];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::basiccolor + cpu.reg.x as usize];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.x = cpu.mem[sym::guardprog];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a ^= cpu.mem[sym::specialcolor + cpu.reg.x as usize];
     cpu.mem[sym::GuardColor] = cpu.reg.a;
     crate::ext::SaveShad(cpu);
@@ -2068,8 +2630,14 @@ pub fn _3anot5(cpu: &mut Cpu) {
 
 pub fn getgdstrength(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::level];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::basicstrength + cpu.reg.x as usize];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.x = cpu.mem[sym::guardprog];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + cpu.mem[sym::extrastrength + cpu.reg.x as usize] as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;

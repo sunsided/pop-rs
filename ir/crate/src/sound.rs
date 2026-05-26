@@ -9,6 +9,8 @@ use crate::sym;
 #[doc(alias = "endlook")]
 pub fn ZEROSOUND(cpu: &mut Cpu) {
     cpu.reg.a = 0x00;  // # sounds in table
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::soundtable] = cpu.reg.a;
     return;
 }
@@ -16,6 +18,8 @@ pub fn ZEROSOUND(cpu: &mut Cpu) {
 pub fn ADDSOUND(cpu: &mut Cpu) {
     cpu.mem[sym::savex] = cpu.reg.x;
     cpu.reg.x = cpu.mem[sym::soundtable];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     if cpu.reg.x < 0x20 {
         let _v = cpu.reg.x.wrapping_add(1);
         cpu.reg.x = _v;
@@ -25,21 +29,31 @@ pub fn ADDSOUND(cpu: &mut Cpu) {
         cpu.mem[sym::soundtable] = cpu.reg.x;
     }
     cpu.reg.x = cpu.mem[sym::savex];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     return;
 }
 
 pub fn PLAYBACK(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::soundon];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a == 0x00 {
     } else {
         cpu.reg.x = cpu.mem[sym::soundtable];
+        cpu.flags.z = cpu.reg.x == 0;
+        cpu.flags.n = (cpu.reg.x >> 7) != 0;
         if cpu.reg.x == 0x00 {
         } else {
             loop {
                 cpu.reg.a = cpu.mem[sym::soundtable + cpu.reg.x as usize];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::savex] = cpu.reg.x;
                 makesound(cpu);
                 cpu.reg.x = cpu.mem[sym::savex];
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 let _v = cpu.reg.x.wrapping_sub(1);
                 cpu.reg.x = _v;
                 cpu.flags.z = _v == 0;
@@ -61,8 +75,12 @@ pub fn makesound(cpu: &mut Cpu) {
     }
     cpu.reg.x = cpu.reg.a;
     cpu.reg.a = cpu.mem[sym::lookup + cpu.reg.x as usize];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.local.insert((":sm", 1), cpu.reg.a);
     cpu.reg.a = cpu.mem[sym::lookup + 1 + cpu.reg.x as usize];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.local.insert((":sm", 2), cpu.reg.a);
     crate::ext::_24ffff(cpu);
     return;
@@ -70,32 +88,56 @@ pub fn makesound(cpu: &mut Cpu) {
 
 pub fn DoPlateDown(cpu: &mut Cpu) {
     cpu.reg.y = 0x46;
+    cpu.flags.z = cpu.reg.y == 0;
+    cpu.flags.n = (cpu.reg.y >> 7) != 0;
     cpu.reg.x = 0x00;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x04;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tone(cpu);
     return;
 }
 
 pub fn DoPlateUp(cpu: &mut Cpu) {
     cpu.reg.y = 0x5a;
+    cpu.flags.z = cpu.reg.y == 0;
+    cpu.flags.n = (cpu.reg.y >> 7) != 0;
     cpu.reg.x = 0x00;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x04;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tone(cpu);
     return;
 }
 
 pub fn DoGateDown(cpu: &mut Cpu) {
     cpu.reg.y = 0x46;
+    cpu.flags.z = cpu.reg.y == 0;
+    cpu.flags.n = (cpu.reg.y >> 7) != 0;
     cpu.reg.x = 0x00;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x04;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tone(cpu);
     return;
 }
 
 pub fn DoJawsClash(cpu: &mut Cpu) {
     cpu.reg.y = 0x0a;
+    cpu.flags.z = cpu.reg.y == 0;
+    cpu.flags.n = (cpu.reg.y >> 7) != 0;
     cpu.reg.x = 0x00;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x32;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tone(cpu);
     return;
 }
@@ -104,24 +146,42 @@ pub fn DoJawsClash(cpu: &mut Cpu) {
 #[doc(alias = "DoSwordClash2")]
 pub fn DoSpecialKey1(cpu: &mut Cpu) {
     cpu.reg.y = 0x0f;
+    cpu.flags.z = cpu.reg.y == 0;
+    cpu.flags.n = (cpu.reg.y >> 7) != 0;
     cpu.reg.x = 0x00;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x32;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tone(cpu);
     return;
 }
 
 pub fn DoSpecialKey2(cpu: &mut Cpu) {
     cpu.reg.y = 0x28;
+    cpu.flags.z = cpu.reg.y == 0;
+    cpu.flags.n = (cpu.reg.y >> 7) != 0;
     cpu.reg.x = 0x00;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x32;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tone(cpu);
     return;
 }
 
 pub fn DoSplat(cpu: &mut Cpu) {
     cpu.reg.y = 0xe8;
+    cpu.flags.z = cpu.reg.y == 0;
+    cpu.flags.n = (cpu.reg.y >> 7) != 0;
     cpu.reg.x = 0x03;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x03;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tone(cpu);
     return;
 }
@@ -139,15 +199,29 @@ pub fn DoLooseCrash(cpu: &mut Cpu) {
 #[doc(alias = "DoFlashMsg")]
 pub fn DoGotKey(cpu: &mut Cpu) {
     cpu.reg.a = 0x02;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     loop {
         let tmp0 = cpu.reg.a;
         cpu.reg.y = 0xf4;
+        cpu.flags.z = cpu.reg.y == 0;
+        cpu.flags.n = (cpu.reg.y >> 7) != 0;
         cpu.reg.x = 0x01;
+        cpu.flags.z = cpu.reg.x == 0;
+        cpu.flags.n = (cpu.reg.x >> 7) != 0;
         cpu.reg.a = 0x0f;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         tone(cpu);
         cpu.reg.y = 0x64;
+        cpu.flags.z = cpu.reg.y == 0;
+        cpu.flags.n = (cpu.reg.y >> 7) != 0;
         cpu.reg.x = 0x00;
+        cpu.flags.z = cpu.reg.x == 0;
+        cpu.flags.n = (cpu.reg.x >> 7) != 0;
         cpu.reg.a = 0x19;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         tone(cpu);
         cpu.reg.a = tmp0;
         cpu.flags.c = true;
@@ -163,40 +237,70 @@ pub fn DoGotKey(cpu: &mut Cpu) {
 
 pub fn DoFootstep(cpu: &mut Cpu) {
     cpu.reg.y = 0x23;
+    cpu.flags.z = cpu.reg.y == 0;
+    cpu.flags.n = (cpu.reg.y >> 7) != 0;
     cpu.reg.x = 0x00;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x03;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tone(cpu);
     return;
 }
 
 pub fn DoRaisingExit(cpu: &mut Cpu) {
     cpu.reg.y = 0x28;
+    cpu.flags.z = cpu.reg.y == 0;
+    cpu.flags.n = (cpu.reg.y >> 7) != 0;
     cpu.reg.x = 0x00;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x06;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tone(cpu);
     return;
 }
 
 pub fn DoRaisingGate(cpu: &mut Cpu) {
     cpu.reg.y = 0x14;
+    cpu.flags.z = cpu.reg.y == 0;
+    cpu.flags.n = (cpu.reg.y >> 7) != 0;
     cpu.reg.x = 0x00;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x02;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tone(cpu);
     return;
 }
 
 pub fn DoLowerGate(cpu: &mut Cpu) {
     cpu.reg.y = 0x07;
+    cpu.flags.z = cpu.reg.y == 0;
+    cpu.flags.n = (cpu.reg.y >> 7) != 0;
     cpu.reg.x = 0x00;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x08;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tone(cpu);
     return;
 }
 
 pub fn DoSmackWall(cpu: &mut Cpu) {
     cpu.reg.y = 0xe8;
+    cpu.flags.z = cpu.reg.y == 0;
+    cpu.flags.n = (cpu.reg.y >> 7) != 0;
     cpu.reg.x = 0x03;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x03;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tone(cpu);
     return;
 }
@@ -225,10 +329,14 @@ pub fn tone(cpu: &mut Cpu) {
                 cpu.flags.z = (cpu.reg.a & _o) == 0;
                 cpu.flags.n = (_o >> 7) != 0;
                 cpu.reg.x = 0x00;
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 pc = 2;
             }
             2 => {
                 cpu.reg.y = 0x00;
+                cpu.flags.z = cpu.reg.y == 0;
+                cpu.flags.n = (cpu.reg.y >> 7) != 0;
                 pc = 3;
             }
             3 => {

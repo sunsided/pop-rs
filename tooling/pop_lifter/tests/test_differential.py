@@ -12,10 +12,10 @@ the interpreter (which always computes them) — registers and RAM are
 never elided.
 
 Pilots are routines confirmed to run to completion in the interpreter
-(no external calls / synthetic-label access) and to match the crate; one
-or more per segment. A broader sweep finds ~380/411 runnable routines
-already agree — the ~31 divergences are tracked separately for
-investigation.
+(no external calls / synthetic-label access); one or more per segment,
+plus a few that previously exposed emitter bugs. A broader sweep now
+finds *all* ~426 runnable routines match the crate exactly from the zero
+state.
 
 Skipped when `cargo` is absent (e.g. minimal CI images), mirroring the
 `rustc` compile-check test.
@@ -49,9 +49,12 @@ _PILOTS = [
     ("grafix", "RND"),
     ("grafix", "cvtpdl"),
     ("hires", "CROP"),
+    ("hires", "LayGen"),     # load-Z/N live across jsr CROP (was a divergence)
     ("master", "SetLevel"),
     ("misc", "STABCHAR"),
     ("mover", "gettimer"),
+    ("mover", "GETSPIKES"),  # load-Z/N live-out (was a divergence)
+    ("grafix", "CVTX"),      # stale load-Z/N caused a non-terminating loop
     ("sound", "ADDSOUND"),
     ("specialk", "addkey"),
     ("subs", "GRAVITY"),
