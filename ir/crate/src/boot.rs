@@ -7,9 +7,7 @@ use crate::sym;
 
 pub fn entry(cpu: &mut Cpu) {
     cpu.mem[sym::entry] = 0x60;
-    cpu.reg.a = 0xff;
-    cpu.flags.z = cpu.reg.a == 0;
-    cpu.flags.n = (cpu.reg.a >> 7) != 0;
+    cpu.set_a(0xff);
     cpu.mem[0x04fb] = cpu.reg.a;
     cpu.mem[0x03f3] = cpu.reg.a;
     cpu.mem[0x03f4] = cpu.reg.a;
@@ -24,44 +22,24 @@ pub fn entry(cpu: &mut Cpu) {
     crate::ext::normal(cpu);
     crate::ext::pr0(cpu);
     crate::ext::in0(cpu);
-    cpu.reg.x = cpu.mem[sym::SLOT];
-    cpu.flags.z = cpu.reg.x == 0;
-    cpu.flags.n = (cpu.reg.x >> 7) != 0;
-    cpu.reg.a = cpu.reg.x;
-    cpu.flags.z = cpu.reg.a == 0;
-    cpu.flags.n = (cpu.reg.a >> 7) != 0;
+    cpu.set_x(cpu.mem[sym::SLOT]);
+    cpu.set_a(cpu.reg.x);
     cpu.flags.c = (cpu.reg.a & 1) != 0;
-    cpu.reg.a = cpu.reg.a.wrapping_shr(1);
-    cpu.flags.z = cpu.reg.a == 0;
-    cpu.flags.n = (cpu.reg.a >> 7) != 0;
+    cpu.set_a(cpu.reg.a.wrapping_shr(1));
     cpu.flags.c = (cpu.reg.a & 1) != 0;
-    cpu.reg.a = cpu.reg.a.wrapping_shr(1);
-    cpu.flags.z = cpu.reg.a == 0;
-    cpu.flags.n = (cpu.reg.a >> 7) != 0;
+    cpu.set_a(cpu.reg.a.wrapping_shr(1));
     cpu.flags.c = (cpu.reg.a & 1) != 0;
-    cpu.reg.a = cpu.reg.a.wrapping_shr(1);
-    cpu.flags.z = cpu.reg.a == 0;
-    cpu.flags.n = (cpu.reg.a >> 7) != 0;
+    cpu.set_a(cpu.reg.a.wrapping_shr(1));
     cpu.flags.c = (cpu.reg.a & 1) != 0;
-    cpu.reg.a = cpu.reg.a.wrapping_shr(1);
-    cpu.flags.z = cpu.reg.a == 0;
-    cpu.flags.n = (cpu.reg.a >> 7) != 0;
-    cpu.reg.a |= 0xc0;
-    cpu.flags.z = cpu.reg.a == 0;
-    cpu.flags.n = (cpu.reg.a >> 7) != 0;
+    cpu.set_a(cpu.reg.a.wrapping_shr(1));
+    cpu.set_a(cpu.reg.a | 0xc0);
     cpu.local.insert((":rdsect", 2), cpu.reg.a);
-    cpu.reg.a = 0x0f;
-    cpu.flags.z = cpu.reg.a == 0;
-    cpu.flags.n = (cpu.reg.a >> 7) != 0;
+    cpu.set_a(0x0f);
     cpu.mem[sym::sector] = cpu.reg.a;
     loop {
-        cpu.reg.y = cpu.mem[sym::sector];
-        cpu.flags.z = cpu.reg.y == 0;
-        cpu.flags.n = (cpu.reg.y >> 7) != 0;
+        cpu.set_y(cpu.mem[sym::sector]);
         cpu.mem[0x003d] = cpu.mem[(sym::skewtbl + cpu.reg.y as usize) & 0xffff];
-        cpu.reg.a = cpu.mem[(sym::sectaddr + cpu.reg.y as usize) & 0xffff];
-        cpu.flags.z = cpu.reg.a == 0;
-        cpu.flags.n = (cpu.reg.a >> 7) != 0;
+        cpu.set_a(cpu.mem[(sym::sectaddr + cpu.reg.y as usize) & 0xffff]);
         if cpu.reg.a == 0x00 {
         } else {
             cpu.mem[0x0027] = cpu.reg.a;
@@ -69,15 +47,12 @@ pub fn entry(cpu: &mut Cpu) {
         }
         let _v = cpu.mem[sym::sector].wrapping_sub(1);
         cpu.mem[sym::sector] = _v;
-        cpu.flags.z = _v == 0;
-        cpu.flags.n = (_v >> 7) != 0;
+        cpu.set_nz(_v);
         if cpu.flags.z {
             break;
         }
     }
-    cpu.reg.a = cpu.mem[sym::SLOT];
-    cpu.flags.z = cpu.reg.a == 0;
-    cpu.flags.n = (cpu.reg.a >> 7) != 0;
+    cpu.set_a(cpu.mem[sym::SLOT]);
     crate::ext::_24900(cpu);
     return;
 }
@@ -86,9 +61,7 @@ pub fn stage2(cpu: &mut Cpu) {
     cpu.mem[sym::slot] = cpu.reg.x;
     check128k(cpu);
     moverw18(cpu);
-    cpu.reg.a = 0x00;
-    cpu.flags.z = cpu.reg.a == 0;
-    cpu.flags.n = (cpu.reg.a >> 7) != 0;
+    cpu.set_a(0x00);
     cpu.mem[sym::lastrack] = cpu.reg.a;
     cpu.mem[0x03f3] = cpu.reg.a;
     cpu.mem[0x03f4] = cpu.reg.a;
@@ -102,23 +75,16 @@ pub fn stage2(cpu: &mut Cpu) {
 
 pub fn CHECKER(cpu: &mut Cpu) {
     'b3: {
-        cpu.reg.a = 0xee;
-        cpu.flags.z = cpu.reg.a == 0;
-        cpu.flags.n = (cpu.reg.a >> 7) != 0;
+        cpu.set_a(0xee);
         cpu.mem[0xc005] = cpu.reg.a;
         cpu.mem[0xc003] = cpu.reg.a;
         cpu.mem[0x0800] = cpu.reg.a;
-        cpu.reg.a = cpu.mem[0x0c00];
-        cpu.flags.z = cpu.reg.a == 0;
-        cpu.flags.n = (cpu.reg.a >> 7) != 0;
+        cpu.set_a(cpu.mem[0x0c00]);
         if cpu.reg.a == 0xee {
             cpu.flags.c = (cpu.mem[0x0c00] >> 7) != 0;
             cpu.mem[0x0c00] = cpu.mem[0x0c00].wrapping_shl(1);
-            cpu.flags.z = cpu.mem[0x0c00] == 0;
-            cpu.flags.n = (cpu.mem[0x0c00] >> 7) != 0;
-            cpu.reg.a = cpu.mem[0x0800];
-            cpu.flags.z = cpu.reg.a == 0;
-            cpu.flags.n = (cpu.reg.a >> 7) != 0;
+            cpu.set_nz(cpu.mem[0x0c00]);
+            cpu.set_a(cpu.mem[0x0800]);
             if cpu.reg.a == cpu.mem[0x0c00] {
                 break 'b3;
             }
@@ -131,9 +97,7 @@ pub fn CHECKER(cpu: &mut Cpu) {
 
 pub fn check128k(cpu: &mut Cpu) {
     cpu.mem[0xc081] = cpu.reg.a;
-    cpu.reg.a = cpu.mem[0xfbb3];
-    cpu.flags.z = cpu.reg.a == 0;
-    cpu.flags.n = (cpu.reg.a >> 7) != 0;
+    cpu.set_a(cpu.mem[0xfbb3]);
     let _o: u8 = 0x06;
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
@@ -151,9 +115,7 @@ pub fn check128k(cpu: &mut Cpu) {
     }
     cpu.reg.x = 0x25;
     loop {
-        cpu.reg.a = cpu.mem[(sym::CHECKER + cpu.reg.x as usize) & 0xffff];
-        cpu.flags.z = cpu.reg.a == 0;
-        cpu.flags.n = (cpu.reg.a >> 7) != 0;
+        cpu.set_a(cpu.mem[(sym::CHECKER + cpu.reg.x as usize) & 0xffff]);
         cpu.mem[(0x0180 + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
         cpu.reg.x = cpu.reg.x.wrapping_sub(0x01);
         if !((cpu.reg.x as i8) >= 0) {
@@ -173,27 +135,17 @@ pub fn NOT128K(cpu: &mut Cpu) {
     loop {
         match pc {
             0 => {
-                cpu.reg.x = cpu.mem[sym::SLOT];
-                cpu.flags.z = cpu.reg.x == 0;
-                cpu.flags.n = (cpu.reg.x >> 7) != 0;
-                cpu.reg.a = cpu.mem[(0xc088 + cpu.reg.x as usize) & 0xffff];
-                cpu.flags.z = cpu.reg.a == 0;
-                cpu.flags.n = (cpu.reg.a >> 7) != 0;
+                cpu.set_x(cpu.mem[sym::SLOT]);
+                cpu.set_a(cpu.mem[(0xc088 + cpu.reg.x as usize) & 0xffff]);
                 crate::ext::text(cpu);
                 crate::ext::home(cpu);
-                cpu.reg.a = 0x08;
-                cpu.flags.z = cpu.reg.a == 0;
-                cpu.flags.n = (cpu.reg.a >> 7) != 0;
+                cpu.set_a(0x08);
                 crate::ext::vtab(cpu);
-                cpu.reg.y = 0x00;
-                cpu.flags.z = cpu.reg.y == 0;
-                cpu.flags.n = (cpu.reg.y >> 7) != 0;
+                cpu.set_y(0x00);
                 pc = 1;
             }
             1 => {
-                cpu.reg.a = cpu.mem[(sym::MEMTEXT + cpu.reg.y as usize) & 0xffff];
-                cpu.flags.z = cpu.reg.a == 0;
-                cpu.flags.n = (cpu.reg.a >> 7) != 0;
+                cpu.set_a(cpu.mem[(sym::MEMTEXT + cpu.reg.y as usize) & 0xffff]);
                 if cpu.reg.a == 0x00 {
                     crate::ext::_2a(cpu);
                     return;
@@ -214,17 +166,12 @@ pub fn NOT128K(cpu: &mut Cpu) {
                 }
             }
             3 => {
-                cpu.reg.a = 0x04;
-                cpu.flags.z = cpu.reg.a == 0;
-                cpu.flags.n = (cpu.reg.a >> 7) != 0;
+                cpu.set_a(0x04);
                 cpu.mem[0x0024] = cpu.reg.a;
                 pc = 4;
             }
             4 => {
-                let _v = cpu.reg.y.wrapping_add(1);
-                cpu.reg.y = _v;
-                cpu.flags.z = _v == 0;
-                cpu.flags.n = (_v >> 7) != 0;
+                cpu.set_y(cpu.reg.y.wrapping_add(1));
                 if cpu.reg.y != 0x00 {
                     pc = 1;
                 } else {
@@ -238,38 +185,25 @@ pub fn NOT128K(cpu: &mut Cpu) {
                 let _o: u8 = cpu.mem[0xc08b];
                 cpu.flags.z = (cpu.reg.a & _o) == 0;
                 cpu.flags.n = (_o >> 7) != 0;
-                cpu.reg.a = 0xd0;
-                cpu.flags.z = cpu.reg.a == 0;
-                cpu.flags.n = (cpu.reg.a >> 7) != 0;
-                cpu.reg.x = 0x30;
-                cpu.flags.z = cpu.reg.x == 0;
-                cpu.flags.n = (cpu.reg.x >> 7) != 0;
-                cpu.reg.y = 0x40;
-                cpu.flags.z = cpu.reg.y == 0;
-                cpu.flags.n = (cpu.reg.y >> 7) != 0;
+                cpu.set_a(0xd0);
+                cpu.set_x(0x30);
+                cpu.set_y(0x40);
                 pc = 6;
             }
             6 => {
                 cpu.mem[sym::dest + 1] = cpu.reg.a;
                 cpu.mem[sym::source + 1] = cpu.reg.x;
                 cpu.mem[sym::endsourc + 1] = cpu.reg.y;
-                cpu.reg.y = 0x00;
-                cpu.flags.z = cpu.reg.y == 0;
-                cpu.flags.n = (cpu.reg.y >> 7) != 0;
+                cpu.set_y(0x00);
                 cpu.mem[sym::dest] = cpu.reg.y;
                 cpu.mem[sym::source] = cpu.reg.y;
                 cpu.mem[sym::endsourc] = cpu.reg.y;
                 pc = 7;
             }
             7 => {
-                cpu.reg.a = cpu.mem[((cpu.mem[sym::source] as usize | (cpu.mem[sym::source + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff];
-                cpu.flags.z = cpu.reg.a == 0;
-                cpu.flags.n = (cpu.reg.a >> 7) != 0;
+                cpu.set_a(cpu.mem[((cpu.mem[sym::source] as usize | (cpu.mem[sym::source + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
                 cpu.mem[((cpu.mem[sym::dest] as usize | (cpu.mem[sym::dest + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
-                let _v = cpu.reg.y.wrapping_add(1);
-                cpu.reg.y = _v;
-                cpu.flags.z = _v == 0;
-                cpu.flags.n = (_v >> 7) != 0;
+                cpu.set_y(cpu.reg.y.wrapping_add(1));
                 if cpu.reg.y != 0x00 {
                     pc = 7;
                 } else {
@@ -279,15 +213,11 @@ pub fn NOT128K(cpu: &mut Cpu) {
             8 => {
                 let _v = cpu.mem[sym::source + 1].wrapping_add(1);
                 cpu.mem[sym::source + 1] = _v;
-                cpu.flags.z = _v == 0;
-                cpu.flags.n = (_v >> 7) != 0;
+                cpu.set_nz(_v);
                 let _v = cpu.mem[sym::dest + 1].wrapping_add(1);
                 cpu.mem[sym::dest + 1] = _v;
-                cpu.flags.z = _v == 0;
-                cpu.flags.n = (_v >> 7) != 0;
-                cpu.reg.a = cpu.mem[sym::source + 1];
-                cpu.flags.z = cpu.reg.a == 0;
-                cpu.flags.n = (cpu.reg.a >> 7) != 0;
+                cpu.set_nz(_v);
+                cpu.set_a(cpu.mem[sym::source + 1]);
                 let _o: u8 = cpu.mem[sym::endsourc + 1];
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -317,38 +247,25 @@ pub fn moverw18(cpu: &mut Cpu) {
                 let _o: u8 = cpu.mem[0xc08b];
                 cpu.flags.z = (cpu.reg.a & _o) == 0;
                 cpu.flags.n = (_o >> 7) != 0;
-                cpu.reg.a = 0xd0;
-                cpu.flags.z = cpu.reg.a == 0;
-                cpu.flags.n = (cpu.reg.a >> 7) != 0;
-                cpu.reg.x = 0x30;
-                cpu.flags.z = cpu.reg.x == 0;
-                cpu.flags.n = (cpu.reg.x >> 7) != 0;
-                cpu.reg.y = 0x40;
-                cpu.flags.z = cpu.reg.y == 0;
-                cpu.flags.n = (cpu.reg.y >> 7) != 0;
+                cpu.set_a(0xd0);
+                cpu.set_x(0x30);
+                cpu.set_y(0x40);
                 pc = 1;
             }
             1 => {
                 cpu.mem[sym::dest + 1] = cpu.reg.a;
                 cpu.mem[sym::source + 1] = cpu.reg.x;
                 cpu.mem[sym::endsourc + 1] = cpu.reg.y;
-                cpu.reg.y = 0x00;
-                cpu.flags.z = cpu.reg.y == 0;
-                cpu.flags.n = (cpu.reg.y >> 7) != 0;
+                cpu.set_y(0x00);
                 cpu.mem[sym::dest] = cpu.reg.y;
                 cpu.mem[sym::source] = cpu.reg.y;
                 cpu.mem[sym::endsourc] = cpu.reg.y;
                 pc = 2;
             }
             2 => {
-                cpu.reg.a = cpu.mem[((cpu.mem[sym::source] as usize | (cpu.mem[sym::source + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff];
-                cpu.flags.z = cpu.reg.a == 0;
-                cpu.flags.n = (cpu.reg.a >> 7) != 0;
+                cpu.set_a(cpu.mem[((cpu.mem[sym::source] as usize | (cpu.mem[sym::source + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
                 cpu.mem[((cpu.mem[sym::dest] as usize | (cpu.mem[sym::dest + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
-                let _v = cpu.reg.y.wrapping_add(1);
-                cpu.reg.y = _v;
-                cpu.flags.z = _v == 0;
-                cpu.flags.n = (_v >> 7) != 0;
+                cpu.set_y(cpu.reg.y.wrapping_add(1));
                 if cpu.reg.y != 0x00 {
                     pc = 2;
                 } else {
@@ -358,15 +275,11 @@ pub fn moverw18(cpu: &mut Cpu) {
             3 => {
                 let _v = cpu.mem[sym::source + 1].wrapping_add(1);
                 cpu.mem[sym::source + 1] = _v;
-                cpu.flags.z = _v == 0;
-                cpu.flags.n = (_v >> 7) != 0;
+                cpu.set_nz(_v);
                 let _v = cpu.mem[sym::dest + 1].wrapping_add(1);
                 cpu.mem[sym::dest + 1] = _v;
-                cpu.flags.z = _v == 0;
-                cpu.flags.n = (_v >> 7) != 0;
-                cpu.reg.a = cpu.mem[sym::source + 1];
-                cpu.flags.z = cpu.reg.a == 0;
-                cpu.flags.n = (cpu.reg.a >> 7) != 0;
+                cpu.set_nz(_v);
+                cpu.set_a(cpu.mem[sym::source + 1]);
                 let _o: u8 = cpu.mem[sym::endsourc + 1];
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -393,23 +306,16 @@ pub fn movemem(cpu: &mut Cpu) {
                 cpu.mem[sym::dest + 1] = cpu.reg.a;
                 cpu.mem[sym::source + 1] = cpu.reg.x;
                 cpu.mem[sym::endsourc + 1] = cpu.reg.y;
-                cpu.reg.y = 0x00;
-                cpu.flags.z = cpu.reg.y == 0;
-                cpu.flags.n = (cpu.reg.y >> 7) != 0;
+                cpu.set_y(0x00);
                 cpu.mem[sym::dest] = cpu.reg.y;
                 cpu.mem[sym::source] = cpu.reg.y;
                 cpu.mem[sym::endsourc] = cpu.reg.y;
                 pc = 1;
             }
             1 => {
-                cpu.reg.a = cpu.mem[((cpu.mem[sym::source] as usize | (cpu.mem[sym::source + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff];
-                cpu.flags.z = cpu.reg.a == 0;
-                cpu.flags.n = (cpu.reg.a >> 7) != 0;
+                cpu.set_a(cpu.mem[((cpu.mem[sym::source] as usize | (cpu.mem[sym::source + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
                 cpu.mem[((cpu.mem[sym::dest] as usize | (cpu.mem[sym::dest + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
-                let _v = cpu.reg.y.wrapping_add(1);
-                cpu.reg.y = _v;
-                cpu.flags.z = _v == 0;
-                cpu.flags.n = (_v >> 7) != 0;
+                cpu.set_y(cpu.reg.y.wrapping_add(1));
                 if cpu.reg.y != 0x00 {
                     pc = 1;
                 } else {
@@ -419,15 +325,11 @@ pub fn movemem(cpu: &mut Cpu) {
             2 => {
                 let _v = cpu.mem[sym::source + 1].wrapping_add(1);
                 cpu.mem[sym::source + 1] = _v;
-                cpu.flags.z = _v == 0;
-                cpu.flags.n = (_v >> 7) != 0;
+                cpu.set_nz(_v);
                 let _v = cpu.mem[sym::dest + 1].wrapping_add(1);
                 cpu.mem[sym::dest + 1] = _v;
-                cpu.flags.z = _v == 0;
-                cpu.flags.n = (_v >> 7) != 0;
-                cpu.reg.a = cpu.mem[sym::source + 1];
-                cpu.flags.z = cpu.reg.a == 0;
-                cpu.flags.n = (cpu.reg.a >> 7) != 0;
+                cpu.set_nz(_v);
+                cpu.set_a(cpu.mem[sym::source + 1]);
                 let _o: u8 = cpu.mem[sym::endsourc + 1];
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;

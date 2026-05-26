@@ -249,9 +249,8 @@ def test_raw_pla_pops_and_sets_flags():
     # `pla` pops into A and sets Z/N from the byte, matching the 6502.
     lines = _emit_stmt(RawStmt(item=Pla(src=SRC)), 0)
     assert lines == [
-        'self.reg.a = self.stack.pop().expect("pla on empty stack");',
-        "self.flags.z = self.reg.a == 0;",
-        "self.flags.n = (self.reg.a >> 7) != 0;",
+        'let _v = self.stack.pop().expect("pla on empty stack");',
+        "self.set_a(_v);",
     ]
 
 
@@ -664,20 +663,10 @@ def _raw(item) -> str:
     return _emit_one(RawStmt(item=item))
 
 
-def _zn(reg: str) -> str:
-    """The trailing Z/N flag-update lines an op that sets Z/N from `reg`
-    emits after its result line."""
-    return f"\nself.flags.z = self.reg.{reg} == 0;\nself.flags.n = (self.reg.{reg} >> 7) != 0;"
-
-
 def _loaded(reg: str, rvalue: str, comment: str = "") -> str:
-    """Expected emit for a register load: the assignment plus its Z/N
-    update (every 6502 load sets Z/N from the loaded byte)."""
-    return (
-        f"self.reg.{reg} = {rvalue};{comment}\n"
-        f"self.flags.z = self.reg.{reg} == 0;\n"
-        f"self.flags.n = (self.reg.{reg} >> 7) != 0;"
-    )
+    """Expected emit for a register write that sets Z/N: a `set_<reg>`
+    call (`Cpu::set_a`/`set_x`/`set_y` write the register + Z/N)."""
+    return f"self.set_{reg}({rvalue});{comment}"
 
 
 def test_raw_load_imm():
@@ -711,14 +700,12 @@ def test_raw_inc_dec_op_var_ref_bumps_field():
     assert _raw(IncTarget(target=OpVarRef(name="smBASE", half="hi"), src=SRC)) == (
         "let _v = self.smc.smBASE_hi.wrapping_add(1);\n"
         "self.smc.smBASE_hi = _v;\n"
-        "self.flags.z = _v == 0;\n"
-        "self.flags.n = (_v >> 7) != 0;"
+        "self.set_nz(_v);"
     )
     assert _raw(DecTarget(target=OpVarRef(name="smXCO", half=None), src=SRC)) == (
         "let _v = self.smc.smXCO.wrapping_sub(1);\n"
         "self.smc.smXCO = _v;\n"
-        "self.flags.z = _v == 0;\n"
-        "self.flags.n = (_v >> 7) != 0;"
+        "self.set_nz(_v);"
     )
 
 
@@ -757,52 +744,40 @@ def test_raw_store_indexed():
 
 
 def test_raw_transfer():
-    assert _raw(Transfer(src_reg=Reg.A, dst_reg=Reg.X, src=SRC)) == "self.reg.x = self.reg.a;" + _zn("x")
+    assert _raw(Transfer(src_reg=Reg.A, dst_reg=Reg.X, src=SRC)) == "self.set_x(self.reg.a);"
 
 
 def test_raw_bitwise_and_or_eor():
-    assert _raw(Bitwise(op="and", source=_imm(0x0f), src=SRC)) == "self.reg.a &= 0x0f;" + _zn("a")
-    assert _raw(Bitwise(op="or", source=_abs("M", 0x40), src=SRC)) == "self.reg.a |= self.mem[0x0040];" + _zn("a")
+    assert _raw(Bitwise(op="and", source=_imm(0x0f), src=SRC)) == "self.set_a(self.reg.a & 0x0f);"
+    assert _raw(Bitwise(op="or", source=_abs("M", 0x40), src=SRC)) == "self.set_a(self.reg.a | self.mem[0x0040]);"
     eor_indexed = Bitwise(op="eor", source=IndexedAbs(base=_abs("t", 0x0200), index=Reg.X), src=SRC)
-    assert _raw(eor_indexed) == "self.reg.a ^= self.mem[(0x0200 + self.reg.x as usize) & 0xffff];" + _zn("a")
+    assert _raw(eor_indexed) == "self.set_a(self.reg.a ^ self.mem[(0x0200 + self.reg.x as usize) & 0xffff]);"
 
 
 def test_raw_bitwise_indirect():
     item = Bitwise(op="and", source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
     assert _raw(item) == (
-        "self.reg.a &= self.mem[((self.mem[0x0020] as usize "
-        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize) & 0xffff];" + _zn("a")
+        "self.set_a(self.reg.a & self.mem[((self.mem[0x0020] as usize "
+        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize) & 0xffff]);"
     )
 
 
 def test_raw_inc_dec_register():
     # inc/dec set Z/N from the post-update value (6502; matches the interp).
-    assert _raw(IncTarget(target=Reg.X, src=SRC)) == (
-        "let _v = self.reg.x.wrapping_add(1);\n"
-        "self.reg.x = _v;\n"
-        "self.flags.z = _v == 0;\n"
-        "self.flags.n = (_v >> 7) != 0;"
-    )
-    assert _raw(DecTarget(target=Reg.Y, src=SRC)) == (
-        "let _v = self.reg.y.wrapping_sub(1);\n"
-        "self.reg.y = _v;\n"
-        "self.flags.z = _v == 0;\n"
-        "self.flags.n = (_v >> 7) != 0;"
-    )
+    assert _raw(IncTarget(target=Reg.X, src=SRC)) == "self.set_x(self.reg.x.wrapping_add(1));"
+    assert _raw(DecTarget(target=Reg.Y, src=SRC)) == "self.set_y(self.reg.y.wrapping_sub(1));"
 
 
 def test_raw_inc_dec_memory():
     assert _raw(IncTarget(target=_abs("M", 0x40), src=SRC)) == (
         "let _v = self.mem[0x0040].wrapping_add(1);\n"
         "self.mem[0x0040] = _v;\n"
-        "self.flags.z = _v == 0;\n"
-        "self.flags.n = (_v >> 7) != 0;"
+        "self.set_nz(_v);"
     )
     assert _raw(DecTarget(target=_abs("M", 0x40), src=SRC)) == (
         "let _v = self.mem[0x0040].wrapping_sub(1);\n"
         "self.mem[0x0040] = _v;\n"
-        "self.flags.z = _v == 0;\n"
-        "self.flags.n = (_v >> 7) != 0;"
+        "self.set_nz(_v);"
     )
 
 
@@ -848,8 +823,8 @@ def test_raw_sbc_indirect():
         "let _r = (self.reg.a as u16) + (!self.mem[((self.mem[0x0020] as usize "
         "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize) & 0xffff]) as u16 + (self.flags.c as u16);"
     )
-    assert lines[1] == "self.reg.a = _r as u8;"
-    assert lines[2] == "self.flags.c = (_r >> 8) != 0;"
+    assert lines[1] == "self.flags.c = (_r >> 8) != 0;"
+    assert lines[2] == "self.set_a(_r as u8);"
 
 
 def test_raw_sbc_imm_complement_is_byte_width():
@@ -873,8 +848,8 @@ def test_indirect_high_byte_resolves_to_symbol():
     lo = Assign(target=_abs("ztemp", 0xF0), source=_imm(0), src=SRC)
     load = RawStmt(item=LoadIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ztemp", 0xF0)), src=SRC))
     out = emit_module(_module([_routine([lo, load, ReturnStmt(src=SRC)], name="r")]))
-    assert "self.reg.a = self.mem[((self.mem[sym::ztemp] as usize " in out
-    assert "(self.mem[sym::ztemp + 1] as usize) << 8) + self.reg.y as usize) & 0xffff];" in out
+    assert "self.set_a(self.mem[((self.mem[sym::ztemp] as usize " in out
+    assert "(self.mem[sym::ztemp + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);" in out
 
 
 def test_indirect_ptr_with_offset_folds_into_high_byte():
@@ -882,8 +857,8 @@ def test_indirect_ptr_with_offset_folds_into_high_byte():
     # the high byte is `ztemp+2`, not the unparseable `ztemp+1+1`.
     load = RawStmt(item=LoadIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ztemp+1", 0xF1)), src=SRC))
     out = emit_module(_module([_routine([load, ReturnStmt(src=SRC)], name="r")]))
-    assert "self.reg.a = self.mem[((self.mem[sym::ztemp + 1] as usize " in out
-    assert "(self.mem[sym::ztemp + 2] as usize) << 8) + self.reg.y as usize) & 0xffff];" in out
+    assert "self.set_a(self.mem[((self.mem[sym::ztemp + 1] as usize " in out
+    assert "(self.mem[sym::ztemp + 2] as usize) << 8) + self.reg.y as usize) & 0xffff]);" in out
 
 
 # ---------------------------------------------------------------- cmp / bit flag lowering
@@ -1060,31 +1035,30 @@ def test_raw_clc_and_sec():
 
 def test_raw_adc_imm():
     lines = _emit_stmt(RawStmt(item=AdcImm(imm=_imm(0xbd), src=SRC)), 0)
-    assert lines[0] == "let _r = (self.reg.a as u16) + (0xbd) as u16 + (self.flags.c as u16);"
-    assert lines[1] == "self.reg.a = _r as u8;"
-    assert lines[2] == "self.flags.c = (_r >> 8) != 0;"
-    # adc/sbc set Z/N from the result, like loads — needed when a branch
-    # on Z/N follows across an intervening store the fuser can't span.
-    assert lines[3] == "self.flags.z = self.reg.a == 0;"
-    assert lines[4] == "self.flags.n = (self.reg.a >> 7) != 0;"
+    # adc/sbc set the result + carry + Z/N; `set_a` writes A and Z/N.
+    assert lines == [
+        "let _r = (self.reg.a as u16) + (0xbd) as u16 + (self.flags.c as u16);",
+        "self.flags.c = (_r >> 8) != 0;",
+        "self.set_a(_r as u8);",
+    ]
 
 
 def test_raw_asl_and_lsr():
     asl_lines = _emit_stmt(RawStmt(item=Asl(src=SRC)), 0)
     assert asl_lines[0] == "self.flags.c = (self.reg.a >> 7) != 0;"
-    assert asl_lines[1] == "self.reg.a = self.reg.a.wrapping_shl(1);"
-    lsr_lines = _emit_stmt(RawStmt(item=Ror(src=SRC)), 0)
-    assert lsr_lines[0] == "let _c = self.reg.a & 1;"
-    assert lsr_lines[2] == "self.flags.c = _c != 0;"
+    assert asl_lines[1] == "self.set_a(self.reg.a.wrapping_shl(1));"
+    ror_lines = _emit_stmt(RawStmt(item=Ror(src=SRC)), 0)
+    assert ror_lines[0] == "let _c = self.reg.a & 1;"
+    assert ror_lines[2] == "self.flags.c = _c != 0;"
 
 
 def test_raw_rol_and_ror():
     rol = _emit_stmt(RawStmt(item=Rol(src=SRC)), 0)
     assert rol[0] == "let _c = self.reg.a >> 7;"
-    assert rol[1] == "self.reg.a = self.reg.a.wrapping_shl(1) | (self.flags.c as u8);"
+    assert rol[1] == "self.set_a(self.reg.a.wrapping_shl(1) | (self.flags.c as u8));"
     assert rol[2] == "self.flags.c = _c != 0;"
     ror = _emit_stmt(RawStmt(item=Ror(src=SRC)), 0)
-    assert ror[1] == "self.reg.a = self.reg.a.wrapping_shr(1) | ((self.flags.c as u8) << 7);"
+    assert ror[1] == "self.set_a(self.reg.a.wrapping_shr(1) | ((self.flags.c as u8) << 7));"
 
 
 # ---------------------------------------------------------------- multi-module emit

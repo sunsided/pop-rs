@@ -128,7 +128,7 @@ def test_local_ops_lower_to_self_local():
     store = _emit_raw(StoreLocal(reg=Reg.A, target_label=":pitch", offset=1, src=_SRC))
     assert store == ['self.local.insert((":pitch", 1), self.reg.a);']
     load = _emit_raw(LoadLocal(reg=Reg.X, source_label="]flag", offset=0, src=_SRC))
-    assert load[0] == 'self.reg.x = self.local.get(&("]flag", 0)).copied().unwrap_or(0);'
+    assert load[0] == 'self.set_x(self.local.get(&("]flag", 0)).copied().unwrap_or(0));'
     cmp = _emit_raw(CmpLocal(reg=Reg.Y, source_label=":pitch", offset=0, src=_SRC))
     assert 'self.local.get(&(":pitch", 0)).copied().unwrap_or(0)' in cmp[0]
 
@@ -143,6 +143,5 @@ def test_inc_indexed_lowers_to_indexed_mem():
     assert out == [
         f"let _v = {place}.wrapping_add(1);",
         f"{place} = _v;",
-        "self.flags.z = _v == 0;",
-        "self.flags.n = (_v >> 7) != 0;",
+        "self.set_nz(_v);",
     ]
