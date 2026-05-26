@@ -34,10 +34,11 @@ def _sta(addr: int):
 
 def test_tail_call_inside_callee_returns_to_caller():
     """`main` does `jsr sub`; `sub` ends with `jmp tail` (a tail call);
-    `tail` returns. On a 6502 `tail`'s `rts` returns to `main`'s caller,
-    so `main` must continue after the `jsr`. Regression for the IR3
-    interpreter unwinding the tail-call past the call frame to the
-    top-level loop, which abandoned the rest of `main`.
+    `tail` returns. On a 6502, `jsr sub` pushed a return address inside
+    `main`, and `sub`'s `jmp` pushes nothing, so `tail`'s `rts` pops that
+    address — execution resumes in `main` right after the `jsr`. Regression
+    for the IR3 interpreter unwinding the tail-call past the call frame to
+    the top-level loop, which abandoned the rest of `main`.
 
         main: jsr sub ; a=$aa ; sta $80 ; rts
         sub:  a=$01 ; jmp tail
