@@ -154,7 +154,10 @@ pub fn CLS(cpu: &mut Cpu) {
             }
             2 => {
                 cpu.mem[((cpu.smc.smod_hi as usize) << 8 | (0x00)) + cpu.reg.y as usize] = cpu.reg.a;
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.y != 0x00 {
                     pc = 1;
                 } else {
@@ -162,9 +165,18 @@ pub fn CLS(cpu: &mut Cpu) {
                 }
             }
             3 => {
-                cpu.smc.loop_hi = cpu.smc.loop_hi.wrapping_add(1);
-                cpu.smc.smod_hi = cpu.smc.smod_hi.wrapping_add(1);
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.smc.loop_hi.wrapping_add(1);
+                cpu.smc.loop_hi = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
+                let _v = cpu.smc.smod_hi.wrapping_add(1);
+                cpu.smc.smod_hi = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.x != 0x00 {
                     pc = 1;
                 } else {
@@ -186,7 +198,10 @@ pub fn LRCLS(cpu: &mut Cpu) {
         cpu.mem[0x0500 + cpu.reg.y as usize] = cpu.reg.a;
         cpu.mem[0x0600 + cpu.reg.y as usize] = cpu.reg.a;
         cpu.mem[0x0700 + cpu.reg.y as usize] = cpu.reg.a;
-        cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+        let _v = cpu.reg.y.wrapping_sub(1);
+        cpu.reg.y = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         let _o: u8 = 0x7f;
         cpu.flags.c = cpu.reg.y >= _o;
         cpu.flags.z = cpu.reg.y == _o;
@@ -216,7 +231,10 @@ pub fn setimage(cpu: &mut Cpu) {
     cpu.flags.c = (_r >> 8) != 0;
     cpu.reg.y = cpu.reg.a;
     cpu.mem[sym::IMAGE] = cpu.mem[(cpu.mem[sym::TABLE] as usize | (cpu.mem[sym::TABLE + 1] as usize) << 8) + cpu.reg.y as usize];
-    cpu.reg.y = cpu.reg.y.wrapping_add(1);
+    let _v = cpu.reg.y.wrapping_add(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[(cpu.mem[sym::TABLE] as usize | (cpu.mem[sym::TABLE + 1] as usize) << 8) + cpu.reg.y as usize];
     cpu.mem[sym::IMAGE + 1] = cpu.reg.a;
     return;
@@ -230,7 +248,10 @@ pub fn GETWIDTH(cpu: &mut Cpu) {
     cpu.reg.y = 0x01;
     cpu.reg.a = cpu.mem[(cpu.mem[sym::IMAGE] as usize | (cpu.mem[sym::IMAGE + 1] as usize) << 8) + cpu.reg.y as usize];
     cpu.reg.x = cpu.reg.a;
-    cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+    let _v = cpu.reg.y.wrapping_sub(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[(cpu.mem[sym::IMAGE] as usize | (cpu.mem[sym::IMAGE + 1] as usize) << 8) + cpu.reg.y as usize];
     return;
 }
@@ -245,7 +266,10 @@ pub fn PREPREP(cpu: &mut Cpu) {
     setimage(cpu);
     cpu.reg.y = 0x00;
     cpu.mem[sym::WIDTH] = cpu.mem[(cpu.mem[sym::IMAGE] as usize | (cpu.mem[sym::IMAGE + 1] as usize) << 8) + cpu.reg.y as usize];
-    cpu.reg.y = cpu.reg.y.wrapping_add(1);
+    let _v = cpu.reg.y.wrapping_add(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::HEIGHT] = cpu.mem[(cpu.mem[sym::IMAGE] as usize | (cpu.mem[sym::IMAGE + 1] as usize) << 8) + cpu.reg.y as usize];
     cpu.reg.a = cpu.mem[sym::IMAGE];
     cpu.flags.c = false;
@@ -254,7 +278,10 @@ pub fn PREPREP(cpu: &mut Cpu) {
     cpu.flags.c = (_r >> 8) != 0;
     cpu.mem[sym::IMAGE] = cpu.reg.a;
     if cpu.flags.c {
-        cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+        let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+        cpu.mem[sym::IMAGE + 1] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
     }
     cpu.mem[0xc002] = cpu.reg.a;
     return;
@@ -298,9 +325,15 @@ pub fn CROP(cpu: &mut Cpu) {
             cpu.mem[sym::IMAGE] = cpu.reg.a;
             if !cpu.flags.c {
             } else {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
             }
-            cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+            let _v = cpu.reg.x.wrapping_sub(1);
+            cpu.reg.x = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
             let _o: u8 = cpu.mem[sym::BOTCUT];
             cpu.flags.c = cpu.reg.x >= _o;
             cpu.flags.z = cpu.reg.x == _o;
@@ -704,9 +737,15 @@ pub fn CROP(cpu: &mut Cpu) {
             cpu.mem[sym::IMAGE] = cpu.reg.a;
             if !cpu.flags.c {
             } else {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
             }
-            cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+            let _v = cpu.reg.x.wrapping_sub(1);
+            cpu.reg.x = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
             let _o: u8 = cpu.mem[sym::BOTCUT];
             cpu.flags.c = cpu.reg.x >= _o;
             cpu.flags.z = cpu.reg.x == _o;
@@ -890,10 +929,16 @@ pub fn CROP(cpu: &mut Cpu) {
 
 pub fn shiftoffset(cpu: &mut Cpu) {
     if cpu.reg.x >= 0x06 {
-        cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+        let _v = cpu.reg.x.wrapping_sub(1);
+        cpu.reg.x = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         return;
     }
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     return;
 }
 
@@ -920,7 +965,10 @@ pub fn LAYRSAVE(cpu: &mut Cpu) {
                 pc = 2;
             }
             2 => {
-                cpu.mem[sym::WIDTH] = cpu.mem[sym::WIDTH].wrapping_add(1);
+                let _v = cpu.mem[sym::WIDTH].wrapping_add(1);
+                cpu.mem[sym::WIDTH] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 CROP(cpu);
                 if cpu.flags.n {
                     SKIPIT(cpu);
@@ -961,7 +1009,10 @@ pub fn LAYRSAVE(cpu: &mut Cpu) {
                 pc = 5;
             }
             5 => {
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.a = cpu.mem[sym::YCO];
                 cpu.flags.c = true;
                 let _r = (cpu.reg.a as u16) + (!cpu.mem[sym::TOPEDGE]) as u16 + (cpu.flags.c as u16);
@@ -981,7 +1032,10 @@ pub fn LAYRSAVE(cpu: &mut Cpu) {
                 }
             }
             6 => {
-                cpu.mem[sym::PEELBUF + 1] = cpu.mem[sym::PEELBUF + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::PEELBUF + 1].wrapping_add(1);
+                cpu.mem[sym::PEELBUF + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 7;
             }
             7 => {
@@ -1018,7 +1072,10 @@ pub fn LAYRSAVE(cpu: &mut Cpu) {
             13 => {
                 cpu.reg.a = cpu.mem[((cpu.smc.smBASE_hi as usize) << 8 | (cpu.smc.smBASE_lo as usize)) + cpu.reg.y as usize];
                 cpu.mem[(cpu.mem[sym::PEELBUF] as usize | (cpu.mem[sym::PEELBUF + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.y as i8) >= 0 {
                     pc = 12;
                 } else {
@@ -1038,11 +1095,17 @@ pub fn LAYRSAVE(cpu: &mut Cpu) {
                 }
             }
             15 => {
-                cpu.mem[sym::PEELBUF + 1] = cpu.mem[sym::PEELBUF + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::PEELBUF + 1].wrapping_add(1);
+                cpu.mem[sym::PEELBUF + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 16;
             }
             16 => {
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = cpu.mem[sym::TOPEDGE];
                 cpu.flags.c = cpu.reg.x >= _o;
                 cpu.flags.z = cpu.reg.x == _o;
@@ -1121,13 +1184,13 @@ pub fn LayGen(cpu: &mut Cpu) {
                 cpu.smc._90_hi = cpu.reg.a;
                 cpu.smc._92_hi = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::AMASKS + cpu.reg.x as usize];
-                // raw: patch *:AMASK+1 = a            ; HIRES.S:707
+                cpu.local.insert((":AMASK", 1), cpu.reg.a);
                 cpu.reg.a = cpu.mem[sym::BMASKS + cpu.reg.x as usize];
-                // raw: patch *:BMASK+1 = a            ; HIRES.S:709
+                cpu.local.insert((":BMASK", 1), cpu.reg.a);
                 cpu.reg.x = cpu.mem[sym::OPACITY];
                 cpu.reg.a = cpu.mem[sym::OPCODE + cpu.reg.x as usize];
-                // raw: patch *:80 = a            ; HIRES.S:713
-                // raw: patch *:81 = a            ; HIRES.S:714
+                cpu.local.insert((":80", 0), cpu.reg.a);
+                cpu.local.insert((":81", 0), cpu.reg.a);
                 cpu.reg.y = cpu.mem[sym::YCO];
                 pc = 3;
             }
@@ -1151,7 +1214,10 @@ pub fn LayGen(cpu: &mut Cpu) {
                 }
             }
             4 => {
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 5;
             }
             5 => {
@@ -1177,7 +1243,10 @@ pub fn LayGen(cpu: &mut Cpu) {
                 }
             }
             7 => {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 8;
             }
             8 => {
@@ -1229,7 +1298,10 @@ pub fn LayGen(cpu: &mut Cpu) {
             16 => {
                 cpu.reg.a = cpu.mem[((cpu.smc._92_hi as usize) << 8 | (cpu.smc._92_lo as usize)) + cpu.reg.x as usize];
                 cpu.mem[sym::CARRY] = cpu.reg.a;
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = cpu.mem[sym::VISWIDTH];
                 cpu.flags.c = cpu.reg.y >= _o;
                 cpu.flags.z = cpu.reg.y == _o;
@@ -1276,11 +1348,17 @@ pub fn LayGen(cpu: &mut Cpu) {
                 }
             }
             22 => {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 23;
             }
             23 => {
-                cpu.mem[sym::YCO] = cpu.mem[sym::YCO].wrapping_sub(1);
+                let _v = cpu.mem[sym::YCO].wrapping_sub(1);
+                cpu.mem[sym::YCO] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.y = cpu.mem[sym::YCO];
                 let _o: u8 = cpu.mem[sym::TOPEDGE];
                 cpu.flags.c = cpu.reg.y >= _o;
@@ -1325,8 +1403,8 @@ pub fn LayMask(cpu: &mut Cpu) {
             0 => {
                 cpu.reg.x = cpu.mem[sym::OPACITY];
                 cpu.reg.a = cpu.mem[sym::OPCODE + cpu.reg.x as usize];
-                // raw: patch *:masksm1 = a            ; HIRES.S:836
-                // raw: patch *:masksm2 = a            ; HIRES.S:837
+                cpu.local.insert((":masksm1", 0), cpu.reg.a);
+                cpu.local.insert((":masksm2", 0), cpu.reg.a);
                 PREPREP(cpu);
                 CROP(cpu);
                 if cpu.flags.n {
@@ -1384,7 +1462,10 @@ pub fn LayMask(cpu: &mut Cpu) {
                 }
             }
             3 => {
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 4;
             }
             4 => {
@@ -1417,7 +1498,10 @@ pub fn LayMask(cpu: &mut Cpu) {
                 }
             }
             7 => {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 8;
             }
             8 => {
@@ -1484,7 +1568,10 @@ pub fn LayMask(cpu: &mut Cpu) {
             18 => {
                 cpu.reg.a = cpu.mem[((cpu.smc._92_hi as usize) << 8 | (cpu.smc._92_lo as usize)) + cpu.reg.x as usize];
                 cpu.mem[sym::CARRY] = cpu.reg.a;
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = cpu.mem[sym::VISWIDTH];
                 cpu.flags.c = cpu.reg.y >= _o;
                 cpu.flags.z = cpu.reg.y == _o;
@@ -1531,11 +1618,17 @@ pub fn LayMask(cpu: &mut Cpu) {
                 }
             }
             24 => {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 25;
             }
             25 => {
-                cpu.mem[sym::YCO] = cpu.mem[sym::YCO].wrapping_sub(1);
+                let _v = cpu.mem[sym::YCO].wrapping_sub(1);
+                cpu.mem[sym::YCO] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.y = cpu.mem[sym::YCO];
                 let _o: u8 = cpu.mem[sym::TOPEDGE];
                 cpu.flags.c = cpu.reg.y >= _o;
@@ -1603,7 +1696,7 @@ pub fn LayXOR(cpu: &mut Cpu) {
                 cpu.smc.c1_hi = cpu.reg.a;
                 cpu.smc.c2_hi = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::AMASKS + cpu.reg.x as usize];
-                // raw: patch *:AMASK+1 = a            ; HIRES.S:1048
+                cpu.local.insert((":AMASK", 1), cpu.reg.a);
                 cpu.reg.y = cpu.mem[sym::YCO];
                 pc = 3;
             }
@@ -1627,7 +1720,10 @@ pub fn LayXOR(cpu: &mut Cpu) {
                 }
             }
             4 => {
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 5;
             }
             5 => {
@@ -1658,7 +1754,10 @@ pub fn LayXOR(cpu: &mut Cpu) {
                 }
             }
             8 => {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 9;
             }
             9 => {
@@ -1722,7 +1821,10 @@ pub fn LayXOR(cpu: &mut Cpu) {
             18 => {
                 cpu.reg.a = cpu.mem[((cpu.smc._92_hi as usize) << 8 | (cpu.smc._92_lo as usize)) + cpu.reg.x as usize];
                 cpu.mem[sym::CARRY] = cpu.reg.a;
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = cpu.mem[sym::VISWIDTH];
                 cpu.flags.c = cpu.reg.y >= _o;
                 cpu.flags.z = cpu.reg.y == _o;
@@ -1763,11 +1865,17 @@ pub fn LayXOR(cpu: &mut Cpu) {
                 }
             }
             22 => {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 23;
             }
             23 => {
-                cpu.mem[sym::YCO] = cpu.mem[sym::YCO].wrapping_sub(1);
+                let _v = cpu.mem[sym::YCO].wrapping_sub(1);
+                cpu.mem[sym::YCO] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.y = cpu.mem[sym::YCO];
                 let _o: u8 = cpu.mem[sym::TOPEDGE];
                 cpu.flags.c = cpu.reg.y >= _o;
@@ -1848,8 +1956,8 @@ pub fn MLayGen(cpu: &mut Cpu) {
                 cpu.mem[sym::BMASK] = cpu.reg.a;
                 cpu.reg.x = cpu.mem[sym::OPACITY];
                 cpu.reg.a = cpu.mem[sym::OPCODE + cpu.reg.x as usize];
-                // raw: patch *:80 = a            ; HIRES.S:1239
-                // raw: patch *:81 = a            ; HIRES.S:1240
+                cpu.local.insert((":80", 0), cpu.reg.a);
+                cpu.local.insert((":81", 0), cpu.reg.a);
                 cpu.reg.y = cpu.mem[sym::YCO];
                 pc = 3;
             }
@@ -1888,7 +1996,10 @@ pub fn MLayGen(cpu: &mut Cpu) {
                 pc = 7;
             }
             7 => {
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.y as i8) >= 0 {
                     pc = 10;
                 } else {
@@ -1908,7 +2019,10 @@ pub fn MLayGen(cpu: &mut Cpu) {
                 cpu.reg.a &= cpu.mem[sym::AMASK];
                 cpu.mem[sym::CARRY] = cpu.reg.a;
                 cpu.reg.y = cpu.mem[sym::WIDTH];
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 10;
             }
             10 => {
@@ -1938,7 +2052,10 @@ pub fn MLayGen(cpu: &mut Cpu) {
             14 => {
                 cpu.reg.a = cpu.mem[((cpu.smc._92_hi as usize) << 8 | (cpu.smc._92_lo as usize)) + cpu.reg.x as usize];
                 cpu.mem[sym::CARRY] = cpu.reg.a;
-                cpu.mem[sym::BASE] = cpu.mem[sym::BASE].wrapping_add(1);
+                let _v = cpu.mem[sym::BASE].wrapping_add(1);
+                cpu.mem[sym::BASE] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.y = cpu.mem[sym::YREG];
                 let _o: u8 = cpu.mem[sym::RMOST];
                 cpu.flags.c = cpu.reg.y >= _o;
@@ -1951,7 +2068,10 @@ pub fn MLayGen(cpu: &mut Cpu) {
                 }
             }
             15 => {
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.y as i8) >= 0 {
                     pc = 10;
                 } else {
@@ -1992,11 +2112,17 @@ pub fn MLayGen(cpu: &mut Cpu) {
                 }
             }
             20 => {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 21;
             }
             21 => {
-                cpu.mem[sym::YCO] = cpu.mem[sym::YCO].wrapping_sub(1);
+                let _v = cpu.mem[sym::YCO].wrapping_sub(1);
+                cpu.mem[sym::YCO] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.y = cpu.mem[sym::YCO];
                 let _o: u8 = cpu.mem[sym::TOPEDGE];
                 cpu.flags.c = cpu.reg.y >= _o;
@@ -2027,8 +2153,8 @@ pub fn MLayMask(cpu: &mut Cpu) {
             0 => {
                 cpu.reg.x = cpu.mem[sym::OPACITY];
                 cpu.reg.a = cpu.mem[sym::OPCODE + cpu.reg.x as usize];
-                // raw: patch *:masksm1 = a            ; HIRES.S:1359
-                // raw: patch *:masksm2 = a            ; HIRES.S:1360
+                cpu.local.insert((":masksm1", 0), cpu.reg.a);
+                cpu.local.insert((":masksm2", 0), cpu.reg.a);
                 PREPREP(cpu);
                 cpu.reg.a = cpu.mem[sym::XCO];
                 cpu.flags.c = true;
@@ -2071,7 +2197,7 @@ pub fn MLayMask(cpu: &mut Cpu) {
                 cpu.reg.a = cpu.mem[sym::AMASKS + cpu.reg.x as usize];
                 cpu.smc.AMASK = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::BMASKS + cpu.reg.x as usize];
-                // raw: patch *:BMASK+1 = a            ; HIRES.S:1402
+                cpu.local.insert((":BMASK", 1), cpu.reg.a);
                 cpu.reg.y = cpu.mem[sym::YCO];
                 pc = 3;
             }
@@ -2117,7 +2243,10 @@ pub fn MLayMask(cpu: &mut Cpu) {
                 pc = 8;
             }
             8 => {
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.y as i8) >= 0 {
                     pc = 12;
                 } else {
@@ -2141,7 +2270,10 @@ pub fn MLayMask(cpu: &mut Cpu) {
                 cpu.reg.a &= cpu.mem[(cpu.mem[sym::BASE] as usize | (cpu.mem[sym::BASE + 1] as usize) << 8) + cpu.reg.y as usize];
                 cpu.mem[sym::carryim] = cpu.reg.a;
                 cpu.reg.y = cpu.mem[sym::WIDTH];
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 12;
             }
             12 => {
@@ -2185,7 +2317,10 @@ pub fn MLayMask(cpu: &mut Cpu) {
             18 => {
                 cpu.reg.a = cpu.mem[((cpu.smc._92_hi as usize) << 8 | (cpu.smc._92_lo as usize)) + cpu.reg.x as usize];
                 cpu.mem[sym::CARRY] = cpu.reg.a;
-                cpu.mem[sym::BASE] = cpu.mem[sym::BASE].wrapping_add(1);
+                let _v = cpu.mem[sym::BASE].wrapping_add(1);
+                cpu.mem[sym::BASE] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.y = cpu.mem[sym::YREG];
                 let _o: u8 = cpu.mem[sym::RMOST];
                 cpu.flags.c = cpu.reg.y >= _o;
@@ -2198,7 +2333,10 @@ pub fn MLayMask(cpu: &mut Cpu) {
                 }
             }
             19 => {
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.y as i8) >= 0 {
                     pc = 12;
                 } else {
@@ -2243,11 +2381,17 @@ pub fn MLayMask(cpu: &mut Cpu) {
                 }
             }
             25 => {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 26;
             }
             26 => {
-                cpu.mem[sym::YCO] = cpu.mem[sym::YCO].wrapping_sub(1);
+                let _v = cpu.mem[sym::YCO].wrapping_sub(1);
+                cpu.mem[sym::YCO] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.y = cpu.mem[sym::YCO];
                 let _o: u8 = cpu.mem[sym::TOPEDGE];
                 cpu.flags.c = cpu.reg.y >= _o;
@@ -2365,7 +2509,10 @@ pub fn MLayXOR(cpu: &mut Cpu) {
                 pc = 8;
             }
             8 => {
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.y as i8) >= 0 {
                     pc = 12;
                 } else {
@@ -2390,7 +2537,10 @@ pub fn MLayXOR(cpu: &mut Cpu) {
                 cpu.reg.a = 0x00;
                 cpu.mem[sym::carryim] = cpu.reg.a;
                 cpu.reg.y = cpu.mem[sym::WIDTH];
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 12;
             }
             12 => {
@@ -2430,7 +2580,10 @@ pub fn MLayXOR(cpu: &mut Cpu) {
             17 => {
                 cpu.reg.a = cpu.mem[((cpu.smc._92_hi as usize) << 8 | (cpu.smc._92_lo as usize)) + cpu.reg.x as usize];
                 cpu.mem[sym::CARRY] = cpu.reg.a;
-                cpu.mem[sym::BASE] = cpu.mem[sym::BASE].wrapping_add(1);
+                let _v = cpu.mem[sym::BASE].wrapping_add(1);
+                cpu.mem[sym::BASE] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.y = cpu.mem[sym::YREG];
                 let _o: u8 = cpu.mem[sym::RMOST];
                 cpu.flags.c = cpu.reg.y >= _o;
@@ -2443,7 +2596,10 @@ pub fn MLayXOR(cpu: &mut Cpu) {
                 }
             }
             18 => {
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.y as i8) >= 0 {
                     pc = 12;
                 } else {
@@ -2481,11 +2637,17 @@ pub fn MLayXOR(cpu: &mut Cpu) {
                 }
             }
             22 => {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 23;
             }
             23 => {
-                cpu.mem[sym::YCO] = cpu.mem[sym::YCO].wrapping_sub(1);
+                let _v = cpu.mem[sym::YCO].wrapping_sub(1);
+                cpu.mem[sym::YCO] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.y = cpu.mem[sym::YCO];
                 let _o: u8 = cpu.mem[sym::TOPEDGE];
                 cpu.flags.c = cpu.reg.y >= _o;
@@ -2541,7 +2703,7 @@ pub fn FASTLAY(cpu: &mut Cpu) {
             }
             2 => {
                 cpu.reg.a = cpu.mem[sym::OPCODE + cpu.reg.x as usize];
-                // raw: patch *:smod = a            ; HIRES.S:1751
+                cpu.local.insert((":smod", 0), cpu.reg.a);
                 cpu.reg.a = cpu.mem[sym::PAGE];
                 cpu.smc.smPAGE = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::XCO];
@@ -2556,7 +2718,10 @@ pub fn FASTLAY(cpu: &mut Cpu) {
                 cpu.smc.smSTART = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::YCO];
                 cpu.reg.x = cpu.reg.a;
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _r = (cpu.reg.a as u16) + (!cpu.mem[(cpu.mem[sym::IMAGE] as usize | (cpu.mem[sym::IMAGE + 1] as usize) << 8) + cpu.reg.y as usize]) as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
@@ -2585,7 +2750,10 @@ pub fn FASTLAY(cpu: &mut Cpu) {
                 }
             }
             5 => {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 6;
             }
             6 => {
@@ -2627,7 +2795,10 @@ pub fn FASTLAY(cpu: &mut Cpu) {
             13 => {
                 cpu.reg.a |= cpu.mem[(cpu.mem[sym::BASE] as usize | (cpu.mem[sym::BASE + 1] as usize) << 8) + cpu.reg.y as usize];
                 cpu.mem[(cpu.mem[sym::BASE] as usize | (cpu.mem[sym::BASE + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.y as i8) >= 0 {
                     pc = 11;
                 } else {
@@ -2647,11 +2818,17 @@ pub fn FASTLAY(cpu: &mut Cpu) {
                 }
             }
             15 => {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 16;
             }
             16 => {
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 17;
             }
             17 => {
@@ -2692,7 +2869,10 @@ pub fn fastlaySTA(cpu: &mut Cpu) {
                 cpu.smc.smSTART = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::YCO];
                 cpu.reg.x = cpu.reg.a;
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _r = (cpu.reg.a as u16) + (!cpu.mem[(cpu.mem[sym::IMAGE] as usize | (cpu.mem[sym::IMAGE + 1] as usize) << 8) + cpu.reg.y as usize]) as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
@@ -2721,7 +2901,10 @@ pub fn fastlaySTA(cpu: &mut Cpu) {
                 }
             }
             3 => {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 4;
             }
             4 => {
@@ -2757,7 +2940,10 @@ pub fn fastlaySTA(cpu: &mut Cpu) {
             }
             10 => {
                 cpu.mem[((cpu.smc.smod_hi as usize) << 8 | (cpu.smc.smod_lo as usize)) + cpu.reg.y as usize] = cpu.reg.a;
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.y as i8) >= 0 {
                     pc = 9;
                 } else {
@@ -2777,11 +2963,17 @@ pub fn fastlaySTA(cpu: &mut Cpu) {
                 }
             }
             12 => {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 13;
             }
             13 => {
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 14;
             }
             14 => {
@@ -2828,7 +3020,10 @@ pub fn FASTMASK(cpu: &mut Cpu) {
                 cpu.smc.smSTART = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::YCO];
                 cpu.reg.x = cpu.reg.a;
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _r = (cpu.reg.a as u16) + (!cpu.mem[(cpu.mem[sym::IMAGE] as usize | (cpu.mem[sym::IMAGE + 1] as usize) << 8) + cpu.reg.y as usize]) as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
@@ -2857,7 +3052,10 @@ pub fn FASTMASK(cpu: &mut Cpu) {
                 }
             }
             4 => {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 5;
             }
             5 => {
@@ -2899,7 +3097,10 @@ pub fn FASTMASK(cpu: &mut Cpu) {
                 cpu.reg.a = cpu.mem[0xe880 + cpu.reg.x as usize];
                 cpu.reg.a &= cpu.mem[(cpu.mem[sym::BASE] as usize | (cpu.mem[sym::BASE + 1] as usize) << 8) + cpu.reg.y as usize];
                 cpu.mem[(cpu.mem[sym::BASE] as usize | (cpu.mem[sym::BASE + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.y as i8) >= 0 {
                     pc = 10;
                 } else {
@@ -2919,12 +3120,18 @@ pub fn FASTMASK(cpu: &mut Cpu) {
                 }
             }
             13 => {
-                cpu.mem[sym::IMAGE + 1] = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::IMAGE + 1].wrapping_add(1);
+                cpu.mem[sym::IMAGE + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 14;
             }
             14 => {
                 cpu.reg.x = cpu.mem[sym::index];
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 15;
             }
             15 => {
@@ -2948,11 +3155,11 @@ pub fn FASTMASK(cpu: &mut Cpu) {
 
 pub fn SETFASTMAIN(cpu: &mut Cpu) {
     cpu.reg.a = 0x02;
-    // raw: patch *]ramrd1+1 = a            ; HIRES.S:1983
-    // raw: patch *]ramrd2+1 = a            ; HIRES.S:1984
-    // raw: patch *]ramrd3+1 = a            ; HIRES.S:1985
-    // raw: patch *]ramrd4+1 = a            ; HIRES.S:1986
-    // raw: patch *]ramrd5+1 = a            ; HIRES.S:1987
+    cpu.local.insert(("]ramrd1", 1), cpu.reg.a);
+    cpu.local.insert(("]ramrd2", 1), cpu.reg.a);
+    cpu.local.insert(("]ramrd3", 1), cpu.reg.a);
+    cpu.local.insert(("]ramrd4", 1), cpu.reg.a);
+    cpu.local.insert(("]ramrd5", 1), cpu.reg.a);
     return;
 }
 
@@ -3023,7 +3230,10 @@ pub fn SETFASTAUX(cpu: &mut Cpu) {
             }
             8 => {
                 cpu.mem[((cpu.smc.smod_hi as usize) << 8 | (cpu.smc.smod_lo as usize)) + cpu.reg.y as usize] = cpu.reg.a;
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.y as i8) >= 0 {
                     pc = 7;
                 } else {
@@ -3031,7 +3241,10 @@ pub fn SETFASTAUX(cpu: &mut Cpu) {
                 }
             }
             9 => {
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 10;
             }
             10 => {
@@ -3111,7 +3324,10 @@ pub fn FASTBLACK(cpu: &mut Cpu) {
             }
             7 => {
                 cpu.mem[((cpu.smc.smod_hi as usize) << 8 | (cpu.smc.smod_lo as usize)) + cpu.reg.y as usize] = cpu.reg.a;
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.y as i8) >= 0 {
                     pc = 6;
                 } else {
@@ -3119,7 +3335,10 @@ pub fn FASTBLACK(cpu: &mut Cpu) {
                 }
             }
             8 => {
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 9;
             }
             9 => {
@@ -3180,7 +3399,10 @@ pub fn COPYSCRN(cpu: &mut Cpu) {
             }
             5 => {
                 cpu.mem[((cpu.smc.dst2_hi as usize) << 8 | (0x00)) + cpu.reg.y as usize] = cpu.reg.a;
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.y != 0x00 {
                     pc = 1;
                 } else {
@@ -3188,11 +3410,26 @@ pub fn COPYSCRN(cpu: &mut Cpu) {
                 }
             }
             6 => {
-                cpu.smc.org1_hi = cpu.smc.org1_hi.wrapping_add(1);
-                cpu.smc.org2_hi = cpu.smc.org2_hi.wrapping_add(1);
-                cpu.smc.dst1_hi = cpu.smc.dst1_hi.wrapping_add(1);
-                cpu.smc.dst2_hi = cpu.smc.dst2_hi.wrapping_add(1);
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.smc.org1_hi.wrapping_add(1);
+                cpu.smc.org1_hi = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
+                let _v = cpu.smc.org2_hi.wrapping_add(1);
+                cpu.smc.org2_hi = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
+                let _v = cpu.smc.dst1_hi.wrapping_add(1);
+                cpu.smc.dst1_hi = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
+                let _v = cpu.smc.dst2_hi.wrapping_add(1);
+                cpu.smc.dst2_hi = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.x != 0x00 {
                     pc = 1;
                 } else {
@@ -3221,8 +3458,14 @@ pub fn INVERTY(cpu: &mut Cpu) {
         cpu.mem[sym::YHI + cpu.reg.x as usize] = cpu.mem[sym::YHI + cpu.reg.y as usize];
         cpu.reg.a = tmp1;
         cpu.mem[sym::YHI + cpu.reg.y as usize] = cpu.reg.a;
-        cpu.reg.x = cpu.reg.x.wrapping_sub(1);
-        cpu.reg.y = cpu.reg.y.wrapping_add(1);
+        let _v = cpu.reg.x.wrapping_sub(1);
+        cpu.reg.x = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
+        let _v = cpu.reg.y.wrapping_add(1);
+        cpu.reg.y = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         let _o: u8 = 0x60;
         cpu.flags.c = cpu.reg.y >= _o;
         cpu.flags.z = cpu.reg.y == _o;

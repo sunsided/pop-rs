@@ -36,6 +36,9 @@ pub struct Cpu {
     pub mem: Box<[u8; 0x10000]>,
     pub stack: Vec<u8>,
     pub smc: Smc,
+    // Local-label / Merlin-variable byte store, keyed by symbolic
+    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.
+    pub local: std::collections::HashMap<(&'static str, u8), u8>,
 }
 
 impl Cpu {
@@ -46,6 +49,7 @@ impl Cpu {
             mem: Box::new([0u8; 0x10000]),
             stack: Vec::new(),
             smc: Smc::default(),
+            local: std::collections::HashMap::new(),
         }
     }
 }
@@ -165,14 +169,16 @@ impl Cpu {
         self.mem[sym::ALTZPon] = self.reg.a;
         self.setcenter();
         self.setfastaux();
-        // raw: ??? lda #FinalDisk!1            ; TOPCTRL.S:127
-        self.mem[sym::develment] = self.reg.a;
+        self.mem[sym::develment] = 0x00;
         self.initgame();
         self.reg.x = 0x00;
         self.reg.a = self.reg.x;
         loop {
             self.mem[0x0000 + self.reg.x as usize] = self.reg.a;
-            self.reg.x = self.reg.x.wrapping_add(1);
+            let _v = self.reg.x.wrapping_add(1);
+            self.reg.x = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             if !(self.reg.x != 0x00) {
                 break;
             }
@@ -614,7 +620,10 @@ impl Cpu {
     fn flashoff(&mut self) {
         self.reg.a = self.mem[sym::lightning];
         if self.reg.a != 0x00 {
-            self.mem[sym::lightning] = self.mem[sym::lightning].wrapping_sub(1);
+            let _v = self.mem[sym::lightning].wrapping_sub(1);
+            self.mem[sym::lightning] = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             if !self.flags.n {
                 self.doflashoff();
                 return;
@@ -636,7 +645,10 @@ impl Cpu {
             self.mem[sym::SNthisframe + self.reg.x as usize] = self.reg.a;
             self.mem[sym::SNbelow + self.reg.x as usize] = self.reg.a;
             self.mem[sym::SNabove + self.reg.x as usize] = self.reg.a;
-            self.reg.x = self.reg.x.wrapping_sub(1);
+            let _v = self.reg.x.wrapping_sub(1);
+            self.reg.x = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             if !((self.reg.x as i8) >= 0) {
                 break;
             }
@@ -763,7 +775,10 @@ impl Cpu {
             self.YouLose();
             return;
         }
-        self.mem[sym::CharLife] = self.mem[sym::CharLife].wrapping_add(1);
+        let _v = self.mem[sym::CharLife].wrapping_add(1);
+        self.mem[sym::CharLife] = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         return;
     }
 
@@ -916,7 +931,10 @@ impl Cpu {
             self.flags.z = self.reg.a == _o;
             self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
             if self.reg.a != 0x10 {
-                self.reg.y = self.reg.y.wrapping_sub(1);
+                let _v = self.reg.y.wrapping_sub(1);
+                self.reg.y = _v;
+                self.flags.z = _v == 0;
+                self.flags.n = (_v >> 7) != 0;
                 if (self.reg.y as i8) >= 0 {
                     continue;
                 }
@@ -950,7 +968,10 @@ impl Cpu {
         if self.reg.a == 0x00 {
             return;
         }
-        self.mem[sym::msgtimer] = self.mem[sym::msgtimer].wrapping_sub(1);
+        let _v = self.mem[sym::msgtimer].wrapping_sub(1);
+        self.mem[sym::msgtimer] = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         self.reg.a = self.mem[sym::KidLife];
         if (self.reg.a as i8) < 0 {
             self.reg.a = self.mem[sym::msgtimer];
@@ -1040,9 +1061,15 @@ impl Cpu {
         self.reg.a = self.mem[sym::mergetimer];
         if self.reg.a != 0x00 {
             if !self.flags.n {
-                self.mem[sym::mergetimer] = self.mem[sym::mergetimer].wrapping_sub(1);
+                let _v = self.mem[sym::mergetimer].wrapping_sub(1);
+                self.mem[sym::mergetimer] = _v;
+                self.flags.z = _v == 0;
+                self.flags.n = (_v >> 7) != 0;
                 if self.flags.z {
-                    self.mem[sym::mergetimer] = self.mem[sym::mergetimer].wrapping_sub(1);
+                    let _v = self.mem[sym::mergetimer].wrapping_sub(1);
+                    self.mem[sym::mergetimer] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                 }
             }
         }
@@ -1064,7 +1091,10 @@ impl Cpu {
                                 self.mouserescue();
                             }
                         }
-                        self.mem[sym::exitopen] = self.mem[sym::exitopen].wrapping_add(1);
+                        let _v = self.mem[sym::exitopen].wrapping_add(1);
+                        self.mem[sym::exitopen] = _v;
+                        self.flags.z = _v == 0;
+                        self.flags.n = (_v >> 7) != 0;
                     }
                 }
             }
@@ -1191,7 +1221,10 @@ impl Cpu {
         if self.reg.a == 0x00 {
             return;
         }
-        self.mem[sym::redrawflg] = self.mem[sym::redrawflg].wrapping_sub(1);
+        let _v = self.mem[sym::redrawflg].wrapping_sub(1);
+        self.mem[sym::redrawflg] = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         self.markmeters();
         self.sure();
         return;

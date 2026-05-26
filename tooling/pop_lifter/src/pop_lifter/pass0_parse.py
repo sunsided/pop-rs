@@ -142,7 +142,7 @@ class ProgramAST:
 # ---------------------------------------------------------------- expressions
 
 
-_BIN_OPS = {"+", "-", "*", "/", "&", "|", "^"}
+_BIN_OPS = {"+", "-", "*", "/", "&", "|", "^", "!"}
 
 
 def _tokenize_expr(s: str) -> list[str]:
@@ -250,7 +250,7 @@ class _ExprParser:
 
     def _term(self) -> int:
         v = self._factor()
-        while self._peek() in ("*", "/", "&", "|", "^", "."):
+        while self._peek() in ("*", "/", "&", "|", "^", ".", "!"):
             op = self._eat()
             r = self._factor()
             if op == "*":
@@ -262,7 +262,8 @@ class _ExprParser:
             elif op in ("|", "."):
                 # `.` is Merlin's bitwise-OR operator, same as `|`.
                 v = v | r
-            elif op == "^":
+            elif op in ("^", "!"):
+                # `!` is Merlin's bitwise-EOR operator, same as `^`.
                 v = v ^ r
         return v
 

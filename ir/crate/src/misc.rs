@@ -35,7 +35,10 @@ pub fn MOVEMEM(cpu: &mut Cpu) {
             1 => {
                 cpu.reg.a = cpu.mem[(cpu.mem[0x00f2] as usize | (cpu.mem[0x00f3] as usize) << 8) + cpu.reg.y as usize];
                 cpu.mem[(cpu.mem[0x00f0] as usize | (cpu.mem[0x00f1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.y != 0x00 {
                     pc = 1;
                 } else {
@@ -43,8 +46,14 @@ pub fn MOVEMEM(cpu: &mut Cpu) {
                 }
             }
             2 => {
-                cpu.mem[0x00f3] = cpu.mem[0x00f3].wrapping_add(1);
-                cpu.mem[0x00f1] = cpu.mem[0x00f1].wrapping_add(1);
+                let _v = cpu.mem[0x00f3].wrapping_add(1);
+                cpu.mem[0x00f3] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
+                let _v = cpu.mem[0x00f1].wrapping_add(1);
+                cpu.mem[0x00f1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.a = cpu.mem[0x00f3];
                 let _o: u8 = cpu.mem[0x00f5];
                 cpu.flags.c = cpu.reg.a >= _o;
@@ -146,9 +155,15 @@ pub fn FIRSTGUARD(cpu: &mut Cpu) {
 
 pub fn Mark3(cpu: &mut Cpu) {
     Mark1(cpu);
-    cpu.reg.y = cpu.reg.y.wrapping_add(1);
+    let _v = cpu.reg.y.wrapping_add(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     Mark1(cpu);
-    cpu.reg.y = cpu.reg.y.wrapping_add(1);
+    let _v = cpu.reg.y.wrapping_add(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::height] = 0x04;
     cpu.reg.a = 0x02;
     crate::ext::markwipe(cpu);
@@ -158,7 +173,10 @@ pub fn Mark3(cpu: &mut Cpu) {
 
 pub fn Mark2(cpu: &mut Cpu) {
     Mark1(cpu);
-    cpu.reg.y = cpu.reg.y.wrapping_add(1);
+    let _v = cpu.reg.y.wrapping_add(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::height] = 0x04;
     cpu.reg.a = 0x02;
     crate::ext::markwipe(cpu);
@@ -355,7 +373,10 @@ pub fn STABCHAR(cpu: &mut Cpu) {
                         cpu.flags.c = (_r >> 8) != 0;
                         crate::ext::addcharx(cpu);
                         cpu.mem[sym::CharX] = cpu.reg.a;
-                        cpu.mem[sym::CharBlockY] = cpu.mem[sym::CharBlockY].wrapping_add(1);
+                        let _v = cpu.mem[sym::CharBlockY].wrapping_add(1);
+                        cpu.mem[sym::CharBlockY] = _v;
+                        cpu.flags.z = _v == 0;
+                        cpu.flags.n = (_v >> 7) != 0;
                         cpu.reg.a = 0x51;
                         crate::ext::jumpseq(cpu);
                         break 'b15;
@@ -435,7 +456,10 @@ pub fn REFLECTION(cpu: &mut Cpu) {
     }
     crate::ext::setupchar(cpu);
     cpu.reg.x = cpu.mem[sym::CharBlockY];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::BlockTop + cpu.reg.x as usize];
     if cpu.reg.a >= cpu.mem[sym::FCharY] {
         return;
@@ -485,7 +509,10 @@ pub fn BONESRISE(cpu: &mut Cpu) {
             cpu.reg.a = 0x02;
             crate::ext::markred(cpu);
             crate::ext::markwipe(cpu);
-            cpu.reg.y = cpu.reg.y.wrapping_add(1);
+            let _v = cpu.reg.y.wrapping_add(1);
+            cpu.reg.y = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
             crate::ext::markred(cpu);
             crate::ext::markwipe(cpu);
             cpu.reg.a = tmp0;
@@ -1062,7 +1089,10 @@ pub fn DISPVERSION(cpu: &mut Cpu) {
             }
             2 => {
                 cpu.mem[0x0400 + cpu.reg.x as usize] = cpu.reg.a;
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_add(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.x as i8) >= 0 {
                     pc = 1;
                 } else {

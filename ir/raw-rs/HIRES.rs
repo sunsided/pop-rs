@@ -74,6 +74,9 @@ pub struct Cpu {
     pub mem: Box<[u8; 0x10000]>,
     pub stack: Vec<u8>,
     pub smc: Smc,
+    // Local-label / Merlin-variable byte store, keyed by symbolic
+    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.
+    pub local: std::collections::HashMap<(&'static str, u8), u8>,
 }
 
 impl Cpu {
@@ -84,6 +87,7 @@ impl Cpu {
             mem: Box::new([0u8; 0x10000]),
             stack: Vec::new(),
             smc: Smc::default(),
+            local: std::collections::HashMap::new(),
         }
     }
 }
@@ -288,7 +292,10 @@ impl Cpu {
                 }
                 2 => {
                     self.mem[((self.smc.smod_hi as usize) << 8 | (0x00)) + self.reg.y as usize] = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if self.reg.y != 0x00 {
                         pc = 1;
                     } else {
@@ -296,9 +303,18 @@ impl Cpu {
                     }
                 }
                 3 => {
-                    self.smc.loop_hi = self.smc.loop_hi.wrapping_add(1);
-                    self.smc.smod_hi = self.smc.smod_hi.wrapping_add(1);
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    let _v = self.smc.loop_hi.wrapping_add(1);
+                    self.smc.loop_hi = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
+                    let _v = self.smc.smod_hi.wrapping_add(1);
+                    self.smc.smod_hi = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
+                    let _v = self.reg.x.wrapping_sub(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if self.reg.x != 0x00 {
                         pc = 1;
                     } else {
@@ -320,7 +336,10 @@ impl Cpu {
             self.mem[0x0500 + self.reg.y as usize] = self.reg.a;
             self.mem[0x0600 + self.reg.y as usize] = self.reg.a;
             self.mem[0x0700 + self.reg.y as usize] = self.reg.a;
-            self.reg.y = self.reg.y.wrapping_sub(1);
+            let _v = self.reg.y.wrapping_sub(1);
+            self.reg.y = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             let _o: u8 = 0x7f;
             self.flags.c = self.reg.y >= _o;
             self.flags.z = self.reg.y == _o;
@@ -350,7 +369,10 @@ impl Cpu {
         self.flags.c = (_r >> 8) != 0;
         self.reg.y = self.reg.a;
         self.mem[sym::IMAGE] = self.mem[(self.mem[sym::TABLE] as usize | (self.mem[sym::TABLE + 1] as usize) << 8) + self.reg.y as usize];
-        self.reg.y = self.reg.y.wrapping_add(1);
+        let _v = self.reg.y.wrapping_add(1);
+        self.reg.y = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         self.reg.a = self.mem[(self.mem[sym::TABLE] as usize | (self.mem[sym::TABLE + 1] as usize) << 8) + self.reg.y as usize];
         self.mem[sym::IMAGE + 1] = self.reg.a;
         return;
@@ -364,7 +386,10 @@ impl Cpu {
         self.reg.y = 0x01;
         self.reg.a = self.mem[(self.mem[sym::IMAGE] as usize | (self.mem[sym::IMAGE + 1] as usize) << 8) + self.reg.y as usize];
         self.reg.x = self.reg.a;
-        self.reg.y = self.reg.y.wrapping_sub(1);
+        let _v = self.reg.y.wrapping_sub(1);
+        self.reg.y = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         self.reg.a = self.mem[(self.mem[sym::IMAGE] as usize | (self.mem[sym::IMAGE + 1] as usize) << 8) + self.reg.y as usize];
         return;
     }
@@ -379,7 +404,10 @@ impl Cpu {
         self.setimage();
         self.reg.y = 0x00;
         self.mem[sym::WIDTH] = self.mem[(self.mem[sym::IMAGE] as usize | (self.mem[sym::IMAGE + 1] as usize) << 8) + self.reg.y as usize];
-        self.reg.y = self.reg.y.wrapping_add(1);
+        let _v = self.reg.y.wrapping_add(1);
+        self.reg.y = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         self.mem[sym::HEIGHT] = self.mem[(self.mem[sym::IMAGE] as usize | (self.mem[sym::IMAGE + 1] as usize) << 8) + self.reg.y as usize];
         self.reg.a = self.mem[sym::IMAGE];
         self.flags.c = false;
@@ -388,7 +416,10 @@ impl Cpu {
         self.flags.c = (_r >> 8) != 0;
         self.mem[sym::IMAGE] = self.reg.a;
         if self.flags.c {
-            self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+            let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+            self.mem[sym::IMAGE + 1] = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
         }
         self.mem[0xc002] = self.reg.a;
         return;
@@ -432,9 +463,15 @@ impl Cpu {
                 self.mem[sym::IMAGE] = self.reg.a;
                 if !self.flags.c {
                 } else {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                 }
-                self.reg.x = self.reg.x.wrapping_sub(1);
+                let _v = self.reg.x.wrapping_sub(1);
+                self.reg.x = _v;
+                self.flags.z = _v == 0;
+                self.flags.n = (_v >> 7) != 0;
                 let _o: u8 = self.mem[sym::BOTCUT];
                 self.flags.c = self.reg.x >= _o;
                 self.flags.z = self.reg.x == _o;
@@ -838,9 +875,15 @@ impl Cpu {
                 self.mem[sym::IMAGE] = self.reg.a;
                 if !self.flags.c {
                 } else {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                 }
-                self.reg.x = self.reg.x.wrapping_sub(1);
+                let _v = self.reg.x.wrapping_sub(1);
+                self.reg.x = _v;
+                self.flags.z = _v == 0;
+                self.flags.n = (_v >> 7) != 0;
                 let _o: u8 = self.mem[sym::BOTCUT];
                 self.flags.c = self.reg.x >= _o;
                 self.flags.z = self.reg.x == _o;
@@ -1024,10 +1067,16 @@ impl Cpu {
 
     fn shiftoffset(&mut self) {
         if self.reg.x >= 0x06 {
-            self.reg.x = self.reg.x.wrapping_sub(1);
+            let _v = self.reg.x.wrapping_sub(1);
+            self.reg.x = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             return;
         }
-        self.reg.x = self.reg.x.wrapping_add(1);
+        let _v = self.reg.x.wrapping_add(1);
+        self.reg.x = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         return;
     }
 
@@ -1054,7 +1103,10 @@ impl Cpu {
                     pc = 2;
                 }
                 2 => {
-                    self.mem[sym::WIDTH] = self.mem[sym::WIDTH].wrapping_add(1);
+                    let _v = self.mem[sym::WIDTH].wrapping_add(1);
+                    self.mem[sym::WIDTH] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.CROP();
                     if self.flags.n {
                         self.SKIPIT();
@@ -1095,7 +1147,10 @@ impl Cpu {
                     pc = 5;
                 }
                 5 => {
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.a = self.mem[sym::YCO];
                     self.flags.c = true;
                     let _r = (self.reg.a as u16) + (!self.mem[sym::TOPEDGE]) as u16 + (self.flags.c as u16);
@@ -1115,7 +1170,10 @@ impl Cpu {
                     }
                 }
                 6 => {
-                    self.mem[sym::PEELBUF + 1] = self.mem[sym::PEELBUF + 1].wrapping_add(1);
+                    let _v = self.mem[sym::PEELBUF + 1].wrapping_add(1);
+                    self.mem[sym::PEELBUF + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 7;
                 }
                 7 => {
@@ -1152,7 +1210,10 @@ impl Cpu {
                 13 => {
                     self.reg.a = self.mem[((self.smc.smBASE_hi as usize) << 8 | (self.smc.smBASE_lo as usize)) + self.reg.y as usize];
                     self.mem[(self.mem[sym::PEELBUF] as usize | (self.mem[sym::PEELBUF + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if (self.reg.y as i8) >= 0 {
                         pc = 12;
                     } else {
@@ -1172,11 +1233,17 @@ impl Cpu {
                     }
                 }
                 15 => {
-                    self.mem[sym::PEELBUF + 1] = self.mem[sym::PEELBUF + 1].wrapping_add(1);
+                    let _v = self.mem[sym::PEELBUF + 1].wrapping_add(1);
+                    self.mem[sym::PEELBUF + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 16;
                 }
                 16 => {
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    let _v = self.reg.x.wrapping_sub(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     let _o: u8 = self.mem[sym::TOPEDGE];
                     self.flags.c = self.reg.x >= _o;
                     self.flags.z = self.reg.x == _o;
@@ -1255,13 +1322,13 @@ impl Cpu {
                     self.smc._90_hi = self.reg.a;
                     self.smc._92_hi = self.reg.a;
                     self.reg.a = self.mem[sym::AMASKS + self.reg.x as usize];
-                    // raw: patch *:AMASK+1 = a            ; HIRES.S:707
+                    self.local.insert((":AMASK", 1), self.reg.a);
                     self.reg.a = self.mem[sym::BMASKS + self.reg.x as usize];
-                    // raw: patch *:BMASK+1 = a            ; HIRES.S:709
+                    self.local.insert((":BMASK", 1), self.reg.a);
                     self.reg.x = self.mem[sym::OPACITY];
                     self.reg.a = self.mem[sym::OPCODE + self.reg.x as usize];
-                    // raw: patch *:80 = a            ; HIRES.S:713
-                    // raw: patch *:81 = a            ; HIRES.S:714
+                    self.local.insert((":80", 0), self.reg.a);
+                    self.local.insert((":81", 0), self.reg.a);
                     self.reg.y = self.mem[sym::YCO];
                     pc = 3;
                 }
@@ -1285,7 +1352,10 @@ impl Cpu {
                     }
                 }
                 4 => {
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 5;
                 }
                 5 => {
@@ -1311,7 +1381,10 @@ impl Cpu {
                     }
                 }
                 7 => {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 8;
                 }
                 8 => {
@@ -1363,7 +1436,10 @@ impl Cpu {
                 16 => {
                     self.reg.a = self.mem[((self.smc._92_hi as usize) << 8 | (self.smc._92_lo as usize)) + self.reg.x as usize];
                     self.mem[sym::CARRY] = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     let _o: u8 = self.mem[sym::VISWIDTH];
                     self.flags.c = self.reg.y >= _o;
                     self.flags.z = self.reg.y == _o;
@@ -1410,11 +1486,17 @@ impl Cpu {
                     }
                 }
                 22 => {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 23;
                 }
                 23 => {
-                    self.mem[sym::YCO] = self.mem[sym::YCO].wrapping_sub(1);
+                    let _v = self.mem[sym::YCO].wrapping_sub(1);
+                    self.mem[sym::YCO] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.y = self.mem[sym::YCO];
                     let _o: u8 = self.mem[sym::TOPEDGE];
                     self.flags.c = self.reg.y >= _o;
@@ -1459,8 +1541,8 @@ impl Cpu {
                 0 => {
                     self.reg.x = self.mem[sym::OPACITY];
                     self.reg.a = self.mem[sym::OPCODE + self.reg.x as usize];
-                    // raw: patch *:masksm1 = a            ; HIRES.S:836
-                    // raw: patch *:masksm2 = a            ; HIRES.S:837
+                    self.local.insert((":masksm1", 0), self.reg.a);
+                    self.local.insert((":masksm2", 0), self.reg.a);
                     self.PREPREP();
                     self.CROP();
                     if self.flags.n {
@@ -1518,7 +1600,10 @@ impl Cpu {
                     }
                 }
                 3 => {
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 4;
                 }
                 4 => {
@@ -1551,7 +1636,10 @@ impl Cpu {
                     }
                 }
                 7 => {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 8;
                 }
                 8 => {
@@ -1618,7 +1706,10 @@ impl Cpu {
                 18 => {
                     self.reg.a = self.mem[((self.smc._92_hi as usize) << 8 | (self.smc._92_lo as usize)) + self.reg.x as usize];
                     self.mem[sym::CARRY] = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     let _o: u8 = self.mem[sym::VISWIDTH];
                     self.flags.c = self.reg.y >= _o;
                     self.flags.z = self.reg.y == _o;
@@ -1665,11 +1756,17 @@ impl Cpu {
                     }
                 }
                 24 => {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 25;
                 }
                 25 => {
-                    self.mem[sym::YCO] = self.mem[sym::YCO].wrapping_sub(1);
+                    let _v = self.mem[sym::YCO].wrapping_sub(1);
+                    self.mem[sym::YCO] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.y = self.mem[sym::YCO];
                     let _o: u8 = self.mem[sym::TOPEDGE];
                     self.flags.c = self.reg.y >= _o;
@@ -1737,7 +1834,7 @@ impl Cpu {
                     self.smc.c1_hi = self.reg.a;
                     self.smc.c2_hi = self.reg.a;
                     self.reg.a = self.mem[sym::AMASKS + self.reg.x as usize];
-                    // raw: patch *:AMASK+1 = a            ; HIRES.S:1048
+                    self.local.insert((":AMASK", 1), self.reg.a);
                     self.reg.y = self.mem[sym::YCO];
                     pc = 3;
                 }
@@ -1761,7 +1858,10 @@ impl Cpu {
                     }
                 }
                 4 => {
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 5;
                 }
                 5 => {
@@ -1792,7 +1892,10 @@ impl Cpu {
                     }
                 }
                 8 => {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 9;
                 }
                 9 => {
@@ -1856,7 +1959,10 @@ impl Cpu {
                 18 => {
                     self.reg.a = self.mem[((self.smc._92_hi as usize) << 8 | (self.smc._92_lo as usize)) + self.reg.x as usize];
                     self.mem[sym::CARRY] = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     let _o: u8 = self.mem[sym::VISWIDTH];
                     self.flags.c = self.reg.y >= _o;
                     self.flags.z = self.reg.y == _o;
@@ -1897,11 +2003,17 @@ impl Cpu {
                     }
                 }
                 22 => {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 23;
                 }
                 23 => {
-                    self.mem[sym::YCO] = self.mem[sym::YCO].wrapping_sub(1);
+                    let _v = self.mem[sym::YCO].wrapping_sub(1);
+                    self.mem[sym::YCO] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.y = self.mem[sym::YCO];
                     let _o: u8 = self.mem[sym::TOPEDGE];
                     self.flags.c = self.reg.y >= _o;
@@ -1982,8 +2094,8 @@ impl Cpu {
                     self.mem[sym::BMASK] = self.reg.a;
                     self.reg.x = self.mem[sym::OPACITY];
                     self.reg.a = self.mem[sym::OPCODE + self.reg.x as usize];
-                    // raw: patch *:80 = a            ; HIRES.S:1239
-                    // raw: patch *:81 = a            ; HIRES.S:1240
+                    self.local.insert((":80", 0), self.reg.a);
+                    self.local.insert((":81", 0), self.reg.a);
                     self.reg.y = self.mem[sym::YCO];
                     pc = 3;
                 }
@@ -2022,7 +2134,10 @@ impl Cpu {
                     pc = 7;
                 }
                 7 => {
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if (self.reg.y as i8) >= 0 {
                         pc = 10;
                     } else {
@@ -2042,7 +2157,10 @@ impl Cpu {
                     self.reg.a &= self.mem[sym::AMASK];
                     self.mem[sym::CARRY] = self.reg.a;
                     self.reg.y = self.mem[sym::WIDTH];
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 10;
                 }
                 10 => {
@@ -2072,7 +2190,10 @@ impl Cpu {
                 14 => {
                     self.reg.a = self.mem[((self.smc._92_hi as usize) << 8 | (self.smc._92_lo as usize)) + self.reg.x as usize];
                     self.mem[sym::CARRY] = self.reg.a;
-                    self.mem[sym::BASE] = self.mem[sym::BASE].wrapping_add(1);
+                    let _v = self.mem[sym::BASE].wrapping_add(1);
+                    self.mem[sym::BASE] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.y = self.mem[sym::YREG];
                     let _o: u8 = self.mem[sym::RMOST];
                     self.flags.c = self.reg.y >= _o;
@@ -2085,7 +2206,10 @@ impl Cpu {
                     }
                 }
                 15 => {
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if (self.reg.y as i8) >= 0 {
                         pc = 10;
                     } else {
@@ -2126,11 +2250,17 @@ impl Cpu {
                     }
                 }
                 20 => {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 21;
                 }
                 21 => {
-                    self.mem[sym::YCO] = self.mem[sym::YCO].wrapping_sub(1);
+                    let _v = self.mem[sym::YCO].wrapping_sub(1);
+                    self.mem[sym::YCO] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.y = self.mem[sym::YCO];
                     let _o: u8 = self.mem[sym::TOPEDGE];
                     self.flags.c = self.reg.y >= _o;
@@ -2161,8 +2291,8 @@ impl Cpu {
                 0 => {
                     self.reg.x = self.mem[sym::OPACITY];
                     self.reg.a = self.mem[sym::OPCODE + self.reg.x as usize];
-                    // raw: patch *:masksm1 = a            ; HIRES.S:1359
-                    // raw: patch *:masksm2 = a            ; HIRES.S:1360
+                    self.local.insert((":masksm1", 0), self.reg.a);
+                    self.local.insert((":masksm2", 0), self.reg.a);
                     self.PREPREP();
                     self.reg.a = self.mem[sym::XCO];
                     self.flags.c = true;
@@ -2205,7 +2335,7 @@ impl Cpu {
                     self.reg.a = self.mem[sym::AMASKS + self.reg.x as usize];
                     self.smc.AMASK = self.reg.a;
                     self.reg.a = self.mem[sym::BMASKS + self.reg.x as usize];
-                    // raw: patch *:BMASK+1 = a            ; HIRES.S:1402
+                    self.local.insert((":BMASK", 1), self.reg.a);
                     self.reg.y = self.mem[sym::YCO];
                     pc = 3;
                 }
@@ -2251,7 +2381,10 @@ impl Cpu {
                     pc = 8;
                 }
                 8 => {
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if (self.reg.y as i8) >= 0 {
                         pc = 12;
                     } else {
@@ -2275,7 +2408,10 @@ impl Cpu {
                     self.reg.a &= self.mem[(self.mem[sym::BASE] as usize | (self.mem[sym::BASE + 1] as usize) << 8) + self.reg.y as usize];
                     self.mem[sym::carryim] = self.reg.a;
                     self.reg.y = self.mem[sym::WIDTH];
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 12;
                 }
                 12 => {
@@ -2319,7 +2455,10 @@ impl Cpu {
                 18 => {
                     self.reg.a = self.mem[((self.smc._92_hi as usize) << 8 | (self.smc._92_lo as usize)) + self.reg.x as usize];
                     self.mem[sym::CARRY] = self.reg.a;
-                    self.mem[sym::BASE] = self.mem[sym::BASE].wrapping_add(1);
+                    let _v = self.mem[sym::BASE].wrapping_add(1);
+                    self.mem[sym::BASE] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.y = self.mem[sym::YREG];
                     let _o: u8 = self.mem[sym::RMOST];
                     self.flags.c = self.reg.y >= _o;
@@ -2332,7 +2471,10 @@ impl Cpu {
                     }
                 }
                 19 => {
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if (self.reg.y as i8) >= 0 {
                         pc = 12;
                     } else {
@@ -2377,11 +2519,17 @@ impl Cpu {
                     }
                 }
                 25 => {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 26;
                 }
                 26 => {
-                    self.mem[sym::YCO] = self.mem[sym::YCO].wrapping_sub(1);
+                    let _v = self.mem[sym::YCO].wrapping_sub(1);
+                    self.mem[sym::YCO] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.y = self.mem[sym::YCO];
                     let _o: u8 = self.mem[sym::TOPEDGE];
                     self.flags.c = self.reg.y >= _o;
@@ -2499,7 +2647,10 @@ impl Cpu {
                     pc = 8;
                 }
                 8 => {
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if (self.reg.y as i8) >= 0 {
                         pc = 12;
                     } else {
@@ -2524,7 +2675,10 @@ impl Cpu {
                     self.reg.a = 0x00;
                     self.mem[sym::carryim] = self.reg.a;
                     self.reg.y = self.mem[sym::WIDTH];
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 12;
                 }
                 12 => {
@@ -2564,7 +2718,10 @@ impl Cpu {
                 17 => {
                     self.reg.a = self.mem[((self.smc._92_hi as usize) << 8 | (self.smc._92_lo as usize)) + self.reg.x as usize];
                     self.mem[sym::CARRY] = self.reg.a;
-                    self.mem[sym::BASE] = self.mem[sym::BASE].wrapping_add(1);
+                    let _v = self.mem[sym::BASE].wrapping_add(1);
+                    self.mem[sym::BASE] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.y = self.mem[sym::YREG];
                     let _o: u8 = self.mem[sym::RMOST];
                     self.flags.c = self.reg.y >= _o;
@@ -2577,7 +2734,10 @@ impl Cpu {
                     }
                 }
                 18 => {
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if (self.reg.y as i8) >= 0 {
                         pc = 12;
                     } else {
@@ -2615,11 +2775,17 @@ impl Cpu {
                     }
                 }
                 22 => {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 23;
                 }
                 23 => {
-                    self.mem[sym::YCO] = self.mem[sym::YCO].wrapping_sub(1);
+                    let _v = self.mem[sym::YCO].wrapping_sub(1);
+                    self.mem[sym::YCO] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     self.reg.y = self.mem[sym::YCO];
                     let _o: u8 = self.mem[sym::TOPEDGE];
                     self.flags.c = self.reg.y >= _o;
@@ -2675,7 +2841,7 @@ impl Cpu {
                 }
                 2 => {
                     self.reg.a = self.mem[sym::OPCODE + self.reg.x as usize];
-                    // raw: patch *:smod = a            ; HIRES.S:1751
+                    self.local.insert((":smod", 0), self.reg.a);
                     self.reg.a = self.mem[sym::PAGE];
                     self.smc.smPAGE = self.reg.a;
                     self.reg.a = self.mem[sym::XCO];
@@ -2690,7 +2856,10 @@ impl Cpu {
                     self.smc.smSTART = self.reg.a;
                     self.reg.a = self.mem[sym::YCO];
                     self.reg.x = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     let _r = (self.reg.a as u16) + (!self.mem[(self.mem[sym::IMAGE] as usize | (self.mem[sym::IMAGE + 1] as usize) << 8) + self.reg.y as usize]) as u16 + (self.flags.c as u16);
                     self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
@@ -2719,7 +2888,10 @@ impl Cpu {
                     }
                 }
                 5 => {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 6;
                 }
                 6 => {
@@ -2761,7 +2933,10 @@ impl Cpu {
                 13 => {
                     self.reg.a |= self.mem[(self.mem[sym::BASE] as usize | (self.mem[sym::BASE + 1] as usize) << 8) + self.reg.y as usize];
                     self.mem[(self.mem[sym::BASE] as usize | (self.mem[sym::BASE + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if (self.reg.y as i8) >= 0 {
                         pc = 11;
                     } else {
@@ -2781,11 +2956,17 @@ impl Cpu {
                     }
                 }
                 15 => {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 16;
                 }
                 16 => {
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    let _v = self.reg.x.wrapping_sub(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 17;
                 }
                 17 => {
@@ -2826,7 +3007,10 @@ impl Cpu {
                     self.smc.smSTART = self.reg.a;
                     self.reg.a = self.mem[sym::YCO];
                     self.reg.x = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     let _r = (self.reg.a as u16) + (!self.mem[(self.mem[sym::IMAGE] as usize | (self.mem[sym::IMAGE + 1] as usize) << 8) + self.reg.y as usize]) as u16 + (self.flags.c as u16);
                     self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
@@ -2855,7 +3039,10 @@ impl Cpu {
                     }
                 }
                 3 => {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 4;
                 }
                 4 => {
@@ -2891,7 +3078,10 @@ impl Cpu {
                 }
                 10 => {
                     self.mem[((self.smc.smod_hi as usize) << 8 | (self.smc.smod_lo as usize)) + self.reg.y as usize] = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if (self.reg.y as i8) >= 0 {
                         pc = 9;
                     } else {
@@ -2911,11 +3101,17 @@ impl Cpu {
                     }
                 }
                 12 => {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 13;
                 }
                 13 => {
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    let _v = self.reg.x.wrapping_sub(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 14;
                 }
                 14 => {
@@ -2962,7 +3158,10 @@ impl Cpu {
                     self.smc.smSTART = self.reg.a;
                     self.reg.a = self.mem[sym::YCO];
                     self.reg.x = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     let _r = (self.reg.a as u16) + (!self.mem[(self.mem[sym::IMAGE] as usize | (self.mem[sym::IMAGE + 1] as usize) << 8) + self.reg.y as usize]) as u16 + (self.flags.c as u16);
                     self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
@@ -2991,7 +3190,10 @@ impl Cpu {
                     }
                 }
                 4 => {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 5;
                 }
                 5 => {
@@ -3033,7 +3235,10 @@ impl Cpu {
                     self.reg.a = self.mem[0xe880 + self.reg.x as usize];
                     self.reg.a &= self.mem[(self.mem[sym::BASE] as usize | (self.mem[sym::BASE + 1] as usize) << 8) + self.reg.y as usize];
                     self.mem[(self.mem[sym::BASE] as usize | (self.mem[sym::BASE + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if (self.reg.y as i8) >= 0 {
                         pc = 10;
                     } else {
@@ -3053,12 +3258,18 @@ impl Cpu {
                     }
                 }
                 13 => {
-                    self.mem[sym::IMAGE + 1] = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    let _v = self.mem[sym::IMAGE + 1].wrapping_add(1);
+                    self.mem[sym::IMAGE + 1] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 14;
                 }
                 14 => {
                     self.reg.x = self.mem[sym::index];
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    let _v = self.reg.x.wrapping_sub(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 15;
                 }
                 15 => {
@@ -3082,11 +3293,11 @@ impl Cpu {
 
     fn SETFASTMAIN(&mut self) {
         self.reg.a = 0x02;
-        // raw: patch *]ramrd1+1 = a            ; HIRES.S:1983
-        // raw: patch *]ramrd2+1 = a            ; HIRES.S:1984
-        // raw: patch *]ramrd3+1 = a            ; HIRES.S:1985
-        // raw: patch *]ramrd4+1 = a            ; HIRES.S:1986
-        // raw: patch *]ramrd5+1 = a            ; HIRES.S:1987
+        self.local.insert(("]ramrd1", 1), self.reg.a);
+        self.local.insert(("]ramrd2", 1), self.reg.a);
+        self.local.insert(("]ramrd3", 1), self.reg.a);
+        self.local.insert(("]ramrd4", 1), self.reg.a);
+        self.local.insert(("]ramrd5", 1), self.reg.a);
         return;
     }
 
@@ -3157,7 +3368,10 @@ impl Cpu {
                 }
                 8 => {
                     self.mem[((self.smc.smod_hi as usize) << 8 | (self.smc.smod_lo as usize)) + self.reg.y as usize] = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if (self.reg.y as i8) >= 0 {
                         pc = 7;
                     } else {
@@ -3165,7 +3379,10 @@ impl Cpu {
                     }
                 }
                 9 => {
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    let _v = self.reg.x.wrapping_sub(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 10;
                 }
                 10 => {
@@ -3245,7 +3462,10 @@ impl Cpu {
                 }
                 7 => {
                     self.mem[((self.smc.smod_hi as usize) << 8 | (self.smc.smod_lo as usize)) + self.reg.y as usize] = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_sub(1);
+                    let _v = self.reg.y.wrapping_sub(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if (self.reg.y as i8) >= 0 {
                         pc = 6;
                     } else {
@@ -3253,7 +3473,10 @@ impl Cpu {
                     }
                 }
                 8 => {
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    let _v = self.reg.x.wrapping_sub(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     pc = 9;
                 }
                 9 => {
@@ -3314,7 +3537,10 @@ impl Cpu {
                 }
                 5 => {
                     self.mem[((self.smc.dst2_hi as usize) << 8 | (0x00)) + self.reg.y as usize] = self.reg.a;
-                    self.reg.y = self.reg.y.wrapping_add(1);
+                    let _v = self.reg.y.wrapping_add(1);
+                    self.reg.y = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if self.reg.y != 0x00 {
                         pc = 1;
                     } else {
@@ -3322,11 +3548,26 @@ impl Cpu {
                     }
                 }
                 6 => {
-                    self.smc.org1_hi = self.smc.org1_hi.wrapping_add(1);
-                    self.smc.org2_hi = self.smc.org2_hi.wrapping_add(1);
-                    self.smc.dst1_hi = self.smc.dst1_hi.wrapping_add(1);
-                    self.smc.dst2_hi = self.smc.dst2_hi.wrapping_add(1);
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    let _v = self.smc.org1_hi.wrapping_add(1);
+                    self.smc.org1_hi = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
+                    let _v = self.smc.org2_hi.wrapping_add(1);
+                    self.smc.org2_hi = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
+                    let _v = self.smc.dst1_hi.wrapping_add(1);
+                    self.smc.dst1_hi = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
+                    let _v = self.smc.dst2_hi.wrapping_add(1);
+                    self.smc.dst2_hi = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
+                    let _v = self.reg.x.wrapping_sub(1);
+                    self.reg.x = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if self.reg.x != 0x00 {
                         pc = 1;
                     } else {
@@ -3355,8 +3596,14 @@ impl Cpu {
             self.mem[sym::YHI + self.reg.x as usize] = self.mem[sym::YHI + self.reg.y as usize];
             self.reg.a = tmp1;
             self.mem[sym::YHI + self.reg.y as usize] = self.reg.a;
-            self.reg.x = self.reg.x.wrapping_sub(1);
-            self.reg.y = self.reg.y.wrapping_add(1);
+            let _v = self.reg.x.wrapping_sub(1);
+            self.reg.x = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
+            let _v = self.reg.y.wrapping_add(1);
+            self.reg.y = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             let _o: u8 = 0x60;
             self.flags.c = self.reg.y >= _o;
             self.flags.z = self.reg.y == _o;

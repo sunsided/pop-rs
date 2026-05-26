@@ -47,7 +47,9 @@ from .ir1 import (
     Bit,
     Bitwise,
     CmpIndexed,
+    CmpLocal,
     IndexedAbs,
+    LoadLocal,
     MemBitOp,
     Pha,
     Phy,
@@ -384,6 +386,18 @@ def _lift_instr(
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return LoadAbs(reg=_reg_of_load(mnemonic), source=addr, src=src)
+        # `lda :sm` / `ldx ]temp1` / `lda ]cleanflag` — load from a
+        # local-label / Merlin-variable address. The read counterpart to
+        # StoreLocal; tried last so resolved symbols take the abs path.
+        local = _parse_local_target(line.operand)
+        if local is not None:
+            label, offset = local
+            return LoadLocal(
+                reg=_reg_of_load(mnemonic),
+                source_label=label,
+                offset=offset,
+                src=src,
+            )
         return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
 
     if mnemonic in ("sta", "stx", "sty"):
@@ -446,6 +460,12 @@ def _lift_instr(
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return CmpAbs(reg=reg, source=addr, src=src)
+        # `cpx :pitch+1` / `cpy :pitch` — compare against a local-label
+        # byte (read from the same store StoreLocal writes).
+        local = _parse_local_target(line.operand)
+        if local is not None:
+            label, offset = local
+            return CmpLocal(reg=reg, source_label=label, offset=offset, src=src)
         return Unsupported(mnemonic=mnemonic, operand=line.operand, src=src)
 
     if mnemonic in ("beq", "bne", "bcc", "bcs", "bpl", "bmi", "bvc", "bvs"):
@@ -598,6 +618,11 @@ def _lift_instr(
         addr = _parse_absolute(line.operand, equates)
         if addr is not None:
             return node_cls(target=addr, src=src)
+        # `inc joyX,x` / `dec pstarcount,x` — indexed memory inc/dec.
+        idx = _parse_indexed(line.operand, equates)
+        if idx is not None:
+            base, idx_reg = idx
+            return node_cls(target=IndexedAbs(base=base, index=idx_reg), src=src)
         # `inc :smod+2` — self-modifying-code operand bump (advancing
         # a patched pointer's high byte). Local-label target, address
         # stays symbolic. Tried after the absolute parse so resolved

@@ -42,7 +42,10 @@ pub fn searchtrob(cpu: &mut Cpu) {
                 }
             }
             3 => {
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.x != 0x00 {
                     pc = 1;
                 } else {
@@ -68,7 +71,10 @@ pub fn addtrob(cpu: &mut Cpu) {
     if cpu.reg.x == 0x1f {
         return;
     }
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::numtrans] = cpu.reg.x;
     cpu.mem[sym::trdirec + cpu.reg.x as usize] = cpu.mem[sym::trdirec];
     cpu.mem[sym::trloc + cpu.reg.x as usize] = cpu.mem[sym::trloc];
@@ -82,7 +88,10 @@ pub fn addamob(cpu: &mut Cpu) {
     if cpu.reg.x == 0x0f {
         return;
     }
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::nummob] = cpu.reg.x;
     savemob(cpu);
     return;
@@ -470,7 +479,10 @@ pub fn JAMPP(cpu: &mut Cpu) {
             }
             7 => {
                 cpu.reg.x = cpu.mem[sym::linkindex];
-                cpu.mem[sym::linkindex] = cpu.mem[sym::linkindex].wrapping_add(1);
+                let _v = cpu.mem[sym::linkindex].wrapping_add(1);
+                cpu.mem[sym::linkindex] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 getlastflag(cpu);
                 if cpu.flags.z {
                     pc = 4;
@@ -507,7 +519,10 @@ pub fn trigger(cpu: &mut Cpu) {
         addtrob(cpu);
     }
     cpu.reg.x = cpu.mem[sym::linkindex];
-    cpu.mem[sym::linkindex] = cpu.mem[sym::linkindex].wrapping_add(1);
+    let _v = cpu.mem[sym::linkindex].wrapping_add(1);
+    cpu.mem[sym::linkindex] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     getlastflag(cpu);
     if cpu.flags.z {
         trigger(cpu);
@@ -666,7 +681,7 @@ pub fn triggate(cpu: &mut Cpu) {
             }
             14 => {
                 cpu.reg.a = 0x00;
-                // raw: patch *]cleanflag = a            ; MOVER.S:637
+                cpu.local.insert(("]cleanflag", 0), cpu.reg.a);
                 pc = 15;
             }
             15 => {
@@ -682,12 +697,15 @@ pub fn triggate(cpu: &mut Cpu) {
             }
             16 => {
                 cpu.reg.a = 0xff;
-                // raw: patch *]cleanflag = a            ; MOVER.S:649
+                cpu.local.insert(("]cleanflag", 0), cpu.reg.a);
                 pc = 17;
             }
             17 => {
                 cpu.mem[sym::trdirec + cpu.reg.x as usize] = cpu.reg.a;
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.x != 0x00 {
                     pc = 15;
                 } else {
@@ -695,8 +713,10 @@ pub fn triggate(cpu: &mut Cpu) {
                 }
             }
             18 => {
-                // raw: ??? lda ]cleanflag            ; MOVER.S:656
-                if cpu.flags.z {
+                cpu.reg.a = cpu.local.get(&("]cleanflag", 0)).copied().unwrap_or(0);
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
+                if cpu.reg.a == 0x00 {
                     pc = 12;
                 } else {
                     pc = 19;
@@ -720,7 +740,10 @@ pub fn triggate(cpu: &mut Cpu) {
                 }
             }
             21 => {
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.mem[sym::trdirec + cpu.reg.y as usize] = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::trloc + cpu.reg.x as usize];
                 cpu.mem[sym::trloc + cpu.reg.y as usize] = cpu.reg.a;
@@ -729,7 +752,10 @@ pub fn triggate(cpu: &mut Cpu) {
                 pc = 22;
             }
             22 => {
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_add(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = cpu.mem[sym::numtrans];
                 cpu.flags.c = cpu.reg.x >= _o;
                 cpu.flags.z = cpu.reg.x == _o;
@@ -772,7 +798,7 @@ pub fn ANIMTRANS(cpu: &mut Cpu) {
             }
             1 => {
                 cpu.reg.a = 0x00;
-                // raw: patch *]cleanflag = a            ; MOVER.S:637
+                cpu.local.insert(("]cleanflag", 0), cpu.reg.a);
                 pc = 2;
             }
             2 => {
@@ -788,12 +814,15 @@ pub fn ANIMTRANS(cpu: &mut Cpu) {
             }
             3 => {
                 cpu.reg.a = 0xff;
-                // raw: patch *]cleanflag = a            ; MOVER.S:649
+                cpu.local.insert(("]cleanflag", 0), cpu.reg.a);
                 pc = 4;
             }
             4 => {
                 cpu.mem[sym::trdirec + cpu.reg.x as usize] = cpu.reg.a;
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.x != 0x00 {
                     pc = 2;
                 } else {
@@ -801,8 +830,10 @@ pub fn ANIMTRANS(cpu: &mut Cpu) {
                 }
             }
             5 => {
-                // raw: ??? lda ]cleanflag            ; MOVER.S:656
-                if cpu.flags.z {
+                cpu.reg.a = cpu.local.get(&("]cleanflag", 0)).copied().unwrap_or(0);
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
+                if cpu.reg.a == 0x00 {
                     pc = 12;
                 } else {
                     pc = 6;
@@ -826,7 +857,10 @@ pub fn ANIMTRANS(cpu: &mut Cpu) {
                 }
             }
             8 => {
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.mem[sym::trdirec + cpu.reg.y as usize] = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::trloc + cpu.reg.x as usize];
                 cpu.mem[sym::trloc + cpu.reg.y as usize] = cpu.reg.a;
@@ -835,7 +869,10 @@ pub fn ANIMTRANS(cpu: &mut Cpu) {
                 pc = 9;
             }
             9 => {
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_add(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = cpu.mem[sym::numtrans];
                 cpu.flags.c = cpu.reg.x >= _o;
                 cpu.flags.z = cpu.reg.x == _o;
@@ -951,7 +988,10 @@ pub fn animexit(cpu: &mut Cpu) {
     if cpu.reg.x >= 0x03 {
         // raw: ??? cpx #maxgatevel            ; MOVER.S:811
         if !cpu.flags.c {
-            cpu.reg.x = cpu.reg.x.wrapping_add(1);
+            let _v = cpu.reg.x.wrapping_add(1);
+            cpu.reg.x = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
             cpu.mem[sym::trdirec] = cpu.reg.x;
         }
         cpu.reg.a = cpu.mem[sym::state];
@@ -1017,7 +1057,10 @@ pub fn animgate(cpu: &mut Cpu) {
     if cpu.reg.x >= 0x03 {
         // raw: ??? cpx #maxgatevel            ; MOVER.S:901
         if !cpu.flags.c {
-            cpu.reg.x = cpu.reg.x.wrapping_add(1);
+            let _v = cpu.reg.x.wrapping_add(1);
+            cpu.reg.x = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
             cpu.mem[sym::trdirec] = cpu.reg.x;
         }
         cpu.reg.a = cpu.mem[sym::state];
@@ -1219,7 +1262,10 @@ pub fn animsword(cpu: &mut Cpu) {
         crate::ext::_5dpurge(cpu);
         return;
     }
-    cpu.mem[sym::state] = cpu.mem[sym::state].wrapping_sub(1);
+    let _v = cpu.mem[sym::state].wrapping_sub(1);
+    cpu.mem[sym::state] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     if !cpu.flags.z {
         redsword(cpu);
         return;
@@ -1294,7 +1340,10 @@ pub fn animspikes(cpu: &mut Cpu) {
     }
     cpu.reg.a = cpu.mem[sym::state];
     if (cpu.reg.a as i8) >= 0 {
-        cpu.mem[sym::state] = cpu.mem[sym::state].wrapping_add(1);
+        let _v = cpu.mem[sym::state].wrapping_add(1);
+        cpu.mem[sym::state] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         let _o: u8 = 0x05;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -1321,7 +1370,10 @@ pub fn animspikes(cpu: &mut Cpu) {
             return;
         }
     }
-    cpu.mem[sym::state] = cpu.mem[sym::state].wrapping_sub(1);
+    let _v = cpu.mem[sym::state].wrapping_sub(1);
+    cpu.mem[sym::state] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::state];
     cpu.reg.a &= 0x7f;
     if cpu.reg.a == 0x00 {
@@ -1341,7 +1393,10 @@ pub fn animfloor(cpu: &mut Cpu) {
         redloose(cpu);
         return;
     }
-    cpu.mem[sym::state] = cpu.mem[sym::state].wrapping_add(1);
+    let _v = cpu.mem[sym::state].wrapping_add(1);
+    cpu.mem[sym::state] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::state];
     if (cpu.reg.a as i8) < 0 {
         cpu.reg.x = cpu.mem[sym::level];
@@ -1434,7 +1489,10 @@ pub fn redsword(cpu: &mut Cpu) {
 }
 
 pub fn redloose(cpu: &mut Cpu) {
-    cpu.mem[sym::trobcount] = cpu.mem[sym::trobcount].wrapping_add(1);
+    let _v = cpu.mem[sym::trobcount].wrapping_add(1);
+    cpu.mem[sym::trobcount] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::height] = 0x1f;
     redtrobj(cpu);
     return;
@@ -1452,14 +1510,20 @@ pub fn redgate(cpu: &mut Cpu) {
 }
 
 pub fn redspikes(cpu: &mut Cpu) {
-    cpu.mem[sym::trobcount] = cpu.mem[sym::trobcount].wrapping_add(1);
+    let _v = cpu.mem[sym::trobcount].wrapping_add(1);
+    cpu.mem[sym::trobcount] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::height] = 0x1f;
     redtrobj(cpu);
     return;
 }
 
 pub fn redslicer(cpu: &mut Cpu) {
-    cpu.mem[sym::trobcount] = cpu.mem[sym::trobcount].wrapping_add(1);
+    let _v = cpu.mem[sym::trobcount].wrapping_add(1);
+    cpu.mem[sym::trobcount] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::height] = 0x3f;
     check(cpu);
     cpu.reg.a = 0x02;
@@ -1527,7 +1591,10 @@ pub fn checkleft(cpu: &mut Cpu) {
         }
         _ => {}
     }
-    cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+    let _v = cpu.reg.y.wrapping_sub(1);
+    cpu.reg.y = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     return;
 }
 
@@ -1559,7 +1626,10 @@ pub fn checkright(cpu: &mut Cpu) {
         if cpu.reg.y != 0x09 {
             if cpu.reg.y != 0x13 {
                 if cpu.reg.y != 0x1d {
-                    cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                    let _v = cpu.reg.y.wrapping_add(1);
+                    cpu.reg.y = _v;
+                    cpu.flags.z = _v == 0;
+                    cpu.flags.n = (_v >> 7) != 0;
                     return;
                 }
             }
@@ -1620,7 +1690,10 @@ pub fn checkabover(cpu: &mut Cpu) {
     }
     cpu.reg.y = cpu.mem[sym::trloc];
     if cpu.reg.y < 0x0a {
-        cpu.reg.y = cpu.reg.y.wrapping_add(1);
+        let _v = cpu.reg.y.wrapping_add(1);
+        cpu.reg.y = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         return;
     }
     match cpu.reg.y {
@@ -1712,7 +1785,10 @@ pub fn ANIMMOBS(cpu: &mut Cpu) {
                 checkcrush(cpu);
                 cpu.reg.x = cpu.mem[sym::tempnt];
                 savemob(cpu);
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.x != 0x00 {
                     pc = 1;
                 } else {
@@ -1737,7 +1813,10 @@ pub fn ANIMMOBS(cpu: &mut Cpu) {
                 }
             }
             4 => {
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.mem[sym::mobvel + cpu.reg.y as usize] = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::mobx + cpu.reg.x as usize];
                 cpu.mem[sym::mobx + cpu.reg.y as usize] = cpu.reg.a;
@@ -1752,7 +1831,10 @@ pub fn ANIMMOBS(cpu: &mut Cpu) {
                 pc = 5;
             }
             5 => {
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_add(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = cpu.mem[sym::nummob];
                 cpu.flags.c = cpu.reg.x >= _o;
                 cpu.flags.z = cpu.reg.x == _o;
@@ -1791,7 +1873,10 @@ pub fn animmob(cpu: &mut Cpu) {
     if (cpu.reg.a as i8) >= 0 {
         return;
     }
-    cpu.mem[sym::mobvel] = cpu.mem[sym::mobvel].wrapping_add(1);
+    let _v = cpu.mem[sym::mobvel].wrapping_add(1);
+    cpu.mem[sym::mobvel] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     return;
 }
 
@@ -1885,7 +1970,10 @@ pub fn makespace(cpu: &mut Cpu) {
 }
 
 pub fn passthru(cpu: &mut Cpu) {
-    cpu.mem[sym::moblevel] = cpu.mem[sym::moblevel].wrapping_add(1);
+    let _v = cpu.mem[sym::moblevel].wrapping_add(1);
+    cpu.mem[sym::moblevel] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::moblevel];
     if cpu.reg.a < 0x03 {
         return;
@@ -1964,7 +2052,10 @@ pub fn markmob(cpu: &mut Cpu) {
     cpu.reg.a = 0x02;
     crate::ext::markred(cpu);
     crate::ext::markwipe(cpu);
-    cpu.mem[sym::tempblockx] = cpu.mem[sym::tempblockx].wrapping_add(1);
+    let _v = cpu.mem[sym::tempblockx].wrapping_add(1);
+    cpu.mem[sym::tempblockx] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     crate::ext::indexblock(cpu);
     cpu.reg.a = 0x02;
     crate::ext::markred(cpu);
@@ -2028,7 +2119,10 @@ pub fn crushchar(cpu: &mut Cpu) {
         }
     }
     cpu.reg.x = cpu.mem[sym::CharBlockY];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.mem[sym::CharY] = cpu.mem[sym::FloorY + cpu.reg.x as usize];
     cpu.reg.a = 0x01;
     crate::ext::decstr(cpu);
@@ -2059,7 +2153,10 @@ pub fn ADDMOBS(cpu: &mut Cpu) {
                 ATM(cpu);
             }
             cpu.reg.x = cpu.mem[sym::tempnt];
-            cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+            let _v = cpu.reg.x.wrapping_sub(1);
+            cpu.reg.x = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
             if !(cpu.reg.x != 0x00) {
                 break;
             }
@@ -2102,7 +2199,10 @@ pub fn ATM(cpu: &mut Cpu) {
     cpu.mem[sym::tempblockx] = cpu.reg.a;
     crate::ext::indexblock(cpu);
     cpu.mem[sym::FCharIndex] = cpu.reg.y;
-    cpu.mem[sym::tempblockx] = cpu.mem[sym::tempblockx].wrapping_add(1);
+    let _v = cpu.mem[sym::tempblockx].wrapping_add(1);
+    cpu.mem[sym::tempblockx] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     crate::ext::indexblock(cpu);
     cpu.reg.a = 0x02;
     crate::ext::markfloor(cpu);
@@ -2126,7 +2226,10 @@ pub fn ATM(cpu: &mut Cpu) {
 }
 
 pub fn addmobobj(cpu: &mut Cpu) {
-    cpu.mem[sym::objX] = cpu.mem[sym::objX].wrapping_add(1);
+    let _v = cpu.mem[sym::objX].wrapping_add(1);
+    cpu.mem[sym::objX] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.x = cpu.mem[sym::objX];
     cpu.reg.a = cpu.mem[sym::mobtype];
     cpu.reg.a |= 0x80;
@@ -2172,7 +2275,10 @@ pub fn SHAKEM(cpu: &mut Cpu) {
             cpu.flags.z = cpu.reg.a == 0;
             cpu.flags.n = (cpu.reg.a >> 7) != 0;
             cpu.reg.x = cpu.reg.a;
-            cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+            let _v = cpu.reg.x.wrapping_sub(1);
+            cpu.reg.x = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
             if !((cpu.reg.x as i8) >= 0) {
                 break;
             }
@@ -2200,7 +2306,10 @@ pub fn SHAKEM1(cpu: &mut Cpu) {
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.x = cpu.reg.a;
-        cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+        let _v = cpu.reg.x.wrapping_sub(1);
+        cpu.reg.x = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         if !((cpu.reg.x as i8) >= 0) {
             break;
         }

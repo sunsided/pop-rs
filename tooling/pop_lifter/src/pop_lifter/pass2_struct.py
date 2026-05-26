@@ -90,6 +90,7 @@ from .ir1 import (
     CmpAbs,
     CmpImm,
     CmpIndexed,
+    CmpLocal,
     Compare,
     DecTarget,
     Goto,
@@ -102,6 +103,7 @@ from .ir1 import (
     LoadImm,
     LoadIndexed,
     LoadIndirect,
+    LoadLocal,
     Lsr,
     ModuleIR1,
     Pla,
@@ -157,7 +159,7 @@ def _affected_register(item: Item):
     visible flag setters (e.g. memory inc/dec, which sets Z/N from
     a memory cell that Compare can't reference yet).
     """
-    if isinstance(item, (LoadAbs, LoadIndexed, LoadImm, LoadIndirect)):
+    if isinstance(item, (LoadAbs, LoadIndexed, LoadImm, LoadIndirect, LoadLocal)):
         return item.reg
     if isinstance(item, Transfer):
         return item.dst_reg
@@ -261,12 +263,18 @@ def _defines_flags(item: Item) -> bool:
     return isinstance(
         item,
         (
-            CmpImm, CmpAbs, CmpIndexed,
-            LoadImm, LoadAbs, LoadIndexed, LoadIndirect,
+            CmpImm, CmpAbs, CmpIndexed, CmpLocal,
+            LoadImm, LoadAbs, LoadIndexed, LoadIndirect, LoadLocal,
             IncTarget, DecTarget, Transfer, Bitwise,
             SbcImm, SbcAbs, SbcIndexed, SbcIndirect,
             Asl, Lsr, Rol, Ror, Bit, ShiftMem,
             Pla,
+            # CmpLocal defines Z/N/C like any compare; LoadLocal defines
+            # Z/N like any load. LoadLocal fuses via `_affected_register`;
+            # CmpLocal has no `Compare.rhs` form for a local operand, so
+            # it stays unfused and its branch reads the flags it set.
+            # Both are listed so an *earlier* comparison can't fuse across
+            # them.
             # AdcIndexed: see `_affected_register` note — adc lacks
             # the symmetric fusion path the others have, so its
             # presence in the body is treated as fusion-opaque
@@ -513,10 +521,10 @@ def _backward_sweep(
                 live.discard("C")
             continue
 
-        if isinstance(item, (LoadImm, LoadAbs, LoadIndexed, LoadIndirect)):
+        if isinstance(item, (LoadImm, LoadAbs, LoadIndexed, LoadIndirect, LoadLocal)):
             # Lda* writes Z/N; the load itself has a side-effect (the
             # register update) so we can't drop it even when Z/N are
-            # dead.
+            # dead. LoadLocal also reads the local store — same rule.
             live -= {"Z", "N"}
             continue
 
@@ -554,15 +562,17 @@ def _backward_sweep(
             live.add("C")
             continue
 
-        if isinstance(item, CmpIndexed):
+        if isinstance(item, (CmpIndexed, CmpLocal)):
             # Same flag effect as CmpImm/CmpAbs (writes Z,N,C without
             # touching A/X/Y), but **never elided** even when those
             # flags are dead — an indexed memory read can hit I/O
             # space, and silently dropping the read would change
             # program behavior. Same rationale as `Bit(Abs)` in
-            # PR #12. Concretely: we clear Z/N/C from the live set
-            # (the cmp DID write them) but don't add the index to
-            # `drop`, so the instruction stays in the body.
+            # PR #12. `CmpLocal` reads the local store and is the
+            # unfused predecessor of a raw flag branch, so dropping it
+            # would lose the branch's predicate. Concretely: we clear
+            # Z/N/C from the live set (the cmp DID write them) but don't
+            # add the index to `drop`, so the instruction stays.
             live -= {"Z", "N", "C"}
             continue
 

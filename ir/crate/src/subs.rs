@@ -27,7 +27,10 @@ pub fn CRUMBLE(cpu: &mut Cpu) {
                 cpu.mem[sym::tempblockx] = cpu.reg.x;
                 _3atrigloose(cpu);
                 cpu.reg.x = cpu.mem[sym::tempblockx];
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = 0x02;
                 cpu.flags.c = cpu.reg.x >= _o;
                 cpu.flags.z = cpu.reg.x == _o;
@@ -51,7 +54,10 @@ pub fn CRUMBLE(cpu: &mut Cpu) {
                     cpu.mem[sym::tempblockx] = cpu.reg.x;
                     _3atrigloose(cpu);
                     cpu.reg.x = cpu.mem[sym::tempblockx];
-                    cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                    let _v = cpu.reg.x.wrapping_sub(1);
+                    cpu.reg.x = _v;
+                    cpu.flags.z = _v == 0;
+                    cpu.flags.n = (_v >> 7) != 0;
                     let _o: u8 = 0x02;
                     cpu.flags.c = cpu.reg.x >= _o;
                     cpu.flags.z = cpu.reg.x == _o;
@@ -173,7 +179,10 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                 }
             }
         }
-        cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+        let _v = cpu.reg.y.wrapping_sub(1);
+        cpu.reg.y = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         if !((cpu.reg.y as i8) >= 0) {
             break;
         }
@@ -279,7 +288,10 @@ pub fn ADDSLICERS(cpu: &mut Cpu) {
                     }
                 }
             }
-            cpu.reg.y = cpu.reg.y.wrapping_add(1);
+            let _v = cpu.reg.y.wrapping_add(1);
+            cpu.reg.y = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
             let _o: u8 = cpu.smc.sm;
             cpu.flags.c = cpu.reg.y >= _o;
             cpu.flags.z = cpu.reg.y == _o;
@@ -310,7 +322,10 @@ pub fn getnextstate(cpu: &mut Cpu) {
 
 pub fn pburn(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::ptorchcount];
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::ptorchx + cpu.reg.x as usize];
     if (cpu.reg.a as i8) < 0 {
         cpu.reg.x = 0x00;
@@ -333,7 +348,10 @@ pub fn pflow(cpu: &mut Cpu) {
     if (cpu.reg.x as i8) < 0 {
         return;
     }
-    cpu.reg.x = cpu.reg.x.wrapping_add(1);
+    let _v = cpu.reg.x.wrapping_add(1);
+    cpu.reg.x = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     if cpu.reg.x >= 0x03 {
         cpu.reg.x = 0x00;
     }
@@ -349,7 +367,10 @@ pub fn pstars(cpu: &mut Cpu) {
         cpu.reg.a = cpu.mem[sym::pstarcount + cpu.reg.x as usize];
         if cpu.reg.a == 0x00 {
         } else {
-            // raw: ??? dec pstarcount,x            ; SUBS.S:364
+            let _v = cpu.mem[sym::pstarcount + cpu.reg.x as usize].wrapping_sub(1);
+            cpu.mem[sym::pstarcount + cpu.reg.x as usize] = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
             if !cpu.flags.z {
             } else {
                 cpu.reg.a = cpu.reg.x;
@@ -359,7 +380,10 @@ pub fn pstars(cpu: &mut Cpu) {
                 cpu.reg.x = cpu.reg.a;
             }
         }
-        cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+        let _v = cpu.reg.x.wrapping_sub(1);
+        cpu.reg.x = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         if !((cpu.reg.x as i8) >= 0) {
             break;
         }
@@ -875,7 +899,10 @@ pub fn flashoff(cpu: &mut Cpu) {
     if cpu.reg.a == 0x00 {
         return;
     }
-    cpu.mem[sym::lightning] = cpu.mem[sym::lightning].wrapping_sub(1);
+    let _v = cpu.mem[sym::lightning].wrapping_sub(1);
+    cpu.mem[sym::lightning] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     crate::ext::doflashoff(cpu);
     return;
 }
@@ -941,7 +968,10 @@ pub fn play(cpu: &mut Cpu) {
                 pc = 7;
             }
             7 => {
-                cpu.mem[sym::SceneCount] = cpu.mem[sym::SceneCount].wrapping_sub(1);
+                let _v = cpu.mem[sym::SceneCount].wrapping_sub(1);
+                cpu.mem[sym::SceneCount] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if !cpu.flags.z {
                     pc = 1;
                 } else {
@@ -989,7 +1019,10 @@ pub fn playloop(cpu: &mut Cpu) {
         crate::ext::playback(cpu);
         crate::ext::zerosound(cpu);
     }
-    cpu.mem[sym::SceneCount] = cpu.mem[sym::SceneCount].wrapping_sub(1);
+    let _v = cpu.mem[sym::SceneCount].wrapping_sub(1);
+    cpu.mem[sym::SceneCount] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     if !cpu.flags.z {
         playloop(cpu);
         return;
@@ -1046,7 +1079,10 @@ pub fn DoFast(cpu: &mut Cpu) {
     crate::ext::zerolsts(cpu);
     cpu.reg.a = cpu.mem[sym::redrawglass];
     if cpu.reg.a != 0x00 {
-        cpu.mem[sym::redrawglass] = cpu.mem[sym::redrawglass].wrapping_sub(1);
+        let _v = cpu.mem[sym::redrawglass].wrapping_sub(1);
+        cpu.mem[sym::redrawglass] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         cpu.reg.x = cpu.mem[sym::GlassState];
         crate::ext::drawglass(cpu);
     }
@@ -1252,13 +1288,25 @@ pub fn getglass(cpu: &mut Cpu) {
     cpu.reg.x = 0x07;
     cpu.reg.a = cpu.mem[sym::MinLeft];
     if cpu.reg.a >= 0x06 {
-        cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+        let _v = cpu.reg.x.wrapping_sub(1);
+        cpu.reg.x = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         if cpu.reg.a >= 0x11 {
-            cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+            let _v = cpu.reg.x.wrapping_sub(1);
+            cpu.reg.x = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
             if cpu.reg.a >= 0x21 {
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if cpu.reg.a >= 0x41 {
-                    cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                    let _v = cpu.reg.x.wrapping_sub(1);
+                    cpu.reg.x = _v;
+                    cpu.flags.z = _v == 0;
+                    cpu.flags.n = (_v >> 7) != 0;
                 }
             }
         }
@@ -1463,7 +1511,10 @@ pub fn SETINITIALS(cpu: &mut Cpu) {
     cpu.mem[sym::SCRNUM] = cpu.reg.a;
     loop {
         DoScrn(cpu);
-        cpu.mem[sym::SCRNUM] = cpu.mem[sym::SCRNUM].wrapping_sub(1);
+        let _v = cpu.mem[sym::SCRNUM].wrapping_sub(1);
+        cpu.mem[sym::SCRNUM] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         if cpu.flags.z {
             break;
         }
@@ -1481,7 +1532,10 @@ pub fn DoScrn(cpu: &mut Cpu) {
         } else {
             cpu.mem[(cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
         }
-        cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+        let _v = cpu.reg.y.wrapping_sub(1);
+        cpu.reg.y = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         if !((cpu.reg.y as i8) >= 0) {
             break;
         }
@@ -1697,7 +1751,10 @@ pub fn INITIALGUARDS(cpu: &mut Cpu) {
             cpu.reg.a = 0x00;
             cpu.mem[sym::GdStartSeqH - 1 + cpu.reg.y as usize] = cpu.reg.a;
         }
-        cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+        let _v = cpu.reg.y.wrapping_sub(1);
+        cpu.reg.y = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         if !(cpu.reg.y != 0x00) {
             break;
         }

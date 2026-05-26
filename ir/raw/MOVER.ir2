@@ -479,8 +479,8 @@ ANIMTRANS:
   *(trdirec@0xb640 + x) = a   ; MOVER.S:651
   x -= 1                         ; MOVER.S:653
   if x != #0x00 goto :loop  ; MOVER.S:654
-  ??? lda ]cleanflag            ; MOVER.S:656
-  if eq goto ]rts       ; MOVER.S:657
+  a = *]cleanflag            ; MOVER.S:656
+  if a == #0x00 goto ]rts  ; MOVER.S:657
   x = #0x01                  ; MOVER.S:663
   y = #0x00                  ; MOVER.S:664
 :dloop:
@@ -521,8 +521,8 @@ fn ANIMTRANS {
   *(trdirec@0xb640 + x) = a   ; MOVER.S:651
   x -= 1                         ; MOVER.S:653
   if x != #0x00 goto :loop  ; MOVER.S:654
-  ??? lda ]cleanflag            ; MOVER.S:656
-  if eq goto ]rts       ; MOVER.S:657
+  a = *]cleanflag            ; MOVER.S:656
+  if a == #0x00 goto ]rts  ; MOVER.S:657
   x = #0x01                  ; MOVER.S:663
   y = #0x00                  ; MOVER.S:664
 :dloop:

@@ -14,15 +14,24 @@ pub fn AUTOCTRL(cpu: &mut Cpu) {
     }
     cpu.reg.a = cpu.mem[sym::justblocked];
     if cpu.reg.a != 0x00 {
-        cpu.mem[sym::justblocked] = cpu.mem[sym::justblocked].wrapping_sub(1);
+        let _v = cpu.mem[sym::justblocked].wrapping_sub(1);
+        cpu.mem[sym::justblocked] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
     }
     cpu.reg.a = cpu.mem[sym::gdtimer];
     if cpu.reg.a != 0x00 {
-        cpu.mem[sym::gdtimer] = cpu.mem[sym::gdtimer].wrapping_sub(1);
+        let _v = cpu.mem[sym::gdtimer].wrapping_sub(1);
+        cpu.mem[sym::gdtimer] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
     }
     cpu.reg.a = cpu.mem[sym::refract];
     if cpu.reg.a != 0x00 {
-        cpu.mem[sym::refract] = cpu.mem[sym::refract].wrapping_sub(1);
+        let _v = cpu.mem[sym::refract].wrapping_sub(1);
+        cpu.mem[sym::refract] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
     }
     cpu.reg.a = cpu.mem[sym::CharID];
     match cpu.reg.a {
@@ -541,7 +550,10 @@ pub fn FollowKid(cpu: &mut Cpu) {
         crate::ext::cmpspace(cpu);
         if cpu.flags.z {
             crate::ext::getinfront(cpu);
-            cpu.mem[sym::tempblocky] = cpu.mem[sym::tempblocky].wrapping_add(1);
+            let _v = cpu.mem[sym::tempblocky].wrapping_add(1);
+            cpu.mem[sym::tempblocky] = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
             crate::ext::rdblock1(cpu);
             cpu.mem[sym::ztemp] = cpu.reg.a;
             if cpu.reg.a != 0x02 {
@@ -974,7 +986,10 @@ pub fn AUTOPLAYBACK(cpu: &mut Cpu) {
         cpu.flags.z = cpu.reg.a == _o;
         cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
         if cpu.reg.a < 0xfe {
-            cpu.mem[sym::PlayCount] = cpu.mem[sym::PlayCount].wrapping_add(1);
+            let _v = cpu.mem[sym::PlayCount].wrapping_add(1);
+            cpu.mem[sym::PlayCount] = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
             cpu.reg.y = cpu.mem[sym::PreRecPtr];
             cpu.reg.a = cpu.mem[sym::PlayCount];
             let _o: u8 = cpu.mem[(cpu.mem[sym::ProgStart] as usize | (cpu.mem[sym::ProgStart + 1] as usize) << 8) + cpu.reg.y as usize];
@@ -982,12 +997,21 @@ pub fn AUTOPLAYBACK(cpu: &mut Cpu) {
             cpu.flags.z = cpu.reg.a == _o;
             cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
             if cpu.flags.c {
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.a = cpu.mem[(cpu.mem[sym::ProgStart] as usize | (cpu.mem[sym::ProgStart + 1] as usize) << 8) + cpu.reg.y as usize];
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.mem[sym::PreRecPtr] = cpu.reg.y;
             } else {
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 cpu.reg.a = cpu.mem[(cpu.mem[sym::ProgStart] as usize | (cpu.mem[sym::ProgStart + 1] as usize) << 8) + cpu.reg.y as usize];
             }
             let _o: u8 = 0xff;
@@ -1222,7 +1246,10 @@ pub fn _3aendpb(cpu: &mut Cpu) {
         transferguard(cpu);
         return;
     }
-    cpu.mem[sym::CUTTIMER] = cpu.mem[sym::CUTTIMER].wrapping_sub(1);
+    let _v = cpu.mem[sym::CUTTIMER].wrapping_sub(1);
+    cpu.mem[sym::CUTTIMER] = _v;
+    cpu.flags.z = _v == 0;
+    cpu.flags.n = (_v >> 7) != 0;
     return;
 }
 

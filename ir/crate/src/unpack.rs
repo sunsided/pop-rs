@@ -46,7 +46,10 @@ pub fn SNGEXPAND(cpu: &mut Cpu) {
                 }
             }
             3 => {
-                cpu.mem[sym::V3] = cpu.mem[sym::V3].wrapping_sub(1);
+                let _v = cpu.mem[sym::V3].wrapping_sub(1);
+                cpu.mem[sym::V3] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 4;
             }
             4 => {
@@ -74,7 +77,10 @@ pub fn SNGEXPAND(cpu: &mut Cpu) {
                 }
             }
             6 => {
-                cpu.mem[sym::V5] = cpu.mem[sym::V5].wrapping_sub(1);
+                let _v = cpu.mem[sym::V5].wrapping_sub(1);
+                cpu.mem[sym::V5] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 7;
             }
             7 => {
@@ -147,7 +153,10 @@ pub fn SNGEXPAND(cpu: &mut Cpu) {
                 }
             }
             13 => {
-                cpu.reg.y = cpu.reg.y.wrapping_sub(1);
+                let _v = cpu.reg.y.wrapping_sub(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.y as i8) >= 0 {
                     pc = 1;
                 } else {
@@ -182,7 +191,10 @@ pub fn SNGEXPAND(cpu: &mut Cpu) {
                 }
             }
             17 => {
-                cpu.mem[sym::PAC] = cpu.mem[sym::PAC].wrapping_add(1);
+                let _v = cpu.mem[sym::PAC].wrapping_add(1);
+                cpu.mem[sym::PAC] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if !cpu.flags.z {
                     pc = 19;
                 } else {
@@ -190,13 +202,19 @@ pub fn SNGEXPAND(cpu: &mut Cpu) {
                 }
             }
             18 => {
-                cpu.mem[sym::PAC + 1] = cpu.mem[sym::PAC + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::PAC + 1].wrapping_add(1);
+                cpu.mem[sym::PAC + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 19;
             }
             19 => {
                 cpu.reg.a = cpu.mem[(cpu.mem[(sym::PAC + cpu.reg.x as usize) & 0xff] as usize | (cpu.mem[(sym::PAC + cpu.reg.x as usize + 1) & 0xff] as usize) << 8)];
                 cpu.mem[sym::V9] = cpu.reg.a;
-                cpu.mem[sym::PAC] = cpu.mem[sym::PAC].wrapping_add(1);
+                let _v = cpu.mem[sym::PAC].wrapping_add(1);
+                cpu.mem[sym::PAC] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if !cpu.flags.z {
                     pc = 21;
                 } else {
@@ -204,13 +222,19 @@ pub fn SNGEXPAND(cpu: &mut Cpu) {
                 }
             }
             20 => {
-                cpu.mem[sym::PAC + 1] = cpu.mem[sym::PAC + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::PAC + 1].wrapping_add(1);
+                cpu.mem[sym::PAC + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 21;
             }
             21 => {
                 cpu.reg.a = cpu.mem[(cpu.mem[(sym::PAC + cpu.reg.x as usize) & 0xff] as usize | (cpu.mem[(sym::PAC + cpu.reg.x as usize + 1) & 0xff] as usize) << 8)];
                 cpu.mem[sym::VB] = cpu.reg.a;
-                cpu.mem[sym::PAC] = cpu.mem[sym::PAC].wrapping_add(1);
+                let _v = cpu.mem[sym::PAC].wrapping_add(1);
+                cpu.mem[sym::PAC] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if !cpu.flags.z {
                     pc = 23;
                 } else {
@@ -218,7 +242,10 @@ pub fn SNGEXPAND(cpu: &mut Cpu) {
                 }
             }
             22 => {
-                cpu.mem[sym::PAC + 1] = cpu.mem[sym::PAC + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::PAC + 1].wrapping_add(1);
+                cpu.mem[sym::PAC + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 23;
             }
             23 => {
@@ -235,7 +262,10 @@ pub fn SNGEXPAND(cpu: &mut Cpu) {
                 cpu.reg.a = cpu.mem[sym::VB];
                 cpu.reg.a |= 0x80;
                 cpu.mem[(cpu.mem[sym::PIC] as usize | (cpu.mem[sym::PIC + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
-                cpu.mem[sym::PAC] = cpu.mem[sym::PAC].wrapping_add(1);
+                let _v = cpu.mem[sym::PAC].wrapping_add(1);
+                cpu.mem[sym::PAC] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if !cpu.flags.z {
                     pc = 26;
                 } else {
@@ -243,7 +273,10 @@ pub fn SNGEXPAND(cpu: &mut Cpu) {
                 }
             }
             25 => {
-                cpu.mem[sym::PAC + 1] = cpu.mem[sym::PAC + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::PAC + 1].wrapping_add(1);
+                cpu.mem[sym::PAC + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 26;
             }
             26 => {
@@ -258,7 +291,10 @@ pub fn SNGEXPAND(cpu: &mut Cpu) {
                 cpu.reg.a = cpu.mem[sym::VB];
                 cpu.reg.a |= 0x80;
                 cpu.mem[(cpu.mem[sym::PIC] as usize | (cpu.mem[sym::PIC + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
-                cpu.mem[sym::V9] = cpu.mem[sym::V9].wrapping_sub(1);
+                let _v = cpu.mem[sym::V9].wrapping_sub(1);
+                cpu.mem[sym::V9] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if !cpu.flags.z {
                     pc = 9;
                 } else {
@@ -301,7 +337,10 @@ pub fn WipeRgtExp(cpu: &mut Cpu) {
         ExpandClm(cpu);
         cpu.mem[sym::YScrPos] = 0x01;
         ExpandClm(cpu);
-        cpu.mem[sym::XClmPos] = cpu.mem[sym::XClmPos].wrapping_add(1);
+        let _v = cpu.mem[sym::XClmPos].wrapping_add(1);
+        cpu.mem[sym::XClmPos] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         cpu.reg.a = cpu.mem[sym::XClmPos];
         let _o: u8 = 0x50;
         cpu.flags.c = cpu.reg.a >= _o;
@@ -375,7 +414,10 @@ pub fn DeltaExp(cpu: &mut Cpu) {
                 }
             }
             5 => {
-                cpu.mem[sym::CrnDatPtr + 1] = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+                cpu.mem[sym::CrnDatPtr + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 6;
             }
             6 => {
@@ -401,7 +443,10 @@ pub fn DeltaExp(cpu: &mut Cpu) {
                 }
             }
             8 => {
-                cpu.mem[sym::CrnDatPtr + 1] = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+                cpu.mem[sym::CrnDatPtr + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 9;
             }
             9 => {
@@ -411,7 +456,10 @@ pub fn DeltaExp(cpu: &mut Cpu) {
                 cpu.reg.a = cpu.mem[sym::ByteHld];
                 cpu.reg.x = 0x01;
                 ExpClmSeq1(cpu);
-                cpu.mem[sym::CrnDatPtr] = cpu.mem[sym::CrnDatPtr].wrapping_add(1);
+                let _v = cpu.mem[sym::CrnDatPtr].wrapping_add(1);
+                cpu.mem[sym::CrnDatPtr] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if !cpu.flags.z {
                     pc = 12;
                 } else {
@@ -419,7 +467,10 @@ pub fn DeltaExp(cpu: &mut Cpu) {
                 }
             }
             11 => {
-                cpu.mem[sym::CrnDatPtr + 1] = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+                let _v = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+                cpu.mem[sym::CrnDatPtr + 1] = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 pc = 12;
             }
             12 => {
@@ -459,9 +510,15 @@ pub fn ExpandClm(cpu: &mut Cpu) {
         cpu.reg.a = cpu.mem[sym::ByteHld];
         cpu.reg.x = 0x01;
         ExpClmSeq(cpu);
-        cpu.mem[sym::CrnDatPtr] = cpu.mem[sym::CrnDatPtr].wrapping_add(1);
+        let _v = cpu.mem[sym::CrnDatPtr].wrapping_add(1);
+        cpu.mem[sym::CrnDatPtr] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         if cpu.flags.z {
-            cpu.mem[sym::CrnDatPtr + 1] = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+            let _v = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+            cpu.mem[sym::CrnDatPtr + 1] = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
         }
     } else {
         cpu.reg.y = 0x01;
@@ -477,7 +534,10 @@ pub fn ExpandClm(cpu: &mut Cpu) {
         cpu.flags.c = (_r >> 8) != 0;
         cpu.mem[sym::CrnDatPtr] = cpu.reg.a;
         if cpu.flags.c {
-            cpu.mem[sym::CrnDatPtr + 1] = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+            let _v = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+            cpu.mem[sym::CrnDatPtr + 1] = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
         }
     }
     cpu.reg.a = cpu.mem[sym::YScrPos];
@@ -502,7 +562,10 @@ pub fn ExpClmSeq(cpu: &mut Cpu) {
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
         cpu.mem[sym::YScrPos] = cpu.reg.a;
-        cpu.mem[sym::RepeatCdn] = cpu.mem[sym::RepeatCdn].wrapping_sub(1);
+        let _v = cpu.mem[sym::RepeatCdn].wrapping_sub(1);
+        cpu.mem[sym::RepeatCdn] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         if cpu.flags.z {
             break;
         }
@@ -521,7 +584,10 @@ pub fn ExpClmSeq1(cpu: &mut Cpu) {
         } else {
             PutScrByte(cpu);
         }
-        cpu.mem[sym::YScrPos] = cpu.mem[sym::YScrPos].wrapping_add(1);
+        let _v = cpu.mem[sym::YScrPos].wrapping_add(1);
+        cpu.mem[sym::YScrPos] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         cpu.reg.a = cpu.mem[sym::YScrPos];
         let _o: u8 = 0xc0;
         cpu.flags.c = cpu.reg.a >= _o;
@@ -531,9 +597,15 @@ pub fn ExpClmSeq1(cpu: &mut Cpu) {
         } else {
             cpu.reg.a = 0x00;
             cpu.mem[sym::YScrPos] = cpu.reg.a;
-            cpu.mem[sym::XClmPos] = cpu.mem[sym::XClmPos].wrapping_add(1);
+            let _v = cpu.mem[sym::XClmPos].wrapping_add(1);
+            cpu.mem[sym::XClmPos] = _v;
+            cpu.flags.z = _v == 0;
+            cpu.flags.n = (_v >> 7) != 0;
         }
-        cpu.mem[sym::RepeatCdn] = cpu.mem[sym::RepeatCdn].wrapping_sub(1);
+        let _v = cpu.mem[sym::RepeatCdn].wrapping_sub(1);
+        cpu.mem[sym::RepeatCdn] = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         if cpu.flags.z {
             break;
         }
@@ -620,8 +692,14 @@ pub fn INVERTY(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::YHI + cpu.reg.y as usize] = cpu.reg.a;
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_sub(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
+                let _v = cpu.reg.y.wrapping_add(1);
+                cpu.reg.y = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 let _o: u8 = 0x60;
                 cpu.flags.c = cpu.reg.y >= _o;
                 cpu.flags.z = cpu.reg.y == _o;
@@ -673,7 +751,10 @@ pub fn INVERTY(cpu: &mut Cpu) {
             }
             7 => {
                 cpu.mem[0x052a + cpu.reg.x as usize] = cpu.reg.a;
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_add(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.x as i8) >= 0 {
                     pc = 6;
                 } else {
@@ -747,7 +828,10 @@ pub fn PROMPT(cpu: &mut Cpu) {
             }
             4 => {
                 cpu.mem[0x052a + cpu.reg.x as usize] = cpu.reg.a;
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
+                let _v = cpu.reg.x.wrapping_add(1);
+                cpu.reg.x = _v;
+                cpu.flags.z = _v == 0;
+                cpu.flags.n = (_v >> 7) != 0;
                 if (cpu.reg.x as i8) >= 0 {
                     pc = 3;
                 } else {
@@ -840,8 +924,8 @@ pub fn SETDHIRES(cpu: &mut Cpu) {
 
 pub fn FADEIN(cpu: &mut Cpu) {
     cpu.mem[sym::RAMRDmain] = cpu.reg.a;
-    // raw: patch *:sm1+2 = a            ; UNPACK.S:683
-    // raw: patch *:sm2+2 = a            ; UNPACK.S:684
+    cpu.local.insert((":sm1", 2), cpu.reg.a);
+    cpu.local.insert((":sm2", 2), cpu.reg.a);
     cpu.flags.c = false;
     // 65816 (IIgs-only, not modeled): xce  ; UNPACK.S:687
     // 65816 (IIgs-only, not modeled): sep $30  ; UNPACK.S:689
@@ -852,8 +936,14 @@ pub fn FADEIN(cpu: &mut Cpu) {
     cpu.reg.a = 0x00;
     cpu.reg.x = 0x1e;
     loop {
-        cpu.reg.x = cpu.reg.x.wrapping_sub(1);
-        cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+        let _v = cpu.reg.x.wrapping_sub(1);
+        cpu.reg.x = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
+        let _v = cpu.reg.x.wrapping_sub(1);
+        cpu.reg.x = _v;
+        cpu.flags.z = _v == 0;
+        cpu.flags.n = (_v >> 7) != 0;
         // raw: ??? stlx $E1            ; UNPACK.S:705
         if cpu.flags.z {
             break;
@@ -892,9 +982,11 @@ pub fn LOADSUPER(cpu: &mut Cpu) {
 pub fn loadscrn(cpu: &mut Cpu) {
     cpu.reg.a = 0x20;
     loop {
-        // raw: patch *:sm = a            ; UNPACK.S:868
+        cpu.local.insert((":sm", 0), cpu.reg.a);
         crate::ext::rw18(cpu);
-        // raw: ??? lda :sm            ; UNPACK.S:872
+        cpu.reg.a = cpu.local.get(&(":sm", 0)).copied().unwrap_or(0);
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.flags.c = false;
         let _r = (cpu.reg.a as u16) + (0x12) as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;

@@ -36,6 +36,9 @@ pub struct Cpu {
     pub mem: Box<[u8; 0x10000]>,
     pub stack: Vec<u8>,
     pub smc: Smc,
+    // Local-label / Merlin-variable byte store, keyed by symbolic
+    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.
+    pub local: std::collections::HashMap<(&'static str, u8), u8>,
 }
 
 impl Cpu {
@@ -46,6 +49,7 @@ impl Cpu {
             mem: Box::new([0u8; 0x10000]),
             stack: Vec::new(),
             smc: Smc::default(),
+            local: std::collections::HashMap::new(),
         }
     }
 }
@@ -310,11 +314,20 @@ impl Cpu {
         self.mem[sym::addr + 1] = self.reg.x;
         self.reg.y = 0x00;
         self.mem[sym::YCO] = self.mem[(self.mem[sym::addr] as usize | (self.mem[sym::addr + 1] as usize) << 8) + self.reg.y as usize];
-        self.reg.y = self.reg.y.wrapping_add(1);
+        let _v = self.reg.y.wrapping_add(1);
+        self.reg.y = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         self.mem[sym::XCO] = self.mem[(self.mem[sym::addr] as usize | (self.mem[sym::addr + 1] as usize) << 8) + self.reg.y as usize];
-        self.reg.y = self.reg.y.wrapping_add(1);
+        let _v = self.reg.y.wrapping_add(1);
+        self.reg.y = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         self.mem[sym::OFFSET] = self.mem[(self.mem[sym::addr] as usize | (self.mem[sym::addr + 1] as usize) << 8) + self.reg.y as usize];
-        self.reg.y = self.reg.y.wrapping_add(1);
+        let _v = self.reg.y.wrapping_add(1);
+        self.reg.y = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         self.reg.a = self.mem[(self.mem[sym::addr] as usize | (self.mem[sym::addr + 1] as usize) << 8) + self.reg.y as usize];
         self.mem[sym::IMAGE] = self.reg.a;
         return;
@@ -381,7 +394,10 @@ impl Cpu {
         self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
         if self.reg.a >= 0x07 {
-            self.mem[sym::XCO] = self.mem[sym::XCO].wrapping_add(1);
+            let _v = self.mem[sym::XCO].wrapping_add(1);
+            self.mem[sym::XCO] = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             self.flags.c = true;
             let _r = (self.reg.a as u16) + (!0x07_u8) as u16 + (self.flags.c as u16);
             self.reg.a = _r as u8;
@@ -568,7 +584,10 @@ impl Cpu {
                 }
                 18 => {
                     self._3adrawimg();
-                    self.mem[sym::xsave] = self.mem[sym::xsave].wrapping_add(1);
+                    let _v = self.mem[sym::xsave].wrapping_add(1);
+                    self.mem[sym::xsave] = _v;
+                    self.flags.z = _v == 0;
+                    self.flags.n = (_v >> 7) != 0;
                     if !self.flags.z {
                         pc = 17;
                     } else {
@@ -811,7 +830,10 @@ impl Cpu {
                     return;
                 }
                 self.mem[sym::IMAGE] = self.mem[sym::torchflame + self.reg.x as usize];
-                self.mem[sym::XCO] = self.mem[sym::XCO].wrapping_add(1);
+                let _v = self.mem[sym::XCO].wrapping_add(1);
+                self.mem[sym::XCO] = _v;
+                self.flags.z = _v == 0;
+                self.flags.n = (_v >> 7) != 0;
                 self.reg.a = self.mem[sym::YCO];
                 self.flags.c = true;
                 let _r = (self.reg.a as u16) + (!0x2b_u8) as u16 + (self.flags.c as u16);
@@ -834,7 +856,10 @@ impl Cpu {
                     if !self.flags.c {
                         break 'b5;
                     } else {
-                        self.mem[sym::OFFSET] = self.mem[sym::OFFSET].wrapping_add(1);
+                        let _v = self.mem[sym::OFFSET].wrapping_add(1);
+                        self.mem[sym::OFFSET] = _v;
+                        self.flags.z = _v == 0;
+                        self.flags.n = (_v >> 7) != 0;
                     }
                 }
                 self.reg.a = self.mem[sym::YCO];
@@ -856,8 +881,14 @@ impl Cpu {
             }
         }
         self.mem[sym::IMAGE] = self.mem[sym::bubble + self.reg.x as usize];
-        self.mem[sym::XCO] = self.mem[sym::XCO].wrapping_add(1);
-        self.mem[sym::XCO] = self.mem[sym::XCO].wrapping_add(1);
+        let _v = self.mem[sym::XCO].wrapping_add(1);
+        self.mem[sym::XCO] = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
+        let _v = self.mem[sym::XCO].wrapping_add(1);
+        self.mem[sym::XCO] = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         self.reg.a = self.mem[sym::YCO];
         self.flags.c = true;
         let _r = (self.reg.a as u16) + (!0x0e_u8) as u16 + (self.flags.c as u16);
@@ -876,7 +907,10 @@ impl Cpu {
             return;
         }
         self.mem[sym::IMAGE] = self.mem[sym::torchflame + self.reg.x as usize];
-        self.mem[sym::XCO] = self.mem[sym::XCO].wrapping_add(1);
+        let _v = self.mem[sym::XCO].wrapping_add(1);
+        self.mem[sym::XCO] = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         self.reg.a = self.mem[sym::YCO];
         self.flags.c = true;
         let _r = (self.reg.a as u16) + (!0x2b_u8) as u16 + (self.flags.c as u16);
@@ -1048,7 +1082,10 @@ impl Cpu {
 
     fn ADDCHAROBJ(&mut self) {
         self.reg.x = self.mem[sym::objX];
-        self.reg.x = self.reg.x.wrapping_add(1);
+        let _v = self.reg.x.wrapping_add(1);
+        self.reg.x = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         if self.reg.x >= 0x14 {
             return;
         }
@@ -1126,7 +1163,10 @@ impl Cpu {
         self.reg.a = 0x01;
         self.mem[sym::OPACITY] = self.reg.a;
         self.lay();
-        self.mem[sym::XCO] = self.mem[sym::XCO].wrapping_add(1);
+        let _v = self.mem[sym::XCO].wrapping_add(1);
+        self.mem[sym::XCO] = _v;
+        self.flags.z = _v == 0;
+        self.flags.n = (_v >> 7) != 0;
         return;
     }
 
@@ -1221,9 +1261,15 @@ impl Cpu {
         self.reg.a ^= self.mem[sym::FCharFace];
         self.reg.a &= 0x01;
         if self.reg.a == 0x00 {
-            self.mem[sym::FCharX] = self.mem[sym::FCharX].wrapping_add(1);
+            let _v = self.mem[sym::FCharX].wrapping_add(1);
+            self.mem[sym::FCharX] = _v;
+            self.flags.z = _v == 0;
+            self.flags.n = (_v >> 7) != 0;
             if self.flags.z {
-                self.mem[sym::FCharX + 1] = self.mem[sym::FCharX + 1].wrapping_add(1);
+                let _v = self.mem[sym::FCharX + 1].wrapping_add(1);
+                self.mem[sym::FCharX + 1] = _v;
+                self.flags.z = _v == 0;
+                self.flags.n = (_v >> 7) != 0;
             }
         }
         self.mem[sym::FCharImage] = 0x41;
