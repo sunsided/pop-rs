@@ -162,6 +162,35 @@ def test_unknown_macro_advances_pc_by_zero(tmp_path):
     assert ast.equates["sz"] == 2
 
 
+def test_masked_address_equate_stays_unresolved(tmp_path):
+    # A masked address (`tbl & $fff`) is non-affine in the position term,
+    # so it must not resolve from the PC base — even though it would
+    # survive a naive two-origin (0 / 0x1000) shift comparison. Affine
+    # analysis rejects any bitwise use of a label.
+    src = _write(tmp_path, "T.S", "\n".join([
+        " org $2000",
+        "tbl db 0,0",
+        "masked = tbl&$fff",
+        "",
+    ]))
+    ast = parse_files([src])
+    assert "masked" not in ast.equates
+
+
+def test_origin_independent_division_resolves(tmp_path):
+    # `(*-tbl)/2` is origin-independent: the position terms cancel before
+    # the divide, so the coefficient is 0 and it resolves to the entry
+    # count (8 bytes of `dw` / 2).
+    src = _write(tmp_path, "T.S", "\n".join([
+        " org $2000",
+        "tbl dw 0,0,0,0",     # 8 bytes
+        "count = (*-tbl)/2",
+        "",
+    ]))
+    ast = parse_files([src])
+    assert ast.equates["count"] == 4
+
+
 def test_equate_wins_over_label_pc_in_fallback(tmp_path):
     # When a name is both an equate and a label, the equate value wins in
     # the position-equate fallback (matching `symbols()` precedence). `w`

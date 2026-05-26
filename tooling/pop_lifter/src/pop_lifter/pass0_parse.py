@@ -292,10 +292,10 @@ class _ExprParser:
         if tok[0].isdigit():
             return int(tok, 10)
         if tok == "*":
-            # Current location counter. Resolvable only when the caller
-            # threads a PC value in under the `*` key (the position-equate
-            # fallback does this); otherwise pass 0 doesn't track PC and a
-            # plain equate eval can't use it.
+            # Current location counter. Pass 0 does track a running PC,
+            # but it isn't threaded into plain `eval_expr` calls — only
+            # the position-equate fallback supplies it (as the `*` key).
+            # Without it a normal equate eval can't use `*`.
             if "*" in self.symbols:
                 return self.symbols["*"]
             raise ValueError("current-PC operator `*` not resolvable in pass 0")
@@ -307,6 +307,135 @@ class _ExprParser:
 def eval_expr(s: str, symbols: dict[str, int]) -> int:
     """Evaluate a Merlin expression against the current symbol table."""
     return _ExprParser(_tokenize_expr(s), symbols).parse()
+
+
+class _NotAffine(Exception):
+    """A position symbol (`*` / a program label) was used non-additively
+    (bitwise, multiplied/divided by another position term, etc.), so the
+    expression's origin-dependence can't be settled by affine analysis."""
+
+
+class _AffineExprParser:
+    """Evaluate a Merlin expression into `(value, origin_coeff)`.
+
+    `origin_coeff` is the net coefficient of the assembly origin summed
+    over every position symbol: `*` and each program label contribute 1,
+    equates and literals contribute 0 (they're constants). The expression
+    is *origin-independent* — a genuine size/offset — exactly when the
+    coefficient is 0, regardless of where the program is assembled.
+
+    This replaces sampling at a couple of origins (which a masked
+    expression like `label & $fff` can defeat): any non-additive use of a
+    position term raises `_NotAffine`, so address-derived values can never
+    masquerade as origin-independent. Grammar/precedence mirror
+    `_ExprParser`; values are `(int, int)` `(value, coeff)` pairs."""
+
+    def __init__(
+        self,
+        tokens: list[str],
+        equates: dict[str, int],
+        labels: dict[str, int],
+        star: int | None,
+    ) -> None:
+        self.t = tokens
+        self.i = 0
+        self.equates = equates   # constants (coeff 0); win over labels
+        self.labels = labels     # name -> PC (coeff 1)
+        self.star = star         # current PC (coeff 1), or None
+
+    def _peek(self) -> str | None:
+        return self.t[self.i] if self.i < len(self.t) else None
+
+    def _eat(self) -> str:
+        tok = self.t[self.i]
+        self.i += 1
+        return tok
+
+    def parse(self) -> tuple[int, int]:
+        value = self._sum()
+        if self.i != len(self.t):
+            raise ValueError(f"trailing tokens after expression: {self.t[self.i:]}")
+        return value
+
+    def _sum(self) -> tuple[int, int]:
+        v = self._term()
+        while self._peek() in ("+", "-"):
+            op = self._eat()
+            r = self._term()
+            sign = 1 if op == "+" else -1
+            v = (v[0] + sign * r[0], v[1] + sign * r[1])
+        return v
+
+    def _term(self) -> tuple[int, int]:
+        v = self._factor()
+        while self._peek() in ("*", "/", "&", "|", "^", ".", "!"):
+            op = self._eat()
+            r = self._factor()
+            if op == "*":
+                v = self._mul(v, r)
+            elif op == "/":
+                # Division is linear only when the divisor is constant and
+                # the dividend is already origin-independent (e.g.
+                # `(*-tbl)/2`). Anything else taints the coefficient.
+                if r[1] != 0 or v[1] != 0:
+                    raise _NotAffine
+                v = (v[0] // r[0], 0)
+            else:
+                # Bitwise & | . ^ ! — only defined here for constants;
+                # masking a position term is non-affine.
+                if v[1] != 0 or r[1] != 0:
+                    raise _NotAffine
+                if op == "&":
+                    v = (v[0] & r[0], 0)
+                elif op in ("|", "."):
+                    v = (v[0] | r[0], 0)
+                else:  # "^" / "!"
+                    v = (v[0] ^ r[0], 0)
+        return v
+
+    @staticmethod
+    def _mul(a: tuple[int, int], b: tuple[int, int]) -> tuple[int, int]:
+        if a[1] == 0 and b[1] == 0:
+            return (a[0] * b[0], 0)
+        if a[1] == 0:           # const * (c + k·o)
+            return (a[0] * b[0], a[0] * b[1])
+        if b[1] == 0:
+            return (a[0] * b[0], b[0] * a[1])
+        raise _NotAffine        # position * position
+
+    def _factor(self) -> tuple[int, int]:
+        tok = self._peek()
+        if tok is None:
+            raise ValueError("unexpected end of expression")
+        if tok == "(":
+            self._eat()
+            v = self._sum()
+            if self._eat() != ")":
+                raise ValueError("expected ')'")
+            return v
+        if tok == "-":
+            self._eat()
+            a = self._factor()
+            return (-a[0], -a[1])
+        if tok == "+":
+            self._eat()
+            return self._factor()
+        self._eat()
+        if tok.startswith("$"):
+            return (int(tok[1:], 16), 0)
+        if tok.startswith("%"):
+            return (int(tok[1:], 2), 0)
+        if tok[0].isdigit():
+            return (int(tok, 10), 0)
+        if tok == "*":
+            if self.star is None:
+                raise ValueError("current-PC operator `*` not resolvable")
+            return (self.star, 1)
+        if tok in self.equates:     # equate wins over a same-named label
+            return (self.equates[tok], 0)
+        if tok in self.labels:
+            return (self.labels[tok], 1)
+        raise ValueError(f"undefined symbol: {tok}")
 
 
 # ---------------------------------------------------------------- parser
@@ -616,27 +745,22 @@ class Parser:
         the current PC and each global label is its recorded PC.
 
         Only returns a value when the expression is *origin-independent*
-        — a true size/offset whose position terms cancel. We check that
-        by evaluating at two different origins and requiring agreement;
-        an address-valued expression (e.g. `label+1`) differs and is
-        left unresolved, exactly as before, so no real address is ever
-        invented from a synthetic PC base."""
-        def evaluate(shift: int) -> int:
-            syms = dict(self.ast.equates)
-            for name, pc in self._pc_of_label.items():
-                # Equates win over label PCs, matching `symbols()`
-                # precedence: a name that's both (e.g. a dum-field equate)
-                # keeps its equate value rather than its recorded PC.
-                syms.setdefault(name, pc + shift)
-            syms["*"] = self._pc + shift
-            return eval_expr(expr, syms)
-
+        — a true size/offset whose net position-coefficient is zero, as
+        determined by affine analysis (`_AffineExprParser`). An address-
+        valued expression (`label+1`) has a non-zero coefficient, and a
+        masked one (`label & $fff`) is non-affine; both are left
+        unresolved, so no real address is ever invented from the PC base.
+        Equates win over same-named labels, matching `symbols()`."""
         try:
-            base = evaluate(0)
-            shifted = evaluate(0x1000)
-        except ValueError:
+            value, coeff = _AffineExprParser(
+                _tokenize_expr(expr),
+                self.ast.equates,
+                self._pc_of_label,
+                self._pc,
+            ).parse()
+        except (_NotAffine, ValueError):
             return None
-        return base if base == shifted else None
+        return value if coeff == 0 else None
 
     def _handle_put(self, current: Path, operand: str) -> None:
         # Strip a trailing comment if the lexer didn't already.
