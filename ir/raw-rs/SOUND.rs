@@ -83,7 +83,7 @@ impl Cpu {
             self.reg.x = _v;
             self.flags.z = _v == 0;
             self.flags.n = (_v >> 7) != 0;
-            self.mem[sym::soundtable + self.reg.x as usize] = self.reg.a;
+            self.mem[(sym::soundtable + self.reg.x as usize) & 0xffff] = self.reg.a;
             self.mem[sym::soundtable] = self.reg.x;
         }
         self.reg.x = self.mem[sym::savex];
@@ -104,7 +104,7 @@ impl Cpu {
             if self.reg.x == 0x00 {
             } else {
                 loop {
-                    self.reg.a = self.mem[sym::soundtable + self.reg.x as usize];
+                    self.reg.a = self.mem[(sym::soundtable + self.reg.x as usize) & 0xffff];
                     self.flags.z = self.reg.a == 0;
                     self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::savex] = self.reg.x;
@@ -132,11 +132,11 @@ impl Cpu {
             return;
         }
         self.reg.x = self.reg.a;
-        self.reg.a = self.mem[sym::lookup + self.reg.x as usize];
+        self.reg.a = self.mem[(sym::lookup + self.reg.x as usize) & 0xffff];
         self.flags.z = self.reg.a == 0;
         self.flags.n = (self.reg.a >> 7) != 0;
         self.local.insert((":sm", 1), self.reg.a);
-        self.reg.a = self.mem[sym::lookup + 1 + self.reg.x as usize];
+        self.reg.a = self.mem[(sym::lookup + 1 + self.reg.x as usize) & 0xffff];
         self.flags.z = self.reg.a == 0;
         self.flags.n = (self.reg.a >> 7) != 0;
         self.local.insert((":sm", 2), self.reg.a);
@@ -285,6 +285,8 @@ impl Cpu {
             let _r = (self.reg.a as u16) + (!0x01_u8) as u16 + (self.flags.c as u16);
             self.reg.a = _r as u8;
             self.flags.c = (_r >> 8) != 0;
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             if !(self.reg.a != 0x00) {
                 break;
             }
@@ -431,6 +433,8 @@ impl Cpu {
                     let _r = (self.reg.a as u16) + (!0x01_u8) as u16 + (self.flags.c as u16);
                     self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     if self.reg.a != 0x00 {
                         pc = 1;
                     } else {

@@ -178,7 +178,7 @@ impl Cpu {
         self.flags.n = (self.reg.x >> 7) != 0;
         self.reg.a = self.reg.x;
         loop {
-            self.mem[0x0000 + self.reg.x as usize] = self.reg.a;
+            self.mem[(0x0000 + self.reg.x as usize) & 0xffff] = self.reg.a;
             let _v = self.reg.x.wrapping_add(1);
             self.reg.x = _v;
             self.flags.z = _v == 0;
@@ -613,6 +613,8 @@ impl Cpu {
         let _r = (self.reg.a as u16) + (0x01) as u16 + (self.flags.c as u16);
         self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::FCharCL] = self.reg.a;
         self.addshadobj();
         return;
@@ -747,10 +749,10 @@ impl Cpu {
         self.flags.z = self.reg.a == 0;
         self.flags.n = (self.reg.a >> 7) != 0;
         loop {
-            self.mem[sym::SNlastframe + self.reg.x as usize] = self.reg.a;
-            self.mem[sym::SNthisframe + self.reg.x as usize] = self.reg.a;
-            self.mem[sym::SNbelow + self.reg.x as usize] = self.reg.a;
-            self.mem[sym::SNabove + self.reg.x as usize] = self.reg.a;
+            self.mem[(sym::SNlastframe + self.reg.x as usize) & 0xffff] = self.reg.a;
+            self.mem[(sym::SNthisframe + self.reg.x as usize) & 0xffff] = self.reg.a;
+            self.mem[(sym::SNbelow + self.reg.x as usize) & 0xffff] = self.reg.a;
+            self.mem[(sym::SNabove + self.reg.x as usize) & 0xffff] = self.reg.a;
             let _v = self.reg.x.wrapping_sub(1);
             self.reg.x = _v;
             self.flags.z = _v == 0;
@@ -1024,6 +1026,8 @@ impl Cpu {
             let _r = (self.reg.a as u16) + (!0x01_u8) as u16 + (self.flags.c as u16);
             self.reg.a = _r as u8;
             self.flags.c = (_r >> 8) != 0;
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.shakem();
             return;
         }
@@ -1084,6 +1088,8 @@ impl Cpu {
             let _r = (self.reg.a as u16) + self.mem[sym::ChgKidStr] as u16 + (self.flags.c as u16);
             self.reg.a = _r as u8;
             self.flags.c = (_r >> 8) != 0;
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             let _o: u8 = self.mem[sym::MaxKidStr];
             self.flags.c = self.reg.a >= _o;
             self.flags.z = self.reg.a == _o;
@@ -1102,6 +1108,8 @@ impl Cpu {
         let _r = (self.reg.a as u16) + self.mem[sym::ChgOppStr] as u16 + (self.flags.c as u16);
         self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         let _o: u8 = self.mem[sym::MaxOppStr];
         self.flags.c = self.reg.a >= _o;
         self.flags.z = self.reg.a == _o;
@@ -1124,7 +1132,7 @@ impl Cpu {
         self.flags.z = self.reg.y == 0;
         self.flags.n = (self.reg.y >> 7) != 0;
         loop {
-            self.reg.a = self.mem[(self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize];
+            self.reg.a = self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff];
             self.flags.z = self.reg.a == 0;
             self.flags.n = (self.reg.a >> 7) != 0;
             self.reg.a &= 0x1f;
@@ -1362,6 +1370,8 @@ impl Cpu {
         let _r = (self.reg.a as u16) + (!0x01_u8) as u16 + (self.flags.c as u16);
         self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::weightless] = self.reg.a;
         if !self.flags.z {
             self.reg.x = 0xff;

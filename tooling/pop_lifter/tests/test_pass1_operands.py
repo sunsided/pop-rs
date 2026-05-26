@@ -139,7 +139,7 @@ def test_inc_indexed_lowers_to_indexed_mem():
     out = _emit_raw(IncTarget(
         target=IndexedAbs(base=Abs(name="joyX", addr=0x40), index=Reg.X), src=_SRC,
     ))
-    place = "self.mem[0x0040 + self.reg.x as usize]"
+    place = "self.mem[(0x0040 + self.reg.x as usize) & 0xffff]"
     assert out == [
         f"let _v = {place}.wrapping_add(1);",
         f"{place} = _v;",

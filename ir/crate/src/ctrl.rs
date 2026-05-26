@@ -16,11 +16,11 @@ pub fn falling(cpu: &mut Cpu) {
     cpu.reg.x = _v;
     cpu.flags.z = _v == 0;
     cpu.flags.n = (_v >> 7) != 0;
-    let _o: u8 = cpu.mem[sym::FloorY + cpu.reg.x as usize];
+    let _o: u8 = cpu.mem[(sym::FloorY + cpu.reg.x as usize) & 0xffff];
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
     cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
-    if cpu.reg.a >= cpu.mem[sym::FloorY + cpu.reg.x as usize] {
+    if cpu.reg.a >= cpu.mem[(sym::FloorY + cpu.reg.x as usize) & 0xffff] {
         crate::ext::getunderft(cpu);
         if cpu.reg.a == 0x14 {
             InsideBlock(cpu);
@@ -97,7 +97,7 @@ pub fn hitflr(cpu: &mut Cpu) {
                 cpu.reg.x = _v;
                 cpu.flags.z = _v == 0;
                 cpu.flags.n = (_v >> 7) != 0;
-                cpu.reg.a = cpu.mem[sym::FloorY + cpu.reg.x as usize];
+                cpu.reg.a = cpu.mem[(sym::FloorY + cpu.reg.x as usize) & 0xffff];
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::CharY] = cpu.reg.a;
@@ -386,6 +386,8 @@ pub fn fallon(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (0x19) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.x = cpu.mem[sym::CharBlockY];
     cpu.flags.z = cpu.reg.x == 0;
     cpu.flags.n = (cpu.reg.x >> 7) != 0;
@@ -393,11 +395,11 @@ pub fn fallon(cpu: &mut Cpu) {
     cpu.reg.x = _v;
     cpu.flags.z = _v == 0;
     cpu.flags.n = (_v >> 7) != 0;
-    let _o: u8 = cpu.mem[sym::FloorY + cpu.reg.x as usize];
+    let _o: u8 = cpu.mem[(sym::FloorY + cpu.reg.x as usize) & 0xffff];
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
     cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
-    if cpu.reg.a < cpu.mem[sym::FloorY + cpu.reg.x as usize] {
+    if cpu.reg.a < cpu.mem[(sym::FloorY + cpu.reg.x as usize) & 0xffff] {
         return;
     }
     cpu.mem[sym::savekidx] = cpu.mem[sym::CharX];
@@ -419,7 +421,7 @@ pub fn fallon(cpu: &mut Cpu) {
         cpu.reg.x = _v;
         cpu.flags.z = _v == 0;
         cpu.flags.n = (_v >> 7) != 0;
-        cpu.mem[sym::CharY] = cpu.mem[sym::FloorY + cpu.reg.x as usize];
+        cpu.mem[sym::CharY] = cpu.mem[(sym::FloorY + cpu.reg.x as usize) & 0xffff];
         cpu.mem[sym::CharYVel] = 0x00;
         cpu.reg.a = 0x0f;
         cpu.flags.z = cpu.reg.a == 0;
@@ -556,7 +558,7 @@ pub fn onground(cpu: &mut Cpu) {
                 cpu.reg.a = 0x01;
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
-                cpu.mem[(cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
+                cpu.mem[((cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
                 crate::ext::indexblock(cpu);
                 cpu.reg.a = 0x02;
                 cpu.flags.z = cpu.reg.a == 0;
@@ -1131,6 +1133,8 @@ pub fn InsideBlock(cpu: &mut Cpu) {
                 let _r = (cpu.reg.a as u16) + (0x04) as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 break 'b3;
             }
         }
@@ -1146,17 +1150,23 @@ pub fn InsideBlock(cpu: &mut Cpu) {
             let _r = (cpu.reg.a as u16) + (0x08) as u16 + (cpu.flags.c as u16);
             cpu.reg.a = _r as u8;
             cpu.flags.c = (_r >> 8) != 0;
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
         } else {
             crate::ext::getdist(cpu);
             cpu.flags.c = false;
             let _r = (cpu.reg.a as u16) + (0x0e) as u16 + (cpu.flags.c as u16);
             cpu.reg.a = _r as u8;
             cpu.flags.c = (_r >> 8) != 0;
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             cpu.reg.a ^= 0xff;
             cpu.flags.c = false;
             let _r = (cpu.reg.a as u16) + (0x08) as u16 + (cpu.flags.c as u16);
             cpu.reg.a = _r as u8;
             cpu.flags.c = (_r >> 8) != 0;
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
         }
     }
     crate::ext::addcharx(cpu);
@@ -2134,7 +2144,7 @@ pub fn standing(cpu: &mut Cpu) {
             cpu.flags.z = cpu.reg.a == _o;
             cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
             if cpu.reg.a == 0x04 {
-                cpu.reg.a = cpu.mem[(cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize];
+                cpu.reg.a = cpu.mem[((cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff];
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.flags.c = (cpu.reg.a & 1) != 0;
@@ -2156,6 +2166,8 @@ pub fn standing(cpu: &mut Cpu) {
         let _r = (cpu.reg.a as u16) + (!0x09_u8) as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         crate::ext::addcharx(cpu);
         cpu.mem[sym::CharX] = cpu.reg.a;
         cpu.reg.a = 0x44;
@@ -2187,7 +2199,7 @@ pub fn standing(cpu: &mut Cpu) {
                 }
             }
         }
-        cpu.reg.a = cpu.mem[(cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize];
+        cpu.reg.a = cpu.mem[((cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff];
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.flags.c = (cpu.reg.a & 1) != 0;
@@ -2223,6 +2235,8 @@ pub fn Stairs(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (0x0a) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::CharX] = cpu.reg.a;
     cpu.mem[sym::CharFace] = 0xff;
     cpu.reg.a = 0x46;
@@ -2431,7 +2445,7 @@ pub fn hanging(cpu: &mut Cpu) {
                         if cpu.reg.x == 0x00 {
                             break 'b21;
                         } else {
-                            cpu.reg.a = cpu.mem[(cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize];
+                            cpu.reg.a = cpu.mem[((cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff];
                             cpu.flags.z = cpu.reg.a == 0;
                             cpu.flags.n = (cpu.reg.a >> 7) != 0;
                             cpu.flags.c = (cpu.reg.a & 1) != 0;
@@ -2707,6 +2721,8 @@ pub fn DoJumpup(cpu: &mut Cpu) {
         let _r = (cpu.reg.a as u16) + (!0x0e_u8) as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         crate::ext::addcharx(cpu);
         cpu.mem[sym::CharX] = cpu.reg.a;
         crate::ext::rereadblocks(cpu);
@@ -2724,6 +2740,8 @@ pub fn DoJumpedge(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (!0x0a_u8) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::addcharx(cpu);
     cpu.mem[sym::CharX] = cpu.reg.a;
     cpu.reg.a = 0x10;
@@ -2776,6 +2794,8 @@ pub fn DoJumphang(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (!0x04_u8) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::addcharx(cpu);
     cpu.mem[sym::CharX] = cpu.reg.a;
     cpu.reg.a = 0x18;
@@ -2829,9 +2849,11 @@ pub fn DoRunjump(cpu: &mut Cpu) {
                 cpu.flags.z = _v == 0;
                 cpu.flags.n = (_v >> 7) != 0;
                 cpu.flags.c = false;
-                let _r = (cpu.reg.a as u16) + cpu.mem[sym::plus1 + cpu.reg.x as usize] as u16 + (cpu.flags.c as u16);
+                let _r = (cpu.reg.a as u16) + cpu.mem[(sym::plus1 + cpu.reg.x as usize) & 0xffff] as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::blockx] = cpu.reg.a;
                 cpu.reg.x = cpu.reg.a;
                 cpu.reg.y = cpu.mem[sym::CharBlockY];
@@ -2893,17 +2915,23 @@ pub fn DoRunjump(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.x == 0;
                 cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 cpu.flags.c = false;
-                let _r = (cpu.reg.a as u16) + cpu.mem[sym::Mult7 + cpu.reg.x as usize] as u16 + (cpu.flags.c as u16);
+                let _r = (cpu.reg.a as u16) + cpu.mem[(sym::Mult7 + cpu.reg.x as usize) & 0xffff] as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.flags.c = false;
-                let _r = (cpu.reg.a as u16) + cpu.mem[sym::Mult7 + cpu.reg.x as usize] as u16 + (cpu.flags.c as u16);
+                let _r = (cpu.reg.a as u16) + cpu.mem[(sym::Mult7 + cpu.reg.x as usize) & 0xffff] as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.flags.c = true;
                 let _r = (cpu.reg.a as u16) + (!0x0e_u8) as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 let _o: u8 = 0xf8;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -2947,6 +2975,8 @@ pub fn DoRunjump(cpu: &mut Cpu) {
                 let _r = (cpu.reg.a as u16) + (0x04) as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 crate::ext::addcharx(cpu);
                 cpu.mem[sym::CharX] = cpu.reg.a;
                 pc = 11;
@@ -3015,6 +3045,8 @@ pub fn DoStepfwd(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (0x1c) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::jumpseq(cpu);
     return;
 }
@@ -3029,6 +3061,8 @@ pub fn DoJumphigh(cpu: &mut Cpu) {
             let _r = (cpu.reg.a as u16) + (!0x03_u8) as u16 + (cpu.flags.c as u16);
             cpu.reg.a = _r as u8;
             cpu.flags.c = (_r >> 8) != 0;
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
             crate::ext::addcharx(cpu);
             cpu.mem[sym::CharX] = cpu.reg.a;
         }
@@ -3043,10 +3077,14 @@ pub fn DoJumphigh(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (0xfa) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + cpu.mem[sym::ztemp] as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::getblockx(cpu);
     cpu.reg.x = cpu.reg.a;
     cpu.reg.y = cpu.mem[sym::CharBlockY];
@@ -3282,7 +3320,7 @@ pub fn DOIMPALE(cpu: &mut Cpu) {
     cpu.reg.x = _v;
     cpu.flags.z = _v == 0;
     cpu.flags.n = (_v >> 7) != 0;
-    cpu.mem[sym::CharY] = cpu.mem[sym::FloorY + cpu.reg.x as usize];
+    cpu.mem[sym::CharY] = cpu.mem[(sym::FloorY + cpu.reg.x as usize) & 0xffff];
     cpu.reg.a = cpu.mem[sym::tempblockx];
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
@@ -3291,6 +3329,8 @@ pub fn DOIMPALE(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (0x0a) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::CharX] = cpu.reg.a;
     cpu.reg.a = 0x08;
     cpu.flags.z = cpu.reg.a == 0;
@@ -3373,7 +3413,7 @@ pub fn PickItUp(cpu: &mut Cpu) {
             crate::ext::jumpseq(cpu);
             return;
         }
-        cpu.reg.a = cpu.mem[(cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize];
+        cpu.reg.a = cpu.mem[((cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff];
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.flags.c = (cpu.reg.a & 1) != 0;

@@ -97,7 +97,7 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.y == 0;
     cpu.flags.n = (cpu.reg.y >> 7) != 0;
     loop {
-        cpu.reg.a = cpu.mem[(cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize];
+        cpu.reg.a = cpu.mem[((cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff];
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.a &= 0x1f;
@@ -240,6 +240,8 @@ pub fn PAUSE(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (!0x01_u8) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x00 {
         PAUSE(cpu);
         return;
@@ -298,7 +300,7 @@ pub fn ADDSLICERS(cpu: &mut Cpu) {
     cpu.flags.n = (cpu.reg.y.wrapping_sub(_o) >> 7) != 0;
     if cpu.reg.y >= 0x03 {
     } else {
-        cpu.reg.a = cpu.mem[sym::Mult10 + cpu.reg.y as usize];
+        cpu.reg.a = cpu.mem[(sym::Mult10 + cpu.reg.y as usize) & 0xffff];
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.y = cpu.reg.a;
@@ -306,9 +308,11 @@ pub fn ADDSLICERS(cpu: &mut Cpu) {
         let _r = (cpu.reg.a as u16) + (0x0a) as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.smc.sm = cpu.reg.a;
         loop {
-            cpu.reg.a = cpu.mem[(cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize];
+            cpu.reg.a = cpu.mem[((cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff];
             cpu.flags.z = cpu.reg.a == 0;
             cpu.flags.n = (cpu.reg.a >> 7) != 0;
             cpu.reg.a &= 0x1f;
@@ -318,7 +322,7 @@ pub fn ADDSLICERS(cpu: &mut Cpu) {
             cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
             if cpu.reg.a != 0x12 {
             } else {
-                cpu.reg.a = cpu.mem[(cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize];
+                cpu.reg.a = cpu.mem[((cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff];
                 cpu.flags.z = cpu.reg.a == 0;
                 cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.x = cpu.reg.a;
@@ -368,11 +372,15 @@ pub fn getnextstate(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (!0x03_u8) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a < 0x06 {
         cpu.flags.c = false;
         let _r = (cpu.reg.a as u16) + (0x0a) as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
     }
     cpu.mem[sym::tempstate] = cpu.reg.a;
     return;
@@ -386,7 +394,7 @@ pub fn pburn(cpu: &mut Cpu) {
     cpu.reg.x = _v;
     cpu.flags.z = _v == 0;
     cpu.flags.n = (_v >> 7) != 0;
-    cpu.reg.a = cpu.mem[sym::ptorchx + cpu.reg.x as usize];
+    cpu.reg.a = cpu.mem[(sym::ptorchx + cpu.reg.x as usize) & 0xffff];
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if (cpu.reg.a as i8) < 0 {
@@ -395,14 +403,14 @@ pub fn pburn(cpu: &mut Cpu) {
         cpu.flags.n = (cpu.reg.x >> 7) != 0;
     }
     cpu.mem[sym::ptorchcount] = cpu.reg.x;
-    cpu.mem[sym::XCO] = cpu.mem[sym::ptorchx + cpu.reg.x as usize];
-    cpu.mem[sym::OFFSET] = cpu.mem[sym::ptorchoff + cpu.reg.x as usize];
-    cpu.mem[sym::YCO] = cpu.mem[sym::ptorchy + cpu.reg.x as usize];
-    cpu.reg.a = cpu.mem[sym::ptorchstate + cpu.reg.x as usize];
+    cpu.mem[sym::XCO] = cpu.mem[(sym::ptorchx + cpu.reg.x as usize) & 0xffff];
+    cpu.mem[sym::OFFSET] = cpu.mem[(sym::ptorchoff + cpu.reg.x as usize) & 0xffff];
+    cpu.mem[sym::YCO] = cpu.mem[(sym::ptorchy + cpu.reg.x as usize) & 0xffff];
+    cpu.reg.a = cpu.mem[(sym::ptorchstate + cpu.reg.x as usize) & 0xffff];
     cpu.flags.z = cpu.reg.a == 0;
     cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::getflameframe(cpu);
-    cpu.mem[sym::ptorchstate + cpu.reg.x as usize] = cpu.reg.a;
+    cpu.mem[(sym::ptorchstate + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
     cpu.reg.x = cpu.reg.a;
     crate::ext::psetupflame(cpu);
     crate::hires::lay(cpu);
@@ -438,13 +446,13 @@ pub fn pstars(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.x == 0;
     cpu.flags.n = (cpu.reg.x >> 7) != 0;
     loop {
-        cpu.reg.a = cpu.mem[sym::pstarcount + cpu.reg.x as usize];
+        cpu.reg.a = cpu.mem[(sym::pstarcount + cpu.reg.x as usize) & 0xffff];
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if cpu.reg.a == 0x00 {
         } else {
-            let _v = cpu.mem[sym::pstarcount + cpu.reg.x as usize].wrapping_sub(1);
-            cpu.mem[sym::pstarcount + cpu.reg.x as usize] = _v;
+            let _v = cpu.mem[(sym::pstarcount + cpu.reg.x as usize) & 0xffff].wrapping_sub(1);
+            cpu.mem[(sym::pstarcount + cpu.reg.x as usize) & 0xffff] = _v;
             cpu.flags.z = _v == 0;
             cpu.flags.n = (_v >> 7) != 0;
             if !cpu.flags.z {
@@ -478,13 +486,15 @@ pub fn pstars(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (0x05) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     let tmp1 = cpu.reg.a;
     crate::ext::rnd(cpu);
     crate::ext::rnd(cpu);
     cpu.reg.a &= 0x03;
     cpu.reg.x = cpu.reg.a;
     cpu.reg.a = tmp1;
-    cpu.mem[sym::pstarcount + cpu.reg.x as usize] = cpu.reg.a;
+    cpu.mem[(sym::pstarcount + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
     crate::ext::twinkle(cpu);
     return;
 }
@@ -1610,7 +1620,7 @@ pub fn initit(cpu: &mut Cpu) {
     cpu.mem[sym::ptorchcount] = cpu.reg.a;
     cpu.reg.x = 0x03;
     loop {
-        cpu.mem[sym::pstarcount + cpu.reg.x as usize] = cpu.reg.a;
+        cpu.mem[(sym::pstarcount + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
         cpu.reg.x = cpu.reg.x.wrapping_sub(0x01);
         if !((cpu.reg.x as i8) >= 0) {
             break;
@@ -1891,8 +1901,8 @@ pub fn REMOVEOBJ(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.x == 0;
     cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.mem[sym::clrbtn] = cpu.reg.x;
-    cpu.mem[(cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize] = 0x01;
-    cpu.mem[(cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize] = 0x00;
+    cpu.mem[((cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = 0x01;
+    cpu.mem[((cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = 0x00;
     cpu.mem[sym::height] = 0x23;
     cpu.reg.a = 0x02;
     cpu.flags.z = cpu.reg.a == 0;
@@ -1910,6 +1920,8 @@ pub fn SETINITIALS(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (!0x01_u8) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::SCRNUM] = cpu.reg.a;
     loop {
         DoScrn(cpu);
@@ -1936,7 +1948,7 @@ pub fn DoScrn(cpu: &mut Cpu) {
         crate::ext::getinitobj(cpu);
         if !cpu.flags.c {
         } else {
-            cpu.mem[(cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
+            cpu.mem[((cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
         }
         let _v = cpu.reg.y.wrapping_sub(1);
         cpu.reg.y = _v;
@@ -1974,7 +1986,7 @@ pub fn STARTKID(cpu: &mut Cpu) {
             cpu.reg.a = 0x00;
             cpu.flags.z = cpu.reg.a == 0;
             cpu.flags.n = (cpu.reg.a >> 7) != 0;
-            cpu.mem[(cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize] = cpu.reg.a;
+            cpu.mem[((cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
         }
     }
     cpu.mem[sym::CharScrn] = cpu.mem[sym::KidStartScrn];
@@ -1992,6 +2004,8 @@ pub fn STARTKID(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (0x0e) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::CharX] = cpu.reg.a;
     cpu.reg.a = cpu.mem[sym::KidStartFace];
     cpu.flags.z = cpu.reg.a == 0;
@@ -2018,7 +2032,7 @@ pub fn STARTKID(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::CharBlockY];
     cpu.flags.z = cpu.reg.x == 0;
     cpu.flags.n = (cpu.reg.x >> 7) != 0;
-    cpu.mem[sym::CharY] = cpu.mem[sym::FloorY + 1 + cpu.reg.x as usize];
+    cpu.mem[sym::CharY] = cpu.mem[(sym::FloorY + 1 + cpu.reg.x as usize) & 0xffff];
     cpu.mem[sym::CharLife] = 0xff;
     cpu.mem[sym::CharID] = 0x00;
     cpu.reg.a = 0x00;
@@ -2069,7 +2083,7 @@ pub fn STARTKID1(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::CharBlockY];
     cpu.flags.z = cpu.reg.x == 0;
     cpu.flags.n = (cpu.reg.x >> 7) != 0;
-    cpu.mem[sym::CharY] = cpu.mem[sym::FloorY + 1 + cpu.reg.x as usize];
+    cpu.mem[sym::CharY] = cpu.mem[(sym::FloorY + 1 + cpu.reg.x as usize) & 0xffff];
     cpu.mem[sym::CharLife] = 0xff;
     cpu.mem[sym::CharID] = 0x00;
     cpu.reg.a = 0x00;
@@ -2138,6 +2152,8 @@ pub fn GRAVITY(cpu: &mut Cpu) {
         let _r = (cpu.reg.a as u16) + (0x01) as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = 0x04;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -2175,6 +2191,8 @@ pub fn GRAVITY(cpu: &mut Cpu) {
         let _r = (cpu.reg.a as u16) + (0x03) as u16 + (cpu.flags.c as u16);
         cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = 0x21;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -2197,6 +2215,8 @@ pub fn ADDFALL(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + cpu.mem[sym::CharY] as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::CharY] = cpu.reg.a;
     cpu.reg.a = cpu.mem[sym::CharAction];
     cpu.flags.z = cpu.reg.a == 0;
@@ -2218,7 +2238,7 @@ pub fn INITIALGUARDS(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.y == 0;
     cpu.flags.n = (cpu.reg.y >> 7) != 0;
     loop {
-        cpu.reg.a = cpu.mem[sym::GdStartBlock - 1 + cpu.reg.y as usize];
+        cpu.reg.a = cpu.mem[(sym::GdStartBlock - 1 + cpu.reg.y as usize) & 0xffff];
         cpu.flags.z = cpu.reg.a == 0;
         cpu.flags.n = (cpu.reg.a >> 7) != 0;
         let _o: u8 = 0x1e;
@@ -2233,11 +2253,13 @@ pub fn INITIALGUARDS(cpu: &mut Cpu) {
             let _r = (cpu.reg.a as u16) + (0x0e) as u16 + (cpu.flags.c as u16);
             cpu.reg.a = _r as u8;
             cpu.flags.c = (_r >> 8) != 0;
-            cpu.mem[sym::GdStartX - 1 + cpu.reg.y as usize] = cpu.reg.a;
+            cpu.flags.z = cpu.reg.a == 0;
+            cpu.flags.n = (cpu.reg.a >> 7) != 0;
+            cpu.mem[(sym::GdStartX - 1 + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
             cpu.reg.a = 0x00;
             cpu.flags.z = cpu.reg.a == 0;
             cpu.flags.n = (cpu.reg.a >> 7) != 0;
-            cpu.mem[sym::GdStartSeqH - 1 + cpu.reg.y as usize] = cpu.reg.a;
+            cpu.mem[(sym::GdStartSeqH - 1 + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
         }
         let _v = cpu.reg.y.wrapping_sub(1);
         cpu.reg.y = _v;
@@ -2319,6 +2341,8 @@ pub fn _3atrigloose(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (0x01) as u16 + (cpu.flags.c as u16);
     cpu.reg.a = _r as u8;
     cpu.flags.c = (_r >> 8) != 0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::breakloose1(cpu);
     return;
 }
