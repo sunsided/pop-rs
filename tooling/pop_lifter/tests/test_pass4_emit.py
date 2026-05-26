@@ -44,6 +44,7 @@ from pop_lifter.ir1 import (
     LoadIndexed,
     LoadIndirect,
     LocalRef,
+    Lsr,
     OpVarRef,
     Pha,
     Pla,
@@ -53,6 +54,7 @@ from pop_lifter.ir1 import (
     SbcImm,
     SbcIndirect,
     Sec,
+    ShiftMem,
     SourceRef,
     StoreAbs,
     StoreIndexed,
@@ -1044,21 +1046,48 @@ def test_raw_adc_imm():
 
 
 def test_raw_asl_and_lsr():
-    asl_lines = _emit_stmt(RawStmt(item=Asl(src=SRC)), 0)
-    assert asl_lines[0] == "self.flags.c = (self.reg.a >> 7) != 0;"
-    assert asl_lines[1] == "self.set_a(self.reg.a.wrapping_shl(1));"
-    ror_lines = _emit_stmt(RawStmt(item=Ror(src=SRC)), 0)
-    assert ror_lines[0] == "let _c = self.reg.a & 1;"
-    assert ror_lines[2] == "self.flags.c = _c != 0;"
+    # Accumulator shifts: carry from the shifted-out bit, then `set_a`
+    # writes A and its Z/N.
+    assert _emit_stmt(RawStmt(item=Asl(src=SRC)), 0) == [
+        "self.flags.c = (self.reg.a >> 7) != 0;",
+        "self.set_a(self.reg.a.wrapping_shl(1));",
+    ]
+    assert _emit_stmt(RawStmt(item=Lsr(src=SRC)), 0) == [
+        "self.flags.c = (self.reg.a & 1) != 0;",
+        "self.set_a(self.reg.a.wrapping_shr(1));",
+    ]
 
 
 def test_raw_rol_and_ror():
-    rol = _emit_stmt(RawStmt(item=Rol(src=SRC)), 0)
-    assert rol[0] == "let _c = self.reg.a >> 7;"
-    assert rol[1] == "self.set_a(self.reg.a.wrapping_shl(1) | (self.flags.c as u8));"
-    assert rol[2] == "self.flags.c = _c != 0;"
-    ror = _emit_stmt(RawStmt(item=Ror(src=SRC)), 0)
-    assert ror[1] == "self.set_a(self.reg.a.wrapping_shr(1) | ((self.flags.c as u8) << 7));"
+    # Rotates read the old carry into the shifted byte (so `set_a`, which
+    # reads the current carry, runs before carry is updated to `_c`).
+    assert _emit_stmt(RawStmt(item=Rol(src=SRC)), 0) == [
+        "let _c = self.reg.a >> 7;",
+        "self.set_a(self.reg.a.wrapping_shl(1) | (self.flags.c as u8));",
+        "self.flags.c = _c != 0;",
+    ]
+    assert _emit_stmt(RawStmt(item=Ror(src=SRC)), 0) == [
+        "let _c = self.reg.a & 1;",
+        "self.set_a(self.reg.a.wrapping_shr(1) | ((self.flags.c as u8) << 7));",
+        "self.flags.c = _c != 0;",
+    ]
+
+
+def test_raw_shift_mem():
+    # Memory shift/rotate: result lands in memory, so Z/N go through
+    # `set_nz` (flags-only) rather than `set_a`.
+    place = "self.mem[0x0040]"
+    assert _raw(ShiftMem(op="asl", target=_abs("M", 0x40), src=SRC)) == "\n".join([
+        f"self.flags.c = ({place} >> 7) != 0;",
+        f"{place} = {place}.wrapping_shl(1);",
+        f"self.set_nz({place});",
+    ])
+    assert _raw(ShiftMem(op="ror", target=_abs("M", 0x40), src=SRC)) == "\n".join([
+        f"let _c = {place} & 1;",
+        f"{place} = {place}.wrapping_shr(1) | ((self.flags.c as u8) << 7);",
+        "self.flags.c = _c != 0;",
+        f"self.set_nz({place});",
+    ])
 
 
 # ---------------------------------------------------------------- multi-module emit
