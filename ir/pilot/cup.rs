@@ -64,16 +64,22 @@ mod sym {
 impl Cpu {
     fn Cup(&mut self) {
         self.reg.a = self.mem[sym::CharScrn];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.getup();
         self.mem[sym::CharScrn] = self.reg.a;
         self.mem[sym::CharBlockY] = (self.mem[sym::CharBlockY]).wrapping_add(0x03);
         self.reg.a = self.mem[sym::CharY];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.flags.c = false;
         let _r = (self.reg.a as u16) + (0xbd) as u16 + (self.flags.c as u16);
         self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
         self.mem[sym::CharY] = self.reg.a;
         self.reg.x = 0x03;
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         return;
     }
 }

@@ -399,6 +399,20 @@ def _indirect_index(iy: IndirectY, syms: SymTable | None) -> str:
     return f"({lo} as usize | ({hi} as usize) << 8) + self.reg.y as usize"
 
 
+def _load_with_flags(reg, rvalue: str, comment: str = "") -> list[str]:
+    """A register load and its Z/N update. On the 6502 every register load
+    sets Z/N from the loaded byte; the emitter writes them unconditionally
+    (like `cmp`/`inc`/`dec`/`pla`) so a flag that's live-out to a caller's
+    branch — which fusion can't bridge across a `jsr`/`rts` — stays
+    correct. `comment` is an optional trailing `// …` on the load line."""
+    place = f"self.reg.{reg}"
+    return [
+        f"{place} = {rvalue};{comment}",
+        f"self.flags.z = {place} == 0;",
+        f"self.flags.n = ({place} >> 7) != 0;",
+    ]
+
+
 def _local_key(label: str, offset: int) -> str:
     """Render the `(label, offset)` key for the `self.local` byte store
     shared by `StoreLocal` / `LoadLocal` / `CmpLocal`. Local (`:`) and
@@ -560,23 +574,20 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         # Surface the source comment so a magic immediate keeps its name
         # (`self.reg.a = 0x63; // "stabbed"`).
         cmt = f"  // {item.src.comment}" if item.src.comment else ""
-        return [f"self.reg.{item.reg} = {_emit_imm(item.imm)};{cmt}"]
+        return _load_with_flags(item.reg, _emit_imm(item.imm), cmt)
 
     if isinstance(item, LoadAbs):
-        return [f"self.reg.{item.reg} = self.mem[{_abs_index(item.source, syms)}];"]
+        return _load_with_flags(item.reg, f"self.mem[{_abs_index(item.source, syms)}]")
 
     if isinstance(item, LoadLocal):
-        reg = f"self.reg.{item.reg}"
         key = _local_key(item.source_label, item.offset)
-        return [
-            f"{reg} = self.local.get(&{key}).copied().unwrap_or(0);",
-            f"self.flags.z = {reg} == 0;",
-            f"self.flags.n = ({reg} >> 7) != 0;",
-        ]
+        return _load_with_flags(
+            item.reg, f"self.local.get(&{key}).copied().unwrap_or(0)"
+        )
 
     if isinstance(item, LoadIndexed):
         place = f"self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize]"
-        return [f"self.reg.{item.reg} = {place};"]
+        return _load_with_flags(item.reg, place)
 
     if isinstance(item, LoadIndirect):
         idx = (
@@ -584,7 +595,7 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             if isinstance(item.source, IndirectX)
             else _indirect_index(item.source, syms)
         )
-        return [f"self.reg.{item.reg} = self.mem[{idx}];"]
+        return _load_with_flags(item.reg, f"self.mem[{idx}]")
 
     if isinstance(item, StoreAbs):
         return [f"self.mem[{_abs_index(item.target, syms)}] = self.reg.{item.reg};"]

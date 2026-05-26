@@ -75,10 +75,16 @@ impl Cpu {
             }
         }
         self.reg.y = 0x07;
+        self.flags.z = self.reg.y == 0;
+        self.flags.n = (self.reg.y >> 7) != 0;
         self.reg.a = self.mem[(self.mem[sym::ztemp] as usize | (self.mem[sym::ztemp + 1] as usize) << 8) + self.reg.y as usize];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.jumpseq();
         self.mem[sym::CharID] = 0x01;
         self.reg.a = 0x00;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::PlayCount] = self.reg.a;
         return;
     }

@@ -7,10 +7,14 @@ use crate::sym;
 
 pub fn FIRSTBOOT(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::MIXEDoff];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     setaux(cpu);
     cpu.mem[sym::BBundID] = 0xa9;
     cpu.mem[sym::RAMWRTmain] = 0xa9;
     cpu.reg.a = 0x02;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::track] = cpu.reg.a;
     crate::ext::rw18(cpu);
     loadperm(cpu);
@@ -26,6 +30,8 @@ pub fn FIRSTBOOT(cpu: &mut Cpu) {
 pub fn loadmusic1(cpu: &mut Cpu) {
     setmain(cpu);
     cpu.reg.a = 0x22;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::track] = cpu.reg.a;
     crate::ext::rw18(cpu);
     setaux(cpu);
@@ -40,6 +46,8 @@ pub fn loadmusic2(cpu: &mut Cpu) {
             0 => {
                 setmain(cpu);
                 cpu.reg.a = 0x14;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::track] = cpu.reg.a;
                 crate::ext::rw18(cpu);
                 crate::ext::_5dmm(cpu);
@@ -69,6 +77,8 @@ pub fn setmain(cpu: &mut Cpu) {
 
 pub fn driveon(cpu: &mut Cpu) {
     cpu.reg.a = 0x00;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.local.insert((":delay", 0), cpu.reg.a);
     setaux(cpu);
     let _o: u8 = cpu.mem[sym::RWBANK1];
@@ -78,6 +88,8 @@ pub fn driveon(cpu: &mut Cpu) {
     cpu.flags.z = (cpu.reg.a & _o) == 0;
     cpu.flags.n = (_o >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::BBundID];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.local.insert((":IDbyte", 0), cpu.reg.a);
     crate::ext::rw18(cpu);
     crate::ext::rw18(cpu);
@@ -94,6 +106,8 @@ pub fn driveon1(cpu: &mut Cpu) {
     cpu.flags.z = (cpu.reg.a & _o) == 0;
     cpu.flags.n = (_o >> 7) != 0;
     cpu.reg.a = cpu.mem[sym::BBundID];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.local.insert((":IDbyte", 0), cpu.reg.a);
     crate::ext::rw18(cpu);
     crate::ext::rw18(cpu);
@@ -115,7 +129,11 @@ pub fn driveoff(cpu: &mut Cpu) {
 
 pub fn set1stlevel(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::firstlevel];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.x = cpu.mem[sym::firstlevel + 1];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.mem[sym::params] = cpu.reg.a;
     cpu.mem[sym::params + 1] = cpu.reg.x;
     return;
@@ -129,7 +147,11 @@ pub fn SetLevel(cpu: &mut Cpu) {
 
 pub fn setdemolevel(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::demolevel];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.x = cpu.mem[sym::demolevel + 1];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     SetLevel(cpu);
     return;
 }
@@ -141,6 +163,8 @@ pub fn checkdisk(cpu: &mut Cpu) {
             0 => {
                 setaux(cpu);
                 cpu.reg.x = 0xad;
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 cpu.mem[sym::BBundID] = cpu.reg.x;
                 driveon(cpu);
                 pc = 1;
@@ -148,6 +172,8 @@ pub fn checkdisk(cpu: &mut Cpu) {
             1 => {
                 setmain(cpu);
                 cpu.reg.a = 0x16;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::track] = cpu.reg.a;
                 crate::ext::rw18(cpu);
                 if !cpu.flags.c {
@@ -174,6 +200,8 @@ pub fn SAVEGAME(cpu: &mut Cpu) {
     cpu.reg.x = 0x0f;
     loop {
         cpu.reg.a = cpu.mem[sym::savedgame + cpu.reg.x as usize];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[0x0200 + cpu.reg.x as usize] = cpu.reg.a;
         cpu.reg.x = cpu.reg.x.wrapping_sub(0x01);
         if !((cpu.reg.x as i8) >= 0) {
@@ -182,6 +210,8 @@ pub fn SAVEGAME(cpu: &mut Cpu) {
     }
     cpu.mem[sym::RAMRDmain] = cpu.reg.a;
     cpu.reg.a = 0x17;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::track] = cpu.reg.a;
     crate::ext::rw18(cpu);
     if !cpu.flags.c {
@@ -195,12 +225,16 @@ pub fn SAVEGAME(cpu: &mut Cpu) {
 pub fn LOADGAME(cpu: &mut Cpu) {
     checkdisk(cpu);
     cpu.reg.a = 0x17;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::track] = cpu.reg.a;
     crate::ext::rw18(cpu);
     cpu.mem[sym::RAMWRTaux] = cpu.reg.a;
     cpu.reg.x = 0x0f;
     loop {
         cpu.reg.a = cpu.mem[0x0200 + cpu.reg.x as usize];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.mem[sym::savedgame + cpu.reg.x as usize] = cpu.reg.a;
         cpu.reg.x = cpu.reg.x.wrapping_sub(0x01);
         if !((cpu.reg.x as i8) >= 0) {
@@ -236,11 +270,15 @@ pub fn LOADLEVEL(cpu: &mut Cpu) {
 pub fn setbluep(cpu: &mut Cpu) {
     cpu.mem[sym::track] = cpu.mem[sym::bluepTRK];
     cpu.reg.a = cpu.mem[sym::bluepREG];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     return;
 }
 
 pub fn vidstuff(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::BBundID];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     let _o: u8 = 0xad;
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
@@ -249,6 +287,8 @@ pub fn vidstuff(cpu: &mut Cpu) {
         return;
     }
     cpu.reg.a = cpu.mem[0xc000];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     let _o: u8 = 0x5e;
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
@@ -258,6 +298,8 @@ pub fn vidstuff(cpu: &mut Cpu) {
     }
     setmain(cpu);
     cpu.reg.a = 0x0c;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::track] = cpu.reg.a;
     crate::ext::rw18(cpu);
     loop {
@@ -286,11 +328,15 @@ pub fn vidstuff(cpu: &mut Cpu) {
 
 pub fn rdbg1(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::newBGset1];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     if cpu.reg.x == cpu.mem[sym::BGset1] {
         return;
     }
     cpu.mem[sym::BGset1] = cpu.reg.x;
     cpu.reg.a = cpu.mem[sym::bg1trk + cpu.reg.x as usize];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::track] = cpu.reg.a;
     crate::ext::rw18(cpu);
     crate::ext::rw18(cpu);
@@ -299,11 +345,15 @@ pub fn rdbg1(cpu: &mut Cpu) {
 
 pub fn rdbg2(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::newBGset2];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     if cpu.reg.x == cpu.mem[sym::BGset2] {
         return;
     }
     cpu.mem[sym::BGset2] = cpu.reg.x;
     cpu.reg.a = cpu.mem[sym::bg2trk + cpu.reg.x as usize];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::track] = cpu.reg.a;
     crate::ext::rw18(cpu);
     return;
@@ -311,12 +361,16 @@ pub fn rdbg2(cpu: &mut Cpu) {
 
 pub fn rdch4(cpu: &mut Cpu) {
     cpu.reg.x = cpu.mem[sym::newCHset];
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     if cpu.reg.x == cpu.mem[sym::CHset] {
         return;
     }
     cpu.mem[sym::CHset] = cpu.reg.x;
     cpu.mem[sym::track] = cpu.mem[sym::ch4trk + cpu.reg.x as usize];
     cpu.reg.a = cpu.mem[sym::ch4off + cpu.reg.x as usize];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     match cpu.reg.a {
         0x00 => {
             crate::ext::rw18(cpu);
@@ -384,10 +438,18 @@ pub fn rdbluep(cpu: &mut Cpu) {
 
 pub fn copy1to2(cpu: &mut Cpu) {
     cpu.reg.a = 0x40;  // dest
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.x = 0x20;  // org
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     if cpu.reg.x == 0x00 {
         cpu.reg.a = 0x20;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         cpu.reg.x = 0x40;
+        cpu.flags.z = cpu.reg.x == 0;
+        cpu.flags.n = (cpu.reg.x >> 7) != 0;
     }
     cpu.mem[sym::IMAGE + 1] = cpu.reg.a;
     cpu.mem[sym::IMAGE] = cpu.reg.x;
@@ -398,7 +460,11 @@ pub fn copy1to2(cpu: &mut Cpu) {
 
 pub fn copy2to1(cpu: &mut Cpu) {
     cpu.reg.a = 0x20;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.reg.x = 0x40;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.mem[sym::IMAGE + 1] = cpu.reg.a;
     cpu.mem[sym::IMAGE] = cpu.reg.x;
     crate::ext::_copy2000aux(cpu);
@@ -417,11 +483,17 @@ pub fn copydhires(cpu: &mut Cpu) {
 pub fn CUTPRINCESS(cpu: &mut Cpu) {
     crate::ext::blackout(cpu);
     cpu.reg.a = 0x01;  // seek track 0
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     LoadStage2(cpu);
     cpu.reg.a = 0x84;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::SngExpand(cpu);
     cpu.mem[sym::IMAGE + 1] = 0x40;
     cpu.reg.a = 0x20;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::IMAGE] = cpu.reg.a;
     crate::ext::_copy2000(cpu);
     return;
@@ -430,9 +502,13 @@ pub fn CUTPRINCESS(cpu: &mut Cpu) {
 pub fn cutprincess1(cpu: &mut Cpu) {
     LoadStage2(cpu);
     cpu.reg.a = 0x84;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::SngExpand(cpu);
     cpu.mem[sym::IMAGE + 1] = 0x40;
     cpu.reg.a = 0x20;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::IMAGE] = cpu.reg.a;
     crate::ext::_copy2000(cpu);
     return;
@@ -440,21 +516,29 @@ pub fn cutprincess1(cpu: &mut Cpu) {
 
 pub fn EPILOG(cpu: &mut Cpu) {
     cpu.reg.a = 0x01;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::soundon] = cpu.reg.a;
     cpu.mem[sym::musicon] = cpu.reg.a;
     crate::ext::blackout(cpu);
     LoadStage1B(cpu);
     Epilog(cpu);
     cpu.reg.a = 0xa9;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::BBundID] = cpu.reg.a;
     cpu.mem[0xc010] = cpu.reg.a;
     loop {
         cpu.reg.a = cpu.mem[0xc000];
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         if !((cpu.reg.a as i8) >= 0) {
             break;
         }
     }
     cpu.reg.a = 0x01;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::musicon] = cpu.reg.a;
     SetupDHires(cpu);
     PubCredit(cpu);
@@ -472,6 +556,8 @@ pub fn EPILOG(cpu: &mut Cpu) {
 #[doc(alias = "AttractLoop")]
 pub fn ATTRACTMODE(cpu: &mut Cpu) {
     cpu.reg.a = 0x01;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::musicon] = cpu.reg.a;
     SetupDHires(cpu);
     PubCredit(cpu);
@@ -497,11 +583,19 @@ pub fn PubCredit(cpu: &mut Cpu) {
     crate::ext::setdhires(cpu);
     copy1to2(cpu);
     cpu.reg.a = 0x2c;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tpause(cpu);
     cpu.reg.a = 0x70;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::DeltaExpPop(cpu);
     cpu.reg.x = 0x50;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x01;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     PlaySongI(cpu);
     CleanScreen(cpu);
     return;
@@ -509,18 +603,30 @@ pub fn PubCredit(cpu: &mut Cpu) {
 
 pub fn CleanScreen(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::PAGE2on];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     copy2to1(cpu);
     cpu.reg.a = cpu.mem[sym::PAGE2off];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     return;
 }
 
 pub fn AuthorCredit(cpu: &mut Cpu) {
     cpu.reg.a = 0x2a;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tpause(cpu);
     cpu.reg.a = 0x72;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::DeltaExpPop(cpu);
     cpu.reg.x = 0x50;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x02;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     PlaySongI(cpu);
     CleanScreen(cpu);
     return;
@@ -530,21 +636,35 @@ pub fn SilentTitle(cpu: &mut Cpu) {
     unpacksplash(cpu);
     copy1to2(cpu);
     cpu.reg.a = 0x14;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tpause(cpu);
     cpu.reg.a = 0x74;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::DeltaExpPop(cpu);
     cpu.reg.a = 0xa0;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tpause(cpu);
     return;
 }
 
 pub fn TitleScreen(cpu: &mut Cpu) {
     cpu.reg.a = 0x26;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     tpause(cpu);
     cpu.reg.a = 0x74;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::DeltaExpPop(cpu);
     cpu.reg.x = 0x8c;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x03;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     PlaySongI(cpu);
     CleanScreen(cpu);
     return;
@@ -552,10 +672,16 @@ pub fn TitleScreen(cpu: &mut Cpu) {
 
 pub fn Prolog1(cpu: &mut Cpu) {
     cpu.reg.a = 0x7c;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::RAMRDaux] = cpu.reg.a;
     crate::ext::DblExpand(cpu);
     cpu.reg.x = 0xfa;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x04;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     PlaySongI(cpu);
     return;
 }
@@ -564,43 +690,67 @@ pub fn PrincessScene(cpu: &mut Cpu) {
     crate::ext::blackout(cpu);
     ReloadStuff(cpu);
     cpu.reg.a = 0x00;  // don't seek track 0
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cutprincess1(cpu);
     cpu.reg.a = 0x00;  // cut #0 (intro)
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::xplaycut(cpu);
     return;
 }
 
 pub fn Prolog2(cpu: &mut Cpu) {
     cpu.reg.a = 0x60;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::RAMRDmain] = cpu.reg.a;
     crate::ext::DblExpand(cpu);
     crate::ext::setdhires(cpu);
     cpu.reg.x = 0xfa;
+    cpu.flags.z = cpu.reg.x == 0;
+    cpu.flags.n = (cpu.reg.x >> 7) != 0;
     cpu.reg.a = 0x05;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     PlaySongI(cpu);
     return;
 }
 
 pub fn Epilog(cpu: &mut Cpu) {
     cpu.reg.a = cpu.mem[sym::IIGS];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x00 {
         SuperEpilog(cpu);
         return;
     }
     cpu.reg.a = 0x76;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::RAMRDaux] = cpu.reg.a;
     crate::ext::DblExpand(cpu);
     crate::ext::setdhires(cpu);
     cpu.reg.a = 0x01;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     PlaySongNI(cpu);
     cpu.reg.a = 0x0f;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     pauseNI(cpu);
     unpacksplash(cpu);
     cpu.reg.a = 0x4b;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     pauseNI(cpu);
     cpu.reg.a = 0x02;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     PlaySongNI(cpu);
     cpu.reg.a = 0x3c;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     pauseNI(cpu);
     crate::ext::blackout(cpu);
     return;
@@ -608,6 +758,8 @@ pub fn Epilog(cpu: &mut Cpu) {
 
 pub fn unpacksplash(cpu: &mut Cpu) {
     cpu.reg.a = 0x40;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::RAMRDaux] = cpu.reg.a;
     crate::ext::DblExpand(cpu);
     return;
@@ -615,19 +767,31 @@ pub fn unpacksplash(cpu: &mut Cpu) {
 
 pub fn SuperEpilog(cpu: &mut Cpu) {
     cpu.reg.a = 0x01;  // aux
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::fadein(cpu);
     setaux(cpu);
     cpu.reg.a = 0x01;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     PlaySongNI(cpu);
     crate::ext::fadeout(cpu);
     cpu.reg.a = 0x00;  // main
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::fadein(cpu);
     setaux(cpu);
     cpu.reg.a = 0x50;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     pauseNI(cpu);
     cpu.reg.a = 0x02;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     PlaySongNI(cpu);
     cpu.reg.a = 0xff;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     pauseNI(cpu);
     crate::ext::fadeout(cpu);
     crate::ext::_2a(cpu);
@@ -641,6 +805,8 @@ pub fn Demo(cpu: &mut Cpu) {
     rdbluep(cpu);
     driveoff(cpu);
     cpu.reg.a = 0x00;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::start(cpu);
     return;
 }
@@ -653,10 +819,14 @@ pub fn pauseNI(cpu: &mut Cpu) {
             0 => {
                 cpu.mem[sym::pausetemp] = cpu.reg.a;
                 cpu.reg.y = 0x14;
+                cpu.flags.z = cpu.reg.y == 0;
+                cpu.flags.n = (cpu.reg.y >> 7) != 0;
                 pc = 1;
             }
             1 => {
                 cpu.reg.x = 0x00;
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 pc = 2;
             }
             2 => {
@@ -683,6 +853,8 @@ pub fn pauseNI(cpu: &mut Cpu) {
             }
             4 => {
                 cpu.reg.a = cpu.mem[sym::pausetemp];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.flags.c = true;
                 let _r = (cpu.reg.a as u16) + (!0x01_u8) as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
@@ -717,12 +889,18 @@ pub fn StartGame_3f(cpu: &mut Cpu) {
     driveoff(cpu);
     cpu.mem[sym::musicon] = 0x01;
     cpu.reg.a = cpu.mem[sym::keypress];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x0c {
         cpu.reg.a = 0x01;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         crate::ext::start(cpu);
         return;
     }
     cpu.reg.a = 0x04;  // arbitrary
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::startresume(cpu);
     return;
 }
@@ -736,24 +914,34 @@ pub fn _3a3(cpu: &mut Cpu) {
     driveoff(cpu);
     cpu.mem[sym::musicon] = 0x01;
     cpu.reg.a = cpu.mem[sym::keypress];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x0c {
         cpu.reg.a = 0x01;
+        cpu.flags.z = cpu.reg.a == 0;
+        cpu.flags.n = (cpu.reg.a >> 7) != 0;
         crate::ext::start(cpu);
         return;
     }
     cpu.reg.a = 0x04;  // arbitrary
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     crate::ext::startresume(cpu);
     return;
 }
 
 pub fn loadperm(cpu: &mut Cpu) {
     cpu.reg.a = 0x03;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::track] = cpu.reg.a;
     setaux(cpu);
     crate::ext::rw18(cpu);
     crate::ext::rw18(cpu);
     setmain(cpu);
     cpu.reg.a = 0x09;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::track] = cpu.reg.a;
     crate::ext::rw18(cpu);
     crate::ext::rw18(cpu);
@@ -761,15 +949,21 @@ pub fn loadperm(cpu: &mut Cpu) {
     crate::ext::rw18(cpu);
     crate::ext::rw18(cpu);
     cpu.reg.a = 0x13;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::track] = cpu.reg.a;
     crate::ext::rw18(cpu);
     crate::ext::rw18(cpu);
     crate::ext::rw18(cpu);
     cpu.reg.a = 0x22;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::track] = cpu.reg.a;
     crate::ext::rw18(cpu);
     setaux(cpu);
     cpu.reg.a = 0x01;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::MSset] = cpu.reg.a;
     setmain(cpu);
     crate::ext::Tmoveauxlc(cpu);
@@ -779,6 +973,8 @@ pub fn loadperm(cpu: &mut Cpu) {
 pub fn LoadStage1A(cpu: &mut Cpu) {
     driveon(cpu);
     cpu.reg.a = 0x16;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     _5dlsub(cpu);
     setmain(cpu);
     crate::ext::rw18(cpu);
@@ -786,6 +982,8 @@ pub fn LoadStage1A(cpu: &mut Cpu) {
     loadmusic1(cpu);
     setaux(cpu);
     cpu.reg.a = 0xff;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     cpu.mem[sym::BGset1] = cpu.reg.a;
     cpu.mem[sym::BGset2] = cpu.reg.a;
     cpu.mem[sym::CHset] = cpu.reg.a;
@@ -797,12 +995,16 @@ pub fn LoadStage1B(cpu: &mut Cpu) {
     driveon(cpu);
     loadmusic3(cpu);
     cpu.reg.a = cpu.mem[sym::IIGS];
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     if cpu.reg.a != 0x00 {
         crate::ext::loadsuper(cpu);
         driveoff(cpu);
         return;
     }
     cpu.reg.a = 0x12;
+    cpu.flags.z = cpu.reg.a == 0;
+    cpu.flags.n = (cpu.reg.a >> 7) != 0;
     _5dlsub(cpu);
     driveoff(cpu);
     return;
@@ -818,6 +1020,8 @@ pub fn ReloadStuff(cpu: &mut Cpu) {
             }
             1 => {
                 cpu.reg.a = 0x04;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::track] = cpu.reg.a;
                 crate::ext::rw18(cpu);
                 if !cpu.flags.c {
@@ -832,6 +1036,8 @@ pub fn ReloadStuff(cpu: &mut Cpu) {
             }
             3 => {
                 cpu.reg.a = 0x0f;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::track] = cpu.reg.a;
                 crate::ext::rw18(cpu);
                 crate::ext::rw18(cpu);
@@ -850,6 +1056,8 @@ pub fn LoadStage2(cpu: &mut Cpu) {
         match pc {
             0 => {
                 cpu.reg.x = cpu.mem[sym::BBundID];
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 let _o: u8 = 0xad;
                 cpu.flags.c = cpu.reg.x >= _o;
                 cpu.flags.z = cpu.reg.x == _o;
@@ -864,8 +1072,12 @@ pub fn LoadStage2(cpu: &mut Cpu) {
             1 => {
                 driveon(cpu);
                 cpu.reg.a = 0x00;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 loadch7(cpu);
                 cpu.reg.a = 0x1d;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 pc = 2;
             }
             2 => {
@@ -889,6 +1101,8 @@ pub fn LoadStage2(cpu: &mut Cpu) {
                 crate::ext::rw18(cpu);
                 crate::ext::rw18(cpu);
                 cpu.reg.a = 0xff;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::BGset1] = cpu.reg.a;
                 cpu.mem[sym::BGset2] = cpu.reg.a;
                 cpu.mem[sym::CHset] = cpu.reg.a;
@@ -907,8 +1121,12 @@ pub fn LoadStage2A(cpu: &mut Cpu) {
             0 => {
                 driveon(cpu);
                 cpu.reg.a = 0x00;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 loadch7(cpu);
                 cpu.reg.a = 0x1d;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 pc = 1;
             }
             1 => {
@@ -932,6 +1150,8 @@ pub fn LoadStage2A(cpu: &mut Cpu) {
                 crate::ext::rw18(cpu);
                 crate::ext::rw18(cpu);
                 cpu.reg.a = 0xff;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::BGset1] = cpu.reg.a;
                 cpu.mem[sym::BGset2] = cpu.reg.a;
                 cpu.mem[sym::CHset] = cpu.reg.a;
@@ -953,6 +1173,8 @@ pub fn loadch7(cpu: &mut Cpu) {
             }
             1 => {
                 cpu.reg.a = 0x1c;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::track] = cpu.reg.a;
                 crate::ext::rw18(cpu);
                 if !cpu.flags.c {
@@ -983,6 +1205,8 @@ pub fn LoadStage2B(cpu: &mut Cpu) {
             0 => {
                 driveon(cpu);
                 cpu.reg.a = 0x18;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 if cpu.reg.a != 0x00 {
                     crate::ext::_5dls2(cpu);
                     return;
@@ -993,6 +1217,8 @@ pub fn LoadStage2B(cpu: &mut Cpu) {
             1 => {
                 driveon(cpu);
                 cpu.reg.a = 0x04;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::track] = cpu.reg.a;
                 pc = 2;
             }
@@ -1016,6 +1242,8 @@ pub fn LoadStage2B(cpu: &mut Cpu) {
                 crate::ext::rw18(cpu);
                 setaux(cpu);
                 cpu.reg.a = 0x0d;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::track] = cpu.reg.a;
                 crate::ext::rw18(cpu);
                 crate::ext::rw18(cpu);
@@ -1024,6 +1252,8 @@ pub fn LoadStage2B(cpu: &mut Cpu) {
                 crate::ext::rw18(cpu);
                 crate::ext::rw18(cpu);
                 cpu.reg.a = 0x00;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::BGset1] = cpu.reg.a;
                 cpu.mem[sym::BGset2] = cpu.reg.a;
                 cpu.mem[sym::CHset] = cpu.reg.a;
@@ -1043,6 +1273,8 @@ pub fn LoadStage3(cpu: &mut Cpu) {
             0 => {
                 driveon(cpu);
                 cpu.reg.a = 0x04;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::track] = cpu.reg.a;
                 pc = 1;
             }
@@ -1066,6 +1298,8 @@ pub fn LoadStage3(cpu: &mut Cpu) {
                 crate::ext::rw18(cpu);
                 setaux(cpu);
                 cpu.reg.a = 0x0d;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::track] = cpu.reg.a;
                 crate::ext::rw18(cpu);
                 crate::ext::rw18(cpu);
@@ -1074,6 +1308,8 @@ pub fn LoadStage3(cpu: &mut Cpu) {
                 crate::ext::rw18(cpu);
                 crate::ext::rw18(cpu);
                 cpu.reg.a = 0x00;
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.mem[sym::BGset1] = cpu.reg.a;
                 cpu.mem[sym::BGset2] = cpu.reg.a;
                 cpu.mem[sym::CHset] = cpu.reg.a;
@@ -1117,6 +1353,8 @@ pub fn PlaySongI(cpu: &mut Cpu) {
             1 => {
                 cpu.reg.y = cpu.reg.a;
                 cpu.reg.a = cpu.mem[sym::musicon];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.reg.a &= cpu.mem[sym::soundon];
                 if cpu.reg.a == 0x00 {
                     pc = 5;
@@ -1155,10 +1393,14 @@ pub fn PlaySongI(cpu: &mut Cpu) {
             7 => {
                 cpu.mem[sym::pausetemp] = cpu.reg.a;
                 cpu.reg.y = 0x02;
+                cpu.flags.z = cpu.reg.y == 0;
+                cpu.flags.n = (cpu.reg.y >> 7) != 0;
                 pc = 8;
             }
             8 => {
                 cpu.reg.x = 0x00;
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 pc = 9;
             }
             9 => {
@@ -1186,6 +1428,8 @@ pub fn PlaySongI(cpu: &mut Cpu) {
             }
             11 => {
                 cpu.reg.a = cpu.mem[sym::pausetemp];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.flags.c = true;
                 let _r = (cpu.reg.a as u16) + (!0x01_u8) as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;
@@ -1212,10 +1456,14 @@ pub fn tpause(cpu: &mut Cpu) {
             0 => {
                 cpu.mem[sym::pausetemp] = cpu.reg.a;
                 cpu.reg.y = 0x02;
+                cpu.flags.z = cpu.reg.y == 0;
+                cpu.flags.n = (cpu.reg.y >> 7) != 0;
                 pc = 1;
             }
             1 => {
                 cpu.reg.x = 0x00;
+                cpu.flags.z = cpu.reg.x == 0;
+                cpu.flags.n = (cpu.reg.x >> 7) != 0;
                 pc = 2;
             }
             2 => {
@@ -1243,6 +1491,8 @@ pub fn tpause(cpu: &mut Cpu) {
             }
             4 => {
                 cpu.reg.a = cpu.mem[sym::pausetemp];
+                cpu.flags.z = cpu.reg.a == 0;
+                cpu.flags.n = (cpu.reg.a >> 7) != 0;
                 cpu.flags.c = true;
                 let _r = (cpu.reg.a as u16) + (!0x01_u8) as u16 + (cpu.flags.c as u16);
                 cpu.reg.a = _r as u8;

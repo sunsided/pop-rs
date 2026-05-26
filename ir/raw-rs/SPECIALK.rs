@@ -123,12 +123,16 @@ mod sym {
 impl Cpu {
     fn KEYS(&mut self) {
         self.reg.a = self.mem[sym::SINGSTEP];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if self.reg.a == 0x00 {
             self.KEYS1();
             return;
         }
         loop {
             self.reg.a = self.mem[0xc000];
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             if !((self.reg.a as i8) >= 0) {
                 break;
             }
@@ -139,19 +143,27 @@ impl Cpu {
         self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
         if self.reg.a == 0x9b {
             self.reg.a = 0x01;
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.mem[sym::SINGSTEP] = self.reg.a;
             self.mem[0xc010] = self.reg.a;
             self.mem[sym::keypress] = self.reg.a;
             return;
         }
         self.reg.x = 0x00;
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         self.mem[sym::SINGSTEP] = self.reg.x;
         self.reg.a = 0x00;  // ignore the keypress that breaks ESC
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if self.reg.a == 0x00 {
             self.KEYS2();
             return;
         }
         self.reg.a = 0x01;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::SINGSTEP] = self.reg.a;
         self.mem[0xc010] = self.reg.a;
         self.mem[sym::keypress] = self.reg.a;
@@ -160,20 +172,28 @@ impl Cpu {
 
     fn freeze(&mut self) {
         self.reg.a = self.mem[0xc000];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if (self.reg.a as i8) >= 0 {
             self.freeze();
             return;
         }
         if self.reg.a != 0x9b {
             self.reg.x = 0x00;
+            self.flags.z = self.reg.x == 0;
+            self.flags.n = (self.reg.x >> 7) != 0;
             self.mem[sym::SINGSTEP] = self.reg.x;
             self.reg.a = 0x00;  // ignore the keypress that breaks ESC
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             if self.reg.a == 0x00 {
                 self.KEYS2();
                 return;
             }
         }
         self.reg.a = 0x01;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::SINGSTEP] = self.reg.a;
         self.mem[0xc010] = self.reg.a;
         self.mem[sym::keypress] = self.reg.a;
@@ -185,11 +205,15 @@ impl Cpu {
         self.mem[sym::keydown] = self.mem[0xc010];
         self.KREAD();
         self.reg.a = self.mem[sym::keypress];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if (self.reg.a as i8) >= 0 {
             return;
         }
         'b13: {
             self.reg.x = self.mem[sym::develment];
+            self.flags.z = self.reg.x == 0;
+            self.flags.n = (self.reg.x >> 7) != 0;
             if self.reg.x != 0x00 {
                 let _o: u8 = 0x30;
                 self.flags.c = self.reg.a >= _o;
@@ -202,22 +226,34 @@ impl Cpu {
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a < 0x3a {
                         self.reg.a = 0x1a;
+                        self.flags.z = self.reg.a == 0;
+                        self.flags.n = (self.reg.a >> 7) != 0;
                         self.reg.x = 0x03;
+                        self.flags.z = self.reg.x == 0;
+                        self.flags.n = (self.reg.x >> 7) != 0;
                         self.checkcode();
                         if !self.flags.z {
                             self.reg.a = 0x1b;
+                            self.flags.z = self.reg.a == 0;
+                            self.flags.n = (self.reg.a >> 7) != 0;
                             self.reg.x = 0x03;
+                            self.flags.z = self.reg.x == 0;
+                            self.flags.n = (self.reg.x >> 7) != 0;
                             self.checkcode();
                             if !self.flags.z {
                                 break 'b13;
                             } else {
                                 self.reg.a = 0x0a;
+                                self.flags.z = self.reg.a == 0;
+                                self.flags.n = (self.reg.a >> 7) != 0;
                                 if self.reg.a == 0x00 {
                                     break 'b13;
                                 }
                             }
                         } else {
                             self.reg.a = 0x00;  // 1st digit
+                            self.flags.z = self.reg.a == 0;
+                            self.flags.n = (self.reg.a >> 7) != 0;
                         }
                         self.flags.c = false;
                         let _r = (self.reg.a as u16) + self.mem[sym::keypress] as u16 + (self.flags.c as u16);
@@ -249,19 +285,35 @@ impl Cpu {
             }
         }
         self.reg.a = self.mem[sym::keypress];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.addkey();
         self.reg.a = 0x19;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.reg.x = 0x03;
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         self.checkcode();
         if !self.flags.z {
             self.reg.a = 0x18;
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.reg.x = 0x03;
+            self.flags.z = self.reg.x == 0;
+            self.flags.n = (self.reg.x >> 7) != 0;
             self.checkcode();
             if self.flags.z {
                 self.reg.a = 0x03;  // up to level 4
+                self.flags.z = self.reg.a == 0;
+                self.flags.n = (self.reg.a >> 7) != 0;
                 self.reg.x = self.mem[sym::develment];
+                self.flags.z = self.reg.x == 0;
+                self.flags.n = (self.reg.x >> 7) != 0;
                 if self.reg.x != 0x00 {
                     self.reg.a = 0x0b;  // or level 12 in cheat mode
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                 }
                 let _o: u8 = self.mem[sym::level];
                 self.flags.c = self.reg.a >= _o;
@@ -281,6 +333,8 @@ impl Cpu {
             return;
         }
         self.reg.a = 0x01;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::develment] = self.reg.a;
         self.gtone();
         return;
@@ -291,11 +345,15 @@ impl Cpu {
         self.mem[sym::keydown] = self.mem[0xc010];
         self.KREAD();
         self.reg.a = self.mem[sym::keypress];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if (self.reg.a as i8) >= 0 {
             return;
         }
         'b12: {
             self.reg.x = self.mem[sym::develment];
+            self.flags.z = self.reg.x == 0;
+            self.flags.n = (self.reg.x >> 7) != 0;
             if self.reg.x != 0x00 {
                 let _o: u8 = 0x30;
                 self.flags.c = self.reg.a >= _o;
@@ -308,22 +366,34 @@ impl Cpu {
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a < 0x3a {
                         self.reg.a = 0x1a;
+                        self.flags.z = self.reg.a == 0;
+                        self.flags.n = (self.reg.a >> 7) != 0;
                         self.reg.x = 0x03;
+                        self.flags.z = self.reg.x == 0;
+                        self.flags.n = (self.reg.x >> 7) != 0;
                         self.checkcode();
                         if !self.flags.z {
                             self.reg.a = 0x1b;
+                            self.flags.z = self.reg.a == 0;
+                            self.flags.n = (self.reg.a >> 7) != 0;
                             self.reg.x = 0x03;
+                            self.flags.z = self.reg.x == 0;
+                            self.flags.n = (self.reg.x >> 7) != 0;
                             self.checkcode();
                             if !self.flags.z {
                                 break 'b12;
                             } else {
                                 self.reg.a = 0x0a;
+                                self.flags.z = self.reg.a == 0;
+                                self.flags.n = (self.reg.a >> 7) != 0;
                                 if self.reg.a == 0x00 {
                                     break 'b12;
                                 }
                             }
                         } else {
                             self.reg.a = 0x00;  // 1st digit
+                            self.flags.z = self.reg.a == 0;
+                            self.flags.n = (self.reg.a >> 7) != 0;
                         }
                         self.flags.c = false;
                         let _r = (self.reg.a as u16) + self.mem[sym::keypress] as u16 + (self.flags.c as u16);
@@ -355,19 +425,35 @@ impl Cpu {
             }
         }
         self.reg.a = self.mem[sym::keypress];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.addkey();
         self.reg.a = 0x19;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.reg.x = 0x03;
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         self.checkcode();
         if !self.flags.z {
             self.reg.a = 0x18;
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.reg.x = 0x03;
+            self.flags.z = self.reg.x == 0;
+            self.flags.n = (self.reg.x >> 7) != 0;
             self.checkcode();
             if self.flags.z {
                 self.reg.a = 0x03;  // up to level 4
+                self.flags.z = self.reg.a == 0;
+                self.flags.n = (self.reg.a >> 7) != 0;
                 self.reg.x = self.mem[sym::develment];
+                self.flags.z = self.reg.x == 0;
+                self.flags.n = (self.reg.x >> 7) != 0;
                 if self.reg.x != 0x00 {
                     self.reg.a = 0x0b;  // or level 12 in cheat mode
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                 }
                 let _o: u8 = self.mem[sym::level];
                 self.flags.c = self.reg.a >= _o;
@@ -387,6 +473,8 @@ impl Cpu {
             return;
         }
         self.reg.a = 0x01;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::develment] = self.reg.a;
         self.gtone();
         return;
@@ -394,6 +482,8 @@ impl Cpu {
 
     fn LegitKeys(&mut self) {
         self.reg.a = self.mem[sym::keypress];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         let _o: u8 = 0x9b;
         self.flags.c = self.reg.a >= _o;
         self.flags.z = self.reg.a == _o;
@@ -424,15 +514,21 @@ impl Cpu {
 
     fn DevelKeys(&mut self) {
         self.reg.a = self.mem[sym::develment];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if self.reg.a == 0x00 {
             return;
         }
         self.checkcodes();
         self.reg.a = self.mem[sym::keypress];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if self.reg.a != 0x0d {
             return;
         }
         self.reg.a = 0x00;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::develment] = self.reg.a;
         return;
     }
@@ -440,26 +536,36 @@ impl Cpu {
     // aliases: ]sm
     fn postload(&mut self) {
         self.reg.a = 0xa9;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::BBundID] = self.reg.a;
         return;
     }
 
     fn preload(&mut self) {
         self.reg.a = self.mem[sym::BBundID];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.local.insert(("]sm", 1), self.reg.a);
         self.reg.a = 0xa9;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::BBundID] = self.reg.a;
         return;
     }
 
     fn addkey(&mut self) {
         self.reg.x = self.mem[sym::keybufptr];
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         let _v = self.reg.x.wrapping_add(1);
         self.reg.x = _v;
         self.flags.z = _v == 0;
         self.flags.n = (_v >> 7) != 0;
         if self.reg.x >= 0x0a {
             self.reg.x = 0x00;  // wrap around
+            self.flags.z = self.reg.x == 0;
+            self.flags.n = (self.reg.x >> 7) != 0;
         }
         self.mem[sym::keybufptr] = self.reg.x;
         self.mem[sym::keybuf + self.reg.x as usize] = self.reg.a;
@@ -474,7 +580,11 @@ impl Cpu {
                     self.smc.smod_lo = self.reg.a;
                     self.smc.smod_hi = self.reg.x;
                     self.reg.x = self.mem[sym::keybufptr];
+                    self.flags.z = self.reg.x == 0;
+                    self.flags.n = (self.reg.x >> 7) != 0;
                     self.reg.y = 0x00;  // last char of code seq
+                    self.flags.z = self.reg.y == 0;
+                    self.flags.n = (self.reg.y >> 7) != 0;
                     pc = 1;
                 }
                 1 => {
@@ -482,6 +592,8 @@ impl Cpu {
                 }
                 2 => {
                     self.reg.a = self.mem[((self.smc.smod_hi as usize) << 8 | (self.smc.smod_lo as usize)) + self.reg.y as usize];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     if self.reg.a == 0x00 {
                         pc = 10;
                     } else {
@@ -550,6 +662,8 @@ impl Cpu {
                 }
                 8 => {
                     self.reg.x = 0x09;  // wrap around
+                    self.flags.z = self.reg.x == 0;
+                    self.flags.n = (self.reg.x >> 7) != 0;
                     if (self.reg.x as i8) >= 0 {
                         pc = 1;
                     } else {
@@ -558,6 +672,8 @@ impl Cpu {
                 }
                 9 => {
                     self.reg.a = 0xff;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     pc = 10;
                 }
                 10 => {
@@ -572,8 +688,12 @@ impl Cpu {
         self.mem[sym::kbdX] = 0x00;
         self.mem[sym::kbdY] = 0x00;
         self.reg.a = self.mem[sym::keypress];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if (self.reg.a as i8) >= 0 {
             self.reg.x = self.mem[sym::keydown];
+            self.flags.z = self.reg.x == 0;
+            self.flags.n = (self.reg.x >> 7) != 0;
             if (self.reg.x as i8) >= 0 {
                 return;
             }
@@ -605,6 +725,8 @@ impl Cpu {
                             }
                         }
                         self.reg.a = 0x01;
+                        self.flags.z = self.reg.a == 0;
+                        self.flags.n = (self.reg.a >> 7) != 0;
                         if self.reg.a != 0x00 {
                             break 'b6;
                         }
@@ -635,6 +757,8 @@ impl Cpu {
                                         }
                                     }
                                     self.reg.a = 0x01;
+                                    self.flags.z = self.reg.a == 0;
+                                    self.flags.n = (self.reg.a >> 7) != 0;
                                     if self.reg.a != 0x00 {
                                         break 'b13;
                                     }
@@ -654,6 +778,8 @@ impl Cpu {
                                         }
                                     }
                                     self.reg.a = 0xff;
+                                    self.flags.z = self.reg.a == 0;
+                                    self.flags.n = (self.reg.a >> 7) != 0;
                                     self.mem[sym::kbdX] = self.reg.a;
                                     if !self.flags.z {
                                         break 'b13;
@@ -674,8 +800,12 @@ impl Cpu {
                                         }
                                     }
                                     self.reg.a = 0x01;
+                                    self.flags.z = self.reg.a == 0;
+                                    self.flags.n = (self.reg.a >> 7) != 0;
                                     self.mem[sym::kbdX] = self.reg.a;
                                     self.reg.a = 0xff;
+                                    self.flags.z = self.reg.a == 0;
+                                    self.flags.n = (self.reg.a >> 7) != 0;
                                     self.mem[sym::kbdY] = self.reg.a;
                                     if !self.flags.z {
                                         break 'b13;
@@ -685,12 +815,16 @@ impl Cpu {
                             }
                         }
                         self.reg.a = 0xff;
+                        self.flags.z = self.reg.a == 0;
+                        self.flags.n = (self.reg.a >> 7) != 0;
                     }
                     self.mem[sym::kbdY] = self.reg.a;
                     return;
                 }
             }
             self.reg.a = 0xff;
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
         }
         self.mem[sym::kbdX] = self.reg.a;
         return;
@@ -698,13 +832,19 @@ impl Cpu {
 
     fn FACEJSTK(&mut self) {
         self.reg.a = 0x00;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.flags.c = true;
         let _r = (self.reg.a as u16) + (!self.mem[sym::JSTKX]) as u16 + (self.flags.c as u16);
         self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
         self.mem[sym::JSTKX] = self.reg.a;
         self.reg.x = self.mem[sym::clrF];
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         self.reg.a = self.mem[sym::clrB];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::clrF] = self.reg.a;
         self.mem[sym::clrB] = self.reg.x;
         return;
@@ -714,6 +854,8 @@ impl Cpu {
         self.reg.x = 0x04;
         loop {
             self.reg.a = self.mem[sym::clrF + self.reg.x as usize];
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.mem[sym::clrSEL + self.reg.x as usize] = self.reg.a;
             self.reg.x = self.reg.x.wrapping_sub(0x01);
             if !((self.reg.x as i8) >= 0) {
@@ -727,6 +869,8 @@ impl Cpu {
         self.reg.x = 0x04;
         loop {
             self.reg.a = self.mem[sym::clrSEL + self.reg.x as usize];
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.mem[sym::clrF + self.reg.x as usize] = self.reg.a;
             self.reg.x = self.reg.x.wrapping_sub(0x01);
             if !((self.reg.x as i8) >= 0) {
@@ -740,6 +884,8 @@ impl Cpu {
         self.reg.x = 0x04;
         loop {
             self.reg.a = self.mem[sym::clrF + self.reg.x as usize];
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.mem[sym::clrDESEL + self.reg.x as usize] = self.reg.a;
             self.reg.x = self.reg.x.wrapping_sub(0x01);
             if !((self.reg.x as i8) >= 0) {
@@ -753,6 +899,8 @@ impl Cpu {
         self.reg.x = 0x04;
         loop {
             self.reg.a = self.mem[sym::clrDESEL + self.reg.x as usize];
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.mem[sym::clrF + self.reg.x as usize] = self.reg.a;
             self.reg.x = self.reg.x.wrapping_sub(0x01);
             if !((self.reg.x as i8) >= 0) {
@@ -764,6 +912,8 @@ impl Cpu {
 
     fn INITINPUT(&mut self) {
         self.reg.a = 0x00;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.reg.x = 0x04;
         loop {
             self.mem[sym::clrDESEL + self.reg.x as usize] = self.reg.a;
@@ -779,11 +929,17 @@ impl Cpu {
     fn CLRJSTK(&mut self) {
         'b6: {
             self.reg.a = self.mem[sym::clrF];
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             if (self.reg.a as i8) >= 0 {
                 'b5: {
                     self.reg.x = self.mem[sym::JSTKX];
+                    self.flags.z = self.reg.x == 0;
+                    self.flags.n = (self.reg.x >> 7) != 0;
                     if (self.reg.x as i8) >= 0 {
                         self.reg.a = 0x00;
+                        self.flags.z = self.reg.a == 0;
+                        self.flags.n = (self.reg.a >> 7) != 0;
                         if self.reg.a == 0x00 {
                             break 'b5;
                         }
@@ -792,6 +948,8 @@ impl Cpu {
                         break 'b6;
                     } else {
                         self.reg.a = 0xff;
+                        self.flags.z = self.reg.a == 0;
+                        self.flags.n = (self.reg.a >> 7) != 0;
                     }
                 }
                 self.mem[sym::clrF] = self.reg.a;
@@ -799,11 +957,17 @@ impl Cpu {
         }
         'b12: {
             self.reg.a = self.mem[sym::clrB];
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             if (self.reg.a as i8) >= 0 {
                 'b11: {
                     self.reg.x = self.mem[sym::JSTKX];
+                    self.flags.z = self.reg.x == 0;
+                    self.flags.n = (self.reg.x >> 7) != 0;
                     if self.reg.x != 0x01 {
                         self.reg.a = 0x00;
+                        self.flags.z = self.reg.a == 0;
+                        self.flags.n = (self.reg.a >> 7) != 0;
                         if self.reg.a == 0x00 {
                             break 'b11;
                         }
@@ -812,6 +976,8 @@ impl Cpu {
                         break 'b12;
                     } else {
                         self.reg.a = 0xff;
+                        self.flags.z = self.reg.a == 0;
+                        self.flags.n = (self.reg.a >> 7) != 0;
                     }
                 }
                 self.mem[sym::clrB] = self.reg.a;
@@ -819,11 +985,17 @@ impl Cpu {
         }
         'b18: {
             self.reg.a = self.mem[sym::clrU];
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             if (self.reg.a as i8) >= 0 {
                 'b17: {
                     self.reg.x = self.mem[sym::JSTKY];
+                    self.flags.z = self.reg.x == 0;
+                    self.flags.n = (self.reg.x >> 7) != 0;
                     if (self.reg.x as i8) >= 0 {
                         self.reg.a = 0x00;
+                        self.flags.z = self.reg.a == 0;
+                        self.flags.n = (self.reg.a >> 7) != 0;
                         if self.reg.a == 0x00 {
                             break 'b17;
                         }
@@ -832,6 +1004,8 @@ impl Cpu {
                         break 'b18;
                     } else {
                         self.reg.a = 0xff;
+                        self.flags.z = self.reg.a == 0;
+                        self.flags.n = (self.reg.a >> 7) != 0;
                     }
                 }
                 self.mem[sym::clrU] = self.reg.a;
@@ -839,11 +1013,17 @@ impl Cpu {
         }
         'b24: {
             self.reg.a = self.mem[sym::clrD];
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             if (self.reg.a as i8) >= 0 {
                 'b23: {
                     self.reg.x = self.mem[sym::JSTKY];
+                    self.flags.z = self.reg.x == 0;
+                    self.flags.n = (self.reg.x >> 7) != 0;
                     if self.reg.x != 0x01 {
                         self.reg.a = 0x00;
+                        self.flags.z = self.reg.a == 0;
+                        self.flags.n = (self.reg.a >> 7) != 0;
                         if self.reg.a == 0x00 {
                             break 'b23;
                         }
@@ -852,6 +1032,8 @@ impl Cpu {
                         break 'b24;
                     } else {
                         self.reg.a = 0xff;
+                        self.flags.z = self.reg.a == 0;
+                        self.flags.n = (self.reg.a >> 7) != 0;
                     }
                 }
                 self.mem[sym::clrD] = self.reg.a;
@@ -859,11 +1041,17 @@ impl Cpu {
         }
         'b30: {
             self.reg.a = self.mem[sym::clrbtn];
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             if (self.reg.a as i8) >= 0 {
                 'b29: {
                     self.reg.x = self.mem[sym::btn];
+                    self.flags.z = self.reg.x == 0;
+                    self.flags.n = (self.reg.x >> 7) != 0;
                     if (self.reg.x as i8) >= 0 {
                         self.reg.a = 0x00;
+                        self.flags.z = self.reg.a == 0;
+                        self.flags.n = (self.reg.a >> 7) != 0;
                         if self.reg.a == 0x00 {
                             break 'b29;
                         }
@@ -872,6 +1060,8 @@ impl Cpu {
                         break 'b30;
                     } else {
                         self.reg.a = 0xff;
+                        self.flags.z = self.reg.a == 0;
+                        self.flags.n = (self.reg.a >> 7) != 0;
                     }
                 }
                 self.mem[sym::clrbtn] = self.reg.a;
@@ -882,6 +1072,8 @@ impl Cpu {
 
     fn ZEROSOUND(&mut self) {
         self.reg.a = 0x00;  // # sounds in table
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::soundtable] = self.reg.a;
         return;
     }
@@ -889,6 +1081,8 @@ impl Cpu {
     fn ADDSOUND(&mut self) {
         self.local.insert(("]temp1", 0), self.reg.x);
         self.reg.x = self.mem[sym::soundtable];
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         if self.reg.x < 0x20 {
             let _v = self.reg.x.wrapping_add(1);
             self.reg.x = _v;
@@ -906,11 +1100,17 @@ impl Cpu {
     fn DEMOKEYS(&mut self) {
         'b6: {
             self.reg.a = self.mem[sym::level];
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             if self.reg.a == 0x00 {
                 self.reg.a = self.mem[0xc061];
+                self.flags.z = self.reg.a == 0;
+                self.flags.n = (self.reg.a >> 7) != 0;
                 self.reg.a |= self.mem[0xc062];
                 if (self.reg.a as i8) >= 0 {
                     self.reg.a = self.mem[sym::keypress];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     if (self.reg.a as i8) >= 0 {
                         break 'b6;
                     } else {
@@ -924,10 +1124,14 @@ impl Cpu {
                     }
                 }
                 self.reg.a = 0xff;
+                self.flags.z = self.reg.a == 0;
+                self.flags.n = (self.reg.a >> 7) != 0;
                 return;
             }
         }
         self.reg.a = 0x00;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         return;
     }
 
@@ -937,15 +1141,23 @@ impl Cpu {
             match pc {
                 0 => {
                     self.reg.a = 0x00;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[0x00f0] = self.reg.a;
                     self.reg.a = self.mem[sym::VisScrn];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.calcblue();
                     self.reg.y = 0x1d;
+                    self.flags.z = self.reg.y == 0;
+                    self.flags.n = (self.reg.y >> 7) != 0;
                     pc = 1;
                 }
                 1 => {
                     self._3asub();
                     self.reg.x = self.mem[0x00f0];
+                    self.flags.z = self.reg.x == 0;
+                    self.flags.n = (self.reg.x >> 7) != 0;
                     let _o: u8 = 0x08;
                     self.flags.c = self.reg.x >= _o;
                     self.flags.z = self.reg.x == _o;
@@ -969,10 +1181,14 @@ impl Cpu {
                 }
                 3 => {
                     self.reg.x = self.mem[0x00f0];
+                    self.flags.z = self.reg.x == 0;
+                    self.flags.n = (self.reg.x >> 7) != 0;
                     pc = 4;
                 }
                 4 => {
                     self.reg.a = 0xff;
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::torchx + self.reg.x as usize] = self.reg.a;
                     self.mem[sym::torchcount] = self.reg.a;
                     pc = 9;
@@ -982,6 +1198,8 @@ impl Cpu {
                 }
                 6 => {
                     self.reg.a = self.mem[(self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.reg.a &= 0x1f;
                     let _o: u8 = 0x13;
                     self.flags.c = self.reg.a >= _o;
@@ -995,6 +1213,8 @@ impl Cpu {
                 }
                 7 => {
                     self.reg.a = self.mem[sym::fredbuf + 1 + self.reg.y as usize];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::BOTCUT] = self.reg.a;
                     self.reg.a = self.reg.y;
                     self.stack.push(self.reg.a);
@@ -1002,14 +1222,20 @@ impl Cpu {
                     self.stack.push(self.reg.a);
                     self.reg.a = self.reg.x;
                     self.reg.x = self.mem[0x00f0];
+                    self.flags.z = self.reg.x == 0;
+                    self.flags.n = (self.reg.x >> 7) != 0;
                     self.reg.y = self.reg.a;
                     self.reg.a = self.mem[sym::BlockBot + 1 + self.reg.y as usize];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.flags.c = true;
                     let _r = (self.reg.a as u16) + (!0x03_u8) as u16 + (self.flags.c as u16);
                     self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
                     self.mem[sym::torchy + self.reg.x as usize] = self.reg.a;
                     self.reg.a = self.mem[sym::BOTCUT];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::torchclip + self.reg.x as usize] = self.reg.a;
                     self.reg.a = self.stack.pop().expect("pla on empty stack");
                     self.flags.z = self.reg.a == 0;
@@ -1039,6 +1265,8 @@ impl Cpu {
                     self.flags.n = (self.reg.a >> 7) != 0;
                     self.reg.y = self.reg.a;
                     self.reg.a = self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.mem[sym::torchstate + self.reg.x as usize] = self.reg.a;
                     let _v = self.mem[0x00f0].wrapping_add(1);
                     self.mem[0x00f0] = _v;
@@ -1056,32 +1284,46 @@ impl Cpu {
 
     fn BURN(&mut self) {
         self.reg.a = self.mem[sym::torchx];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if (self.reg.a as i8) < 0 {
             return;
         }
         self.reg.x = self.mem[sym::torchcount];
+        self.flags.z = self.reg.x == 0;
+        self.flags.n = (self.reg.x >> 7) != 0;
         let _v = self.reg.x.wrapping_add(1);
         self.reg.x = _v;
         self.flags.z = _v == 0;
         self.flags.n = (_v >> 7) != 0;
         self.reg.a = self.mem[sym::torchx + self.reg.x as usize];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if (self.reg.a as i8) < 0 {
             self.reg.x = 0x00;  // start again at beginning of list
+            self.flags.z = self.reg.x == 0;
+            self.flags.n = (self.reg.x >> 7) != 0;
         }
         self.mem[sym::torchcount] = self.reg.x;
         self.mem[sym::XCO] = self.mem[sym::torchx + self.reg.x as usize];
         self.mem[sym::YCO] = self.mem[sym::torchy + self.reg.x as usize];
         self.mem[sym::BOTCUT] = self.mem[sym::torchclip + self.reg.x as usize];
         self.reg.a = self.mem[sym::torchstate + self.reg.x as usize];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.getflameframe();
         self.mem[sym::torchstate + self.reg.x as usize] = self.reg.a;
         self.reg.x = self.reg.a;
         self.setupflame();
         self.reg.a = self.mem[sym::BOTCUT];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if self.reg.a != 0x00 {
             self.initlay();
             self.mem[sym::OFFSET] = 0x00;
             self.reg.a = self.mem[sym::YCO];
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.flags.c = true;
             let _r = (self.reg.a as u16) + (!0x04_u8) as u16 + (self.flags.c as u16);
             self.reg.a = _r as u8;
@@ -1098,8 +1340,12 @@ impl Cpu {
         self.mem[0x00f1] = 0x00;
         self.mem[0x00f2] = 0x00;
         self.reg.a = 0x42;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.smc.sm1 = self.reg.a;
         self.reg.a = 0x04;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.smc.sm2 = self.reg.a;
         self._3asub();
         self.mem[sym::MinLeft] = self.reg.y;
@@ -1113,8 +1359,12 @@ impl Cpu {
         self.mem[0x00f1] = 0x36;
         self.mem[0x00f2] = 0xfb;
         self.reg.a = 0x12;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.smc.sm1 = self.reg.a;
         self.reg.a = 0x00;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.smc.sm2 = self.reg.a;
         self._3asub();
         self.mem[sym::SecLeft] = self.reg.y;
@@ -1123,10 +1373,14 @@ impl Cpu {
 
     fn KEEPTIME(&mut self) {
         self.reg.a = self.mem[sym::level];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if self.reg.a == 0x00 {
             return;
         }
         self.reg.a = self.mem[sym::KidLife];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if (self.reg.a as i8) >= 0 {
             return;
         }
@@ -1142,14 +1396,20 @@ impl Cpu {
         }
         if self.flags.z {
             self.reg.a = 0xff;
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.mem[sym::FrameCount] = self.reg.a;
             self.mem[sym::FrameCount + 1] = self.reg.a;
         }
         self.reg.y = self.mem[sym::NextTimeMsg];
+        self.flags.z = self.reg.y == 0;
+        self.flags.n = (self.reg.y >> 7) != 0;
         if self.reg.y >= 0x24 {
             return;
         }
         self.reg.a = self.mem[sym::FrameCount + 1];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         let _o: u8 = self.mem[sym::timetable + 1 + self.reg.y as usize];
         self.flags.c = self.reg.a >= _o;
         self.flags.z = self.reg.a == _o;
@@ -1158,6 +1418,8 @@ impl Cpu {
             return;
         }
         self.reg.a = self.mem[sym::FrameCount];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         let _o: u8 = self.mem[sym::timetable + self.reg.y as usize];
         self.flags.c = self.reg.a >= _o;
         self.flags.z = self.reg.a == _o;
@@ -1166,6 +1428,8 @@ impl Cpu {
             return;
         }
         self.reg.a = self.mem[sym::msgtimer];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if self.reg.a != 0x00 {
             return;
         }
@@ -1178,19 +1442,27 @@ impl Cpu {
         self.flags.z = _v == 0;
         self.flags.n = (_v >> 7) != 0;
         self.reg.a = 0x02;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::timerequest] = self.reg.a;
         return;
     }
 
     fn SHORTENTIME(&mut self) {
         self.reg.y = self.mem[sym::NextTimeMsg];
+        self.flags.z = self.reg.y == 0;
+        self.flags.n = (self.reg.y >> 7) != 0;
         if self.reg.y >= 0x14 {
             return;
         }
         self.reg.y = 0x12;
+        self.flags.z = self.reg.y == 0;
+        self.flags.n = (self.reg.y >> 7) != 0;
         self.mem[sym::NextTimeMsg] = self.reg.y;
         self.mem[sym::FrameCount] = self.mem[sym::timetable + self.reg.y as usize];
         self.reg.a = self.mem[sym::timetable + 1 + self.reg.y as usize];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::FrameCount + 1] = self.reg.a;
         return;
     }
@@ -1210,10 +1482,14 @@ impl Cpu {
 
     fn TempDevel(&mut self) {
         self.reg.a = self.mem[sym::develment];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         if self.reg.a == 0x00 {
             return;
         }
         self.reg.a = self.mem[sym::keypress];
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         let _o: u8 = 0x06;
         self.flags.c = self.reg.a >= _o;
         self.flags.z = self.reg.a == _o;
@@ -1250,6 +1526,8 @@ impl Cpu {
                                 self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                                 if self.reg.a != 0x2b {
                                     self.reg.a = self.mem[sym::keypress];
+                                    self.flags.z = self.reg.a == 0;
+                                    self.flags.n = (self.reg.a >> 7) != 0;
                                     let _o: u8 = 0x30;
                                     self.flags.c = self.reg.a >= _o;
                                     self.flags.z = self.reg.a == _o;
@@ -1321,6 +1599,8 @@ impl Cpu {
                                                                             self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                                                                             if self.reg.a == 0x3e {
                                                                                 self.reg.a = 0x02;
+                                                                                self.flags.z = self.reg.a == 0;
+                                                                                self.flags.n = (self.reg.a >> 7) != 0;
                                                                                 if self.reg.a != 0x00 {
                                                                                     break 'b42;
                                                                                 }
@@ -1338,15 +1618,21 @@ impl Cpu {
                                                                                     return;
                                                                                 }
                                                                                 self.reg.a = 0xff;
+                                                                                self.flags.z = self.reg.a == 0;
+                                                                                self.flags.n = (self.reg.a >> 7) != 0;
                                                                                 self.mem[sym::FrameCount + 1] = self.reg.a;
                                                                                 return;
                                                                             }
                                                                             self.reg.a = 0xff;
+                                                                            self.flags.z = self.reg.a == 0;
+                                                                            self.flags.n = (self.reg.a >> 7) != 0;
                                                                             self.mem[sym::SavLevel] = self.reg.a;
                                                                             self.DoSaveGame();
                                                                             return;
                                                                         }
                                                                         self.reg.a = 0xfe;
+                                                                        self.flags.z = self.reg.a == 0;
+                                                                        self.flags.n = (self.reg.a >> 7) != 0;
                                                                     }
                                                                     self.flags.c = false;
                                                                     let _r = (self.reg.a as u16) + self.mem[sym::FrameCount + 1] as u16 + (self.flags.c as u16);
@@ -1357,10 +1643,14 @@ impl Cpu {
                                                                 }
                                                                 self.mem[sym::level] = 0x01;
                                                                 self.reg.a = 0x02;
+                                                                self.flags.z = self.reg.a == 0;
+                                                                self.flags.n = (self.reg.a >> 7) != 0;
                                                                 self.mem[sym::NextLevel] = self.reg.a;
                                                                 return;
                                                             }
                                                             self.reg.a = self.mem[sym::ManCtrl];
+                                                            self.flags.z = self.reg.a == 0;
+                                                            self.flags.n = (self.reg.a >> 7) != 0;
                                                             self.reg.a ^= 0xff;
                                                             self.mem[sym::ManCtrl] = self.reg.a;
                                                             return;
@@ -1372,6 +1662,8 @@ impl Cpu {
                                                         return;
                                                     }
                                                     self.reg.a = self.mem[sym::KidY];
+                                                    self.flags.z = self.reg.a == 0;
+                                                    self.flags.n = (self.reg.a >> 7) != 0;
                                                     self.flags.c = true;
                                                     let _r = (self.reg.a as u16) + (!0x3f_u8) as u16 + (self.flags.c as u16);
                                                     self.reg.a = _r as u8;
@@ -1384,11 +1676,15 @@ impl Cpu {
                                                     return;
                                                 }
                                                 self.reg.a = self.mem[sym::PAGE];
+                                                self.flags.z = self.reg.a == 0;
+                                                self.flags.n = (self.reg.a >> 7) != 0;
                                                 self.screendump();
                                                 return;
                                             }
                                             self.gtone();
                                             self.reg.a = self.mem[sym::SPEED];
+                                            self.flags.z = self.reg.a == 0;
+                                            self.flags.n = (self.reg.a >> 7) != 0;
                                             self.flags.c = false;
                                             let _r = (self.reg.a as u16) + (0x04) as u16 + (self.flags.c as u16);
                                             self.reg.a = _r as u8;
@@ -1397,12 +1693,16 @@ impl Cpu {
                                             return;
                                         }
                                         self.reg.a = self.mem[sym::SPEED];
+                                        self.flags.z = self.reg.a == 0;
+                                        self.flags.n = (self.reg.a >> 7) != 0;
                                         let _o: u8 = 0x05;
                                         self.flags.c = self.reg.a >= _o;
                                         self.flags.z = self.reg.a == _o;
                                         self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                                         if self.reg.a < 0x05 {
                                             self.reg.a = 0x01;  // fastest
+                                            self.flags.z = self.reg.a == 0;
+                                            self.flags.n = (self.reg.a >> 7) != 0;
                                             self.mem[sym::SPEED] = self.reg.a;
                                             return;
                                         }
@@ -1416,12 +1716,16 @@ impl Cpu {
                                     }
                                     self.preload();
                                     self.reg.a = 0x02;
+                                    self.flags.z = self.reg.a == 0;
+                                    self.flags.n = (self.reg.a >> 7) != 0;
                                     self.mem[sym::redrawflg] = self.reg.a;
                                     self.reload();
                                     self.postload();
                                     return;
                                 }
                                 self.reg.a = self.mem[sym::level];
+                                self.flags.z = self.reg.a == 0;
+                                self.flags.n = (self.reg.a >> 7) != 0;
                                 self.flags.c = false;
                                 let _r = (self.reg.a as u16) + (0x05) as u16 + (self.flags.c as u16);
                                 self.reg.a = _r as u8;
@@ -1449,16 +1753,22 @@ impl Cpu {
                     return;
                 }
                 self.reg.a = 0x0a;
+                self.flags.z = self.reg.a == 0;
+                self.flags.n = (self.reg.a >> 7) != 0;
                 self.mem[sym::AMtimer] = self.reg.a;
                 return;
             }
             self.reg.a = self.mem[sym::blackflag];
+            self.flags.z = self.reg.a == 0;
+            self.flags.n = (self.reg.a >> 7) != 0;
             self.reg.a ^= 0xff;
             self.mem[sym::blackflag] = self.reg.a;
             return;
         }
         self.mem[sym::redrawflg] = 0x02;
         self.reg.a = 0x00;
+        self.flags.z = self.reg.a == 0;
+        self.flags.n = (self.reg.a >> 7) != 0;
         self.mem[sym::blackflag] = self.reg.a;
         return;
     }
@@ -1473,10 +1783,14 @@ impl Cpu {
             match pc {
                 0 => {
                     self.reg.y = 0x61;  // counter
+                    self.flags.z = self.reg.y == 0;
+                    self.flags.n = (self.reg.y >> 7) != 0;
                     pc = 1;
                 }
                 1 => {
                     self.reg.a = self.mem[0x00f2];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     let _o: u8 = self.mem[sym::FrameCount + 1];
                     self.flags.c = self.reg.a >= _o;
                     self.flags.z = self.reg.a == _o;
@@ -1496,6 +1810,8 @@ impl Cpu {
                 }
                 3 => {
                     self.reg.a = self.mem[0x00f1];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     let _o: u8 = self.mem[sym::FrameCount];
                     self.flags.c = self.reg.a >= _o;
                     self.flags.z = self.reg.a == _o;
@@ -1508,6 +1824,8 @@ impl Cpu {
                 }
                 4 => {
                     self.reg.a = self.mem[0x00f1];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     self.flags.c = false;
                     pc = 5;
                 }
@@ -1517,6 +1835,8 @@ impl Cpu {
                     self.flags.c = (_r >> 8) != 0;
                     self.mem[0x00f1] = self.reg.a;
                     self.reg.a = self.mem[0x00f2];
+                    self.flags.z = self.reg.a == 0;
+                    self.flags.n = (self.reg.a >> 7) != 0;
                     pc = 6;
                 }
                 6 => {
@@ -1540,6 +1860,8 @@ impl Cpu {
                 }
                 7 => {
                     self.reg.y = 0x00;
+                    self.flags.z = self.reg.y == 0;
+                    self.flags.n = (self.reg.y >> 7) != 0;
                     pc = 8;
                 }
                 8 => {

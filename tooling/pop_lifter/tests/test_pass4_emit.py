@@ -224,19 +224,19 @@ def test_return_stmt():
 
 def test_raw_load_abs_is_lowered():
     raw = RawStmt(item=LoadAbs(reg=Reg.A, source=_abs("X", 0x10), src=SRC))
-    assert _emit_one(raw) == "self.reg.a = self.mem[0x0010];"
+    assert _emit_one(raw) == _loaded("a", "self.mem[0x0010]")
 
 
 def test_load_imm_surfaces_source_comment():
     # A magic immediate keeps its source annotation as a trailing comment.
     src = SourceRef(file="syn", line=0, raw="", comment='"stabbed"')
     raw = RawStmt(item=LoadImm(reg=Reg.A, imm=_imm(0x63), src=src))
-    assert _emit_one(raw) == 'self.reg.a = 0x63;  // "stabbed"'
+    assert _emit_one(raw) == _loaded("a", "0x63", '  // "stabbed"')
 
 
 def test_load_imm_without_comment_has_no_suffix():
     raw = RawStmt(item=LoadImm(reg=Reg.A, imm=_imm(5), src=SRC))
-    assert _emit_one(raw) == "self.reg.a = 0x05;"
+    assert _emit_one(raw) == _loaded("a", "0x05")
 
 
 def test_raw_pha_pushes_value_stack():
@@ -664,8 +664,18 @@ def _raw(item) -> str:
     return _emit_one(RawStmt(item=item))
 
 
+def _loaded(reg: str, rvalue: str, comment: str = "") -> str:
+    """Expected emit for a register load: the assignment plus its Z/N
+    update (every 6502 load sets Z/N from the loaded byte)."""
+    return (
+        f"self.reg.{reg} = {rvalue};{comment}\n"
+        f"self.flags.z = self.reg.{reg} == 0;\n"
+        f"self.flags.n = (self.reg.{reg} >> 7) != 0;"
+    )
+
+
 def test_raw_load_imm():
-    assert _raw(LoadImm(reg=Reg.X, imm=_imm(0x12), src=SRC)) == "self.reg.x = 0x12;"
+    assert _raw(LoadImm(reg=Reg.X, imm=_imm(0x12), src=SRC)) == _loaded("x", "0x12")
 
 
 def test_raw_load_imm_opvar_reads_operand_var():
@@ -673,7 +683,7 @@ def test_raw_load_imm_opvar_reads_operand_var():
     # variable field that the matching StoreOpVar writes.
     smc = Imm(value=0, text="#smXCO", opvar="smXCO")
     out = _raw(LoadImm(reg=Reg.A, imm=smc, src=SRC))
-    assert out == "self.reg.a = self.smc.smXCO;"
+    assert out == _loaded("a", "self.smc.smXCO")
 
 
 def test_raw_store_opvar_writes_operand_var():
@@ -710,9 +720,10 @@ def test_address_opvar_operand_composes_runtime_base():
     # A fully-patched address opvar reads both byte halves from fields.
     base = Abs(name="$2000", addr=0x2000, opvar="smBASE", opvar_halves=("lo", "hi"))
     item = LoadIndexed(reg=Reg.A, base=base, index=Reg.Y, src=SRC)
-    assert _raw(item) == (
-        "self.reg.a = self.mem[((self.smc.smBASE_hi as usize) << 8 "
-        "| (self.smc.smBASE_lo as usize)) + self.reg.y as usize];"
+    assert _raw(item) == _loaded(
+        "a",
+        "self.mem[((self.smc.smBASE_hi as usize) << 8 "
+        "| (self.smc.smBASE_lo as usize)) + self.reg.y as usize]",
     )
 
 
@@ -722,12 +733,12 @@ def test_address_opvar_partial_patch_bakes_assembled_byte():
     # rather than reading an uninitialised `_hi` field.
     base = Abs(name="$12ab", addr=0x12ab, opvar="smodCD", opvar_halves=("lo",))
     item = LoadAbs(reg=Reg.A, source=base, src=SRC)
-    assert _raw(item) == "self.reg.a = self.mem[((0x12) << 8 | (self.smc.smodCD_lo as usize))];"
+    assert _raw(item) == _loaded("a", "self.mem[((0x12) << 8 | (self.smc.smodCD_lo as usize))]")
 
 
 def test_raw_load_indexed():
     item = LoadIndexed(reg=Reg.A, base=_abs("tbl", 0x0200), index=Reg.Y, src=SRC)
-    assert _raw(item) == "self.reg.a = self.mem[0x0200 + self.reg.y as usize];"
+    assert _raw(item) == _loaded("a", "self.mem[0x0200 + self.reg.y as usize]")
 
 
 def test_raw_store_abs():
@@ -804,17 +815,18 @@ def _indirect(name: str, addr: int) -> str:
 
 def test_raw_load_indirect():
     item = LoadIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
-    assert _raw(item) == f"self.reg.a = {_indirect('ptr', 0x20)};"
+    assert _raw(item) == _loaded("a", _indirect('ptr', 0x20))
 
 
 def test_raw_load_indirect_x_pre_indexed():
     # `(ptr,x)`: X indexes the zero-page pointer location (with zp wrap);
     # the fetched 16-bit pointer is the effective address (no post-index).
     item = LoadIndirect(reg=Reg.A, source=IndirectX(ptr=_abs("PAC", 0x00)), src=SRC)
-    assert _raw(item) == (
-        "self.reg.a = self.mem[(self.mem[(0x0000 + self.reg.x as usize) & 0xff] "
+    assert _raw(item) == _loaded(
+        "a",
+        "self.mem[(self.mem[(0x0000 + self.reg.x as usize) & 0xff] "
         "as usize | (self.mem[(0x0000 + self.reg.x as usize + 1) & 0xff] "
-        "as usize) << 8)];"
+        "as usize) << 8)]",
     )
 
 
