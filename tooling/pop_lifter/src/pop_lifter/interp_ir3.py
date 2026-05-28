@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import sys
 
+from dataclasses import dataclass
+
 from .interp_ir1 import (
     InterpError,
     Trace,
@@ -29,7 +31,6 @@ from .interp_ir1 import (
     _eval_compare,
     _indexed_addr,
     _real_addr,
-    _resolve,
     _resolve_indirect_y,
     _set_zn,
     exec_atom,
@@ -126,6 +127,68 @@ class _GotoStateSignal(Exception):
         self.state = state
 
 
+@dataclass(frozen=True)
+class _Ctx:
+    """Static per-run resolution config threaded through the walker.
+
+    * `modules` — the loaded module set (for the IR1-leaf delegate path).
+    * `entry_owners` — entry name (routine name + each `entry_alias`) →
+      list of modules that define it. Mirrors `pass4_crate.build_name_map`.
+    * `routine_by_module` — `(module_name, entry_name)` → routine, so a
+      resolved `(owner, target)` pair lands on the exact routine the crate
+      would call.
+    * `alias_idx` — flat alias→canonical map, only for the IR1 delegate.
+    """
+
+    modules: tuple
+    entry_owners: dict[str, list[str]]
+    routine_by_module: dict[tuple[str, str], object]
+    alias_idx: dict[str, str]
+
+
+def _build_ctx(modules, alias_idx: dict[str, str]) -> _Ctx:
+    entry_owners: dict[str, list[str]] = {}
+    routine_by_module: dict[tuple[str, str], object] = {}
+    for m in modules:
+        for r in m.routines:
+            for nm in (r.name, *(getattr(r, "entry_aliases", []) or [])):
+                owners = entry_owners.setdefault(nm, [])
+                if m.name not in owners:
+                    owners.append(m.name)
+                routine_by_module[(m.name, nm)] = r
+    return _Ctx(tuple(modules), entry_owners, routine_by_module, alias_idx)
+
+
+def _resolve_call_ctx(ctx: _Ctx, home_module: str | None, target: str):
+    """Resolve a call to `target` made from `home_module` using the crate's
+    policy: intra-module preferred, then unique cross-module, else `None`
+    (external — no owner — or ambiguous — many owners). A `None` makes the
+    caller raise `InterpError`, so such a routine is skipped rather than
+    compared against the crate's no-op stub. Returns `(routine, owner)`."""
+    owners = ctx.entry_owners.get(target)
+    if not owners:
+        return None
+    if home_module in owners:
+        owner = home_module
+    elif len(owners) == 1:
+        owner = owners[0]
+    else:
+        return None
+    return ctx.routine_by_module[(owner, target)], owner
+
+
+def _resolve_entry(modules, entry: str):
+    """Resolve the run's root entry. The root has no caller, so it keeps
+    the historical first-module-wins rule (the differential harness orders
+    the target segment first precisely so this picks it). Returns
+    `(routine, owner_module)` or `(None, None)`."""
+    for m in modules:
+        r = m.find(entry)
+        if r is not None:
+            return r, m.name
+    return None, None
+
+
 def run(
     modules: list[ModuleIR3 | ModuleIR1],
     entry: str,
@@ -151,10 +214,12 @@ def run(
     alias_idx = _alias_index(modules)
     if aliases:
         alias_idx.update(aliases)
+    ctx = _build_ctx(modules, alias_idx)
 
-    routine = _resolve(modules, alias_idx, entry)
+    routine, owner = _resolve_entry(modules, entry)
     if routine is None:
         raise InterpError(f"entry {entry!r} not found in any module")
+    trace.home_module = owner
 
     # The structured walker uses one Python frame per nested block/call, so
     # a legitimate `_MAX_CALL_DEPTH` chain needs headroom above CPython's
@@ -166,15 +231,17 @@ def run(
     try:
         while True:
             try:
-                _exec_routine(routine, modules, alias_idx, trace)
+                _exec_routine(routine, ctx, trace)
                 return trace
             except _TailCallSignal as tc:
-                target = _resolve(modules, alias_idx, tc.target)
-                if target is None:
+                nxt = _resolve_call_ctx(ctx, trace.home_module, tc.target)
+                if nxt is None:
                     raise InterpError(
-                        f"tail-call target {tc.target!r} not found in any module"
+                        f"tail-call target {tc.target!r} unresolved from "
+                        f"module {trace.home_module!r} (external/ambiguous)"
                     )
-                routine = target
+                routine, owner = nxt
+                trace.home_module = owner
                 continue
     except RecursionError as e:
         raise InterpError("Python recursion limit hit (non-terminating run)") from e
@@ -192,10 +259,10 @@ def _alias_index(modules) -> dict[str, str]:
     return out
 
 
-def _exec_routine(routine, modules, aliases, trace: Trace) -> None:
+def _exec_routine(routine, ctx: _Ctx, trace: Trace) -> None:
     if isinstance(routine, RoutineIR3):
         try:
-            _exec_block(routine.body, modules, aliases, trace)
+            _exec_block(routine.body, ctx, trace)
         except _ReturnSignal:
             pass
         return
@@ -203,7 +270,7 @@ def _exec_routine(routine, modules, aliases, trace: Trace) -> None:
         # Delegate to the IR1 interpreter for IR1 leaves. We share the
         # RAM bytearray via `trace.ram`, so observable state stays in
         # sync.
-        ir1_modules = [m for m in modules if isinstance(m, ModuleIR1)]
+        ir1_modules = [m for m in ctx.modules if isinstance(m, ModuleIR1)]
         # We need the IR1 routine reachable via the same alias map.
         # Re-running `ir1_run` with the same alias index keeps the
         # behaviour identical to "this routine in isolation".
@@ -212,15 +279,15 @@ def _exec_routine(routine, modules, aliases, trace: Trace) -> None:
             routine.name,
             ram=trace.ram,
             a=trace.a, x=trace.x, y=trace.y, c=trace.c,
-            aliases=aliases,
+            aliases=ctx.alias_idx,
         )
         return
     raise InterpError(f"unknown routine type: {type(routine).__name__}")
 
 
-def _exec_block(block: Block, modules, aliases, trace: Trace) -> None:
+def _exec_block(block: Block, ctx: _Ctx, trace: Trace) -> None:
     for stmt in block.stmts:
-        _exec_stmt(stmt, modules, aliases, trace)
+        _exec_stmt(stmt, ctx, trace)
 
 
 def _assign_read(value, trace: Trace, src) -> int:
@@ -282,7 +349,7 @@ def _assign_addr(target, trace: Trace, src) -> int:
     raise InterpError(f"unknown Assign target type: {type(target).__name__}")
 
 
-def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
+def _exec_stmt(stmt: Stmt, ctx: _Ctx, trace: Trace) -> None:
     if isinstance(stmt, RawStmt):
         handled = exec_atom(stmt.item, trace, trace.ram)
         if not handled:
@@ -359,9 +426,17 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
         _set_zn(trace, trace.a)
         return
     if isinstance(stmt, CallStmt):
-        callee = _resolve(modules, aliases, stmt.target)
-        if callee is None:
-            raise InterpError(f"call target {stmt.target!r} not found")
+        resolved = _resolve_call_ctx(ctx, trace.home_module, stmt.target)
+        if resolved is None:
+            # External (no owner) or ambiguous (reused name in several
+            # modules) from this caller — exactly what the crate emits as
+            # an `ext` no-op stub. We can't faithfully reproduce that, so
+            # skip the routine rather than risk a false divergence.
+            raise InterpError(
+                f"call target {stmt.target!r} unresolved from module "
+                f"{trace.home_module!r} (external/ambiguous)"
+            )
+        callee, owner = resolved
         if trace.call_depth >= _MAX_CALL_DEPTH:
             # A real 6502 would overflow its 256-byte stack long before
             # this; an unbounded cycle here means the routine can't be run
@@ -376,19 +451,26 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
         # so resolve the tail-call chain inside the call frame rather than
         # letting the signal unwind to the top-level loop (which would
         # abandon the rest of this routine). Mirrors `run`'s tail loop.
+        # Calls made from inside the callee resolve relative to its owning
+        # module, so set `home_module` accordingly across the frame.
         trace.call_depth += 1
+        saved_home = trace.home_module
         try:
             while True:
+                trace.home_module = owner
                 try:
-                    _exec_routine(callee, modules, aliases, trace)
+                    _exec_routine(callee, ctx, trace)
                     break
                 except _TailCallSignal as tc:
-                    callee = _resolve(modules, aliases, tc.target)
-                    if callee is None:
+                    nxt = _resolve_call_ctx(ctx, owner, tc.target)
+                    if nxt is None:
                         raise InterpError(
-                            f"tail-call target {tc.target!r} not found in any module"
+                            f"tail-call target {tc.target!r} unresolved from "
+                            f"module {owner!r} (external/ambiguous)"
                         )
+                    callee, owner = nxt
         finally:
+            trace.home_module = saved_home
             trace.call_depth -= 1
         return
     if isinstance(stmt, TailCallStmt):
@@ -397,9 +479,9 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
         raise _ReturnSignal()
     if isinstance(stmt, IfStmt):
         if _eval_compare(stmt.cond, trace, trace.ram):
-            _exec_block(stmt.then_block, modules, aliases, trace)
+            _exec_block(stmt.then_block, ctx, trace)
         elif stmt.else_block is not None:
-            _exec_block(stmt.else_block, modules, aliases, trace)
+            _exec_block(stmt.else_block, ctx, trace)
         return
     if isinstance(stmt, MatchStmt):
         reg_val = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[stmt.reg]
@@ -408,14 +490,14 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
                 # The arm terminates (return / tail-call / break / ...),
                 # so this raises the matching signal; if it somehow falls
                 # off, returning here matches the no-match fall-through.
-                _exec_block(arm.body, modules, aliases, trace)
+                _exec_block(arm.body, ctx, trace)
                 return
         return  # no arm matched — fall through to the next statement
     if isinstance(stmt, RawIfStmt):
         if _branch_taken(stmt.cond, trace):
-            _exec_block(stmt.then_block, modules, aliases, trace)
+            _exec_block(stmt.then_block, ctx, trace)
         elif stmt.else_block is not None:
-            _exec_block(stmt.else_block, modules, aliases, trace)
+            _exec_block(stmt.else_block, ctx, trace)
         return
     if isinstance(stmt, LoopStmt):
         # Bounded so a busted exit guard doesn't hang the interpreter.
@@ -423,7 +505,7 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
         # times in practice — a million is room to spare for tests.
         for _ in range(1_000_000):
             try:
-                _exec_block(stmt.body, modules, aliases, trace)
+                _exec_block(stmt.body, ctx, trace)
             except _ContinueSignal:
                 continue
             except _BreakSignal:
@@ -438,7 +520,7 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
     if isinstance(stmt, DoWhileStmt):
         for _ in range(1_000_000):
             try:
-                _exec_block(stmt.body, modules, aliases, trace)
+                _exec_block(stmt.body, ctx, trace)
             except _ContinueSignal:
                 # A 6502 back-edge `continue` restarts the body without
                 # re-testing the bottom guard.
@@ -470,7 +552,7 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
             target=stmt.var, src=stmt.src)
         for _ in range(1_000_000):
             try:
-                _exec_block(stmt.body, modules, aliases, trace)
+                _exec_block(stmt.body, ctx, trace)
             except _ContinueSignal:
                 # Matches the do-while back-edge: restart body, no step.
                 continue
@@ -502,12 +584,12 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
         step_op = (DecTarget if stmt.step < 0 else IncTarget)(
             target=stmt.var, src=stmt.src)
         for _ in range(stmt.count):
-            _exec_block(stmt.body, modules, aliases, trace)
+            _exec_block(stmt.body, ctx, trace)
             exec_atom(step_op, trace, trace.ram)
         return
     if isinstance(stmt, LabeledBlock):
         try:
-            _exec_block(stmt.body, modules, aliases, trace)
+            _exec_block(stmt.body, ctx, trace)
         except _LabeledBreakSignal as sig:
             if sig.label != stmt.label:
                 raise  # not ours — keep unwinding to the matching block
@@ -531,7 +613,7 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
             if body is None:
                 raise InterpError(f"dispatch: no arm for state {pc}")
             try:
-                _exec_block(body, modules, aliases, trace)
+                _exec_block(body, ctx, trace)
             except _GotoStateSignal as sig:
                 pc = sig.state
                 continue

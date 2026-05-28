@@ -139,6 +139,12 @@ class Trace:
     # blowing the Python stack. The real 6502 caps nesting at ~128 (a
     # 256-byte stack, two bytes per return address).
     call_depth: int = 0
+    # Name of the module the currently-executing routine belongs to. The
+    # IR3 interpreter threads this so inter-routine calls resolve with the
+    # same caller-sensitive policy the emitted crate uses (intra-module
+    # preferred, then unique cross-module, else external). `None` until a
+    # run sets it; the IR1 interpreter doesn't use it.
+    home_module: str | None = None
     # PHA/PLA byte stack — see `ir1.Pha` for the two-stack design
     # rationale. Kept distinct from the JSR/RTS call-stack tracking
     # (a local `stack` list inside `run()`) so each routine's pushed
