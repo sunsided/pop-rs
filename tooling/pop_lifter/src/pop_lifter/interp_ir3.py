@@ -177,6 +177,23 @@ def _resolve_call_ctx(ctx: _Ctx, home_module: str | None, target: str):
     return ctx.routine_by_module[(owner, target)], owner
 
 
+def _resolve_tail(ctx: _Ctx, current, home_module: str | None, target: str):
+    """Resolve a tail-call target. A jump back into the *current* routine's
+    own entry — its name or one of the loop-label entry aliases the
+    relooper exposes (e.g. `:loop`) — is a self-loop, not a cross-routine
+    call. Resolve it to the current routine directly, the way the crate's
+    lexical `tail_call :loop` does, before the global name table — where a
+    generic local label like `:loop` collides across routines and
+    last-wins would send the jump to the wrong one. Returns
+    `(routine, owner)` or `None`."""
+    if current is not None and (
+        target == current.name
+        or target in (getattr(current, "entry_aliases", ()) or ())
+    ):
+        return current, home_module
+    return _resolve_call_ctx(ctx, home_module, target)
+
+
 def _resolve_entry(modules, entry: str):
     """Resolve the run's root entry. The root has no caller, so it keeps
     the historical first-module-wins rule (the differential harness orders
@@ -234,7 +251,7 @@ def run(
                 _exec_routine(routine, ctx, trace)
                 return trace
             except _TailCallSignal as tc:
-                nxt = _resolve_call_ctx(ctx, trace.home_module, tc.target)
+                nxt = _resolve_tail(ctx, routine, trace.home_module, tc.target)
                 if nxt is None:
                     raise InterpError(
                         f"tail-call target {tc.target!r} unresolved from "
@@ -462,7 +479,7 @@ def _exec_stmt(stmt: Stmt, ctx: _Ctx, trace: Trace) -> None:
                     _exec_routine(callee, ctx, trace)
                     break
                 except _TailCallSignal as tc:
-                    nxt = _resolve_call_ctx(ctx, owner, tc.target)
+                    nxt = _resolve_tail(ctx, callee, owner, tc.target)
                     if nxt is None:
                         raise InterpError(
                             f"tail-call target {tc.target!r} unresolved from "
