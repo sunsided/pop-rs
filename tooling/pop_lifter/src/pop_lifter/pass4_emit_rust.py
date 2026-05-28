@@ -844,8 +844,9 @@ def _emit_wide16(stmt: Wide16Stmt, syms: SymTable | None) -> list[str]:
     indentation). `_lo` carries the low-byte result; its bit-8 is the
     carry into the high byte. Add uses a 0 carry-in (`clc`); subtract
     uses the `src + ~op + 1` identity (`sec`), so both reduce to `+`.
-    Preserves the idiom's full effect: both stores, plus A = high byte
-    and C = high carry-out (Z/N are not modelled for add/sbc)."""
+    Preserves the idiom's full effect: both stores, plus A = high byte,
+    C = high carry-out, and Z/N from the high-byte result (the final
+    `adc`/`sbc`'s flags, which a following `bne`/`beq` may read)."""
     complement = stmt.op == "-"
     lo_carry_in = " + 1" if complement else ""
     return [
@@ -855,8 +856,8 @@ def _emit_wide16(stmt: Wide16Stmt, syms: SymTable | None) -> list[str]:
         f"let _hi = {_wide_term(stmt.hi_src, syms, complement=False)}"
         f" + {_wide_term(stmt.hi_op, syms, complement=complement)} + (_lo >> 8);",
         f"{_emit_target(stmt.hi_dst, syms)} = _hi as u8;",
-        "self.reg.a = _hi as u8;",
         "self.flags.c = (_hi >> 8) != 0;",
+        "self.set_a(_hi as u8);",
     ]
 
 

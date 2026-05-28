@@ -706,8 +706,8 @@ pub fn CVTX(cpu: &mut Cpu) {
             cpu.mem[0x0001] = _lo as u8;
             let _hi = (cpu.mem[0x0003] as u16) + (0x00 as u16) + (_lo >> 8);
             cpu.mem[0x0003] = _hi as u8;
-            cpu.reg.a = _hi as u8;
             cpu.flags.c = (_hi >> 8) != 0;
+            cpu.set_a(_hi as u8);
             if cpu.flags.z {
                 break;
             }
@@ -734,8 +734,8 @@ pub fn CVTX(cpu: &mut Cpu) {
             cpu.mem[0x0001] = _lo as u8;
             let _hi = (cpu.mem[0x0003] as u16) + (!0x00_u8 as u16) + (_lo >> 8);
             cpu.mem[0x0003] = _hi as u8;
-            cpu.reg.a = _hi as u8;
             cpu.flags.c = (_hi >> 8) != 0;
+            cpu.set_a(_hi as u8);
             if cpu.flags.z {
                 break;
             }
@@ -1684,14 +1684,14 @@ pub fn CALCBLUE(cpu: &mut Cpu) {
     cpu.mem[sym::BlueType] = _lo as u8;
     let _hi = (cpu.mem[(sym::Mult30 + 1 + cpu.reg.x as usize) & 0xffff] as u16) + (0xb7 as u16) + (_lo >> 8);
     cpu.mem[sym::BlueType + 1] = _hi as u8;
-    cpu.reg.a = _hi as u8;
     cpu.flags.c = (_hi >> 8) != 0;
+    cpu.set_a(_hi as u8);
     let _lo = (cpu.mem[sym::BlueType] as u16) + (0xd0 as u16);
     cpu.mem[sym::BlueSpec] = _lo as u8;
     let _hi = (cpu.mem[sym::BlueType + 1] as u16) + (0x02 as u16) + (_lo >> 8);
     cpu.mem[sym::BlueSpec + 1] = _hi as u8;
-    cpu.reg.a = _hi as u8;
     cpu.flags.c = (_hi >> 8) != 0;
+    cpu.set_a(_hi as u8);
     return;
 }
 

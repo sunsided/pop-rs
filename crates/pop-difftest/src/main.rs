@@ -40,11 +40,10 @@ fn main() {
     }
 
     // The routine may index memory out of range where the interpreter
-    // wraps; catch the panic so the harness records it rather than dying.
-    let prev = panic::take_hook();
-    panic::set_hook(Box::new(|_| {}));
+    // wraps. Catch the panic so the harness records it rather than dying;
+    // the default hook still prints the panic message to stderr, which the
+    // differential test surfaces in its failure report.
     let ran = panic::catch_unwind(AssertUnwindSafe(|| dispatch::call(module, name, &mut cpu)));
-    panic::set_hook(prev);
 
     match ran {
         Ok(true) => {}
