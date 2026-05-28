@@ -384,12 +384,14 @@ def _resolve_indirect_x(ind: IndirectX, trace: Trace, ram: bytearray) -> int:
 
 def _indexed_addr(ix: IndexedAbs, trace: Trace, src) -> int:
     """Compute the effective address for an `base,x` / `base,y`
-    indexed operand. Mirrors the load/store path: validate the base
-    against the synthetic-label gate, then add the 8-bit index and
-    wrap the result at 16 bits. See `_real_addr` for why we don't
-    push the un-wrapped sum through the gate.
+    indexed operand. Resolve the base through `_abs_base` so a
+    self-modifying-code address operand (`opvar` set) uses its patched
+    bytes — `_abs_base` falls back to the synthetic-label gate for an
+    ordinary operand — then add the 8-bit index and wrap at 16 bits.
+    See `_real_addr` for why we don't push the un-wrapped sum through
+    the gate.
     """
-    base = _real_addr(ix.base.addr, src)
+    base = _abs_base(ix.base, trace, src)
     idx_val = trace.x if ix.index is Reg.X else trace.y
     return (base + (idx_val & 0xff)) & 0xffff
 
