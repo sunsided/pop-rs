@@ -5,6 +5,7 @@
 use crate::cpu::Cpu;
 use crate::sym;
 
+#[doc(alias = "_cls")]
 pub fn cls(cpu: &mut Cpu) {
     mainmem(cpu);
     CLS(cpu);
@@ -12,6 +13,7 @@ pub fn cls(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "_lay")]
 pub fn lay(cpu: &mut Cpu) {
     mainmem(cpu);
     LAY(cpu);
@@ -19,12 +21,14 @@ pub fn lay(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "_fastlay")]
 pub fn fastlay(cpu: &mut Cpu) {
     FASTLAY(cpu);
     auxmem(cpu);
     return;
 }
 
+#[doc(alias = "_layrsave")]
 pub fn layrsave(cpu: &mut Cpu) {
     mainmem(cpu);
     LAYRSAVE(cpu);
@@ -32,6 +36,7 @@ pub fn layrsave(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "_lrcls")]
 pub fn lrcls(cpu: &mut Cpu) {
     mainmem(cpu);
     LRCLS(cpu);
@@ -39,12 +44,14 @@ pub fn lrcls(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "_fastmask")]
 pub fn fastmask(cpu: &mut Cpu) {
     FASTMASK(cpu);
     auxmem(cpu);
     return;
 }
 
+#[doc(alias = "_fastblack")]
 pub fn fastblack(cpu: &mut Cpu) {
     mainmem(cpu);
     FASTBLACK(cpu);
@@ -52,12 +59,14 @@ pub fn fastblack(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "_peel")]
 pub fn peel(cpu: &mut Cpu) {
     PEEL(cpu);
     auxmem(cpu);
     return;
 }
 
+#[doc(alias = "_getwidth")]
 pub fn getwidth(cpu: &mut Cpu) {
     mainmem(cpu);
     GETWIDTH(cpu);
@@ -65,6 +74,7 @@ pub fn getwidth(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "_copy2000")]
 pub fn copyscrnMM(cpu: &mut Cpu) {
     mainmem(cpu);
     COPYSCRN(cpu);
@@ -72,6 +82,7 @@ pub fn copyscrnMM(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "_copy2000aux")]
 pub fn copyscrnAA(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -86,6 +97,7 @@ pub fn copyscrnAA(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "_copy2000ma")]
 pub fn copyscrnMA(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -101,6 +113,7 @@ pub fn copyscrnMA(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "_copy2000am")]
 pub fn copyscrnAM(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -3010,6 +3023,7 @@ pub fn FASTMASK(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "_setfastmain")]
 pub fn SETFASTMAIN(cpu: &mut Cpu) {
     cpu.set_a(0x02);  // RAMRD main
     cpu.local.insert(("]ramrd1", 1), cpu.reg.a);
@@ -3020,6 +3034,7 @@ pub fn SETFASTMAIN(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "_setfastaux")]
 pub fn SETFASTAUX(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {

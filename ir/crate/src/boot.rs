@@ -17,7 +17,7 @@ pub fn entry(cpu: &mut Cpu) {
     cpu.mem[0xc00c] = cpu.reg.a;
     cpu.mem[0xc00e] = cpu.reg.a;
     cpu.mem[0xc081] = cpu.reg.a;
-    crate::ext::text(cpu);
+    crate::unpack::TEXT(cpu);
     crate::ext::home(cpu);
     crate::ext::normal(cpu);
     crate::ext::pr0(cpu);
@@ -137,7 +137,7 @@ pub fn NOT128K(cpu: &mut Cpu) {
             0 => {
                 cpu.set_x(cpu.mem[sym::SLOT]);
                 cpu.set_a(cpu.mem[(0xc088 + cpu.reg.x as usize) & 0xffff]);
-                crate::ext::text(cpu);
+                crate::unpack::TEXT(cpu);
                 crate::ext::home(cpu);
                 cpu.set_a(0x08);
                 crate::ext::vtab(cpu);

@@ -25,6 +25,7 @@ pub fn ADDSOUND(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "playback")]
 pub fn PLAYBACK(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::soundon]);
     if cpu.reg.a == 0x00 {

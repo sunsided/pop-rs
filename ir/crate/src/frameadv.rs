@@ -5,6 +5,7 @@
 use crate::cpu::Cpu;
 use crate::sym;
 
+#[doc(alias = "sure")]
 pub fn SURE(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -15,7 +16,7 @@ pub fn SURE(cpu: &mut Cpu) {
                 setback(cpu);
                 getprev(cpu);
                 cpu.set_a(cpu.mem[sym::SCRNUM]);
-                crate::ext::calcblue(cpu);
+                crate::grafix::CALCBLUE(cpu);
                 cpu.set_y(0x02);
                 pc = 1;
             }
@@ -104,7 +105,7 @@ pub fn SURE(cpu: &mut Cpu) {
                 cpu.mem[sym::scrnBelowL] = cpu.reg.a;
                 getbelow(cpu);
                 cpu.set_a(cpu.mem[sym::scrnAbove]);
-                crate::ext::calcblue(cpu);
+                crate::grafix::CALCBLUE(cpu);
                 cpu.set_a(0x00);
                 cpu.mem[sym::colno] = cpu.reg.a;
                 pc = 6;
@@ -177,6 +178,7 @@ pub fn SURE(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "fast")]
 pub fn FAST(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -184,7 +186,7 @@ pub fn FAST(cpu: &mut Cpu) {
             0 => {
                 getprev(cpu);
                 cpu.set_a(cpu.mem[sym::SCRNUM]);
-                crate::ext::calcblue(cpu);
+                crate::grafix::CALCBLUE(cpu);
                 cpu.set_a(0x00);
                 cpu.set_y(0x14);
                 metbufs3(cpu);
@@ -295,7 +297,7 @@ pub fn FAST(cpu: &mut Cpu) {
                 }
             }
             7 => {
-                crate::ext::calcblue(cpu);
+                crate::grafix::CALCBLUE(cpu);
                 cpu.set_a(0x00);
                 cpu.mem[sym::colno] = cpu.reg.a;
                 pc = 8;
@@ -350,7 +352,7 @@ pub fn FAST(cpu: &mut Cpu) {
                 }
             }
             10 => {
-                crate::ext::updatemeters(cpu);
+                crate::gamebg::UPDATEMETERS(cpu);
                 return;
             }
             11 => {
@@ -620,7 +622,7 @@ pub fn getprev(cpu: &mut Cpu) {
         cpu.mem[sym::sprev + 2] = cpu.reg.a;
         return;
     }
-    crate::ext::calcblue(cpu);
+    crate::grafix::CALCBLUE(cpu);
     cpu.set_y(0x09);
     getobjid1(cpu);
     cpu.mem[sym::PREV] = cpu.reg.a;
@@ -662,7 +664,7 @@ pub fn getbelow(cpu: &mut Cpu) {
                 }
             }
             2 => {
-                crate::ext::calcblue(cpu);
+                crate::grafix::CALCBLUE(cpu);
                 cpu.set_y(0x08);  // skip rmost
                 pc = 3;
             }
@@ -687,7 +689,7 @@ pub fn getbelow(cpu: &mut Cpu) {
                 }
             }
             5 => {
-                crate::ext::calcblue(cpu);
+                crate::grafix::CALCBLUE(cpu);
                 cpu.set_y(0x09);  // u.r. block
                 getobjid(cpu);
                 cpu.mem[sym::BELOW] = cpu.reg.a;
@@ -697,7 +699,7 @@ pub fn getbelow(cpu: &mut Cpu) {
             }
             6 => {
                 cpu.set_a(cpu.mem[sym::SCRNUM]);
-                crate::ext::calcblue(cpu);
+                crate::grafix::CALCBLUE(cpu);
                 return;
             }
             7 => {
@@ -909,7 +911,7 @@ pub fn drawfrnt(cpu: &mut Cpu) {
         }
         cpu.set_x(0x02);
         cpu.mem[sym::OPACITY] = cpu.reg.x;
-        crate::ext::addfore(cpu);
+        crate::grafix::ADDFORE(cpu);
         return;
     }
     drawslicerf(cpu);
@@ -1245,7 +1247,7 @@ pub fn redrawd(cpu: &mut Cpu) {
     if cpu.flags.z {
         return;
     }
-    crate::ext::addfore(cpu);
+    crate::grafix::ADDFORE(cpu);
     return;
 }
 
@@ -1392,13 +1394,13 @@ pub fn drawa(cpu: &mut Cpu) {
 
 pub fn addmidezfast(cpu: &mut Cpu) {
     cpu.set_a(0x00);
-    crate::ext::addmidez(cpu);
+    crate::grafix::ADDMIDEZ(cpu);
     return;
 }
 
 #[doc(alias = "]add")]
 pub fn add(cpu: &mut Cpu) {
-    crate::ext::addback(cpu);
+    crate::grafix::ADDBACK(cpu);
     return;
 }
 
@@ -1421,10 +1423,10 @@ pub fn setmid(cpu: &mut Cpu) {
 pub fn maddfore(cpu: &mut Cpu) {
     cpu.set_x(0x04);
     cpu.mem[sym::OPACITY] = cpu.reg.x;
-    crate::ext::addfore(cpu);
+    crate::grafix::ADDFORE(cpu);
     cpu.set_x(0x01);
     cpu.mem[sym::OPACITY] = cpu.reg.x;
-    crate::ext::addfore(cpu);
+    crate::grafix::ADDFORE(cpu);
     return;
 }
 
@@ -1568,7 +1570,7 @@ pub fn wipesq(cpu: &mut Cpu) {
     cpu.mem[sym::XCO] = cpu.mem[sym::blockxco];
     cpu.mem[sym::YCO] = cpu.mem[sym::Dy];
     cpu.set_a(0x80);
-    crate::ext::addwipe(cpu);
+    crate::grafix::ADDWIPE(cpu);
     return;
 }
 
@@ -1966,7 +1968,7 @@ pub fn drawgatebf(cpu: &mut Cpu) {
                 cpu.mem[sym::YCO] = cpu.reg.a;
                 cpu.set_a(0x44);
                 cpu.mem[sym::IMAGE] = cpu.reg.a;
-                crate::ext::addfore(cpu);
+                crate::grafix::ADDFORE(cpu);
                 pc = 1;
             }
             1 => {
@@ -2014,7 +2016,7 @@ pub fn drawgatebf(cpu: &mut Cpu) {
                 }
             }
             5 => {
-                crate::ext::addfore(cpu);
+                crate::grafix::ADDFORE(cpu);
                 cpu.set_a(cpu.mem[sym::YCO]);
                 cpu.flags.c = true;
                 let _r = (cpu.reg.a as u16) + (!0x08_u8) as u16 + (cpu.flags.c as u16);
@@ -2069,7 +2071,7 @@ pub fn drawgateb(cpu: &mut Cpu) {
                 cpu.mem[sym::IMAGE] = cpu.reg.a;
                 cpu.set_a(0x01);
                 cpu.mem[sym::OPACITY] = cpu.reg.a;
-                crate::ext::addback(cpu);
+                crate::grafix::ADDBACK(cpu);
                 pc = 3;
             }
             2 => {
@@ -2079,7 +2081,7 @@ pub fn drawgateb(cpu: &mut Cpu) {
                 cpu.mem[sym::IMAGE] = cpu.reg.a;
                 cpu.set_a(0x02);
                 cpu.mem[sym::OPACITY] = cpu.reg.a;
-                crate::ext::addback(cpu);
+                crate::grafix::ADDBACK(cpu);
                 pc = 3;
             }
             3 => {
@@ -2129,7 +2131,7 @@ pub fn drawgateb(cpu: &mut Cpu) {
                 }
             }
             7 => {
-                crate::ext::addback(cpu);
+                crate::grafix::ADDBACK(cpu);
                 cpu.set_a(cpu.mem[sym::YCO]);
                 cpu.flags.c = true;
                 let _r = (cpu.reg.a as u16) + (!0x08_u8) as u16 + (cpu.flags.c as u16);
@@ -2172,7 +2174,7 @@ pub fn drawgateb(cpu: &mut Cpu) {
                 cpu.set_y(cpu.reg.a);
                 cpu.set_a(cpu.mem[(sym::gate8b - 1 + cpu.reg.y as usize) & 0xffff]);
                 cpu.mem[sym::IMAGE] = cpu.reg.a;
-                crate::ext::addback(cpu);
+                crate::grafix::ADDBACK(cpu);
                 pc = 11;
             }
             11 => {
@@ -2209,14 +2211,14 @@ pub fn restorebot(cpu: &mut Cpu) {
 pub fn drawobjx(cpu: &mut Cpu) {
     loadobj(cpu);
     if cpu.reg.a == 0x00 {
-        crate::ext::DrawKid(cpu);
+        crate::gamebg::DRAWKID(cpu);
         return;
     }
     if cpu.reg.a != 0x04 {
         if cpu.reg.a != 0x01 {
             if cpu.reg.a != 0x80 {
                 if cpu.reg.a == 0x03 {
-                    crate::ext::DrawSword(cpu);
+                    crate::gamebg::DRAWSWORD(cpu);
                     return;
                 }
                 if cpu.reg.a != 0x05 {
@@ -2226,16 +2228,16 @@ pub fn drawobjx(cpu: &mut Cpu) {
                     crate::ext::DrawGuard(cpu);
                     return;
                 }
-                crate::ext::DrawSword(cpu);
+                crate::gamebg::DRAWSWORD(cpu);
                 return;
             }
             DrawFF(cpu);
             return;
         }
-        crate::ext::DrawShad(cpu);
+        crate::gamebg::DRAWSHAD(cpu);
         return;
     }
-    crate::ext::DrawKid(cpu);
+    crate::gamebg::DRAWKID(cpu);
     return;
 }
 
@@ -2252,18 +2254,18 @@ pub fn DrawFF(cpu: &mut Cpu) {
     cpu.mem[sym::IMAGE] = cpu.mem[(sym::maska + cpu.reg.x as usize) & 0xffff];
     cpu.mem[sym::OPACITY] = 0x00;
     cpu.set_a(0x02);
-    crate::ext::addmid(cpu);
+    crate::grafix::ADDMID(cpu);
     cpu.set_x(cpu.mem[sym::FCharImage]);
     cpu.mem[sym::IMAGE] = cpu.mem[(sym::loosea + cpu.reg.x as usize) & 0xffff];
     cpu.mem[sym::OPACITY] = 0x01;
     cpu.set_a(0x01);
-    crate::ext::addmid(cpu);
+    crate::grafix::ADDMID(cpu);
     cpu.set_x(cpu.mem[sym::FCharImage]);
     cpu.mem[sym::IMAGE] = cpu.mem[(sym::loosed + cpu.reg.x as usize) & 0xffff];
     cpu.mem[sym::YCO] = cpu.mem[sym::FCharY];
     cpu.mem[sym::OPACITY] = 0x02;
     cpu.set_a(0x02);
-    crate::ext::addmid(cpu);
+    crate::grafix::ADDMID(cpu);
     cpu.mem[sym::XCO] = (cpu.mem[sym::FCharX]).wrapping_add(0x04);
     cpu.set_a(cpu.mem[sym::FCharY]);
     cpu.flags.c = true;
@@ -2274,7 +2276,7 @@ pub fn DrawFF(cpu: &mut Cpu) {
     cpu.mem[sym::IMAGE] = 0x1b;
     cpu.mem[sym::OPACITY] = 0x01;
     cpu.set_a(0x02);
-    crate::ext::addmid(cpu);
+    crate::grafix::ADDMID(cpu);
     return;
 }
 
@@ -2504,6 +2506,7 @@ pub fn compare(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "getinitobj")]
 pub fn GETINITOBJ(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[((cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
     cpu.set_a(cpu.reg.a & 0x1f);
@@ -2660,8 +2663,8 @@ pub fn drawtorchb(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::Ay]);
     cpu.mem[sym::YCO] = cpu.reg.a;
     cpu.set_x(cpu.mem[sym::spreced]);
-    crate::ext::setupflame(cpu);
-    crate::ext::addback(cpu);
+    crate::gamebg::SETUPFLAME(cpu);
+    crate::grafix::ADDBACK(cpu);
     return;
 }
 
@@ -2684,9 +2687,9 @@ pub fn drawflaska(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::Ay]);
     cpu.mem[sym::YCO] = cpu.reg.a;
     cpu.set_x(cpu.mem[sym::state]);
-    crate::ext::setupflask(cpu);
+    crate::gamebg::SETUPFLASK(cpu);
     cpu.set_a(0x01);
-    crate::ext::addmidezo(cpu);
+    crate::grafix::ADDMIDEZO(cpu);
     return;
 }
 

@@ -5,6 +5,7 @@
 use crate::cpu::Cpu;
 use crate::sym;
 
+#[doc(alias = "_firstboot")]
 pub fn FIRSTBOOT(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::MIXEDoff]);
     setaux(cpu);
@@ -16,7 +17,7 @@ pub fn FIRSTBOOT(cpu: &mut Cpu) {
     loadperm(cpu);
     driveoff(cpu);
     crate::ext::checkIIGS(cpu);
-    crate::ext::initsystem(cpu);
+    crate::topctrl::INITSYSTEM(cpu);
     cpu.mem[sym::invert] = 0x00;
     cpu.mem[sym::soundon] = 0x01;
     ATTRACTMODE(cpu);
@@ -29,7 +30,7 @@ pub fn loadmusic1(cpu: &mut Cpu) {
     cpu.mem[sym::track] = cpu.reg.a;
     crate::ext::rw18(cpu);
     setaux(cpu);
-    crate::ext::xmovemusic(cpu);
+    crate::grafix::XMOVEMUSIC(cpu);
     return;
 }
 
@@ -168,6 +169,7 @@ pub fn checkdisk(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "_savegame")]
 pub fn SAVEGAME(cpu: &mut Cpu) {
     checkdisk(cpu);
     cpu.mem[sym::RAMRDaux] = cpu.reg.a;
@@ -186,12 +188,13 @@ pub fn SAVEGAME(cpu: &mut Cpu) {
     crate::ext::rw18(cpu);
     if !cpu.flags.c {
     } else {
-        crate::ext::whoop(cpu);
+        crate::grafix::WHOOP(cpu);
     }
     driveoff(cpu);
     return;
 }
 
+#[doc(alias = "_loadgame")]
 pub fn LOADGAME(cpu: &mut Cpu) {
     checkdisk(cpu);
     cpu.set_a(0x17);
@@ -211,6 +214,7 @@ pub fn LOADGAME(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "_loadaltset")]
 pub fn LOADALTSET(cpu: &mut Cpu) {
     cpu.mem[sym::newCHset] = cpu.reg.y;
     driveon(cpu);
@@ -219,6 +223,7 @@ pub fn LOADALTSET(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "_loadlevel")]
 pub fn LOADLEVEL(cpu: &mut Cpu) {
     cpu.mem[sym::newBGset1] = cpu.reg.a;
     cpu.mem[sym::newBGset2] = cpu.reg.x;
@@ -389,8 +394,8 @@ pub fn copy1to2(cpu: &mut Cpu) {
     }
     cpu.mem[sym::IMAGE + 1] = cpu.reg.a;
     cpu.mem[sym::IMAGE] = cpu.reg.x;
-    crate::ext::_copy2000aux(cpu);
-    crate::ext::_copy2000(cpu);
+    crate::hires::copyscrnAA(cpu);
+    crate::hires::copyscrnMM(cpu);
     return;
 }
 
@@ -399,48 +404,50 @@ pub fn copy2to1(cpu: &mut Cpu) {
     cpu.set_x(0x40);
     cpu.mem[sym::IMAGE + 1] = cpu.reg.a;
     cpu.mem[sym::IMAGE] = cpu.reg.x;
-    crate::ext::_copy2000aux(cpu);
-    crate::ext::_copy2000(cpu);
+    crate::hires::copyscrnAA(cpu);
+    crate::hires::copyscrnMM(cpu);
     return;
 }
 
 pub fn copydhires(cpu: &mut Cpu) {
     cpu.mem[sym::IMAGE + 1] = cpu.reg.a;
     cpu.mem[sym::IMAGE] = cpu.reg.x;
-    crate::ext::_copy2000aux(cpu);
-    crate::ext::_copy2000(cpu);
+    crate::hires::copyscrnAA(cpu);
+    crate::hires::copyscrnMM(cpu);
     return;
 }
 
+#[doc(alias = "_cutprincess")]
 pub fn CUTPRINCESS(cpu: &mut Cpu) {
-    crate::ext::blackout(cpu);
+    crate::unpack::BLACKOUT(cpu);
     cpu.set_a(0x01);  // seek track 0
     LoadStage2(cpu);
     cpu.set_a(0x84);
-    crate::ext::SngExpand(cpu);
+    crate::unpack::SNGEXPAND(cpu);
     cpu.mem[sym::IMAGE + 1] = 0x40;
     cpu.set_a(0x20);
     cpu.mem[sym::IMAGE] = cpu.reg.a;
-    crate::ext::_copy2000(cpu);
+    crate::hires::copyscrnMM(cpu);
     return;
 }
 
 pub fn cutprincess1(cpu: &mut Cpu) {
     LoadStage2(cpu);
     cpu.set_a(0x84);
-    crate::ext::SngExpand(cpu);
+    crate::unpack::SNGEXPAND(cpu);
     cpu.mem[sym::IMAGE + 1] = 0x40;
     cpu.set_a(0x20);
     cpu.mem[sym::IMAGE] = cpu.reg.a;
-    crate::ext::_copy2000(cpu);
+    crate::hires::copyscrnMM(cpu);
     return;
 }
 
+#[doc(alias = "_epilog")]
 pub fn EPILOG(cpu: &mut Cpu) {
     cpu.set_a(0x01);
     cpu.mem[sym::soundon] = cpu.reg.a;
     cpu.mem[sym::musicon] = cpu.reg.a;
-    crate::ext::blackout(cpu);
+    crate::unpack::BLACKOUT(cpu);
     LoadStage1B(cpu);
     Epilog(cpu);
     cpu.set_a(0xa9);
@@ -468,6 +475,7 @@ pub fn EPILOG(cpu: &mut Cpu) {
 }
 
 #[doc(alias = "AttractLoop")]
+#[doc(alias = "_attractmode")]
 pub fn ATTRACTMODE(cpu: &mut Cpu) {
     cpu.set_a(0x01);
     cpu.mem[sym::musicon] = cpu.reg.a;
@@ -485,19 +493,19 @@ pub fn ATTRACTMODE(cpu: &mut Cpu) {
 }
 
 pub fn SetupDHires(cpu: &mut Cpu) {
-    crate::ext::blackout(cpu);
+    crate::unpack::BLACKOUT(cpu);
     LoadStage1A(cpu);
     return;
 }
 
 pub fn PubCredit(cpu: &mut Cpu) {
     unpacksplash(cpu);
-    crate::ext::setdhires(cpu);
+    crate::unpack::SETDHIRES(cpu);
     copy1to2(cpu);
     cpu.set_a(0x2c);
     tpause(cpu);
     cpu.set_a(0x70);
-    crate::ext::DeltaExpPop(cpu);
+    crate::unpack::DELTAEXPPOP(cpu);
     cpu.set_x(0x50);
     cpu.set_a(0x01);
     PlaySongI(cpu);
@@ -516,7 +524,7 @@ pub fn AuthorCredit(cpu: &mut Cpu) {
     cpu.set_a(0x2a);
     tpause(cpu);
     cpu.set_a(0x72);
-    crate::ext::DeltaExpPop(cpu);
+    crate::unpack::DELTAEXPPOP(cpu);
     cpu.set_x(0x50);
     cpu.set_a(0x02);
     PlaySongI(cpu);
@@ -530,7 +538,7 @@ pub fn SilentTitle(cpu: &mut Cpu) {
     cpu.set_a(0x14);
     tpause(cpu);
     cpu.set_a(0x74);
-    crate::ext::DeltaExpPop(cpu);
+    crate::unpack::DELTAEXPPOP(cpu);
     cpu.set_a(0xa0);
     tpause(cpu);
     return;
@@ -540,7 +548,7 @@ pub fn TitleScreen(cpu: &mut Cpu) {
     cpu.set_a(0x26);
     tpause(cpu);
     cpu.set_a(0x74);
-    crate::ext::DeltaExpPop(cpu);
+    crate::unpack::DELTAEXPPOP(cpu);
     cpu.set_x(0x8c);
     cpu.set_a(0x03);
     PlaySongI(cpu);
@@ -551,7 +559,7 @@ pub fn TitleScreen(cpu: &mut Cpu) {
 pub fn Prolog1(cpu: &mut Cpu) {
     cpu.set_a(0x7c);
     cpu.mem[sym::RAMRDaux] = cpu.reg.a;
-    crate::ext::DblExpand(cpu);
+    crate::unpack::DBLEXPAND(cpu);
     cpu.set_x(0xfa);
     cpu.set_a(0x04);
     PlaySongI(cpu);
@@ -559,20 +567,20 @@ pub fn Prolog1(cpu: &mut Cpu) {
 }
 
 pub fn PrincessScene(cpu: &mut Cpu) {
-    crate::ext::blackout(cpu);
+    crate::unpack::BLACKOUT(cpu);
     ReloadStuff(cpu);
     cpu.set_a(0x00);  // don't seek track 0
     cutprincess1(cpu);
     cpu.set_a(0x00);  // cut #0 (intro)
-    crate::ext::xplaycut(cpu);
+    crate::grafix::XPLAYCUT(cpu);
     return;
 }
 
 pub fn Prolog2(cpu: &mut Cpu) {
     cpu.set_a(0x60);
     cpu.mem[sym::RAMRDmain] = cpu.reg.a;
-    crate::ext::DblExpand(cpu);
-    crate::ext::setdhires(cpu);
+    crate::unpack::DBLEXPAND(cpu);
+    crate::unpack::SETDHIRES(cpu);
     cpu.set_x(0xfa);
     cpu.set_a(0x05);
     PlaySongI(cpu);
@@ -587,8 +595,8 @@ pub fn Epilog(cpu: &mut Cpu) {
     }
     cpu.set_a(0x76);
     cpu.mem[sym::RAMRDaux] = cpu.reg.a;
-    crate::ext::DblExpand(cpu);
-    crate::ext::setdhires(cpu);
+    crate::unpack::DBLEXPAND(cpu);
+    crate::unpack::SETDHIRES(cpu);
     cpu.set_a(0x01);
     PlaySongNI(cpu);
     cpu.set_a(0x0f);
@@ -600,26 +608,26 @@ pub fn Epilog(cpu: &mut Cpu) {
     PlaySongNI(cpu);
     cpu.set_a(0x3c);
     pauseNI(cpu);
-    crate::ext::blackout(cpu);
+    crate::unpack::BLACKOUT(cpu);
     return;
 }
 
 pub fn unpacksplash(cpu: &mut Cpu) {
     cpu.set_a(0x40);
     cpu.mem[sym::RAMRDaux] = cpu.reg.a;
-    crate::ext::DblExpand(cpu);
+    crate::unpack::DBLEXPAND(cpu);
     return;
 }
 
 pub fn SuperEpilog(cpu: &mut Cpu) {
     cpu.set_a(0x01);  // aux
-    crate::ext::fadein(cpu);
+    crate::unpack::FADEIN(cpu);
     setaux(cpu);
     cpu.set_a(0x01);
     PlaySongNI(cpu);
     crate::ext::fadeout(cpu);
     cpu.set_a(0x00);  // main
-    crate::ext::fadein(cpu);
+    crate::unpack::FADEIN(cpu);
     setaux(cpu);
     cpu.set_a(0x50);
     pauseNI(cpu);
@@ -633,13 +641,13 @@ pub fn SuperEpilog(cpu: &mut Cpu) {
 }
 
 pub fn Demo(cpu: &mut Cpu) {
-    crate::ext::blackout(cpu);
+    crate::unpack::BLACKOUT(cpu);
     LoadStage3(cpu);
     setdemolevel(cpu);
     rdbluep(cpu);
     driveoff(cpu);
     cpu.set_a(0x00);
-    crate::ext::start(cpu);
+    crate::topctrl::START(cpu);
     return;
 }
 
@@ -695,7 +703,7 @@ pub fn pauseNI(cpu: &mut Cpu) {
 }
 
 pub fn StartGame_3f(cpu: &mut Cpu) {
-    crate::ext::musickeys(cpu);
+    crate::grafix::MUSICKEYS(cpu);
     if cpu.reg.a < 0x80 {
         return;
     }
@@ -711,17 +719,17 @@ pub fn StartGame_3f(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::keypress]);
     if cpu.reg.a != 0x0c {
         cpu.set_a(0x01);
-        crate::ext::start(cpu);
+        crate::topctrl::START(cpu);
         return;
     }
     cpu.set_a(0x04);  // arbitrary
-    crate::ext::startresume(cpu);
+    crate::topctrl::STARTRESUME(cpu);
     return;
 }
 
 #[doc(alias = "DOSTARTGAME")]
 pub fn _3a3(cpu: &mut Cpu) {
-    crate::ext::blackout(cpu);
+    crate::unpack::BLACKOUT(cpu);
     LoadStage3(cpu);
     set1stlevel(cpu);
     rdbluep(cpu);
@@ -730,11 +738,11 @@ pub fn _3a3(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::keypress]);
     if cpu.reg.a != 0x0c {
         cpu.set_a(0x01);
-        crate::ext::start(cpu);
+        crate::topctrl::START(cpu);
         return;
     }
     cpu.set_a(0x04);  // arbitrary
-    crate::ext::startresume(cpu);
+    crate::topctrl::STARTRESUME(cpu);
     return;
 }
 
@@ -790,7 +798,7 @@ pub fn LoadStage1B(cpu: &mut Cpu) {
     loadmusic3(cpu);
     cpu.set_a(cpu.mem[sym::IIGS]);
     if cpu.reg.a != 0x00 {
-        crate::ext::loadsuper(cpu);
+        crate::unpack::LOADSUPER(cpu);
         driveoff(cpu);
         return;
     }
@@ -836,6 +844,7 @@ pub fn ReloadStuff(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "_loadstage2")]
 pub fn LoadStage2(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -1080,9 +1089,9 @@ pub fn LoadStage3(cpu: &mut Cpu) {
 
 pub fn PlaySongNI(cpu: &mut Cpu) {
     setaux(cpu);
-    crate::ext::xminit(cpu);
+    crate::grafix::XMINIT(cpu);
     loop {
-        crate::ext::xmplay(cpu);
+        crate::grafix::XMPLAY(cpu);
         let _o: u8 = 0x00;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -1118,12 +1127,12 @@ pub fn PlaySongI(cpu: &mut Cpu) {
             }
             2 => {
                 cpu.set_a(cpu.reg.y);
-                crate::ext::xminit(cpu);
+                crate::grafix::XMINIT(cpu);
                 pc = 7;
             }
             3 => {
                 StartGame_3f(cpu);
-                crate::ext::xmplay(cpu);
+                crate::grafix::XMPLAY(cpu);
                 let _o: u8 = 0x00;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -1244,7 +1253,7 @@ pub fn tpause(cpu: &mut Cpu) {
 
 pub fn error(cpu: &mut Cpu) {
     driveoff(cpu);
-    crate::ext::prompt(cpu);
+    crate::unpack::PROMPT(cpu);
     driveon(cpu);
     return;
 }

@@ -5,6 +5,7 @@
 use crate::cpu::Cpu;
 use crate::sym;
 
+#[doc(alias = "checkbarr")]
 pub fn CHECKBARR(cpu: &mut Cpu) {
     cpu.mem[sym::collideL] = 0xff;
     cpu.mem[sym::collideR] = 0xff;
@@ -19,7 +20,7 @@ pub fn CHECKBARR(cpu: &mut Cpu) {
         initCDbufs(cpu);
         cpu.mem[sym::BlockYlast] = cpu.mem[sym::BlockYthis];
         cpu.set_a(cpu.mem[sym::CDRightEj]);
-        crate::ext::getblockxp(cpu);
+        crate::ctrlsubs::GETBLOCKXP(cpu);
         cpu.flags.c = false;
         let _r = (cpu.reg.a as u16) + (0x02) as u16 + (cpu.flags.c as u16);
         cpu.flags.c = (_r >> 8) != 0;
@@ -34,7 +35,7 @@ pub fn CHECKBARR(cpu: &mut Cpu) {
         }
         cpu.mem[sym::endrange] = cpu.reg.a;
         cpu.set_a(cpu.mem[sym::CDLeftEj]);
-        crate::ext::getblockxp(cpu);
+        crate::ctrlsubs::GETBLOCKXP(cpu);
         cpu.set_x(cpu.reg.a);
         cpu.set_x(cpu.reg.x.wrapping_sub(1));
         cpu.mem[sym::begrange] = cpu.reg.x;
@@ -110,7 +111,7 @@ pub fn getCData(cpu: &mut Cpu) {
     cpu.smc.smodSN_lo = cpu.reg.a;
     cpu.smc.smodCD_lo = cpu.reg.x;
     cpu.set_a(cpu.mem[sym::begrange]);
-    crate::ext::getblockej(cpu);
+    crate::ctrlsubs::GETBLOCKEJ(cpu);
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + (0x07) as u16 + (cpu.flags.c as u16);
     cpu.flags.c = (_r >> 8) != 0;
@@ -266,8 +267,8 @@ pub fn initCDbufs(cpu: &mut Cpu) {
 }
 
 pub fn getleftbar(cpu: &mut Cpu) {
-    crate::ext::rdblock(cpu);
-    crate::ext::cmpbarr(cpu);
+    crate::ctrlsubs::RDBLOCK(cpu);
+    crate::ctrlsubs::CMPBARR(cpu);
     if cpu.flags.z {
         cpu.set_a(0xff);
         return;
@@ -282,8 +283,8 @@ pub fn getleftbar(cpu: &mut Cpu) {
 }
 
 pub fn getrightbar(cpu: &mut Cpu) {
-    crate::ext::rdblock(cpu);
-    crate::ext::cmpbarr(cpu);
+    crate::ctrlsubs::RDBLOCK(cpu);
+    crate::ctrlsubs::CMPBARR(cpu);
     if cpu.flags.z {
         cpu.set_a(0x00);
         return;
@@ -301,6 +302,7 @@ pub fn getrightbar(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "collisions")]
 pub fn COLLISIONS(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::AMtimer]);
     if cpu.reg.a == 0x00 {
@@ -411,11 +413,12 @@ pub fn checkcoll1(cpu: &mut Cpu) {
     cpu.mem[sym::tempblocky] = cpu.reg.a;
     cpu.set_a(cpu.mem[(sym::SNthisframe + cpu.reg.x as usize) & 0xffff]);
     cpu.mem[sym::tempscrn] = cpu.reg.a;
-    crate::ext::rdblock1(cpu);
+    crate::ctrlsubs::RDBLOCK1(cpu);
     CHECKCOLL(cpu);
     return;
 }
 
+#[doc(alias = "checkcoll")]
 pub fn CHECKCOLL(cpu: &mut Cpu) {
     'b13: {
         if cpu.reg.a != 0x0a {
@@ -459,7 +462,7 @@ pub fn CHECKCOLL(cpu: &mut Cpu) {
                                     if (cpu.reg.a as i8) >= 0 {
                                         break 'b14;
                                     } else {
-                                        crate::ext::smashmirror(cpu);
+                                        crate::mover::SMASHMIRROR(cpu);
                                         cpu.set_a(0xff);
                                         cpu.mem[sym::createshad] = cpu.reg.a;
                                         cpu.flags.c = false;
@@ -476,7 +479,7 @@ pub fn CHECKCOLL(cpu: &mut Cpu) {
                 }
             }
             cpu.set_a(cpu.mem[sym::tempblockx]);
-            crate::ext::getblockej(cpu);
+            crate::ctrlsubs::GETBLOCKEJ(cpu);
             AdjustScrn(cpu);
             cpu.flags.c = false;
             let _r = (cpu.reg.a as u16) + (0x07) as u16 + (cpu.flags.c as u16);
@@ -535,7 +538,7 @@ pub fn collide(cpu: &mut Cpu) {
                 cpu.flags.c = (_r >> 8) != 0;
                 cpu.set_a(_r as u8);
                 cpu.mem[sym::CharX] = cpu.reg.a;
-                crate::ext::rdblock1(cpu);
+                crate::ctrlsubs::RDBLOCK1(cpu);
                 cpu.set_x(cpu.mem[sym::CollFace]);
                 if (cpu.reg.x as i8) >= 0 {
                     if cpu.reg.a != 0x0c {
@@ -579,13 +582,13 @@ pub fn collide(cpu: &mut Cpu) {
                     break 'b16;
                 }
             }
-            crate::ext::cmpspace(cpu);
+            crate::ctrlsubs::CMPSPACE(cpu);
             if !cpu.flags.z {
                 GroundBump(cpu);
                 return;
             }
             cpu.set_a(0xfc);
-            crate::ext::addcharx(cpu);
+            crate::ctrlsubs::ADDCHARX(cpu);
             cpu.mem[sym::CharX] = cpu.reg.a;
             cpu.set_a(cpu.mem[sym::CharAction]);
             if cpu.reg.a == 0x04 {
@@ -597,19 +600,19 @@ pub fn collide(cpu: &mut Cpu) {
             }
         }
         cpu.set_a(0x2d);
-        crate::ext::jumpseq(cpu);
-        crate::ext::animchar(cpu);
+        crate::ctrlsubs::JUMPSEQ(cpu);
+        ANIMCHAR(cpu);
     }
     cpu.mem[sym::alertguard] = 0x01;
     cpu.set_a(0x0d);
-    crate::ext::addsound(cpu);
+    crate::specialk::ADDSOUND(cpu);
     return;
 }
 
 pub fn AirBump(cpu: &mut Cpu) {
     'b3: {
         cpu.set_a(0xfc);
-        crate::ext::addcharx(cpu);
+        crate::ctrlsubs::ADDCHARX(cpu);
         cpu.mem[sym::CharX] = cpu.reg.a;
         cpu.set_a(cpu.mem[sym::CharAction]);
         if cpu.reg.a == 0x04 {
@@ -620,12 +623,12 @@ pub fn AirBump(cpu: &mut Cpu) {
             }
         }
         cpu.set_a(0x2d);
-        crate::ext::jumpseq(cpu);
-        crate::ext::animchar(cpu);
+        crate::ctrlsubs::JUMPSEQ(cpu);
+        ANIMCHAR(cpu);
     }
     cpu.mem[sym::alertguard] = 0x01;
     cpu.set_a(0x0d);
-    crate::ext::addsound(cpu);
+    crate::specialk::ADDSOUND(cpu);
     return;
 }
 
@@ -633,7 +636,7 @@ pub fn AirBump(cpu: &mut Cpu) {
 pub fn _3asmackwall(cpu: &mut Cpu) {
     cpu.mem[sym::alertguard] = 0x01;
     cpu.set_a(0x0d);
-    crate::ext::addsound(cpu);
+    crate::specialk::ADDSOUND(cpu);
     return;
 }
 
@@ -690,10 +693,10 @@ pub fn GroundBump(cpu: &mut Cpu) {
                     }
                 }
                 cpu.set_a(0x41);
-                crate::ext::jumpseq(cpu);
-                crate::ext::animchar(cpu);
+                crate::ctrlsubs::JUMPSEQ(cpu);
+                ANIMCHAR(cpu);
                 cpu.set_a(0x01);
-                crate::ext::addcharx(cpu);
+                crate::ctrlsubs::ADDCHARX(cpu);
                 cpu.mem[sym::CharX] = cpu.reg.a;
                 return;
             }
@@ -736,37 +739,38 @@ pub fn GroundBump(cpu: &mut Cpu) {
                             }
                         }
                         cpu.set_a(0x2f);
-                        crate::ext::jumpseq(cpu);
+                        crate::ctrlsubs::JUMPSEQ(cpu);
                         _3asmackwall(cpu);
-                        crate::ext::animchar(cpu);
+                        ANIMCHAR(cpu);
                         return;
                     }
                 }
             }
             cpu.set_a(0x2e);
         }
-        crate::ext::jumpseq(cpu);
-        crate::ext::animchar(cpu);
+        crate::ctrlsubs::JUMPSEQ(cpu);
+        ANIMCHAR(cpu);
         _3asmackwall(cpu);
         return;
     }
     cpu.set_a(0xfb);
-    crate::ext::addcharx(cpu);
+    crate::ctrlsubs::ADDCHARX(cpu);
     cpu.mem[sym::CharX] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "getfwddist")]
 pub fn GETFWDDIST(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
         match pc {
             0 => {
-                crate::ext::GetBaseBlock(cpu);
-                crate::ext::setupchar(cpu);
-                crate::ext::getedges(cpu);
-                crate::ext::getunderft(cpu);
+                crate::ctrlsubs::GETBASEBLOCK(cpu);
+                crate::ctrlsubs::SETUPCHAR(cpu);
+                crate::ctrlsubs::GETEDGES(cpu);
+                crate::ctrlsubs::GETUNDERFT(cpu);
                 cpu.mem[sym::tempobjid] = cpu.reg.a;
-                crate::ext::cmpbarr(cpu);
+                crate::ctrlsubs::CMPBARR(cpu);
                 if cpu.flags.z {
                     pc = 2;
                 } else {
@@ -785,7 +789,7 @@ pub fn GETFWDDIST(cpu: &mut Cpu) {
                 }
             }
             2 => {
-                crate::ext::getinfront(cpu);
+                crate::ctrlsubs::GETINFRONT(cpu);
                 cpu.mem[sym::tempobjid] = cpu.reg.a;
                 let _o: u8 = 0x0c;
                 cpu.flags.c = cpu.reg.a >= _o;
@@ -806,7 +810,7 @@ pub fn GETFWDDIST(cpu: &mut Cpu) {
                 }
             }
             4 => {
-                crate::ext::cmpbarr(cpu);
+                crate::ctrlsubs::CMPBARR(cpu);
                 if cpu.flags.z {
                     pc = 6;
                 } else {
@@ -825,7 +829,7 @@ pub fn GETFWDDIST(cpu: &mut Cpu) {
                 }
             }
             6 => {
-                crate::ext::getinfront(cpu);
+                crate::ctrlsubs::GETINFRONT(cpu);
                 cpu.mem[sym::tempobjid] = cpu.reg.a;
                 let _o: u8 = 0x0b;
                 cpu.flags.c = cpu.reg.a >= _o;
@@ -871,7 +875,7 @@ pub fn GETFWDDIST(cpu: &mut Cpu) {
                 }
             }
             10 => {
-                crate::ext::cmpspace(cpu);
+                crate::ctrlsubs::CMPSPACE(cpu);
                 if cpu.flags.z {
                     pc = 14;
                 } else {
@@ -888,7 +892,7 @@ pub fn GETFWDDIST(cpu: &mut Cpu) {
                 }
             }
             12 => {
-                crate::ext::getdist(cpu);
+                crate::ctrlsubs::GETDIST(cpu);
                 if cpu.flags.z {
                     pc = 11;
                 } else {
@@ -904,7 +908,7 @@ pub fn GETFWDDIST(cpu: &mut Cpu) {
                 }
             }
             14 => {
-                crate::ext::getdist(cpu);
+                crate::ctrlsubs::GETDIST(cpu);
                 cpu.set_x(0x00);  // edge
                 pc = 15;
             }
@@ -956,7 +960,7 @@ pub fn GETFWDDIST(cpu: &mut Cpu) {
             }
             21 => {
                 cpu.set_a(cpu.mem[sym::tempblockx]);
-                crate::ext::getblockej(cpu);
+                crate::ctrlsubs::GETBLOCKEJ(cpu);
                 cpu.flags.c = false;
                 let _r = (cpu.reg.a as u16) + (0x07) as u16 + (cpu.flags.c as u16);
                 cpu.flags.c = (_r >> 8) != 0;
@@ -971,7 +975,7 @@ pub fn GETFWDDIST(cpu: &mut Cpu) {
             }
             22 => {
                 cpu.set_a(cpu.mem[sym::tempobjid]);
-                crate::ext::cmpbarr(cpu);
+                crate::ctrlsubs::CMPBARR(cpu);
                 if cpu.flags.z {
                     pc = 24;
                 } else {
@@ -998,7 +1002,7 @@ pub fn GETFWDDIST(cpu: &mut Cpu) {
             }
             25 => {
                 cpu.set_a(cpu.mem[sym::tempobjid]);
-                crate::ext::cmpbarr(cpu);
+                crate::ctrlsubs::CMPBARR(cpu);
                 if cpu.flags.z {
                     pc = 24;
                 } else {
@@ -1046,7 +1050,7 @@ pub fn DBarr(cpu: &mut Cpu) {
             }
         }
         cpu.set_a(cpu.mem[sym::tempblockx]);
-        crate::ext::getblockej(cpu);
+        crate::ctrlsubs::GETBLOCKEJ(cpu);
         cpu.flags.c = false;
         let _r = (cpu.reg.a as u16) + (0x07) as u16 + (cpu.flags.c as u16);
         cpu.flags.c = (_r >> 8) != 0;
@@ -1055,7 +1059,7 @@ pub fn DBarr(cpu: &mut Cpu) {
         cpu.set_a(cpu.mem[sym::CharFace]);
         if (cpu.reg.a as i8) < 0 {
             cpu.set_a(cpu.mem[sym::tempobjid]);
-            crate::ext::cmpbarr(cpu);
+            crate::ctrlsubs::CMPBARR(cpu);
             if !cpu.flags.z {
                 cpu.set_y(cpu.reg.a);
                 cpu.set_a(cpu.mem[sym::blockedge]);
@@ -1077,7 +1081,7 @@ pub fn DBarr(cpu: &mut Cpu) {
             }
         } else {
             cpu.set_a(cpu.mem[sym::tempobjid]);
-            crate::ext::cmpbarr(cpu);
+            crate::ctrlsubs::CMPBARR(cpu);
             if !cpu.flags.z {
                 cpu.set_y(cpu.reg.a);
                 cpu.set_a(cpu.mem[sym::blockedge]);
@@ -1099,12 +1103,13 @@ pub fn DBarr(cpu: &mut Cpu) {
 }
 
 #[doc(alias = ":next")]
+#[doc(alias = "animchar")]
 pub fn ANIMCHAR(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
         match pc {
             0 => {
-                crate::ext::getseq(cpu);
+                crate::ctrlsubs::GETSEQ(cpu);
                 let _o: u8 = 0xfb;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -1116,8 +1121,8 @@ pub fn ANIMCHAR(cpu: &mut Cpu) {
                 }
             }
             1 => {
-                crate::ext::getseq(cpu);
-                crate::ext::addcharx(cpu);
+                crate::ctrlsubs::GETSEQ(cpu);
+                crate::ctrlsubs::ADDCHARX(cpu);
                 cpu.mem[sym::CharX] = cpu.reg.a;
                 ANIMCHAR(cpu);
                 return;
@@ -1134,7 +1139,7 @@ pub fn ANIMCHAR(cpu: &mut Cpu) {
                 }
             }
             3 => {
-                crate::ext::getseq(cpu);
+                crate::ctrlsubs::GETSEQ(cpu);
                 cpu.flags.c = false;
                 let _r = (cpu.reg.a as u16) + cpu.mem[sym::CharY] as u16 + (cpu.flags.c as u16);
                 cpu.flags.c = (_r >> 8) != 0;
@@ -1173,9 +1178,9 @@ pub fn ANIMCHAR(cpu: &mut Cpu) {
                 }
             }
             7 => {
-                crate::ext::getseq(cpu);
+                crate::ctrlsubs::GETSEQ(cpu);
                 cpu.stack.push(cpu.reg.a);
-                crate::ext::getseq(cpu);
+                crate::ctrlsubs::GETSEQ(cpu);
                 cpu.mem[sym::CharSeq + 1] = cpu.reg.a;
                 let _v = cpu.stack.pop().expect("pla on empty stack");
                 cpu.set_a(_v);
@@ -1198,7 +1203,7 @@ pub fn ANIMCHAR(cpu: &mut Cpu) {
                 let _v = cpu.mem[sym::CharBlockY].wrapping_sub(1);
                 cpu.mem[sym::CharBlockY] = _v;
                 cpu.set_nz(_v);
-                crate::ext::addslicers(cpu);
+                crate::subs::ADDSLICERS(cpu);
                 ANIMCHAR(cpu);
                 return;
             }
@@ -1217,7 +1222,7 @@ pub fn ANIMCHAR(cpu: &mut Cpu) {
                 let _v = cpu.mem[sym::CharBlockY].wrapping_add(1);
                 cpu.mem[sym::CharBlockY] = _v;
                 cpu.set_nz(_v);
-                crate::ext::addslicers(cpu);
+                crate::subs::ADDSLICERS(cpu);
                 ANIMCHAR(cpu);
                 return;
             }
@@ -1233,7 +1238,7 @@ pub fn ANIMCHAR(cpu: &mut Cpu) {
                 }
             }
             13 => {
-                crate::ext::getseq(cpu);
+                crate::ctrlsubs::GETSEQ(cpu);
                 cpu.mem[sym::CharAction] = cpu.reg.a;
                 ANIMCHAR(cpu);
                 return;
@@ -1250,9 +1255,9 @@ pub fn ANIMCHAR(cpu: &mut Cpu) {
                 }
             }
             15 => {
-                crate::ext::getseq(cpu);
+                crate::ctrlsubs::GETSEQ(cpu);
                 cpu.mem[sym::CharXVel] = cpu.reg.a;
-                crate::ext::getseq(cpu);
+                crate::ctrlsubs::GETSEQ(cpu);
                 cpu.mem[sym::CharYVel] = cpu.reg.a;
                 ANIMCHAR(cpu);
                 return;
@@ -1277,8 +1282,8 @@ pub fn ANIMCHAR(cpu: &mut Cpu) {
                 }
             }
             18 => {
-                crate::ext::getseq(cpu);
-                crate::ext::getseq(cpu);
+                crate::ctrlsubs::GETSEQ(cpu);
+                crate::ctrlsubs::GETSEQ(cpu);
                 ANIMCHAR(cpu);
                 return;
             }
@@ -1343,7 +1348,7 @@ pub fn ANIMCHAR(cpu: &mut Cpu) {
                 }
             }
             26 => {
-                crate::ext::getseq(cpu);
+                crate::ctrlsubs::GETSEQ(cpu);
                 let _o: u8 = 0x00;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -1370,7 +1375,7 @@ pub fn ANIMCHAR(cpu: &mut Cpu) {
                 pc = 29;
             }
             29 => {
-                crate::ext::addsound(cpu);
+                crate::specialk::ADDSOUND(cpu);
                 pc = 30;
             }
             30 => {
@@ -1430,7 +1435,7 @@ pub fn ANIMCHAR(cpu: &mut Cpu) {
                 }
             }
             37 => {
-                crate::ext::getseq(cpu);
+                crate::ctrlsubs::GETSEQ(cpu);
                 let _o: u8 = 0x01;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -1474,7 +1479,7 @@ pub fn GoneUpstairs(cpu: &mut Cpu) {
             cpu.set_a(0x09);
         }
         cpu.set_x(0x19);
-        crate::ext::cuesong(cpu);
+        crate::specialk::CUESONG(cpu);
     }
     let _v = cpu.mem[sym::NextLevel].wrapping_add(1);
     cpu.mem[sym::NextLevel] = _v;
@@ -1482,6 +1487,7 @@ pub fn GoneUpstairs(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "checkslice")]
 pub fn CHECKSLICE(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -1508,7 +1514,7 @@ pub fn CHECKSLICE(cpu: &mut Cpu) {
             2 => {
                 cpu.set_a(cpu.mem[(sym::SNthisframe + cpu.reg.x as usize) & 0xffff]);
                 cpu.mem[sym::tempscrn] = cpu.reg.a;
-                crate::ext::rdblock1(cpu);
+                crate::ctrlsubs::RDBLOCK1(cpu);
                 let _o: u8 = 0x12;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -1567,14 +1573,14 @@ pub fn CHECKSLICE(cpu: &mut Cpu) {
             }
             9 => {
                 cpu.set_a(cpu.mem[sym::tempblockx]);
-                crate::ext::getblockej(cpu);
+                crate::ctrlsubs::GETBLOCKEJ(cpu);
                 cpu.flags.c = false;
                 let _r = (cpu.reg.a as u16) + (0x07) as u16 + (cpu.flags.c as u16);
                 cpu.flags.c = (_r >> 8) != 0;
                 cpu.set_a(_r as u8);
                 cpu.mem[sym::CharX] = cpu.reg.a;
                 cpu.set_a(0x08);
-                crate::ext::addcharx(cpu);
+                crate::ctrlsubs::ADDCHARX(cpu);
                 cpu.mem[sym::CharX] = cpu.reg.a;
                 cpu.set_x(cpu.mem[sym::CharBlockY]);
                 cpu.set_x(cpu.reg.x.wrapping_add(1));
@@ -1583,10 +1589,10 @@ pub fn CHECKSLICE(cpu: &mut Cpu) {
                 cpu.set_a(0x64);
                 crate::ext::decstr(cpu);
                 cpu.set_a(0x05);
-                crate::ext::addsound(cpu);
+                crate::specialk::ADDSOUND(cpu);
                 cpu.set_a(0x36);
-                crate::ext::jumpseq(cpu);
-                crate::ext::animchar(cpu);
+                crate::ctrlsubs::JUMPSEQ(cpu);
+                ANIMCHAR(cpu);
                 return;
             }
             _ => unreachable!(),
@@ -1594,8 +1600,9 @@ pub fn CHECKSLICE(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "checkslice2")]
 pub fn CHECKSLICE2(cpu: &mut Cpu) {
-    crate::ext::getunderft(cpu);
+    crate::ctrlsubs::GETUNDERFT(cpu);
     _3aslice_3f(cpu);
     if cpu.flags.c {
         return;
@@ -1603,13 +1610,13 @@ pub fn CHECKSLICE2(cpu: &mut Cpu) {
     let _v = cpu.mem[sym::tempblockx].wrapping_add(1);
     cpu.mem[sym::tempblockx] = _v;
     cpu.set_nz(_v);
-    crate::ext::rdblock1(cpu);
+    crate::ctrlsubs::RDBLOCK1(cpu);
     if cpu.reg.a == 0x12 {
         cpu.set_a(cpu.mem[((cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
         cpu.set_a(cpu.reg.a & 0x7f);
         if cpu.reg.a == 0x02 {
             cpu.set_a(cpu.mem[sym::tempblockx]);
-            crate::ext::getblockej(cpu);
+            crate::ctrlsubs::GETBLOCKEJ(cpu);
             cpu.flags.c = false;
             let _r = (cpu.reg.a as u16) + (0x07) as u16 + (cpu.flags.c as u16);
             cpu.flags.c = (_r >> 8) != 0;
@@ -1630,7 +1637,7 @@ pub fn CHECKSLICE2(cpu: &mut Cpu) {
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a >= cpu.mem[sym::CDLeftEj] {
                     if !cpu.flags.z {
-                        crate::ext::rdblock1(cpu);
+                        crate::ctrlsubs::RDBLOCK1(cpu);
                         _3aslice(cpu);
                         return;
                     }
@@ -1641,6 +1648,7 @@ pub fn CHECKSLICE2(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "checkgate")]
 pub fn CHECKGATE(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::CharAction]);
     if cpu.reg.a != 0x07 {
@@ -1654,12 +1662,12 @@ pub fn CHECKGATE(cpu: &mut Cpu) {
             }
         }
     }
-    crate::ext::getunderft(cpu);
+    crate::ctrlsubs::GETUNDERFT(cpu);
     if cpu.reg.a != 0x04 {
         let _v = cpu.mem[sym::tempblockx].wrapping_sub(1);
         cpu.mem[sym::tempblockx] = _v;
         cpu.set_nz(_v);
-        crate::ext::rdblock1(cpu);
+        crate::ctrlsubs::RDBLOCK1(cpu);
         if cpu.reg.a != 0x04 {
             return;
         }
@@ -1679,7 +1687,7 @@ pub fn CHECKGATE(cpu: &mut Cpu) {
             _3asmackwall(cpu);
             cpu.set_a(cpu.mem[sym::tempblockx]);
             cpu.mem[sym::collX] = cpu.reg.a;
-            crate::ext::getunderft(cpu);
+            crate::ctrlsubs::GETUNDERFT(cpu);
             cpu.set_a(cpu.mem[sym::tempblockx]);
             let _o: u8 = cpu.mem[sym::collX];
             cpu.flags.c = cpu.reg.a >= _o;
@@ -1722,6 +1730,7 @@ pub fn gatebarr_3f(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "enemycoll")]
 pub fn ENEMYCOLL(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::AMtimer]);
     if cpu.reg.a != 0x00 {
@@ -1748,7 +1757,7 @@ pub fn ENEMYCOLL(cpu: &mut Cpu) {
         return;
     }
     'b13: {
-        crate::ext::getunderft(cpu);
+        crate::ctrlsubs::GETUNDERFT(cpu);
         let _o: u8 = 0x14;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -1776,7 +1785,7 @@ pub fn ENEMYCOLL(cpu: &mut Cpu) {
                 let _v = cpu.mem[sym::tempblockx].wrapping_sub(1);
                 cpu.mem[sym::tempblockx] = _v;
                 cpu.set_nz(_v);
-                crate::ext::rdblock1(cpu);
+                crate::ctrlsubs::RDBLOCK1(cpu);
                 let _o: u8 = 0x07;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -1797,14 +1806,14 @@ pub fn ENEMYCOLL(cpu: &mut Cpu) {
             }
         }
     }
-    crate::ext::setupchar(cpu);
-    crate::ext::getedges(cpu);
+    crate::ctrlsubs::SETUPCHAR(cpu);
+    crate::ctrlsubs::GETEDGES(cpu);
     cpu.set_a(cpu.mem[sym::tempscrn]);
     cpu.set_x(cpu.mem[sym::tempblockx]);
     cpu.set_y(cpu.mem[sym::tempblocky]);
-    crate::ext::rdblock(cpu);
+    crate::ctrlsubs::RDBLOCK(cpu);
     cpu.mem[sym::tempobjid] = cpu.reg.a;
-    crate::ext::checkcoll(cpu);
+    CHECKCOLL(cpu);
     if !cpu.flags.c {
         return;
     }
@@ -1818,12 +1827,12 @@ pub fn ENEMYCOLL(cpu: &mut Cpu) {
     let _r = (cpu.reg.a as u16) + (0x01) as u16 + (cpu.flags.c as u16);
     cpu.flags.c = (_r >> 8) != 0;
     cpu.set_a(_r as u8);
-    crate::ext::addcharx(cpu);
+    crate::ctrlsubs::ADDCHARX(cpu);
     cpu.mem[sym::CharX] = cpu.reg.a;
     cpu.set_a(0x41);
-    crate::ext::jumpseq(cpu);
-    crate::ext::animchar(cpu);
-    crate::ext::rereadblocks(cpu);
+    crate::ctrlsubs::JUMPSEQ(cpu);
+    ANIMCHAR(cpu);
+    crate::ctrl::REREADBLOCKS(cpu);
     return;
 }
 
@@ -1831,7 +1840,7 @@ pub fn DBarr2(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::CharFace]);
     if (cpu.reg.a as i8) >= 0 {
         cpu.set_a(cpu.mem[sym::tempobjid]);
-        crate::ext::cmpbarr(cpu);
+        crate::ctrlsubs::CMPBARR(cpu);
         if !cpu.flags.z {
             cpu.set_y(cpu.reg.a);
             cpu.set_a(cpu.mem[sym::blockedge]);
@@ -1853,7 +1862,7 @@ pub fn DBarr2(cpu: &mut Cpu) {
         }
     } else {
         cpu.set_a(cpu.mem[sym::tempobjid]);
-        crate::ext::cmpbarr(cpu);
+        crate::ctrlsubs::CMPBARR(cpu);
         if !cpu.flags.z {
             cpu.set_y(cpu.reg.a);
             cpu.set_a(cpu.mem[sym::blockedge]);
@@ -1879,7 +1888,7 @@ pub fn _3aslice_3f(cpu: &mut Cpu) {
         cpu.set_a(cpu.reg.a & 0x7f);
         if cpu.reg.a == 0x02 {
             cpu.set_a(cpu.mem[sym::tempblockx]);
-            crate::ext::getblockej(cpu);
+            crate::ctrlsubs::GETBLOCKEJ(cpu);
             cpu.flags.c = false;
             let _r = (cpu.reg.a as u16) + (0x07) as u16 + (cpu.flags.c as u16);
             cpu.flags.c = (_r >> 8) != 0;
@@ -1900,7 +1909,7 @@ pub fn _3aslice_3f(cpu: &mut Cpu) {
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a >= cpu.mem[sym::CDLeftEj] {
                     if !cpu.flags.z {
-                        crate::ext::rdblock1(cpu);
+                        crate::ctrlsubs::RDBLOCK1(cpu);
                         _3aslice(cpu);
                         cpu.flags.c = true;
                         return;
@@ -1923,14 +1932,14 @@ pub fn _3aslice(cpu: &mut Cpu) {
         return;
     }
     cpu.set_a(cpu.mem[sym::tempblockx]);
-    crate::ext::getblockej(cpu);
+    crate::ctrlsubs::GETBLOCKEJ(cpu);
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + (0x07) as u16 + (cpu.flags.c as u16);
     cpu.flags.c = (_r >> 8) != 0;
     cpu.set_a(_r as u8);
     cpu.mem[sym::CharX] = cpu.reg.a;
     cpu.set_a(0x08);
-    crate::ext::addcharx(cpu);
+    crate::ctrlsubs::ADDCHARX(cpu);
     cpu.mem[sym::CharX] = cpu.reg.a;
     cpu.set_x(cpu.mem[sym::CharBlockY]);
     cpu.set_x(cpu.reg.x.wrapping_add(1));
@@ -1938,9 +1947,9 @@ pub fn _3aslice(cpu: &mut Cpu) {
     cpu.set_a(0x64);
     crate::ext::decstr(cpu);
     cpu.set_a(0x05);
-    crate::ext::addsound(cpu);
+    crate::specialk::ADDSOUND(cpu);
     cpu.set_a(0x36);
-    crate::ext::jumpseq(cpu);
-    crate::ext::animchar(cpu);
+    crate::ctrlsubs::JUMPSEQ(cpu);
+    ANIMCHAR(cpu);
     return;
 }

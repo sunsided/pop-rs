@@ -5,6 +5,7 @@
 use crate::cpu::Cpu;
 use crate::sym;
 
+#[doc(alias = "SngExpand")]
 pub fn SNGEXPAND(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -308,6 +309,7 @@ pub fn SNGEXPAND(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "DblExpand")]
 pub fn DBLEXPAND(cpu: &mut Cpu) {
     cpu.mem[sym::CrnDatPtr + 1] = cpu.reg.a;
     cpu.mem[sym::CrnDatPtr] = 0x01;
@@ -613,10 +615,12 @@ pub fn NoAuxSet(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "purple")]
 pub fn PURPLE(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "DeltaExpPop")]
 pub fn DELTAEXPPOP(cpu: &mut Cpu) {
     cpu.mem[sym::PAGE2on] = cpu.reg.a;
     DeltaExp(cpu);
@@ -626,6 +630,7 @@ pub fn DELTAEXPPOP(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "DeltaExpWipe")]
 pub fn DELTAEXPWIPE(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -640,6 +645,7 @@ pub fn DELTAEXPWIPE(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "_inverty")]
 pub fn INVERTY(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -698,7 +704,7 @@ pub fn INVERTY(cpu: &mut Cpu) {
             }
             5 => {
                 cpu.mem[sym::msg2] = cpu.reg.a;
-                crate::ext::blackout(cpu);
+                BLACKOUT(cpu);
                 cpu.mem[sym::RAMWRTmain] = cpu.reg.a;
                 cpu.set_x(0x00);
                 pc = 6;
@@ -726,7 +732,7 @@ pub fn INVERTY(cpu: &mut Cpu) {
             }
             8 => {
                 cpu.mem[sym::RAMWRTaux] = cpu.reg.a;
-                crate::ext::whoop(cpu);
+                crate::grafix::WHOOP(cpu);
                 pc = 9;
             }
             9 => {
@@ -741,7 +747,7 @@ pub fn INVERTY(cpu: &mut Cpu) {
             }
             10 => {
                 cpu.mem[0xc010] = cpu.reg.a;
-                crate::ext::clr(cpu);
+                CLR(cpu);
                 return;
             }
             _ => unreachable!(),
@@ -749,6 +755,7 @@ pub fn INVERTY(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "prompt")]
 pub fn PROMPT(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -772,7 +779,7 @@ pub fn PROMPT(cpu: &mut Cpu) {
             }
             2 => {
                 cpu.mem[sym::msg2] = cpu.reg.a;
-                crate::ext::blackout(cpu);
+                BLACKOUT(cpu);
                 cpu.mem[sym::RAMWRTmain] = cpu.reg.a;
                 cpu.set_x(0x00);
                 pc = 3;
@@ -800,7 +807,7 @@ pub fn PROMPT(cpu: &mut Cpu) {
             }
             5 => {
                 cpu.mem[sym::RAMWRTaux] = cpu.reg.a;
-                crate::ext::whoop(cpu);
+                crate::grafix::WHOOP(cpu);
                 pc = 6;
             }
             6 => {
@@ -815,7 +822,7 @@ pub fn PROMPT(cpu: &mut Cpu) {
             }
             7 => {
                 cpu.mem[0xc010] = cpu.reg.a;
-                crate::ext::clr(cpu);
+                CLR(cpu);
                 return;
             }
             _ => unreachable!(),
@@ -823,6 +830,7 @@ pub fn PROMPT(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "clr")]
 pub fn CLR(cpu: &mut Cpu) {
     let _o: u8 = cpu.mem[sym::RWBANK2];
     cpu.flags.z = (cpu.reg.a & _o) == 0;
@@ -832,33 +840,36 @@ pub fn CLR(cpu: &mut Cpu) {
     cpu.flags.n = (_o >> 7) != 0;
     cpu.mem[0xc010] = cpu.reg.a;
     cpu.set_a(0x20);
-    crate::ext::_lrcls(cpu);
+    crate::hires::lrcls(cpu);
     return;
 }
 
+#[doc(alias = "blackout")]
 pub fn BLACKOUT(cpu: &mut Cpu) {
     CLR(cpu);
     cpu.mem[sym::RAMRDaux] = cpu.reg.a;
-    crate::ext::vblank(cpu);
+    crate::grafix::VBLANK(cpu);
     cpu.mem[sym::TEXTon] = cpu.reg.a;
     cpu.mem[sym::ADCOLoff] = cpu.reg.a;
     cpu.mem[sym::PAGE2off] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "text")]
 pub fn TEXT(cpu: &mut Cpu) {
     cpu.mem[sym::RAMRDaux] = cpu.reg.a;
-    crate::ext::vblank(cpu);
+    crate::grafix::VBLANK(cpu);
     cpu.mem[sym::TEXTon] = cpu.reg.a;
     cpu.mem[sym::ADCOLoff] = cpu.reg.a;
     cpu.mem[sym::PAGE2off] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "setdhires")]
 pub fn SETDHIRES(cpu: &mut Cpu) {
     cpu.mem[sym::RAMRDaux] = cpu.reg.a;
     cpu.mem[sym::RAMWRTaux] = cpu.reg.a;
-    crate::ext::vblank(cpu);
+    crate::grafix::VBLANK(cpu);
     cpu.mem[sym::ADCOLon] = cpu.reg.a;
     let _o: u8 = cpu.mem[sym::HIRESon];
     cpu.flags.z = (cpu.reg.a & _o) == 0;
@@ -882,6 +893,7 @@ pub fn SETDHIRES(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "fadein")]
 pub fn FADEIN(cpu: &mut Cpu) {
     cpu.mem[sym::RAMRDmain] = cpu.reg.a;
     cpu.local.insert((":sm1", 2), cpu.reg.a);
@@ -923,6 +935,7 @@ pub fn FADEIN(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "loadsuper")]
 pub fn LOADSUPER(cpu: &mut Cpu) {
     crate::ext::rw18(cpu);
     cpu.mem[sym::track] = 0x00;
