@@ -1,10 +1,9 @@
 # Plan: segment jump-table call-target resolution (`slot_aliases`)
 
-Status as of this writing: **implemented and mostly green; blocked on one
-scope decision** (interpreter vs. crate call-resolution parity). This file
-captures everything needed to continue offline.
+Status: **COMPLETE** — differential sweep green, all tests pass (see
+"RESOLVED" below). This file captures the design and the three fixes.
 
-Branch: `claude/blissful-newton-2DB3a` (do not push elsewhere). No PR yet.
+Branch: `claude/blissful-newton-2DB3a`. PR: #68.
 
 ---
 
@@ -89,96 +88,68 @@ python3 -m pytest tests/test_differential.py -q     # needs cargo on PATH
 
 ---
 
-## THE OPEN DECISION (blocker)
+## RESOLVED — sweep is green
 
-The differential sweep (`test_differential.py::test_seeded_sweep_no_divergence`)
-now runs **1176 comparisons** (more routines are reachable) and reports **4
-state divergences** in 2 newly-reachable routines: `coll/getCData` and
-`gamebg/TIMELEFTMSG`.
+`test_differential.py::test_seeded_sweep_no_divergence` passes (0
+divergences over ~1240 comparisons); full suite: 616 unit + 93
+differential tests green. The widened reachability from the slot aliases
+exposed three pre-existing interpreter↔crate gaps, fixed in order:
 
-Traced precisely: **registers match**; only ~20 RAM bytes differ, all in
-**sound buffers** (`vibes`/`SongCue`/`musicon` @ `$0316–$031f`, `$0360–$0369`).
+1. **Caller-sensitive call resolution** (commit *resolve calls
+   caller-sensitively*). The IR3 interpreter resolved calls
+   caller-*insensitively* (flat first-module-wins) while the crate
+   resolves per-caller-module (intra preferred, unique cross-module, else
+   external stub). Once aliases widened reachability, routines hitting a
+   reused name (`addsound`, `tone`, …) ran a different callee in each.
+   Fix: thread the caller's home module through the walker (`_Ctx` +
+   `trace.home_module`) and resolve with the crate's exact policy
+   (`_resolve_call_ctx`); external/ambiguous → `InterpError` (skip,
+   mirroring the crate's no-op stub). Fixed `gamebg/TIMELEFTMSG`.
 
-Root cause is **pre-existing**, not a bug in the slot work:
-- The IR3 interpreter resolves calls **caller-insensitively** — flat name
-  lookup over a module-ordered list (`interp_ir1._resolve` + the global
-  `_alias_index`). So `addsound`→SOUND, `tone`→GRAFIX.
-- The emitted crate resolves **per-caller-module** (`pass4_crate.resolve_call`:
-  intra-module preferred, unique cross-module, else `ext`). So
-  `addsound`→SPECIALK, `tone`→SOUND.
-- There are **111** such latent mismatches program-wide
-  (`addsound`×32, `tone`×14, `DoEngarde`×6, `PlaySongI`×6, …). They were
-  simply never both-reached in a completing run until the aliases widened
-  reachability.
+2. **SMC operand patch in indexed addressing** (commit *honor SMC operand
+   patch for indexed addressing*). `_indexed_addr` resolved its base via
+   `_real_addr`, ignoring an `opvar` address patch — so an SMC store
+   folded into an IR3 `Assign` (`IndexedAbs` base with `opvar`) used the
+   unpatched address while the unfolded `StoreIndexed` path (`_abs_base`)
+   used the patched one. `coll/getCData` patches its `CDthisframe,x` /
+   `SNthisframe,x` store low-bytes from X / A; the folded `SNthisframe`
+   store landed wrong. Fix: `_indexed_addr` resolves through `_abs_base`
+   (non-SMC operands fall back to `_real_addr` unchanged).
 
-So the slot resolution is correct; it tripped over an existing
-interpreter↔crate resolution gap.
+3. **Loop-back tail call mis-resolved** (commit *resolve a loop-back tail
+   call to the current routine*). The relooper exposes a routine's loop
+   label (e.g. `:loop`) as an entry alias so its self-looping
+   `tail_call :loop` has a target. That label isn't unique (both
+   `pauseNI` and `tpause` carry `:loop`), so the global name table sent
+   `pauseNI`'s loop into `tpause` (last-wins). The crate resolves it
+   lexically as a self-loop. Fix: `_resolve_tail` resolves a tail call
+   whose target is the current routine's own name/entry-alias to the
+   current routine, before the global table. Fixed `master/pauseNI`.
 
-### Options (pick one to proceed)
+### Done
+- All slot-alias work committed (`slot_aliases.py`, `cli.py` wiring,
+  tests, regenerated `ir/crate`).
+- Interpreter: depth bound, caller-sensitive resolution, SMC indexed-addr
+  fix, loop-back tail-call fix — all committed.
+- `pytest -q` (616) + `pytest tests/test_differential.py -q` (93) green.
+- PR #68 open; branch `claude/blissful-newton-2DB3a`.
 
-1. **Fix interpreter resolution to match the crate (RECOMMENDED).**
-   Make the IR3 interpreter resolve each call relative to the *current
-   routine's module* using `resolve_call` semantics (intra preferred,
-   unique cross-module, else treat as external → `InterpError`/skip, the
-   same as today's unresolved behavior). Eliminates all 111 latent
-   mismatches and makes the differential harness sound.
-   - Why it's safe: currently-passing routines already agree with the
-     crate, so switching the interpreter to the crate's policy can't
-     regress them; it only fixes the divergent ones.
-   - Sketch: in `run`, build `name_map = build_name_map(modules)` plus a
-     `(module, entry-name) → routine` index and a `routine → home module`
-     map. Thread the home module through execution (simplest: carry it on
-     `Trace` and save/restore around each routine invocation, since `Trace`
-     is already threaded everywhere). New `_resolve_call_ctx(name_map,
-     index, home_module, target)` returns `(routine, owner_module)` or
-     `None` (ambiguous/external → caller raises `InterpError`). `CallStmt`
-     and `TailCallStmt` use it and recurse with `home_module = owner`.
-     `run` seeds `home_module` = entry routine's module. Keep external/
-     ambiguous as skip (do **not** switch to no-op — that would widen the
-     comparison set and risk surfacing unrelated pre-existing bugs).
-   - Verify: differential sweep → 0 divergences; full suite green; crate
-     regen unchanged (this is interpreter-only).
+### Notes for future work
+- `:loop` (and similar generic local labels) leaking into `entry_aliases`
+  is a latent smell — the interp fix handles the self-loop case, but a
+  cross-routine tail call to a genuinely colliding alias would still hit
+  the last-wins ambiguity in `routine_by_module`. Consider not promoting
+  bare local loop labels to global entry aliases in the relooper.
+- `master/pauseNI`'s ~256K-iteration delay loop runs near the sweep's
+  `_INTERP_TIMEOUT_S = 0.5s`; it now matches the crate when it completes,
+  and a timeout is a skip (not a divergence), so the sweep is stable
+  either way.
 
-2. **Skip ambiguous-call routines (smaller unblock).** When a routine
-   reaches a call that's ambiguous from its module, raise `InterpError` so
-   the sweep skips it (like today's unresolved behavior) rather than
-   comparing with wrong resolution. Same plumbing cost as option 1 (still
-   needs current-module + name_map) but strictly less capable — it skips
-   `getCData` instead of correctly resolving it. Only worth it if option 1
-   feels too risky.
-
-3. **Crate-only aliases.** Feed slot aliases to the crate but not the
-   interpreter (separate path), so sweep reachability is unchanged. Loses
-   interpreter validation of the newly-resolved calls and undercuts the
-   "single insertion point" design. Not recommended.
-
-**Recommendation: option 1.** It's the principled fix, aligns with the
-differential harness's evident design intent (interp and crate should
-agree), and is strictly an improvement.
-
----
-
-## Remaining steps once the decision is made
-
-1. Implement the chosen option (option 1: interpreter caller-sensitive
-   resolution).
-2. `pytest tests/test_differential.py -q` → expect 0 divergences.
-3. Full suite: `cd tooling/pop_lifter && python3 -m pytest -q`.
-4. Re-confirm `ir/crate` regen + `-D warnings` compile (interpreter change
-   shouldn't touch the crate, but re-run `test_crate_scaffold.py`).
-5. Commit: the slot-alias feature (`slot_aliases.py`, `cli.py` wiring,
-   tests), the interpreter depth bound, the interpreter resolution fix, and
-   the regenerated `ir/crate`. Suggested split: (a) slot-alias resolution +
-   crate regen, (b) interpreter depth bound, (c) interpreter resolution
-   parity. Then push `-u origin claude/blissful-newton-2DB3a`. **No PR
-   unless explicitly asked.**
-
-## Quick orientation for whoever picks this up
+## Quick orientation
 - `pass4_crate.resolve_call` / `build_name_map` — the crate's resolution
-  policy (the target behavior).
-- `pass4_emit_rust._make_call_render` (line ~1470) — how the crate emits
-  intra (`fn(cpu)`) vs cross-module (`crate::owner::fn(cpu)`) vs
-  `crate::ext::stub(cpu)`.
-- `interp_ir1._resolve` (line ~323) — the interpreter's current flat
-  resolver (what option 1 replaces for call sites).
-- `slot_aliases.apply_slot_aliases` — the new binding logic.
+  policy (the behavior the interpreter now mirrors).
+- `interp_ir3._Ctx` / `_resolve_call_ctx` / `_resolve_tail` — the
+  interpreter's caller-sensitive resolver.
+- `interp_ir1._abs_base` / `_indexed_addr` — SMC-patch-aware base
+  resolution.
+- `slot_aliases.apply_slot_aliases` — the slot-alias binding logic.
