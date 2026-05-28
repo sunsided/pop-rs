@@ -487,7 +487,7 @@ ANIMTRANS:
   *(trdirec@0xb640 + x) = a   ; MOVER.S:651
   x -= 1                         ; MOVER.S:653
   if ne goto :loop       ; MOVER.S:654
-  ??? lda ]cleanflag            ; MOVER.S:656
+  a = *]cleanflag            ; MOVER.S:656
   if eq goto ]rts       ; MOVER.S:657
   x = #0x01                  ; MOVER.S:663
   y = #0x00                  ; MOVER.S:664
@@ -529,7 +529,7 @@ fn ANIMTRANS {
   *(trdirec@0xb640 + x) = a   ; MOVER.S:651
   x -= 1                         ; MOVER.S:653
   if ne goto :loop       ; MOVER.S:654
-  ??? lda ]cleanflag            ; MOVER.S:656
+  a = *]cleanflag            ; MOVER.S:656
   if eq goto ]rts       ; MOVER.S:657
   x = #0x01                  ; MOVER.S:663
   y = #0x00                  ; MOVER.S:664
@@ -657,7 +657,7 @@ fn animexit {
   call mirappear                  ; MOVER.S:805
   goto :cont                ; MOVER.S:806
 :downfast:
-  ??? cpx #maxgatevel            ; MOVER.S:811
+  cmp x, #maxgatevel              ; MOVER.S:811
   if cs goto :2       ; MOVER.S:812
   x += 1                         ; MOVER.S:813
   *trdirec@0xb640 = x            ; MOVER.S:814
@@ -722,7 +722,7 @@ fn animgate {
 ]rts:
   return                           ; MOVER.S:896
 :downfast:
-  ??? cpx #maxgatevel            ; MOVER.S:901
+  cmp x, #maxgatevel              ; MOVER.S:901
   if cs goto :2       ; MOVER.S:902
   x += 1                         ; MOVER.S:904
   *trdirec@0xb640 = x            ; MOVER.S:905

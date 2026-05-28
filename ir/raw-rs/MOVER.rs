@@ -36,6 +36,9 @@ pub struct Cpu {
     pub mem: Box<[u8; 0x10000]>,
     pub stack: Vec<u8>,
     pub smc: Smc,
+    // Local-label / Merlin-variable byte store, keyed by symbolic
+    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.
+    pub local: std::collections::HashMap<(&'static str, u8), u8>,
 }
 
 impl Cpu {
@@ -46,8 +49,25 @@ impl Cpu {
             mem: Box::new([0u8; 0x10000]),
             stack: Vec::new(),
             smc: Smc::default(),
+            local: std::collections::HashMap::new(),
         }
     }
+
+    // Register loads/transfers/arith set Z (result == 0) and N
+    // (bit 7) on the 6502; these helpers keep that in one place so
+    // every reg write stays flag-faithful. `set_nz` is for ops that
+    // write memory but still set Z/N (inc/dec/shift on memory).
+    #[inline]
+    pub fn set_nz(&mut self, v: u8) {
+        self.flags.z = v == 0;
+        self.flags.n = (v >> 7) != 0;
+    }
+    #[inline]
+    pub fn set_a(&mut self, v: u8) { self.reg.a = v; self.set_nz(v); }
+    #[inline]
+    pub fn set_x(&mut self, v: u8) { self.reg.x = v; self.set_nz(v); }
+    #[inline]
+    pub fn set_y(&mut self, v: u8) { self.reg.y = v; self.set_nz(v); }
 }
 
 #[allow(non_upper_case_globals)]
@@ -117,7 +137,7 @@ impl Cpu {
         loop {
             match pc {
                 0 => {
-                    self.reg.x = self.mem[sym::numtrans];
+                    self.set_x(self.mem[sym::numtrans]);
                     if self.reg.x == 0x00 {
                         pc = 4;
                     } else {
@@ -125,7 +145,7 @@ impl Cpu {
                     }
                 }
                 1 => {
-                    self.reg.a = self.mem[sym::trloc + self.reg.x as usize];
+                    self.set_a(self.mem[(sym::trloc + self.reg.x as usize) & 0xffff]);
                     let _o: u8 = self.mem[sym::trloc];
                     self.flags.c = self.reg.a >= _o;
                     self.flags.z = self.reg.a == _o;
@@ -137,7 +157,7 @@ impl Cpu {
                     }
                 }
                 2 => {
-                    self.reg.a = self.mem[sym::trscrn + self.reg.x as usize];
+                    self.set_a(self.mem[(sym::trscrn + self.reg.x as usize) & 0xffff]);
                     let _o: u8 = self.mem[sym::trscrn];
                     self.flags.c = self.reg.a >= _o;
                     self.flags.z = self.reg.a == _o;
@@ -149,7 +169,7 @@ impl Cpu {
                     }
                 }
                 3 => {
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    self.set_x(self.reg.x.wrapping_sub(1));
                     if self.reg.x != 0x00 {
                         pc = 1;
                     } else {
@@ -167,68 +187,68 @@ impl Cpu {
     fn addtrob(&mut self) {
         self.searchtrob();
         if self.reg.x != 0x00 {
-            self.reg.a = self.mem[sym::trdirec];
-            self.mem[sym::trdirec + self.reg.x as usize] = self.reg.a;
+            self.set_a(self.mem[sym::trdirec]);
+            self.mem[(sym::trdirec + self.reg.x as usize) & 0xffff] = self.reg.a;
             return;
         }
-        self.reg.x = self.mem[sym::numtrans];
+        self.set_x(self.mem[sym::numtrans]);
         if self.reg.x == 0x1f {
             return;
         }
-        self.reg.x = self.reg.x.wrapping_add(1);
+        self.set_x(self.reg.x.wrapping_add(1));
         self.mem[sym::numtrans] = self.reg.x;
-        self.mem[sym::trdirec + self.reg.x as usize] = self.mem[sym::trdirec];
-        self.mem[sym::trloc + self.reg.x as usize] = self.mem[sym::trloc];
-        self.reg.a = self.mem[sym::trscrn];
-        self.mem[sym::trscrn + self.reg.x as usize] = self.reg.a;
+        self.mem[(sym::trdirec + self.reg.x as usize) & 0xffff] = self.mem[sym::trdirec];
+        self.mem[(sym::trloc + self.reg.x as usize) & 0xffff] = self.mem[sym::trloc];
+        self.set_a(self.mem[sym::trscrn]);
+        self.mem[(sym::trscrn + self.reg.x as usize) & 0xffff] = self.reg.a;
         return;
     }
 
     fn addamob(&mut self) {
-        self.reg.x = self.mem[sym::nummob];
+        self.set_x(self.mem[sym::nummob]);
         if self.reg.x == 0x0f {
             return;
         }
-        self.reg.x = self.reg.x.wrapping_add(1);
+        self.set_x(self.reg.x.wrapping_add(1));
         self.mem[sym::nummob] = self.reg.x;
         self.savemob();
         return;
     }
 
     fn savemob(&mut self) {
-        self.mem[sym::mobx + self.reg.x as usize] = self.mem[sym::mobx];
-        self.mem[sym::moby + self.reg.x as usize] = self.mem[sym::moby];
-        self.mem[sym::mobscrn + self.reg.x as usize] = self.mem[sym::mobscrn];
-        self.mem[sym::mobvel + self.reg.x as usize] = self.mem[sym::mobvel];
-        self.mem[sym::mobtype + self.reg.x as usize] = self.mem[sym::mobtype];
-        self.reg.a = self.mem[sym::moblevel];
-        self.mem[sym::moblevel + self.reg.x as usize] = self.reg.a;
+        self.mem[(sym::mobx + self.reg.x as usize) & 0xffff] = self.mem[sym::mobx];
+        self.mem[(sym::moby + self.reg.x as usize) & 0xffff] = self.mem[sym::moby];
+        self.mem[(sym::mobscrn + self.reg.x as usize) & 0xffff] = self.mem[sym::mobscrn];
+        self.mem[(sym::mobvel + self.reg.x as usize) & 0xffff] = self.mem[sym::mobvel];
+        self.mem[(sym::mobtype + self.reg.x as usize) & 0xffff] = self.mem[sym::mobtype];
+        self.set_a(self.mem[sym::moblevel]);
+        self.mem[(sym::moblevel + self.reg.x as usize) & 0xffff] = self.reg.a;
         return;
     }
 
     fn loadmob(&mut self) {
-        self.mem[sym::mobx] = self.mem[sym::mobx + self.reg.x as usize];
-        self.mem[sym::moby] = self.mem[sym::moby + self.reg.x as usize];
-        self.mem[sym::mobscrn] = self.mem[sym::mobscrn + self.reg.x as usize];
-        self.mem[sym::mobvel] = self.mem[sym::mobvel + self.reg.x as usize];
-        self.mem[sym::mobtype] = self.mem[sym::mobtype + self.reg.x as usize];
-        self.reg.a = self.mem[sym::moblevel + self.reg.x as usize];
+        self.mem[sym::mobx] = self.mem[(sym::mobx + self.reg.x as usize) & 0xffff];
+        self.mem[sym::moby] = self.mem[(sym::moby + self.reg.x as usize) & 0xffff];
+        self.mem[sym::mobscrn] = self.mem[(sym::mobscrn + self.reg.x as usize) & 0xffff];
+        self.mem[sym::mobvel] = self.mem[(sym::mobvel + self.reg.x as usize) & 0xffff];
+        self.mem[sym::mobtype] = self.mem[(sym::mobtype + self.reg.x as usize) & 0xffff];
+        self.set_a(self.mem[(sym::moblevel + self.reg.x as usize) & 0xffff]);
         self.mem[sym::moblevel] = self.reg.a;
         return;
     }
 
     fn TRIGSLICER(&mut self) {
         self.mem[sym::state] = self.reg.a;
-        self.reg.a = self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize];
+        self.set_a(self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
         if self.reg.a != 0x00 {
             if self.reg.a < 0x06 {
                 return;
             }
         }
         self.mem[sym::trloc] = self.reg.y;
-        self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.mem[sym::state];
+        self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.mem[sym::state];
         self.mem[sym::trscrn] = self.mem[sym::VisScrn];
-        self.reg.a = 0x01;
+        self.set_a(0x01);
         self.mem[sym::trdirec] = self.reg.a;
         self.addtrob();
         return;
@@ -237,28 +257,28 @@ impl Cpu {
     fn CLOSEEXIT(&mut self) {
         self.mem[sym::trloc] = self.reg.y;
         self.mem[sym::trscrn] = self.reg.a;
-        self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = 0xac;
-        self.reg.a = 0x03;
+        self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = 0xac;
+        self.set_a(0x03);  // coming down fast
         self.mem[sym::trdirec] = self.reg.a;
         self.addtrob();
         return;
     }
 
     fn SMASHMIRROR(&mut self) {
-        self.reg.a = 0x56;
-        self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
+        self.set_a(0x56);
+        self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.reg.a;
         return;
     }
 
     fn TRIGFLASK(&mut self) {
         self.mem[sym::trloc] = self.reg.y;
         self.mem[sym::trscrn] = self.reg.a;
-        self.reg.a = 0x01;
+        self.set_a(0x01);
         self.mem[sym::trdirec] = self.reg.a;
         self.rnd();
-        self.reg.a &= 0x07;
-        self.reg.a |= self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize];
-        self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
+        self.set_a(self.reg.a & 0x07);
+        self.set_a(self.reg.a | self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
+        self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.reg.a;
         self.addtrob();
         return;
     }
@@ -266,11 +286,11 @@ impl Cpu {
     fn TRIGSWORD(&mut self) {
         self.mem[sym::trloc] = self.reg.y;
         self.mem[sym::trscrn] = self.reg.a;
-        self.reg.a = 0x01;
+        self.set_a(0x01);
         self.mem[sym::trdirec] = self.reg.a;
         self.rnd();
-        self.reg.a &= 0x1f;
-        self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
+        self.set_a(self.reg.a & 0x1f);
+        self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.reg.a;
         self.addtrob();
         return;
     }
@@ -278,26 +298,26 @@ impl Cpu {
     fn TRIGTORCH(&mut self) {
         self.mem[sym::trloc] = self.reg.y;
         self.mem[sym::trscrn] = self.reg.a;
-        self.reg.a = 0x01;
+        self.set_a(0x01);
         self.mem[sym::trdirec] = self.reg.a;
         self.rnd();
-        self.reg.a &= 0x0f;
-        self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
+        self.set_a(self.reg.a & 0x0f);
+        self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.reg.a;
         self.addtrob();
         return;
     }
 
     fn TRIGSPIKES(&mut self) {
-        self.reg.a = self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize];
+        self.set_a(self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
         if self.reg.a == 0x00 {
-            self.reg.x = 0x01;
+            self.set_x(0x01);
             self.mem[sym::trdirec] = self.reg.x;
             self.mem[sym::trloc] = self.reg.y;
-            self.reg.a = self.mem[sym::tempscrn];
+            self.set_a(self.mem[sym::tempscrn]);
             self.mem[sym::trscrn] = self.reg.a;
             self.addtrob();
             self.redspikes();
-            self.reg.a = 0x02;
+            self.set_a(0x02);  // TEMP
             self.addsound();
             return;
         }
@@ -307,27 +327,27 @@ impl Cpu {
         if self.reg.a == 0xff {
             return;
         }
-        self.reg.a = 0x8f;
-        self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
+        self.set_a(0x8f);  // Nonzero, hibit set: spikes are fully
+        self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.reg.a;
         return;
     }
 
     fn JAMSPIKES(&mut self) {
-        self.reg.a = 0xff;
-        self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
-        self.reg.x = 0xff;
+        self.set_a(0xff);
+        self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.reg.a;
+        self.set_x(0xff);  // stop object
         if (self.reg.x as i8) < 0 {
             self._5dcont();
             return;
         }
-        self.reg.a = self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize];
+        self.set_a(self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
         if (self.reg.a as i8) < 0 {
             let _o: u8 = 0xff;
             self.flags.c = self.reg.a >= _o;
             self.flags.z = self.reg.a == _o;
             self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
             if self.reg.a != 0xff {
-                self.reg.a = 0x01;
+                self.set_a(0x01);
                 return;
             }
         } else {
@@ -337,24 +357,24 @@ impl Cpu {
                 self.flags.z = self.reg.a == _o;
                 self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if self.reg.a < 0x05 {
-                    self.reg.a = 0x02;
+                    self.set_a(0x02);
                     return;
                 }
             }
         }
-        self.reg.a = 0x00;
+        self.set_a(0x00);  // safe: retracted or retracting
         return;
     }
 
     fn GETSPIKES(&mut self) {
-        self.reg.a = self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize];
+        self.set_a(self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
         if (self.reg.a as i8) < 0 {
             let _o: u8 = 0xff;
             self.flags.c = self.reg.a >= _o;
             self.flags.z = self.reg.a == _o;
             self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
             if self.reg.a != 0xff {
-                self.reg.a = 0x01;
+                self.set_a(0x01);
                 return;
             }
         } else {
@@ -364,32 +384,32 @@ impl Cpu {
                 self.flags.z = self.reg.a == _o;
                 self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if self.reg.a < 0x05 {
-                    self.reg.a = 0x02;
+                    self.set_a(0x02);
                     return;
                 }
             }
         }
-        self.reg.a = 0x00;
+        self.set_a(0x00);  // safe: retracted or retracting
         return;
     }
 
     fn BREAKLOOSE(&mut self) {
         self.mem[sym::state] = 0x01;
-        self.reg.a = self.mem[(self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize];
-        self.reg.a &= 0x20;
+        self.set_a(self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
+        self.set_a(self.reg.a & 0x20);
         if self.reg.a != 0x00 {
             return;
         }
-        self.reg.a = self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize];
+        self.set_a(self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
         if (self.reg.a as i8) >= 0 {
             if !self.flags.z {
                 return;
             }
         }
-        self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.mem[sym::state];
+        self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.mem[sym::state];
         self.mem[sym::trloc] = self.reg.y;
         self.mem[sym::trscrn] = self.mem[sym::tempscrn];
-        self.reg.a = 0x00;
+        self.set_a(0x00);  // down
         self.mem[sym::trdirec] = self.reg.a;
         self.addtrob();
         self.redloose();
@@ -398,21 +418,21 @@ impl Cpu {
 
     fn BREAKLOOSE1(&mut self) {
         self.mem[sym::state] = self.reg.a;
-        self.reg.a = self.mem[(self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize];
-        self.reg.a &= 0x20;
+        self.set_a(self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
+        self.set_a(self.reg.a & 0x20);
         if self.reg.a != 0x00 {
             return;
         }
-        self.reg.a = self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize];
+        self.set_a(self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
         if (self.reg.a as i8) >= 0 {
             if !self.flags.z {
                 return;
             }
         }
-        self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.mem[sym::state];
+        self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.mem[sym::state];
         self.mem[sym::trloc] = self.reg.y;
         self.mem[sym::trscrn] = self.mem[sym::tempscrn];
-        self.reg.a = 0x00;
+        self.set_a(0x00);  // down
         self.mem[sym::trdirec] = self.reg.a;
         self.addtrob();
         self.redloose();
@@ -420,12 +440,12 @@ impl Cpu {
     }
 
     fn PUSHPP(&mut self) {
-        self.reg.a = self.mem[(self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize];
-        self.reg.a &= 0x1f;
+        self.set_a(self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
+        self.set_a(self.reg.a & 0x1f);
         self.mem[sym::pptype] = self.reg.a;
-        self.reg.a = self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize];
+        self.set_a(self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
         self.mem[sym::linkindex] = self.reg.a;
-        self.reg.x = self.reg.a;
+        self.set_x(self.reg.a);
         self.gettimer();
         let _o: u8 = 0x1f;
         self.flags.c = self.reg.a >= _o;
@@ -439,30 +459,30 @@ impl Cpu {
         self.flags.z = self.reg.a == _o;
         self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
         if self.reg.a >= 0x02 {
-            self.reg.a = 0x05;
+            self.set_a(0x05);
             self.chgtimer();
             self.trigger();
             return;
         }
-        self.reg.a = 0x05;
+        self.set_a(0x05);  // put plate down for the count
         self.chgtimer();
         self.mem[sym::trloc] = self.reg.y;
         self.mem[sym::trscrn] = self.mem[sym::tempscrn];
-        self.reg.a = 0x01;
+        self.set_a(0x01);
         self.mem[sym::trdirec] = self.reg.a;
         self.addtrob();
         self.redplate();
         self.mem[sym::alertguard] = 0x01;
-        self.reg.a = 0x00;
+        self.set_a(0x00);
         self.addsound();
         self.trigger();
         return;
     }
 
     fn pushpp1(&mut self) {
-        self.reg.a = self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize];
+        self.set_a(self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
         self.mem[sym::linkindex] = self.reg.a;
-        self.reg.x = self.reg.a;
+        self.set_x(self.reg.a);
         self.gettimer();
         let _o: u8 = 0x1f;
         self.flags.c = self.reg.a >= _o;
@@ -476,21 +496,21 @@ impl Cpu {
         self.flags.z = self.reg.a == _o;
         self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
         if self.reg.a >= 0x02 {
-            self.reg.a = 0x05;
+            self.set_a(0x05);
             self.chgtimer();
             self.trigger();
             return;
         }
-        self.reg.a = 0x05;
+        self.set_a(0x05);  // put plate down for the count
         self.chgtimer();
         self.mem[sym::trloc] = self.reg.y;
         self.mem[sym::trscrn] = self.mem[sym::tempscrn];
-        self.reg.a = 0x01;
+        self.set_a(0x01);
         self.mem[sym::trdirec] = self.reg.a;
         self.addtrob();
         self.redplate();
         self.mem[sym::alertguard] = 0x01;
-        self.reg.a = 0x00;
+        self.set_a(0x00);
         self.addsound();
         self.trigger();
         return;
@@ -501,8 +521,8 @@ impl Cpu {
         loop {
             match pc {
                 0 => {
-                    self.reg.a = self.mem[(self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize];
-                    self.reg.a &= 0x1f;
+                    self.set_a(self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
+                    self.set_a(self.reg.a & 0x1f);
                     self.mem[sym::pptype] = self.reg.a;
                     let _o: u8 = 0x06;
                     self.flags.c = self.reg.a >= _o;
@@ -515,11 +535,11 @@ impl Cpu {
                     }
                 }
                 1 => {
-                    self.reg.a = 0x01;
-                    self.mem[(self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
-                    self.reg.a = 0x00;
-                    self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
-                    self.reg.a = 0x0e;
+                    self.set_a(0x01);
+                    self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.reg.a;
+                    self.set_a(0x00);
+                    self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.reg.a;
+                    self.set_a(0x0e);
                     self.mem[sym::pptype] = self.reg.a;
                     if !self.flags.z {
                         self.pushpp1();
@@ -529,8 +549,8 @@ impl Cpu {
                     }
                 }
                 2 => {
-                    self.reg.a = 0x05;
-                    self.mem[(self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
+                    self.set_a(0x05);
+                    self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.reg.a;
                     if !self.flags.z {
                         self.pushpp1();
                         return;
@@ -542,8 +562,8 @@ impl Cpu {
                     pc = 4;
                 }
                 4 => {
-                    self.reg.x = self.mem[sym::linkindex];
-                    self.reg.a = self.mem[sym::LINKLOC + self.reg.x as usize];
+                    self.set_x(self.mem[sym::linkindex]);
+                    self.set_a(self.mem[(sym::LINKLOC + self.reg.x as usize) & 0xffff]);
                     let _o: u8 = 0xff;
                     self.flags.c = self.reg.a >= _o;
                     self.flags.z = self.reg.a == _o;
@@ -560,11 +580,11 @@ impl Cpu {
                     self.getscrn();
                     self.mem[sym::trscrn] = self.reg.a;
                     self.calcblue();
-                    self.reg.y = self.mem[sym::trloc];
-                    self.reg.a = self.mem[(self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize];
-                    self.reg.a &= 0x1f;
+                    self.set_y(self.mem[sym::trloc]);
+                    self.set_a(self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
+                    self.set_a(self.reg.a & 0x1f);
                     self.trigobj();
-                    self.reg.a = self.mem[sym::trdirec];
+                    self.set_a(self.mem[sym::trdirec]);
                     if (self.reg.a as i8) < 0 {
                         pc = 7;
                     } else {
@@ -576,8 +596,10 @@ impl Cpu {
                     pc = 7;
                 }
                 7 => {
-                    self.reg.x = self.mem[sym::linkindex];
-                    self.mem[sym::linkindex] = self.mem[sym::linkindex].wrapping_add(1);
+                    self.set_x(self.mem[sym::linkindex]);
+                    let _v = self.mem[sym::linkindex].wrapping_add(1);
+                    self.mem[sym::linkindex] = _v;
+                    self.set_nz(_v);
                     self.getlastflag();
                     if self.flags.z {
                         pc = 4;
@@ -595,8 +617,8 @@ impl Cpu {
 
     // aliases: :loop
     fn trigger(&mut self) {
-        self.reg.x = self.mem[sym::linkindex];
-        self.reg.a = self.mem[sym::LINKLOC + self.reg.x as usize];
+        self.set_x(self.mem[sym::linkindex]);
+        self.set_a(self.mem[(sym::LINKLOC + self.reg.x as usize) & 0xffff]);
         if self.reg.a == 0xff {
             return;
         }
@@ -605,16 +627,18 @@ impl Cpu {
         self.getscrn();
         self.mem[sym::trscrn] = self.reg.a;
         self.calcblue();
-        self.reg.y = self.mem[sym::trloc];
-        self.reg.a = self.mem[(self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize];
-        self.reg.a &= 0x1f;
+        self.set_y(self.mem[sym::trloc]);
+        self.set_a(self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
+        self.set_a(self.reg.a & 0x1f);
         self.trigobj();
-        self.reg.a = self.mem[sym::trdirec];
+        self.set_a(self.mem[sym::trdirec]);
         if (self.reg.a as i8) >= 0 {
             self.addtrob();
         }
-        self.reg.x = self.mem[sym::linkindex];
-        self.mem[sym::linkindex] = self.mem[sym::linkindex].wrapping_add(1);
+        self.set_x(self.mem[sym::linkindex]);
+        let _v = self.mem[sym::linkindex].wrapping_add(1);
+        self.mem[sym::linkindex] = _v;
+        self.set_nz(_v);
         self.getlastflag();
         if self.flags.z {
             self.trigger();
@@ -637,14 +661,14 @@ impl Cpu {
 
     fn openexit(&mut self) {
         'b3: {
-            self.reg.a = self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize];
+            self.set_a(self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
             if self.reg.a == 0x00 {
-                self.reg.a = 0x01;
+                self.set_a(0x01);
                 if (self.reg.a as i8) >= 0 {
                     break 'b3;
                 }
             }
-            self.reg.a = 0xff;
+            self.set_a(0xff);
         }
         self.mem[sym::trdirec] = self.reg.a;
         return;
@@ -655,8 +679,8 @@ impl Cpu {
         loop {
             match pc {
                 0 => {
-                    self.reg.a = self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize];
-                    self.reg.x = self.mem[sym::pptype];
+                    self.set_a(self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
+                    self.set_x(self.mem[sym::pptype]);
                     let _o: u8 = 0x0f;
                     self.flags.c = self.reg.x >= _o;
                     self.flags.z = self.reg.x == _o;
@@ -694,12 +718,12 @@ impl Cpu {
                     return;
                 }
                 4 => {
-                    self.reg.a = 0x03;
+                    self.set_a(0x03);  // down fast
                     self.mem[sym::trdirec] = self.reg.a;
                     return;
                 }
                 5 => {
-                    self.reg.x = 0x02;
+                    self.set_x(0x02);  // open & jam
                     self.mem[sym::trdirec] = self.reg.x;
                     let _o: u8 = 0xbc;
                     self.flags.c = self.reg.a >= _o;
@@ -712,7 +736,7 @@ impl Cpu {
                     }
                 }
                 6 => {
-                    self.reg.a = 0xff;
+                    self.set_a(0xff);  // "jammed open" state
                     if (self.reg.a as i8) < 0 {
                         pc = 10;
                     } else {
@@ -720,7 +744,7 @@ impl Cpu {
                     }
                 }
                 7 => {
-                    self.reg.x = 0x01;
+                    self.set_x(0x01);  // open
                     self.mem[sym::trdirec] = self.reg.x;
                     let _o: u8 = 0xff;
                     self.flags.c = self.reg.a >= _o;
@@ -744,11 +768,11 @@ impl Cpu {
                     }
                 }
                 9 => {
-                    self.reg.a = 0xee;
+                    self.set_a(0xee);
                     pc = 10;
                 }
                 10 => {
-                    self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
+                    self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.reg.a;
                     if !self.flags.z {
                         pc = 3;
                     } else {
@@ -762,9 +786,9 @@ impl Cpu {
                     return;
                 }
                 13 => {
-                    self.reg.a = 0x00;
+                    self.set_a(0x00);
                     self.mem[sym::trobcount] = self.reg.a;
-                    self.reg.x = self.mem[sym::numtrans];
+                    self.set_x(self.mem[sym::numtrans]);
                     if self.reg.x == 0x00 {
                         pc = 12;
                     } else {
@@ -772,15 +796,15 @@ impl Cpu {
                     }
                 }
                 14 => {
-                    self.reg.a = 0x00;
-                    // raw: patch *]cleanflag = a            ; MOVER.S:637
+                    self.set_a(0x00);
+                    self.local.insert(("]cleanflag", 0), self.reg.a);
                     pc = 15;
                 }
                 15 => {
                     self.mem[sym::tempnt] = self.reg.x;
                     self.animobj();
-                    self.reg.x = self.mem[sym::tempnt];
-                    self.reg.a = self.mem[sym::trdirec];
+                    self.set_x(self.mem[sym::tempnt]);
+                    self.set_a(self.mem[sym::trdirec]);
                     if (self.reg.a as i8) >= 0 {
                         pc = 17;
                     } else {
@@ -788,13 +812,13 @@ impl Cpu {
                     }
                 }
                 16 => {
-                    self.reg.a = 0xff;
-                    // raw: patch *]cleanflag = a            ; MOVER.S:649
+                    self.set_a(0xff);  // yes--mark it for deletion
+                    self.local.insert(("]cleanflag", 0), self.reg.a);
                     pc = 17;
                 }
                 17 => {
-                    self.mem[sym::trdirec + self.reg.x as usize] = self.reg.a;
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    self.mem[(sym::trdirec + self.reg.x as usize) & 0xffff] = self.reg.a;
+                    self.set_x(self.reg.x.wrapping_sub(1));
                     if self.reg.x != 0x00 {
                         pc = 15;
                     } else {
@@ -802,20 +826,20 @@ impl Cpu {
                     }
                 }
                 18 => {
-                    // raw: ??? lda ]cleanflag            ; MOVER.S:656
-                    if self.flags.z {
+                    self.set_a(self.local.get(&("]cleanflag", 0)).copied().unwrap_or(0));
+                    if self.reg.a == 0x00 {
                         pc = 12;
                     } else {
                         pc = 19;
                     }
                 }
                 19 => {
-                    self.reg.x = 0x01;
-                    self.reg.y = 0x00;
+                    self.set_x(0x01);  // source index (assume numtrans > 0)
+                    self.set_y(0x00);  // dest index
                     pc = 20;
                 }
                 20 => {
-                    self.reg.a = self.mem[sym::trdirec + self.reg.x as usize];
+                    self.set_a(self.mem[(sym::trdirec + self.reg.x as usize) & 0xffff]);
                     let _o: u8 = 0xff;
                     self.flags.c = self.reg.a >= _o;
                     self.flags.z = self.reg.a == _o;
@@ -827,16 +851,16 @@ impl Cpu {
                     }
                 }
                 21 => {
-                    self.reg.y = self.reg.y.wrapping_add(1);
-                    self.mem[sym::trdirec + self.reg.y as usize] = self.reg.a;
-                    self.reg.a = self.mem[sym::trloc + self.reg.x as usize];
-                    self.mem[sym::trloc + self.reg.y as usize] = self.reg.a;
-                    self.reg.a = self.mem[sym::trscrn + self.reg.x as usize];
-                    self.mem[sym::trscrn + self.reg.y as usize] = self.reg.a;
+                    self.set_y(self.reg.y.wrapping_add(1));
+                    self.mem[(sym::trdirec + self.reg.y as usize) & 0xffff] = self.reg.a;
+                    self.set_a(self.mem[(sym::trloc + self.reg.x as usize) & 0xffff]);
+                    self.mem[(sym::trloc + self.reg.y as usize) & 0xffff] = self.reg.a;
+                    self.set_a(self.mem[(sym::trscrn + self.reg.x as usize) & 0xffff]);
+                    self.mem[(sym::trscrn + self.reg.y as usize) & 0xffff] = self.reg.a;
                     pc = 22;
                 }
                 22 => {
-                    self.reg.x = self.reg.x.wrapping_add(1);
+                    self.set_x(self.reg.x.wrapping_add(1));
                     let _o: u8 = self.mem[sym::numtrans];
                     self.flags.c = self.reg.x >= _o;
                     self.flags.z = self.reg.x == _o;
@@ -868,9 +892,9 @@ impl Cpu {
         loop {
             match pc {
                 0 => {
-                    self.reg.a = 0x00;
+                    self.set_a(0x00);
                     self.mem[sym::trobcount] = self.reg.a;
-                    self.reg.x = self.mem[sym::numtrans];
+                    self.set_x(self.mem[sym::numtrans]);
                     if self.reg.x == 0x00 {
                         pc = 12;
                     } else {
@@ -878,15 +902,15 @@ impl Cpu {
                     }
                 }
                 1 => {
-                    self.reg.a = 0x00;
-                    // raw: patch *]cleanflag = a            ; MOVER.S:637
+                    self.set_a(0x00);
+                    self.local.insert(("]cleanflag", 0), self.reg.a);
                     pc = 2;
                 }
                 2 => {
                     self.mem[sym::tempnt] = self.reg.x;
                     self.animobj();
-                    self.reg.x = self.mem[sym::tempnt];
-                    self.reg.a = self.mem[sym::trdirec];
+                    self.set_x(self.mem[sym::tempnt]);
+                    self.set_a(self.mem[sym::trdirec]);
                     if (self.reg.a as i8) >= 0 {
                         pc = 4;
                     } else {
@@ -894,13 +918,13 @@ impl Cpu {
                     }
                 }
                 3 => {
-                    self.reg.a = 0xff;
-                    // raw: patch *]cleanflag = a            ; MOVER.S:649
+                    self.set_a(0xff);  // yes--mark it for deletion
+                    self.local.insert(("]cleanflag", 0), self.reg.a);
                     pc = 4;
                 }
                 4 => {
-                    self.mem[sym::trdirec + self.reg.x as usize] = self.reg.a;
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    self.mem[(sym::trdirec + self.reg.x as usize) & 0xffff] = self.reg.a;
+                    self.set_x(self.reg.x.wrapping_sub(1));
                     if self.reg.x != 0x00 {
                         pc = 2;
                     } else {
@@ -908,20 +932,20 @@ impl Cpu {
                     }
                 }
                 5 => {
-                    // raw: ??? lda ]cleanflag            ; MOVER.S:656
-                    if self.flags.z {
+                    self.set_a(self.local.get(&("]cleanflag", 0)).copied().unwrap_or(0));
+                    if self.reg.a == 0x00 {
                         pc = 12;
                     } else {
                         pc = 6;
                     }
                 }
                 6 => {
-                    self.reg.x = 0x01;
-                    self.reg.y = 0x00;
+                    self.set_x(0x01);  // source index (assume numtrans > 0)
+                    self.set_y(0x00);  // dest index
                     pc = 7;
                 }
                 7 => {
-                    self.reg.a = self.mem[sym::trdirec + self.reg.x as usize];
+                    self.set_a(self.mem[(sym::trdirec + self.reg.x as usize) & 0xffff]);
                     let _o: u8 = 0xff;
                     self.flags.c = self.reg.a >= _o;
                     self.flags.z = self.reg.a == _o;
@@ -933,16 +957,16 @@ impl Cpu {
                     }
                 }
                 8 => {
-                    self.reg.y = self.reg.y.wrapping_add(1);
-                    self.mem[sym::trdirec + self.reg.y as usize] = self.reg.a;
-                    self.reg.a = self.mem[sym::trloc + self.reg.x as usize];
-                    self.mem[sym::trloc + self.reg.y as usize] = self.reg.a;
-                    self.reg.a = self.mem[sym::trscrn + self.reg.x as usize];
-                    self.mem[sym::trscrn + self.reg.y as usize] = self.reg.a;
+                    self.set_y(self.reg.y.wrapping_add(1));
+                    self.mem[(sym::trdirec + self.reg.y as usize) & 0xffff] = self.reg.a;
+                    self.set_a(self.mem[(sym::trloc + self.reg.x as usize) & 0xffff]);
+                    self.mem[(sym::trloc + self.reg.y as usize) & 0xffff] = self.reg.a;
+                    self.set_a(self.mem[(sym::trscrn + self.reg.x as usize) & 0xffff]);
+                    self.mem[(sym::trscrn + self.reg.y as usize) & 0xffff] = self.reg.a;
                     pc = 9;
                 }
                 9 => {
-                    self.reg.x = self.reg.x.wrapping_add(1);
+                    self.set_x(self.reg.x.wrapping_add(1));
                     let _o: u8 = self.mem[sym::numtrans];
                     self.flags.c = self.reg.x >= _o;
                     self.flags.z = self.reg.x == _o;
@@ -974,19 +998,19 @@ impl Cpu {
 
     fn animobj(&mut self) {
         'b22: {
-            self.reg.a = self.mem[sym::trloc + self.reg.x as usize];
+            self.set_a(self.mem[(sym::trloc + self.reg.x as usize) & 0xffff]);
             self.mem[sym::trloc] = self.reg.a;
-            self.reg.a = self.mem[sym::trscrn + self.reg.x as usize];
+            self.set_a(self.mem[(sym::trscrn + self.reg.x as usize) & 0xffff]);
             self.mem[sym::trscrn] = self.reg.a;
-            self.reg.a = self.mem[sym::trdirec + self.reg.x as usize];
+            self.set_a(self.mem[(sym::trdirec + self.reg.x as usize) & 0xffff]);
             self.mem[sym::trdirec] = self.reg.a;
-            self.reg.a = self.mem[sym::trscrn];
+            self.set_a(self.mem[sym::trscrn]);
             self.calcblue();
-            self.reg.y = self.mem[sym::trloc];
-            self.reg.a = self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize];
+            self.set_y(self.mem[sym::trloc]);
+            self.set_a(self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
             self.mem[sym::state] = self.reg.a;
-            self.reg.a = self.mem[(self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize];
-            self.reg.a &= 0x1f;
+            self.set_a(self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
+            self.set_a(self.reg.a & 0x1f);
             if self.reg.a != 0x13 {
                 if self.reg.a != 0x0f {
                     if self.reg.a != 0x06 {
@@ -1039,14 +1063,14 @@ impl Cpu {
                 self.animtorch();
             }
         }
-        self.reg.a = self.mem[sym::state];
-        self.reg.y = self.mem[sym::trloc];
-        self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
+        self.set_a(self.mem[sym::state]);
+        self.set_y(self.mem[sym::trloc]);
+        self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.reg.a;
         return;
     }
 
     fn animexit(&mut self) {
-        self.reg.x = self.mem[sym::trdirec];
+        self.set_x(self.mem[sym::trdirec]);
         if (self.reg.x as i8) < 0 {
             self.redexit();
             return;
@@ -1056,16 +1080,19 @@ impl Cpu {
         self.flags.z = self.reg.x == _o;
         self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
         if self.reg.x >= 0x03 {
-            // raw: ??? cpx #maxgatevel            ; MOVER.S:811
-            if !self.flags.c {
-                self.reg.x = self.reg.x.wrapping_add(1);
+            let _o: u8 = 0x08;
+            self.flags.c = self.reg.x >= _o;
+            self.flags.z = self.reg.x == _o;
+            self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
+            if self.reg.x < 0x08 {
+                self.set_x(self.reg.x.wrapping_add(1));
                 self.mem[sym::trdirec] = self.reg.x;
             }
-            self.reg.a = self.mem[sym::state];
+            self.set_a(self.mem[sym::state]);
             self.flags.c = true;
-            let _r = (self.reg.a as u16) + (!self.mem[sym::gatevel + self.reg.x as usize]) as u16 + (self.flags.c as u16);
-            self.reg.a = _r as u8;
+            let _r = (self.reg.a as u16) + (!self.mem[(sym::gatevel + self.reg.x as usize) & 0xffff]) as u16 + (self.flags.c as u16);
             self.flags.c = (_r >> 8) != 0;
+            self.set_a(_r as u8);
             self.mem[sym::state] = self.reg.a;
             if self.flags.z {
                 self.redexit();
@@ -1077,18 +1104,18 @@ impl Cpu {
             }
             self.stopobj();
             self.mem[sym::state] = 0x00;
-            self.reg.a = 0x0f;
+            self.set_a(0x0f);
             self.addsound();
             self.redexit();
             return;
         }
-        self.reg.a = 0x0a;
+        self.set_a(0x0a);
         self.addsound();
-        self.reg.a = self.mem[sym::state];
+        self.set_a(self.mem[sym::state]);
         self.flags.c = false;
         let _r = (self.reg.a as u16) + (0x04) as u16 + (self.flags.c as u16);
-        self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
+        self.set_a(_r as u8);
         self.mem[sym::state] = self.reg.a;
         let _o: u8 = 0xac;
         self.flags.c = self.reg.a >= _o;
@@ -1096,12 +1123,12 @@ impl Cpu {
         self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
         if self.reg.a >= 0xac {
             self.stopobj();
-            self.reg.a = 0x02;
+            self.set_a(0x02);
             self.addsound();
-            self.reg.a = 0x08;
-            self.reg.x = 0x0f;
+            self.set_a(0x08);
+            self.set_x(0x0f);
             self.cuesong();
-            self.reg.a = 0x01;
+            self.set_a(0x01);
             self.mem[sym::exitopen] = self.reg.a;
             self.mirappear();
             self.redexit();
@@ -1112,7 +1139,7 @@ impl Cpu {
     }
 
     fn animgate(&mut self) {
-        self.reg.x = self.mem[sym::trdirec];
+        self.set_x(self.mem[sym::trdirec]);
         if (self.reg.x as i8) < 0 {
             self.redgate();
             return;
@@ -1122,16 +1149,19 @@ impl Cpu {
         self.flags.z = self.reg.x == _o;
         self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
         if self.reg.x >= 0x03 {
-            // raw: ??? cpx #maxgatevel            ; MOVER.S:901
-            if !self.flags.c {
-                self.reg.x = self.reg.x.wrapping_add(1);
+            let _o: u8 = 0x08;
+            self.flags.c = self.reg.x >= _o;
+            self.flags.z = self.reg.x == _o;
+            self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
+            if self.reg.x < 0x08 {
+                self.set_x(self.reg.x.wrapping_add(1));
                 self.mem[sym::trdirec] = self.reg.x;
             }
-            self.reg.a = self.mem[sym::state];
+            self.set_a(self.mem[sym::state]);
             self.flags.c = true;
-            let _r = (self.reg.a as u16) + (!self.mem[sym::gatevel + self.reg.x as usize]) as u16 + (self.flags.c as u16);
-            self.reg.a = _r as u8;
+            let _r = (self.reg.a as u16) + (!self.mem[(sym::gatevel + self.reg.x as usize) & 0xffff]) as u16 + (self.flags.c as u16);
             self.flags.c = (_r >> 8) != 0;
+            self.set_a(_r as u8);
             self.mem[sym::state] = self.reg.a;
             if self.flags.z {
                 self.redgate();
@@ -1143,21 +1173,21 @@ impl Cpu {
             }
             self.mem[sym::state] = 0x00;
             self.stopobj();
-            self.reg.a = 0x0f;
+            self.set_a(0x0f);
             self.addsound();
             self.redgate();
             return;
         }
-        self.reg.a = self.mem[sym::state];
+        self.set_a(self.mem[sym::state]);
         let _o: u8 = 0xff;
         self.flags.c = self.reg.a >= _o;
         self.flags.z = self.reg.a == _o;
         self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
         if self.reg.a != 0xff {
             self.flags.c = false;
-            let _r = (self.reg.a as u16) + self.mem[sym::gateinc + self.reg.x as usize] as u16 + (self.flags.c as u16);
-            self.reg.a = _r as u8;
+            let _r = (self.reg.a as u16) + self.mem[(sym::gateinc + self.reg.x as usize) & 0xffff] as u16 + (self.flags.c as u16);
             self.flags.c = (_r >> 8) != 0;
+            self.set_a(_r as u8);
             self.mem[sym::state] = self.reg.a;
             let _o: u8 = 0x00;
             self.flags.c = self.reg.x >= _o;
@@ -1195,14 +1225,14 @@ impl Cpu {
                     self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.x < 0x02 {
                         self.mem[sym::state] = 0xee;
-                        self.reg.a = 0x00;
+                        self.set_a(0x00);  // down
                         self.mem[sym::trdirec] = self.reg.a;
                         return;
                     }
-                    self.reg.a = 0xff;
+                    self.set_a(0xff);  // jammed-open value
                     self.mem[sym::state] = self.reg.a;
                 } else {
-                    self.reg.a = 0x0b;
+                    self.set_a(0x0b);
                     self.addsound();
                     self.redgate();
                     return;
@@ -1210,31 +1240,31 @@ impl Cpu {
             }
         }
         self.stopobj();
-        self.reg.a = 0x02;
+        self.set_a(0x02);
         self.addsound();
         self.redgate();
         return;
     }
 
     fn animplate(&mut self) {
-        self.reg.x = self.mem[sym::trdirec];
+        self.set_x(self.mem[sym::trdirec]);
         if (self.reg.x as i8) < 0 {
             return;
         }
-        self.reg.a = self.mem[sym::state];
-        self.reg.x = self.reg.a;
+        self.set_a(self.mem[sym::state]);
+        self.set_x(self.reg.a);
         self.gettimer();
         self.flags.c = true;
         let _r = (self.reg.a as u16) + (!0x01_u8) as u16 + (self.flags.c as u16);
-        self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
+        self.set_a(_r as u8);
         let tmp0 = self.reg.a;
         self.chgtimer();
         self.reg.a = tmp0;
         if self.reg.a >= 0x02 {
             return;
         }
-        self.reg.a = 0x01;
+        self.set_a(0x01);
         self.addsound();
         self.stopobj();
         self.redplate();
@@ -1243,54 +1273,54 @@ impl Cpu {
 
     fn animslicer(&mut self) {
         'b11: {
-            self.reg.x = self.mem[sym::trdirec];
+            self.set_x(self.mem[sym::trdirec]);
             if (self.reg.x as i8) >= 0 {
-                self.reg.a = self.mem[sym::state];
-                self.reg.x = self.reg.a;
-                self.reg.a &= 0x80;
+                self.set_a(self.mem[sym::state]);
+                self.set_x(self.reg.a);
+                self.set_a(self.reg.a & 0x80);
                 self.mem[sym::state] = self.reg.a;
-                self.reg.a = self.reg.x;
-                self.reg.a &= 0x7f;
+                self.set_a(self.reg.x);
+                self.set_a(self.reg.a & 0x7f);
                 self.flags.c = false;
                 let _r = (self.reg.a as u16) + (0x01) as u16 + (self.flags.c as u16);
-                self.reg.a = _r as u8;
                 self.flags.c = (_r >> 8) != 0;
+                self.set_a(_r as u8);
                 if self.reg.a >= 0x10 {
-                    self.reg.a = 0x01;
+                    self.set_a(0x01);  // wrap around
                 }
-                self.reg.a |= self.mem[sym::state];
+                self.set_a(self.reg.a | self.mem[sym::state]);
                 self.mem[sym::state] = self.reg.a;
-                self.reg.a &= 0x7f;
+                self.set_a(self.reg.a & 0x7f);
                 if self.reg.a == 0x02 {
-                    self.reg.a = 0x13;
+                    self.set_a(0x13);
                     self.addsound();
                 }
-                self.reg.a = self.mem[sym::trscrn];
+                self.set_a(self.mem[sym::trscrn]);
                 if self.reg.a == self.mem[sym::VisScrn] {
-                    self.reg.a = self.mem[sym::trloc];
+                    self.set_a(self.mem[sym::trloc]);
                     self.unindex();
                     if self.reg.x == self.mem[sym::KidBlockY] {
-                        self.reg.a = self.mem[sym::KidLife];
+                        self.set_a(self.mem[sym::KidLife]);
                         if (self.reg.a as i8) < 0 {
                             break 'b11;
                         } else {
-                            self.reg.a = self.mem[sym::state];
-                            self.reg.a &= 0x80;
+                            self.set_a(self.mem[sym::state]);
+                            self.set_a(self.reg.a & 0x80);
                             if self.reg.a != 0x00 {
                                 break 'b11;
                             }
                         }
                     }
                 }
-                self.reg.a = self.mem[sym::state];
-                self.reg.a &= 0x7f;
+                self.set_a(self.mem[sym::state]);
+                self.set_a(self.reg.a & 0x7f);
                 if self.reg.a >= 0x06 {
                     self.stopobj();
                 }
             }
         }
-        self.reg.a = self.mem[sym::state];
-        self.reg.a &= 0x7f;
+        self.set_a(self.mem[sym::state]);
+        self.set_a(self.reg.a & 0x7f);
         if self.reg.a >= 0x06 {
             return;
         }
@@ -1299,60 +1329,62 @@ impl Cpu {
     }
 
     fn animflask(&mut self) {
-        self.reg.x = self.mem[sym::trdirec];
+        self.set_x(self.mem[sym::trdirec]);
         if (self.reg.x as i8) < 0 {
             return;
         }
-        self.reg.a = self.mem[sym::trscrn];
+        self.set_a(self.mem[sym::trscrn]);
         if self.reg.a != self.mem[sym::VisScrn] {
             self.stopobj();
             return;
         }
-        self.reg.a = self.mem[sym::state];
-        self.reg.a &= 0xe0;
+        self.set_a(self.mem[sym::state]);
+        self.set_a(self.reg.a & 0xe0);
         self.mem[sym::temp1] = self.reg.a;
-        self.reg.a = self.mem[sym::state];
-        self.reg.a &= 0x1f;
+        self.set_a(self.mem[sym::state]);
+        self.set_a(self.reg.a & 0x1f);
         self.GETFLASKFRAME();
-        self.reg.a |= self.mem[sym::temp1];
+        self.set_a(self.reg.a | self.mem[sym::temp1]);
         self.mem[sym::state] = self.reg.a;
         self.redsword();
         return;
     }
 
     fn animsword(&mut self) {
-        self.reg.a = self.mem[sym::trscrn];
+        self.set_a(self.mem[sym::trscrn]);
         if self.reg.a != self.mem[sym::VisScrn] {
             self._5dpurge();
             return;
         }
-        self.mem[sym::state] = self.mem[sym::state].wrapping_sub(1);
+        let _v = self.mem[sym::state].wrapping_sub(1);
+        self.mem[sym::state] = _v;
+        self.set_nz(_v);
         if !self.flags.z {
             self.redsword();
             return;
         }
         self.rnd();
-        self.reg.a &= 0x3f;
+        self.set_a(self.reg.a & 0x3f);
         self.flags.c = false;
         let _r = (self.reg.a as u16) + (0x28) as u16 + (self.flags.c as u16);
-        self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
+        self.set_a(_r as u8);
         self.mem[sym::state] = self.reg.a;
         self.redsword();
         return;
     }
 
     fn animtorch(&mut self) {
-        self.reg.x = self.mem[sym::trdirec];
+        self.set_x(self.mem[sym::trdirec]);
         if (self.reg.x as i8) < 0 {
             return;
         }
-        self.reg.a = self.mem[sym::trscrn];
+        self.set_a(self.mem[sym::trscrn]);
         if self.reg.a != self.mem[sym::VisScrn] {
             self._5dpurge();
             return;
         }
-        self.reg.a = self.mem[sym::state];
+        self.set_a(self.mem[sym::state]);
         self.GETFLAMEFRAME();
         self.mem[sym::state] = self.reg.a;
         self.redexit();
@@ -1367,15 +1399,15 @@ impl Cpu {
                 if self.reg.a < 0x12 {
                     break 'b5;
                 } else {
-                    self.reg.a = self.mem[sym::state];
+                    self.set_a(self.mem[sym::state]);
                 }
             }
             self.flags.c = false;
             let _r = (self.reg.a as u16) + (0x01) as u16 + (self.flags.c as u16);
-            self.reg.a = _r as u8;
             self.flags.c = (_r >> 8) != 0;
+            self.set_a(_r as u8);
             if self.reg.a >= 0x12 {
-                self.reg.a = 0x00;
+                self.set_a(0x00);  // wrap around
             }
         }
         return;
@@ -1384,30 +1416,32 @@ impl Cpu {
     fn GETFLASKFRAME(&mut self) {
         self.flags.c = false;
         let _r = (self.reg.a as u16) + (0x01) as u16 + (self.flags.c as u16);
-        self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
+        self.set_a(_r as u8);
         if self.reg.a < 0x09 {
             return;
         }
-        self.reg.a = 0x01;
+        self.set_a(0x01);
         return;
     }
 
     fn animspikes(&mut self) {
-        self.reg.x = self.mem[sym::trdirec];
+        self.set_x(self.mem[sym::trdirec]);
         if (self.reg.x as i8) < 0 {
             self.redspikes();
             return;
         }
-        self.reg.a = self.mem[sym::state];
+        self.set_a(self.mem[sym::state]);
         if (self.reg.a as i8) >= 0 {
-            self.mem[sym::state] = self.mem[sym::state].wrapping_add(1);
+            let _v = self.mem[sym::state].wrapping_add(1);
+            self.mem[sym::state] = _v;
+            self.set_nz(_v);
             let _o: u8 = 0x05;
             self.flags.c = self.reg.a >= _o;
             self.flags.z = self.reg.a == _o;
             self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
             if self.reg.a == 0x05 {
-                self.reg.a = 0x8f;
+                self.set_a(0x8f);
                 self.mem[sym::state] = self.reg.a;
                 if !self.flags.z {
                     self.redspikes();
@@ -1428,11 +1462,13 @@ impl Cpu {
                 return;
             }
         }
-        self.mem[sym::state] = self.mem[sym::state].wrapping_sub(1);
-        self.reg.a = self.mem[sym::state];
-        self.reg.a &= 0x7f;
+        let _v = self.mem[sym::state].wrapping_sub(1);
+        self.mem[sym::state] = _v;
+        self.set_nz(_v);
+        self.set_a(self.mem[sym::state]);
+        self.set_a(self.reg.a & 0x7f);
         if self.reg.a == 0x00 {
-            self.reg.a = 0x06;
+            self.set_a(0x06);  // First "retracting" frame
             self.mem[sym::state] = self.reg.a;
             if !self.flags.z {
                 self.redspikes();
@@ -1443,15 +1479,17 @@ impl Cpu {
     }
 
     fn animfloor(&mut self) {
-        self.reg.x = self.mem[sym::trdirec];
+        self.set_x(self.mem[sym::trdirec]);
         if (self.reg.x as i8) < 0 {
             self.redloose();
             return;
         }
-        self.mem[sym::state] = self.mem[sym::state].wrapping_add(1);
-        self.reg.a = self.mem[sym::state];
+        let _v = self.mem[sym::state].wrapping_add(1);
+        self.mem[sym::state] = _v;
+        self.set_nz(_v);
+        self.set_a(self.mem[sym::state]);
         if (self.reg.a as i8) < 0 {
-            self.reg.x = self.mem[sym::level];
+            self.set_x(self.mem[sym::level]);
             let _o: u8 = 0x0d;
             self.flags.c = self.reg.x >= _o;
             self.flags.z = self.reg.x == _o;
@@ -1483,15 +1521,15 @@ impl Cpu {
         self.makespace();
         self.mem[sym::state] = self.reg.a;
         self.stopobj();
-        self.reg.a = self.mem[sym::trloc];
+        self.set_a(self.mem[sym::trloc]);
         self.unindex();
         self.flags.c = (self.reg.a >> 7) != 0;
-        self.reg.a = self.reg.a.wrapping_shl(1);
+        self.set_a(self.reg.a.wrapping_shl(1));
         self.flags.c = (self.reg.a >> 7) != 0;
-        self.reg.a = self.reg.a.wrapping_shl(1);
+        self.set_a(self.reg.a.wrapping_shl(1));
         self.mem[sym::mobx] = self.reg.a;
         self.mem[sym::moblevel] = self.reg.x;
-        self.mem[sym::moby] = self.mem[sym::BlockBot + 1 + self.reg.x as usize];
+        self.mem[sym::moby] = self.mem[(sym::BlockBot + 1 + self.reg.x as usize) & 0xffff];
         self.mem[sym::mobscrn] = self.mem[sym::trscrn];
         self.mem[sym::mobvel] = 0x00;
         self.mem[sym::mobtype] = 0x00;
@@ -1507,18 +1545,18 @@ impl Cpu {
     }
 
     fn stopobj(&mut self) {
-        self.reg.a = 0xff;
+        self.set_a(0xff);
         self.mem[sym::trdirec] = self.reg.a;
         return;
     }
 
     fn redtrobj(&mut self) {
         self.check();
-        self.reg.a = 0x02;
+        self.set_a(0x02);
         self.markred();
         self.markwipe();
         self.checkright();
-        self.reg.a = 0x02;
+        self.set_a(0x02);
         self.markred();
         self.markwipe();
         return;
@@ -1527,7 +1565,7 @@ impl Cpu {
     // aliases: redtorch
     fn redexit(&mut self) {
         self.checkright();
-        self.reg.a = 0x02;
+        self.set_a(0x02);
         self.markmove();
         return;
     }
@@ -1535,13 +1573,15 @@ impl Cpu {
     // aliases: redflask
     fn redsword(&mut self) {
         self.check();
-        self.reg.a = 0x02;
+        self.set_a(0x02);
         self.markmove();
         return;
     }
 
     fn redloose(&mut self) {
-        self.mem[sym::trobcount] = self.mem[sym::trobcount].wrapping_add(1);
+        let _v = self.mem[sym::trobcount].wrapping_add(1);
+        self.mem[sym::trobcount] = _v;
+        self.set_nz(_v);
         self.mem[sym::height] = 0x1f;
         self.redtrobj();
         return;
@@ -1549,27 +1589,31 @@ impl Cpu {
 
     fn redgate(&mut self) {
         self.checkright();
-        self.reg.a = 0x02;
+        self.set_a(0x02);
         self.markmove();
         self.markfred();
         self.checkabover();
-        self.reg.a = 0x02;
+        self.set_a(0x02);
         self.markmove();
         return;
     }
 
     fn redspikes(&mut self) {
-        self.mem[sym::trobcount] = self.mem[sym::trobcount].wrapping_add(1);
+        let _v = self.mem[sym::trobcount].wrapping_add(1);
+        self.mem[sym::trobcount] = _v;
+        self.set_nz(_v);
         self.mem[sym::height] = 0x1f;
         self.redtrobj();
         return;
     }
 
     fn redslicer(&mut self) {
-        self.mem[sym::trobcount] = self.mem[sym::trobcount].wrapping_add(1);
+        let _v = self.mem[sym::trobcount].wrapping_add(1);
+        self.mem[sym::trobcount] = _v;
+        self.set_nz(_v);
         self.mem[sym::height] = 0x3f;
         self.check();
-        self.reg.a = 0x02;
+        self.set_a(0x02);
         self.markred();
         self.markwipe();
         return;
@@ -1582,41 +1626,41 @@ impl Cpu {
     }
 
     fn check(&mut self) {
-        self.reg.a = self.mem[sym::trscrn];
+        self.set_a(self.mem[sym::trscrn]);
         if self.reg.a != self.mem[sym::VisScrn] {
             self._5dabove();
             return;
         }
-        self.reg.y = self.mem[sym::trloc];
+        self.set_y(self.mem[sym::trloc]);
         return;
     }
 
     fn checkleft(&mut self) {
-        self.reg.a = self.mem[sym::trscrn];
+        self.set_a(self.mem[sym::trscrn]);
         if self.reg.a != self.mem[sym::VisScrn] {
             if self.reg.a != self.mem[sym::scrnRight] {
                 self._5dabove();
                 return;
             }
-            self.reg.y = self.mem[sym::trloc];
+            self.set_y(self.mem[sym::trloc]);
             match self.reg.y {
                 0x00 | 0x0a | 0x14 => {
-                    self.reg.a = self.reg.y;
+                    self.set_a(self.reg.y);
                     self.flags.c = false;
                     let _r = (self.reg.a as u16) + (0x09) as u16 + (self.flags.c as u16);
-                    self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
-                    self.reg.y = self.reg.a;
+                    self.set_a(_r as u8);
+                    self.set_y(self.reg.a);
                     return;
                 }
                 _ => {}
             }
-            self.reg.a = self.reg.y;
+            self.set_a(self.reg.y);
             self.flags.c = false;
             let _r = (self.reg.a as u16) + (0x09) as u16 + (self.flags.c as u16);
-            self.reg.a = _r as u8;
             self.flags.c = (_r >> 8) != 0;
-            self.reg.y = self.reg.a;
+            self.set_a(_r as u8);
+            self.set_y(self.reg.a);
             return;
         }
         match self.reg.y {
@@ -1634,19 +1678,19 @@ impl Cpu {
             }
             _ => {}
         }
-        self.reg.y = self.reg.y.wrapping_sub(1);
+        self.set_y(self.reg.y.wrapping_sub(1));
         return;
     }
 
     fn checkright(&mut self) {
         'b10: {
-            self.reg.a = self.mem[sym::trscrn];
+            self.set_a(self.mem[sym::trscrn]);
             if self.reg.a != self.mem[sym::VisScrn] {
                 if self.reg.a != self.mem[sym::scrnLeft] {
                     self._5dabove();
                     return;
                 }
-                self.reg.y = self.mem[sym::trloc];
+                self.set_y(self.mem[sym::trloc]);
                 if self.reg.y != 0x09 {
                     if self.reg.y != 0x13 {
                         if self.reg.y != 0x1d {
@@ -1654,70 +1698,70 @@ impl Cpu {
                         }
                     }
                 }
-                self.reg.a = self.reg.y;
+                self.set_a(self.reg.y);
                 self.flags.c = true;
                 let _r = (self.reg.a as u16) + (!0x09_u8) as u16 + (self.flags.c as u16);
-                self.reg.a = _r as u8;
                 self.flags.c = (_r >> 8) != 0;
-                self.reg.y = self.reg.a;
+                self.set_a(_r as u8);
+                self.set_y(self.reg.a);
                 return;
             }
-            self.reg.y = self.mem[sym::trloc];
+            self.set_y(self.mem[sym::trloc]);
             if self.reg.y != 0x09 {
                 if self.reg.y != 0x13 {
                     if self.reg.y != 0x1d {
-                        self.reg.y = self.reg.y.wrapping_add(1);
+                        self.set_y(self.reg.y.wrapping_add(1));
                         return;
                     }
                 }
             }
         }
-        self.reg.y = 0x1e;
+        self.set_y(0x1e);
         return;
     }
 
     fn checkabover(&mut self) {
-        self.reg.a = self.mem[sym::trscrn];
+        self.set_a(self.mem[sym::trscrn]);
         if self.reg.a != self.mem[sym::VisScrn] {
             if self.reg.a != self.mem[sym::scrnLeft] {
                 if self.reg.a != self.mem[sym::scrnBelow] {
                     if self.reg.a != self.mem[sym::scrnBelowL] {
                         return;
                     }
-                    self.reg.y = self.mem[sym::trloc];
+                    self.set_y(self.mem[sym::trloc]);
                     if self.reg.y != 0x09 {
                         self._5dno();
                         return;
                     }
-                    self.reg.y = 0x14;
+                    self.set_y(0x14);
                     return;
                 }
-                self.reg.y = self.mem[sym::trloc];
+                self.set_y(self.mem[sym::trloc]);
                 if self.reg.y >= 0x09 {
                     self._5dno();
                     return;
                 }
-                self.reg.a = self.reg.y;
+                self.set_a(self.reg.y);
                 self.flags.c = false;
                 let _r = (self.reg.a as u16) + (0x15) as u16 + (self.flags.c as u16);
-                self.reg.a = _r as u8;
                 self.flags.c = (_r >> 8) != 0;
-                self.reg.y = self.reg.a;
+                self.set_a(_r as u8);
+                self.set_y(self.reg.a);
                 return;
             }
-            self.reg.y = self.mem[sym::trloc];
+            self.set_y(self.mem[sym::trloc]);
             if self.reg.y == 0x09 {
-                self.reg.y = 0x00;
+                self.set_y(0x00);
                 return;
             }
             match self.reg.y {
                 0x13 | 0x1d => {
-                    self.reg.a = self.reg.y;
+                    self.set_a(self.reg.y);
                     self.flags.c = true;
                     let _r = (self.reg.a as u16) + (!0x13_u8) as u16 + (self.flags.c as u16);
-                    self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
-                    self.reg.y = self.reg.a;
+                    self.set_a(_r as u8);
+                    self.set_y(self.reg.a);
                     return;
                 }
                 _ => {}
@@ -1725,9 +1769,9 @@ impl Cpu {
             self._5dno();
             return;
         }
-        self.reg.y = self.mem[sym::trloc];
+        self.set_y(self.mem[sym::trloc]);
         if self.reg.y < 0x0a {
-            self.reg.y = self.reg.y.wrapping_add(1);
+            self.set_y(self.reg.y.wrapping_add(1));
             return;
         }
         match self.reg.y {
@@ -1741,62 +1785,62 @@ impl Cpu {
             }
             _ => {}
         }
-        self.reg.a = self.reg.y;
+        self.set_a(self.reg.y);
         self.flags.c = true;
         let _r = (self.reg.a as u16) + (!0x09_u8) as u16 + (self.flags.c as u16);
-        self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
-        self.reg.y = self.reg.a;
+        self.set_a(_r as u8);
+        self.set_y(self.reg.a);
         return;
     }
 
     fn gettimer(&mut self) {
-        self.reg.a = self.mem[sym::LINKMAP + self.reg.x as usize];
-        self.reg.a &= 0x1f;
+        self.set_a(self.mem[(sym::LINKMAP + self.reg.x as usize) & 0xffff]);
+        self.set_a(self.reg.a & 0x1f);
         return;
     }
 
     fn chgtimer(&mut self) {
-        self.reg.a &= 0x1f;
+        self.set_a(self.reg.a & 0x1f);
         self.mem[sym::temp1] = self.reg.a;
-        self.reg.a = self.mem[sym::LINKMAP + self.reg.x as usize];
-        self.reg.a &= 0xe0;
-        self.reg.a |= self.mem[sym::temp1];
-        self.mem[sym::LINKMAP + self.reg.x as usize] = self.reg.a;
+        self.set_a(self.mem[(sym::LINKMAP + self.reg.x as usize) & 0xffff]);
+        self.set_a(self.reg.a & 0xe0);
+        self.set_a(self.reg.a | self.mem[sym::temp1]);
+        self.mem[(sym::LINKMAP + self.reg.x as usize) & 0xffff] = self.reg.a;
         return;
     }
 
     fn getloc(&mut self) {
-        self.reg.a = self.mem[sym::LINKLOC + self.reg.x as usize];
-        self.reg.a &= 0x1f;
+        self.set_a(self.mem[(sym::LINKLOC + self.reg.x as usize) & 0xffff]);
+        self.set_a(self.reg.a & 0x1f);
         return;
     }
 
     fn getlastflag(&mut self) {
-        self.reg.a = self.mem[sym::LINKLOC + self.reg.x as usize];
-        self.reg.a &= 0x80;
+        self.set_a(self.mem[(sym::LINKLOC + self.reg.x as usize) & 0xffff]);
+        self.set_a(self.reg.a & 0x80);
         return;
     }
 
     fn getscrn(&mut self) {
-        self.reg.a = self.mem[sym::LINKLOC + self.reg.x as usize];
-        self.reg.a &= 0x60;
+        self.set_a(self.mem[(sym::LINKLOC + self.reg.x as usize) & 0xffff]);
+        self.set_a(self.reg.a & 0x60);
         self.flags.c = (self.reg.a & 1) != 0;
-        self.reg.a = self.reg.a.wrapping_shr(1);
+        self.set_a(self.reg.a.wrapping_shr(1));
         self.flags.c = (self.reg.a & 1) != 0;
-        self.reg.a = self.reg.a.wrapping_shr(1);
+        self.set_a(self.reg.a.wrapping_shr(1));
         self.mem[sym::temp1] = self.reg.a;
-        self.reg.a = self.mem[sym::LINKMAP + self.reg.x as usize];
-        self.reg.a &= 0xe0;
+        self.set_a(self.mem[(sym::LINKMAP + self.reg.x as usize) & 0xffff]);
+        self.set_a(self.reg.a & 0xe0);
         let _r = (self.reg.a as u16) + self.mem[sym::temp1] as u16 + (self.flags.c as u16);
-        self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
+        self.set_a(_r as u8);
         self.flags.c = (self.reg.a & 1) != 0;
-        self.reg.a = self.reg.a.wrapping_shr(1);
+        self.set_a(self.reg.a.wrapping_shr(1));
         self.flags.c = (self.reg.a & 1) != 0;
-        self.reg.a = self.reg.a.wrapping_shr(1);
+        self.set_a(self.reg.a.wrapping_shr(1));
         self.flags.c = (self.reg.a & 1) != 0;
-        self.reg.a = self.reg.a.wrapping_shr(1);
+        self.set_a(self.reg.a.wrapping_shr(1));
         return;
     }
 
@@ -1805,7 +1849,7 @@ impl Cpu {
         loop {
             match pc {
                 0 => {
-                    self.reg.x = self.mem[sym::nummob];
+                    self.set_x(self.mem[sym::nummob]);
                     if self.reg.x == 0x00 {
                         pc = 8;
                     } else {
@@ -1817,9 +1861,9 @@ impl Cpu {
                     self.loadmob();
                     self.animmob();
                     self.checkcrush();
-                    self.reg.x = self.mem[sym::tempnt];
+                    self.set_x(self.mem[sym::tempnt]);
                     self.savemob();
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    self.set_x(self.reg.x.wrapping_sub(1));
                     if self.reg.x != 0x00 {
                         pc = 1;
                     } else {
@@ -1827,12 +1871,12 @@ impl Cpu {
                     }
                 }
                 2 => {
-                    self.reg.x = 0x01;
-                    self.reg.y = 0x00;
+                    self.set_x(0x01);  // source index (assume nummob > 0)
+                    self.set_y(0x00);  // dest index
                     pc = 3;
                 }
                 3 => {
-                    self.reg.a = self.mem[sym::mobvel + self.reg.x as usize];
+                    self.set_a(self.mem[(sym::mobvel + self.reg.x as usize) & 0xffff]);
                     let _o: u8 = 0xff;
                     self.flags.c = self.reg.a >= _o;
                     self.flags.z = self.reg.a == _o;
@@ -1844,22 +1888,22 @@ impl Cpu {
                     }
                 }
                 4 => {
-                    self.reg.y = self.reg.y.wrapping_add(1);
-                    self.mem[sym::mobvel + self.reg.y as usize] = self.reg.a;
-                    self.reg.a = self.mem[sym::mobx + self.reg.x as usize];
-                    self.mem[sym::mobx + self.reg.y as usize] = self.reg.a;
-                    self.reg.a = self.mem[sym::moby + self.reg.x as usize];
-                    self.mem[sym::moby + self.reg.y as usize] = self.reg.a;
-                    self.reg.a = self.mem[sym::mobscrn + self.reg.x as usize];
-                    self.mem[sym::mobscrn + self.reg.y as usize] = self.reg.a;
-                    self.reg.a = self.mem[sym::mobtype + self.reg.x as usize];
-                    self.mem[sym::mobtype + self.reg.y as usize] = self.reg.a;
-                    self.reg.a = self.mem[sym::moblevel + self.reg.x as usize];
-                    self.mem[sym::moblevel + self.reg.y as usize] = self.reg.a;
+                    self.set_y(self.reg.y.wrapping_add(1));
+                    self.mem[(sym::mobvel + self.reg.y as usize) & 0xffff] = self.reg.a;
+                    self.set_a(self.mem[(sym::mobx + self.reg.x as usize) & 0xffff]);
+                    self.mem[(sym::mobx + self.reg.y as usize) & 0xffff] = self.reg.a;
+                    self.set_a(self.mem[(sym::moby + self.reg.x as usize) & 0xffff]);
+                    self.mem[(sym::moby + self.reg.y as usize) & 0xffff] = self.reg.a;
+                    self.set_a(self.mem[(sym::mobscrn + self.reg.x as usize) & 0xffff]);
+                    self.mem[(sym::mobscrn + self.reg.y as usize) & 0xffff] = self.reg.a;
+                    self.set_a(self.mem[(sym::mobtype + self.reg.x as usize) & 0xffff]);
+                    self.mem[(sym::mobtype + self.reg.y as usize) & 0xffff] = self.reg.a;
+                    self.set_a(self.mem[(sym::moblevel + self.reg.x as usize) & 0xffff]);
+                    self.mem[(sym::moblevel + self.reg.y as usize) & 0xffff] = self.reg.a;
                     pc = 5;
                 }
                 5 => {
-                    self.reg.x = self.reg.x.wrapping_add(1);
+                    self.set_x(self.reg.x.wrapping_add(1));
                     let _o: u8 = self.mem[sym::nummob];
                     self.flags.c = self.reg.x >= _o;
                     self.flags.z = self.reg.x == _o;
@@ -1890,74 +1934,76 @@ impl Cpu {
     }
 
     fn animmob(&mut self) {
-        self.reg.a = self.mem[sym::mobtype];
+        self.set_a(self.mem[sym::mobtype]);
         if self.reg.a == 0x00 {
             self.mobfloor();
         }
-        self.reg.a = self.mem[sym::mobvel];
+        self.set_a(self.mem[sym::mobvel]);
         if (self.reg.a as i8) >= 0 {
             return;
         }
-        self.mem[sym::mobvel] = self.mem[sym::mobvel].wrapping_add(1);
+        let _v = self.mem[sym::mobvel].wrapping_add(1);
+        self.mem[sym::mobvel] = _v;
+        self.set_nz(_v);
         return;
     }
 
     fn mobfloor(&mut self) {
-        self.reg.a = self.mem[sym::mobvel];
+        self.set_a(self.mem[sym::mobvel]);
         if (self.reg.a as i8) < 0 {
             return;
         }
         if self.reg.a < 0x1d {
             self.flags.c = false;
             let _r = (self.reg.a as u16) + (0x03) as u16 + (self.flags.c as u16);
-            self.reg.a = _r as u8;
             self.flags.c = (_r >> 8) != 0;
+            self.set_a(_r as u8);
             self.mem[sym::mobvel] = self.reg.a;
         }
         self.flags.c = false;
         let _r = (self.reg.a as u16) + self.mem[sym::moby] as u16 + (self.flags.c as u16);
-        self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
+        self.set_a(_r as u8);
         self.mem[sym::moby] = self.reg.a;
-        self.reg.x = self.mem[sym::mobscrn];
+        self.set_x(self.mem[sym::mobscrn]);
         if self.reg.x == 0x00 {
-            self.reg.a = self.mem[sym::moby];
+            self.set_a(self.mem[sym::moby]);
             if self.reg.a < 0xd1 {
                 return;
             }
-            self.reg.a = 0xfe;
+            self.set_a(0xfe);
             self.mem[sym::mobvel] = self.reg.a;
             return;
         }
         if self.reg.a < 0xe2 {
-            self.reg.x = self.mem[sym::moblevel];
-            let _o: u8 = self.mem[sym::BlockAy + 1 + self.reg.x as usize];
+            self.set_x(self.mem[sym::moblevel]);
+            let _o: u8 = self.mem[(sym::BlockAy + 1 + self.reg.x as usize) & 0xffff];
             self.flags.c = self.reg.a >= _o;
             self.flags.z = self.reg.a == _o;
             self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-            if self.reg.a >= self.mem[sym::BlockAy + 1 + self.reg.x as usize] {
-                self.reg.x = self.mem[sym::moblevel];
+            if self.reg.a >= self.mem[(sym::BlockAy + 1 + self.reg.x as usize) & 0xffff] {
+                self.set_x(self.mem[sym::moblevel]);
                 self.mem[sym::tempblocky] = self.reg.x;
-                self.reg.a = self.mem[sym::mobx];
+                self.set_a(self.mem[sym::mobx]);
                 self.flags.c = (self.reg.a & 1) != 0;
-                self.reg.a = self.reg.a.wrapping_shr(1);
+                self.set_a(self.reg.a.wrapping_shr(1));
                 self.flags.c = (self.reg.a & 1) != 0;
-                self.reg.a = self.reg.a.wrapping_shr(1);
+                self.set_a(self.reg.a.wrapping_shr(1));
                 self.mem[sym::tempblockx] = self.reg.a;
-                self.reg.a = self.mem[sym::mobscrn];
+                self.set_a(self.mem[sym::mobscrn]);
                 self.mem[sym::tempscrn] = self.reg.a;
                 self.rdblock1();
                 self.mem[sym::underFF] = self.reg.a;
                 if self.reg.a != 0x00 {
                     if self.reg.a != 0x0b {
-                        self.reg.a = 0x07;
+                        self.set_a(0x07);
                         self.addsound();
                         self.mem[sym::tempscrn] = self.mem[sym::mobscrn];
                         self.mem[sym::tempblocky] = self.mem[sym::moblevel];
                         self.SHAKEM1();
-                        self.reg.x = self.mem[sym::moblevel];
-                        self.mem[sym::moby] = self.mem[sym::BlockAy + 1 + self.reg.x as usize];
-                        self.reg.a = 0xfe;
+                        self.set_x(self.mem[sym::moblevel]);
+                        self.mem[sym::moby] = self.mem[(sym::BlockAy + 1 + self.reg.x as usize) & 0xffff];
+                        self.set_a(0xfe);
                         self.mem[sym::mobvel] = self.reg.a;
                         self.makerubble();
                         return;
@@ -1972,39 +2018,41 @@ impl Cpu {
 
     fn knockloose(&mut self) {
         self.makespace();
-        self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
+        self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.reg.a;
         self.mem[sym::mobvel] = (self.mem[sym::mobvel]).wrapping_shr(0x01 as u32);
-        self.reg.x = self.mem[sym::tempnt];
+        self.set_x(self.mem[sym::tempnt]);
         self.savemob();
         self.mem[sym::moby] = (self.mem[sym::moby]).wrapping_add(0x06);
         self.passthru();
         self.addamob();
-        self.reg.x = self.mem[sym::tempnt];
+        self.set_x(self.mem[sym::tempnt]);
         self.loadmob();
         self.markmob();
         return;
     }
 
     fn makespace(&mut self) {
-        self.mem[(self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize] = 0x00;
-        self.reg.a = 0x01;
+        self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = 0x00;
+        self.set_a(0x01);
         return;
     }
 
     fn passthru(&mut self) {
-        self.mem[sym::moblevel] = self.mem[sym::moblevel].wrapping_add(1);
-        self.reg.a = self.mem[sym::moblevel];
+        let _v = self.mem[sym::moblevel].wrapping_add(1);
+        self.mem[sym::moblevel] = _v;
+        self.set_nz(_v);
+        self.set_a(self.mem[sym::moblevel]);
         if self.reg.a < 0x03 {
             return;
         }
-        self.reg.a = self.mem[sym::moby];
+        self.set_a(self.mem[sym::moby]);
         self.flags.c = true;
         let _r = (self.reg.a as u16) + (!0xc0_u8) as u16 + (self.flags.c as u16);
-        self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
+        self.set_a(_r as u8);
         self.mem[sym::moby] = self.reg.a;
         self.mem[sym::moblevel] = 0x00;
-        self.reg.a = self.mem[sym::mobscrn];
+        self.set_a(self.mem[sym::mobscrn]);
         self.getdown();
         self.mem[sym::mobscrn] = self.reg.a;
         return;
@@ -2012,15 +2060,15 @@ impl Cpu {
 
     fn makerubble(&mut self) {
         'b9: {
-            self.reg.a = self.mem[sym::moblevel];
+            self.set_a(self.mem[sym::moblevel]);
             self.mem[sym::tempblocky] = self.reg.a;
-            self.reg.a = self.mem[sym::mobx];
+            self.set_a(self.mem[sym::mobx]);
             self.flags.c = (self.reg.a & 1) != 0;
-            self.reg.a = self.reg.a.wrapping_shr(1);
+            self.set_a(self.reg.a.wrapping_shr(1));
             self.flags.c = (self.reg.a & 1) != 0;
-            self.reg.a = self.reg.a.wrapping_shr(1);
+            self.set_a(self.reg.a.wrapping_shr(1));
             self.mem[sym::tempblockx] = self.reg.a;
-            self.reg.a = self.mem[sym::mobscrn];
+            self.set_a(self.mem[sym::mobscrn]);
             self.mem[sym::tempscrn] = self.reg.a;
             self.rdblock1();
             if self.reg.a != 0x06 {
@@ -2049,31 +2097,33 @@ impl Cpu {
                         }
                     }
                 }
-                self.reg.a = 0x0e;
-                self.mem[(self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize] = self.reg.a;
+                self.set_a(0x0e);
+                self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.reg.a;
             }
             self.PUSHPP();
             self.rdblock1();
         }
-        self.mem[(self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize] = 0x0e;
+        self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = 0x0e;
         self.markmob();
         return;
     }
 
     fn markmob(&mut self) {
-        self.reg.a = self.mem[sym::mobscrn];
+        self.set_a(self.mem[sym::mobscrn]);
         if self.reg.a != self.mem[sym::VisScrn] {
             return;
         }
-        self.reg.a = 0x1f;
+        self.set_a(0x1f);
         self.mem[sym::height] = self.reg.a;
         self.indexblock();
-        self.reg.a = 0x02;
+        self.set_a(0x02);
         self.markred();
         self.markwipe();
-        self.mem[sym::tempblockx] = self.mem[sym::tempblockx].wrapping_add(1);
+        let _v = self.mem[sym::tempblockx].wrapping_add(1);
+        self.mem[sym::tempblockx] = _v;
+        self.set_nz(_v);
         self.indexblock();
-        self.reg.a = 0x02;
+        self.set_a(0x02);
         self.markred();
         self.markfred();
         self.markwipe();
@@ -2092,21 +2142,21 @@ impl Cpu {
     }
 
     fn chcrush1(&mut self) {
-        self.reg.a = self.mem[sym::mobscrn];
+        self.set_a(self.mem[sym::mobscrn]);
         if self.reg.a == self.mem[sym::CharScrn] {
-            self.reg.a = self.mem[sym::mobx];
+            self.set_a(self.mem[sym::mobx]);
             self.flags.c = (self.reg.a & 1) != 0;
-            self.reg.a = self.reg.a.wrapping_shr(1);
+            self.set_a(self.reg.a.wrapping_shr(1));
             self.flags.c = (self.reg.a & 1) != 0;
-            self.reg.a = self.reg.a.wrapping_shr(1);
+            self.set_a(self.reg.a.wrapping_shr(1));
             if self.reg.a == self.mem[sym::CharBlockX] {
-                self.reg.a = self.mem[sym::moby];
+                self.set_a(self.mem[sym::moby]);
                 if self.reg.a < self.mem[sym::CharY] {
-                    self.reg.a = self.mem[sym::CharY];
+                    self.set_a(self.mem[sym::CharY]);
                     self.flags.c = true;
                     let _r = (self.reg.a as u16) + (!0x1e_u8) as u16 + (self.flags.c as u16);
-                    self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
+                    self.set_a(_r as u8);
                     if self.reg.a < self.mem[sym::moby] {
                         self.flags.c = true;
                         return;
@@ -2119,54 +2169,54 @@ impl Cpu {
     }
 
     fn crushchar(&mut self) {
-        self.reg.a = self.mem[sym::level];
+        self.set_a(self.mem[sym::level]);
         if self.reg.a != 0x0d {
-            self.reg.a = self.mem[sym::CharPosn];
+            self.set_a(self.mem[sym::CharPosn]);
             if self.reg.a >= 0x05 {
                 if self.reg.a < 0x0f {
                     return;
                 }
             }
         }
-        self.reg.a = self.mem[sym::CharAction];
+        self.set_a(self.mem[sym::CharAction]);
         if self.reg.a >= 0x02 {
             if self.reg.a != 0x07 {
                 return;
             }
         }
-        self.reg.x = self.mem[sym::CharBlockY];
-        self.reg.x = self.reg.x.wrapping_add(1);
-        self.mem[sym::CharY] = self.mem[sym::FloorY + self.reg.x as usize];
-        self.reg.a = 0x01;
+        self.set_x(self.mem[sym::CharBlockY]);
+        self.set_x(self.reg.x.wrapping_add(1));
+        self.mem[sym::CharY] = self.mem[(sym::FloorY + self.reg.x as usize) & 0xffff];
+        self.set_a(0x01);
         self.decstr();
         if self.flags.z {
-            self.reg.a = 0x16;
+            self.set_a(0x16);  // temp
             self.jumpseq();
             return;
         }
-        self.reg.a = self.mem[sym::CharPosn];
+        self.set_a(self.mem[sym::CharPosn]);
         if self.reg.a == 0x6d {
             return;
         }
-        self.reg.a = 0x34;
+        self.set_a(0x34);
         self.jumpseq();
         return;
     }
 
     fn ADDMOBS(&mut self) {
-        self.reg.x = self.mem[sym::nummob];
+        self.set_x(self.mem[sym::nummob]);
         if self.reg.x == 0x00 {
         } else {
             loop {
                 self.mem[sym::tempnt] = self.reg.x;
                 self.loadmob();
-                self.reg.a = self.mem[sym::mobtype];
+                self.set_a(self.mem[sym::mobtype]);
                 if self.reg.a != 0x00 {
                 } else {
                     self.ATM();
                 }
-                self.reg.x = self.mem[sym::tempnt];
-                self.reg.x = self.reg.x.wrapping_sub(1);
+                self.set_x(self.mem[sym::tempnt]);
+                self.set_x(self.reg.x.wrapping_sub(1));
                 if !(self.reg.x != 0x00) {
                     break;
                 }
@@ -2176,12 +2226,12 @@ impl Cpu {
     }
 
     fn ATM(&mut self) {
-        self.reg.a = self.mem[sym::mobscrn];
+        self.set_a(self.mem[sym::mobscrn]);
         if self.reg.a != self.mem[sym::VisScrn] {
             if self.reg.a != self.mem[sym::scrnBelow] {
                 return;
             }
-            self.reg.a = self.mem[sym::moby];
+            self.set_a(self.mem[sym::moby]);
             if self.reg.a < 0xef {
                 if self.reg.a >= 0x11 {
                     return;
@@ -2189,41 +2239,43 @@ impl Cpu {
             }
             self.flags.c = false;
             let _r = (self.reg.a as u16) + (0xc0) as u16 + (self.flags.c as u16);
-            self.reg.a = _r as u8;
             self.flags.c = (_r >> 8) != 0;
+            self.set_a(_r as u8);
             self.mem[sym::moby] = self.reg.a;
         } else {
-            self.reg.a = self.mem[sym::moby];
+            self.set_a(self.mem[sym::moby]);
             if self.reg.a >= 0xd1 {
                 return;
             }
         }
-        self.reg.a = self.mem[sym::moby];
+        self.set_a(self.mem[sym::moby]);
         self.getblocky();
         self.mem[sym::tempblocky] = self.reg.a;
-        self.reg.a = self.mem[sym::mobx];
+        self.set_a(self.mem[sym::mobx]);
         self.flags.c = (self.reg.a & 1) != 0;
-        self.reg.a = self.reg.a.wrapping_shr(1);
+        self.set_a(self.reg.a.wrapping_shr(1));
         self.flags.c = (self.reg.a & 1) != 0;
-        self.reg.a = self.reg.a.wrapping_shr(1);
+        self.set_a(self.reg.a.wrapping_shr(1));
         self.mem[sym::tempblockx] = self.reg.a;
         self.indexblock();
         self.mem[sym::FCharIndex] = self.reg.y;
-        self.mem[sym::tempblockx] = self.mem[sym::tempblockx].wrapping_add(1);
+        let _v = self.mem[sym::tempblockx].wrapping_add(1);
+        self.mem[sym::tempblockx] = _v;
+        self.set_nz(_v);
         self.indexblock();
-        self.reg.a = 0x02;
+        self.set_a(0x02);
         self.markfloor();
         self.markfred();
-        self.reg.a = self.mem[sym::moby];
+        self.set_a(self.mem[sym::moby]);
         self.flags.c = true;
         let _r = (self.reg.a as u16) + (!0x11_u8) as u16 + (self.flags.c as u16);
-        self.reg.a = _r as u8;
         self.flags.c = (_r >> 8) != 0;
+        self.set_a(_r as u8);
         self.getblocky();
         if self.reg.a != self.mem[sym::tempblocky] {
             self.mem[sym::tempblocky] = self.reg.a;
             self.indexblock();
-            self.reg.a = 0x02;
+            self.set_a(0x02);
             self.markfloor();
             self.markfred();
         }
@@ -2233,25 +2285,27 @@ impl Cpu {
     }
 
     fn addmobobj(&mut self) {
-        self.mem[sym::objX] = self.mem[sym::objX].wrapping_add(1);
-        self.reg.x = self.mem[sym::objX];
-        self.reg.a = self.mem[sym::mobtype];
-        self.reg.a |= 0x80;
-        self.mem[sym::objTYP + self.reg.x as usize] = self.reg.a;
-        self.mem[sym::objX + self.reg.x as usize] = self.mem[sym::mobx];
-        self.mem[sym::objOFF + self.reg.x as usize] = 0x00;
-        self.mem[sym::objY + self.reg.x as usize] = self.mem[sym::moby];
-        self.mem[sym::objIMG + self.reg.x as usize] = self.mem[sym::mobframe];
-        self.mem[sym::objCU + self.reg.x as usize] = 0x00;
-        self.mem[sym::objCL + self.reg.x as usize] = 0x00;
-        self.reg.a = 0x28;
-        self.mem[sym::objCR + self.reg.x as usize] = self.reg.a;
+        let _v = self.mem[sym::objX].wrapping_add(1);
+        self.mem[sym::objX] = _v;
+        self.set_nz(_v);
+        self.set_x(self.mem[sym::objX]);
+        self.set_a(self.mem[sym::mobtype]);
+        self.set_a(self.reg.a | 0x80);
+        self.mem[(sym::objTYP + self.reg.x as usize) & 0xffff] = self.reg.a;
+        self.mem[(sym::objX + self.reg.x as usize) & 0xffff] = self.mem[sym::mobx];
+        self.mem[(sym::objOFF + self.reg.x as usize) & 0xffff] = 0x00;
+        self.mem[(sym::objY + self.reg.x as usize) & 0xffff] = self.mem[sym::moby];
+        self.mem[(sym::objIMG + self.reg.x as usize) & 0xffff] = self.mem[sym::mobframe];
+        self.mem[(sym::objCU + self.reg.x as usize) & 0xffff] = 0x00;
+        self.mem[(sym::objCL + self.reg.x as usize) & 0xffff] = 0x00;
+        self.set_a(0x28);
+        self.mem[(sym::objCR + self.reg.x as usize) & 0xffff] = self.reg.a;
         self.setobjindx();
         return;
     }
 
     fn SHAKEM(&mut self) {
-        self.reg.x = self.mem[sym::level];
+        self.set_x(self.mem[sym::level]);
         let _o: u8 = 0x0d;
         self.flags.c = self.reg.x >= _o;
         self.flags.z = self.reg.x == _o;
@@ -2259,11 +2313,11 @@ impl Cpu {
         if self.reg.x == 0x0d {
         } else {
             self.mem[sym::tempblocky] = self.reg.a;
-            self.reg.a = self.mem[sym::VisScrn];
+            self.set_a(self.mem[sym::VisScrn]);
             self.mem[sym::tempscrn] = self.reg.a;
-            self.reg.x = 0x09;
+            self.set_x(0x09);
             loop {
-                self.reg.a = self.reg.x;
+                self.set_a(self.reg.x);
                 self.stack.push(self.reg.a);
                 self.mem[sym::tempblockx] = self.reg.a;
                 self.rdblock1();
@@ -2275,11 +2329,10 @@ impl Cpu {
                 } else {
                     self.shakeit();
                 }
-                self.reg.a = self.stack.pop().expect("pla on empty stack");
-                self.flags.z = self.reg.a == 0;
-                self.flags.n = (self.reg.a >> 7) != 0;
-                self.reg.x = self.reg.a;
-                self.reg.x = self.reg.x.wrapping_sub(1);
+                let _v = self.stack.pop().expect("pla on empty stack");
+                self.set_a(_v);
+                self.set_x(self.reg.a);
+                self.set_x(self.reg.x.wrapping_sub(1));
                 if !((self.reg.x as i8) >= 0) {
                     break;
                 }
@@ -2289,9 +2342,9 @@ impl Cpu {
     }
 
     fn SHAKEM1(&mut self) {
-        self.reg.x = 0x09;
+        self.set_x(0x09);
         loop {
-            self.reg.a = self.reg.x;
+            self.set_a(self.reg.x);
             self.stack.push(self.reg.a);
             self.mem[sym::tempblockx] = self.reg.a;
             self.rdblock1();
@@ -2303,11 +2356,10 @@ impl Cpu {
             } else {
                 self.shakeit();
             }
-            self.reg.a = self.stack.pop().expect("pla on empty stack");
-            self.flags.z = self.reg.a == 0;
-            self.flags.n = (self.reg.a >> 7) != 0;
-            self.reg.x = self.reg.a;
-            self.reg.x = self.reg.x.wrapping_sub(1);
+            let _v = self.stack.pop().expect("pla on empty stack");
+            self.set_a(_v);
+            self.set_x(self.reg.a);
+            self.set_x(self.reg.x.wrapping_sub(1));
             if !((self.reg.x as i8) >= 0) {
                 break;
             }
@@ -2316,17 +2368,17 @@ impl Cpu {
     }
 
     fn shakeit(&mut self) {
-        self.reg.a = self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize];
+        self.set_a(self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
         if (self.reg.a as i8) < 0 {
             return;
         }
         if !self.flags.z {
             return;
         }
-        self.mem[(self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize] = 0x80;
+        self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = 0x80;
         self.mem[sym::trloc] = self.reg.y;
         self.mem[sym::trscrn] = self.mem[sym::tempscrn];
-        self.reg.a = 0x01;
+        self.set_a(0x01);
         self.mem[sym::trdirec] = self.reg.a;
         self.addtrob();
         return;

@@ -554,7 +554,7 @@ ADDSOUND:
   *(soundtable@0xb6c0 + x) = a   ; SPECIALK.S:1000
   *soundtable@0xb6c0 = x            ; SPECIALK.S:1001
 :rts:
-  ??? ldx ]temp1            ; SPECIALK.S:1003
+  x = *]temp1            ; SPECIALK.S:1003
   return                           ; SPECIALK.S:1004
 }
 
@@ -567,7 +567,7 @@ fn ADDSOUND {
   *(soundtable@0xb6c0 + x) = a   ; SPECIALK.S:1000
   *soundtable@0xb6c0 = x            ; SPECIALK.S:1001
 :rts:
-  ??? ldx ]temp1            ; SPECIALK.S:1003
+  x = *]temp1            ; SPECIALK.S:1003
   return                           ; SPECIALK.S:1004
 }
 
@@ -756,7 +756,7 @@ fn KEEPTIME {
   *FrameCount+1@0x0307 = a            ; SPECIALK.S:1278
 :2:
   y = *NextTimeMsg@0x0301        ; SPECIALK.S:1282
-  ??? cpy #nummsg            ; SPECIALK.S:1283
+  cmp y, #nummsg              ; SPECIALK.S:1283
   if cs goto ]rts       ; SPECIALK.S:1284
   a = *FrameCount+1@0x0307        ; SPECIALK.S:1285
   cmp a, *(timetable+1@0x0333 + y)   ; SPECIALK.S:1286

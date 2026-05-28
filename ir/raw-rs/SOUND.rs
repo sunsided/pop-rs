@@ -36,6 +36,9 @@ pub struct Cpu {
     pub mem: Box<[u8; 0x10000]>,
     pub stack: Vec<u8>,
     pub smc: Smc,
+    // Local-label / Merlin-variable byte store, keyed by symbolic
+    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.
+    pub local: std::collections::HashMap<(&'static str, u8), u8>,
 }
 
 impl Cpu {
@@ -46,8 +49,25 @@ impl Cpu {
             mem: Box::new([0u8; 0x10000]),
             stack: Vec::new(),
             smc: Smc::default(),
+            local: std::collections::HashMap::new(),
         }
     }
+
+    // Register loads/transfers/arith set Z (result == 0) and N
+    // (bit 7) on the 6502; these helpers keep that in one place so
+    // every reg write stays flag-faithful. `set_nz` is for ops that
+    // write memory but still set Z/N (inc/dec/shift on memory).
+    #[inline]
+    pub fn set_nz(&mut self, v: u8) {
+        self.flags.z = v == 0;
+        self.flags.n = (v >> 7) != 0;
+    }
+    #[inline]
+    pub fn set_a(&mut self, v: u8) { self.reg.a = v; self.set_nz(v); }
+    #[inline]
+    pub fn set_x(&mut self, v: u8) { self.reg.x = v; self.set_nz(v); }
+    #[inline]
+    pub fn set_y(&mut self, v: u8) { self.reg.y = v; self.set_nz(v); }
 }
 
 #[allow(non_upper_case_globals)]
@@ -62,36 +82,36 @@ mod sym {
 impl Cpu {
     // aliases: lookup, endlook
     fn ZEROSOUND(&mut self) {
-        self.reg.a = 0x00;
+        self.set_a(0x00);  // # sounds in table
         self.mem[sym::soundtable] = self.reg.a;
         return;
     }
 
     fn ADDSOUND(&mut self) {
         self.mem[sym::savex] = self.reg.x;
-        self.reg.x = self.mem[sym::soundtable];
+        self.set_x(self.mem[sym::soundtable]);
         if self.reg.x < 0x20 {
-            self.reg.x = self.reg.x.wrapping_add(1);
-            self.mem[sym::soundtable + self.reg.x as usize] = self.reg.a;
+            self.set_x(self.reg.x.wrapping_add(1));
+            self.mem[(sym::soundtable + self.reg.x as usize) & 0xffff] = self.reg.a;
             self.mem[sym::soundtable] = self.reg.x;
         }
-        self.reg.x = self.mem[sym::savex];
+        self.set_x(self.mem[sym::savex]);
         return;
     }
 
     fn PLAYBACK(&mut self) {
-        self.reg.a = self.mem[sym::soundon];
+        self.set_a(self.mem[sym::soundon]);
         if self.reg.a == 0x00 {
         } else {
-            self.reg.x = self.mem[sym::soundtable];
+            self.set_x(self.mem[sym::soundtable]);
             if self.reg.x == 0x00 {
             } else {
                 loop {
-                    self.reg.a = self.mem[sym::soundtable + self.reg.x as usize];
+                    self.set_a(self.mem[(sym::soundtable + self.reg.x as usize) & 0xffff]);
                     self.mem[sym::savex] = self.reg.x;
                     self.makesound();
-                    self.reg.x = self.mem[sym::savex];
-                    self.reg.x = self.reg.x.wrapping_sub(1);
+                    self.set_x(self.mem[sym::savex]);
+                    self.set_x(self.reg.x.wrapping_sub(1));
                     if !(self.reg.x != 0x00) {
                         break;
                     }
@@ -103,73 +123,72 @@ impl Cpu {
 
     fn makesound(&mut self) {
         self.flags.c = (self.reg.a >> 7) != 0;
-        self.reg.a = self.reg.a.wrapping_shl(1);
-        // raw: ??? cmp #maxaddr            ; SOUND.S:129
-        if self.flags.c {
+        self.set_a(self.reg.a.wrapping_shl(1));
+        if self.reg.a >= 0x28 {
             return;
         }
-        self.reg.x = self.reg.a;
-        self.reg.a = self.mem[sym::lookup + self.reg.x as usize];
-        // raw: patch *:sm+1 = a            ; SOUND.S:134
-        self.reg.a = self.mem[sym::lookup + 1 + self.reg.x as usize];
-        // raw: patch *:sm+2 = a            ; SOUND.S:136
+        self.set_x(self.reg.a);
+        self.set_a(self.mem[(sym::lookup + self.reg.x as usize) & 0xffff]);
+        self.local.insert((":sm", 1), self.reg.a);
+        self.set_a(self.mem[(sym::lookup + 1 + self.reg.x as usize) & 0xffff]);
+        self.local.insert((":sm", 2), self.reg.a);
         self._24ffff();
         return;
     }
 
     fn DoPlateDown(&mut self) {
-        self.reg.y = 0x46;
-        self.reg.x = 0x00;
-        self.reg.a = 0x04;
+        self.set_y(0x46);
+        self.set_x(0x00);
+        self.set_a(0x04);
         self.tone();
         return;
     }
 
     fn DoPlateUp(&mut self) {
-        self.reg.y = 0x5a;
-        self.reg.x = 0x00;
-        self.reg.a = 0x04;
+        self.set_y(0x5a);
+        self.set_x(0x00);
+        self.set_a(0x04);
         self.tone();
         return;
     }
 
     fn DoGateDown(&mut self) {
-        self.reg.y = 0x46;
-        self.reg.x = 0x00;
-        self.reg.a = 0x04;
+        self.set_y(0x46);
+        self.set_x(0x00);
+        self.set_a(0x04);
         self.tone();
         return;
     }
 
     fn DoJawsClash(&mut self) {
-        self.reg.y = 0x0a;
-        self.reg.x = 0x00;
-        self.reg.a = 0x32;
+        self.set_y(0x0a);
+        self.set_x(0x00);
+        self.set_a(0x32);
         self.tone();
         return;
     }
 
     // aliases: DoSwordClash1, DoSwordClash2
     fn DoSpecialKey1(&mut self) {
-        self.reg.y = 0x0f;
-        self.reg.x = 0x00;
-        self.reg.a = 0x32;
+        self.set_y(0x0f);
+        self.set_x(0x00);
+        self.set_a(0x32);
         self.tone();
         return;
     }
 
     fn DoSpecialKey2(&mut self) {
-        self.reg.y = 0x28;
-        self.reg.x = 0x00;
-        self.reg.a = 0x32;
+        self.set_y(0x28);
+        self.set_x(0x00);
+        self.set_a(0x32);
         self.tone();
         return;
     }
 
     fn DoSplat(&mut self) {
-        self.reg.y = 0xe8;
-        self.reg.x = 0x03;
-        self.reg.a = 0x03;
+        self.set_y(0xe8);
+        self.set_x(0x03);
+        self.set_a(0x03);
         self.tone();
         return;
     }
@@ -186,22 +205,22 @@ impl Cpu {
 
     // aliases: DoFlashMsg
     fn DoGotKey(&mut self) {
-        self.reg.a = 0x02;
+        self.set_a(0x02);
         loop {
             let tmp0 = self.reg.a;
-            self.reg.y = 0xf4;
-            self.reg.x = 0x01;
-            self.reg.a = 0x0f;
+            self.set_y(0xf4);
+            self.set_x(0x01);
+            self.set_a(0x0f);
             self.tone();
-            self.reg.y = 0x64;
-            self.reg.x = 0x00;
-            self.reg.a = 0x19;
+            self.set_y(0x64);
+            self.set_x(0x00);
+            self.set_a(0x19);
             self.tone();
             self.reg.a = tmp0;
             self.flags.c = true;
             let _r = (self.reg.a as u16) + (!0x01_u8) as u16 + (self.flags.c as u16);
-            self.reg.a = _r as u8;
             self.flags.c = (_r >> 8) != 0;
+            self.set_a(_r as u8);
             if !(self.reg.a != 0x00) {
                 break;
             }
@@ -210,41 +229,41 @@ impl Cpu {
     }
 
     fn DoFootstep(&mut self) {
-        self.reg.y = 0x23;
-        self.reg.x = 0x00;
-        self.reg.a = 0x03;
+        self.set_y(0x23);
+        self.set_x(0x00);
+        self.set_a(0x03);
         self.tone();
         return;
     }
 
     fn DoRaisingExit(&mut self) {
-        self.reg.y = 0x28;
-        self.reg.x = 0x00;
-        self.reg.a = 0x06;
+        self.set_y(0x28);
+        self.set_x(0x00);
+        self.set_a(0x06);
         self.tone();
         return;
     }
 
     fn DoRaisingGate(&mut self) {
-        self.reg.y = 0x14;
-        self.reg.x = 0x00;
-        self.reg.a = 0x02;
+        self.set_y(0x14);
+        self.set_x(0x00);
+        self.set_a(0x02);
         self.tone();
         return;
     }
 
     fn DoLowerGate(&mut self) {
-        self.reg.y = 0x07;
-        self.reg.x = 0x00;
-        self.reg.a = 0x08;
+        self.set_y(0x07);
+        self.set_x(0x00);
+        self.set_a(0x08);
         self.tone();
         return;
     }
 
     fn DoSmackWall(&mut self) {
-        self.reg.y = 0xe8;
-        self.reg.x = 0x03;
-        self.reg.a = 0x03;
+        self.set_y(0xe8);
+        self.set_x(0x03);
+        self.set_a(0x03);
         self.tone();
         return;
     }
@@ -264,24 +283,27 @@ impl Cpu {
         loop {
             match pc {
                 0 => {
-                    // raw: patch *:pitch = y            ; SOUND.S:332
-                    // raw: patch *:pitch+1 = x            ; SOUND.S:333
+                    self.local.insert((":pitch", 0), self.reg.y);
+                    self.local.insert((":pitch", 1), self.reg.x);
                     pc = 1;
                 }
                 1 => {
                     let _o: u8 = self.mem[sym::spkr];
                     self.flags.z = (self.reg.a & _o) == 0;
                     self.flags.n = (_o >> 7) != 0;
-                    self.reg.x = 0x00;
+                    self.set_x(0x00);
                     pc = 2;
                 }
                 2 => {
-                    self.reg.y = 0x00;
+                    self.set_y(0x00);
                     pc = 3;
                 }
                 3 => {
-                    self.reg.y = self.reg.y.wrapping_add(1);
-                    // raw: ??? cpy :pitch            ; SOUND.S:341
+                    self.set_y(self.reg.y.wrapping_add(1));
+                    let _o: u8 = self.local.get(&(":pitch", 0)).copied().unwrap_or(0);
+                    self.flags.c = self.reg.y >= _o;
+                    self.flags.z = self.reg.y == _o;
+                    self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
                     if !self.flags.c {
                         pc = 3;
                     } else {
@@ -289,8 +311,11 @@ impl Cpu {
                     }
                 }
                 4 => {
-                    self.reg.x = self.reg.x.wrapping_add(1);
-                    // raw: ??? cpx :pitch+1            ; SOUND.S:345
+                    self.set_x(self.reg.x.wrapping_add(1));
+                    let _o: u8 = self.local.get(&(":pitch", 1)).copied().unwrap_or(0);
+                    self.flags.c = self.reg.x >= _o;
+                    self.flags.z = self.reg.x == _o;
+                    self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
                     if !self.flags.c {
                         pc = 2;
                     } else {
@@ -300,8 +325,8 @@ impl Cpu {
                 5 => {
                     self.flags.c = true;
                     let _r = (self.reg.a as u16) + (!0x01_u8) as u16 + (self.flags.c as u16);
-                    self.reg.a = _r as u8;
                     self.flags.c = (_r >> 8) != 0;
+                    self.set_a(_r as u8);
                     if self.reg.a != 0x00 {
                         pc = 1;
                     } else {

@@ -19,6 +19,7 @@ as raw `Line` objects in `FileAST.lines` for later passes.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -142,7 +143,7 @@ class ProgramAST:
 # ---------------------------------------------------------------- expressions
 
 
-_BIN_OPS = {"+", "-", "*", "/", "&", "|", "^"}
+_BIN_OPS = {"+", "-", "*", "/", "&", "|", "^", "!"}
 
 
 def _tokenize_expr(s: str) -> list[str]:
@@ -250,7 +251,7 @@ class _ExprParser:
 
     def _term(self) -> int:
         v = self._factor()
-        while self._peek() in ("*", "/", "&", "|", "^", "."):
+        while self._peek() in ("*", "/", "&", "|", "^", ".", "!"):
             op = self._eat()
             r = self._factor()
             if op == "*":
@@ -262,7 +263,8 @@ class _ExprParser:
             elif op in ("|", "."):
                 # `.` is Merlin's bitwise-OR operator, same as `|`.
                 v = v | r
-            elif op == "^":
+            elif op in ("^", "!"):
+                # `!` is Merlin's bitwise-EOR operator, same as `^`.
                 v = v ^ r
         return v
 
@@ -290,6 +292,12 @@ class _ExprParser:
         if tok[0].isdigit():
             return int(tok, 10)
         if tok == "*":
+            # Current location counter. Pass 0 does track a running PC,
+            # but it isn't threaded into plain `eval_expr` calls — only
+            # the position-equate fallback supplies it (as the `*` key).
+            # Without it a normal equate eval can't use `*`.
+            if "*" in self.symbols:
+                return self.symbols["*"]
             raise ValueError("current-PC operator `*` not resolvable in pass 0")
         if tok in self.symbols:
             return self.symbols[tok]
@@ -301,10 +309,258 @@ def eval_expr(s: str, symbols: dict[str, int]) -> int:
     return _ExprParser(_tokenize_expr(s), symbols).parse()
 
 
+class _NotAffine(Exception):
+    """A position symbol (`*` / a program label) was used non-additively
+    (bitwise, multiplied/divided by another position term, etc.), so the
+    expression's origin-dependence can't be settled by affine analysis."""
+
+
+class _AffineExprParser:
+    """Evaluate a Merlin expression into `(value, origin_coeff)`.
+
+    `origin_coeff` is the net coefficient of the assembly origin summed
+    over every position symbol: `*` and each program label contribute 1,
+    equates and literals contribute 0 (they're constants). The expression
+    is *origin-independent* — a genuine size/offset — exactly when the
+    coefficient is 0, regardless of where the program is assembled.
+
+    This replaces sampling at a couple of origins (which a masked
+    expression like `label & $fff` can defeat): any non-additive use of a
+    position term raises `_NotAffine`, so address-derived values can never
+    masquerade as origin-independent. Grammar/precedence mirror
+    `_ExprParser`; values are `(int, int)` `(value, coeff)` pairs."""
+
+    def __init__(
+        self,
+        tokens: list[str],
+        equates: dict[str, int],
+        labels: dict[str, int],
+        star: int | None,
+    ) -> None:
+        self.t = tokens
+        self.i = 0
+        self.equates = equates   # constants (coeff 0); win over labels
+        self.labels = labels     # name -> PC (coeff 1)
+        self.star = star         # current PC (coeff 1), or None
+
+    def _peek(self) -> str | None:
+        return self.t[self.i] if self.i < len(self.t) else None
+
+    def _eat(self) -> str:
+        tok = self.t[self.i]
+        self.i += 1
+        return tok
+
+    def parse(self) -> tuple[int, int]:
+        value = self._sum()
+        if self.i != len(self.t):
+            raise ValueError(f"trailing tokens after expression: {self.t[self.i:]}")
+        return value
+
+    def _sum(self) -> tuple[int, int]:
+        v = self._term()
+        while self._peek() in ("+", "-"):
+            op = self._eat()
+            r = self._term()
+            sign = 1 if op == "+" else -1
+            v = (v[0] + sign * r[0], v[1] + sign * r[1])
+        return v
+
+    def _term(self) -> tuple[int, int]:
+        v = self._factor()
+        while self._peek() in ("*", "/", "&", "|", "^", ".", "!"):
+            op = self._eat()
+            r = self._factor()
+            if op == "*":
+                v = self._mul(v, r)
+            elif op == "/":
+                # Division is linear only when the divisor is constant and
+                # the dividend is already origin-independent (e.g.
+                # `(*-tbl)/2`). Anything else taints the coefficient.
+                if r[1] != 0 or v[1] != 0:
+                    raise _NotAffine
+                v = (v[0] // r[0], 0)
+            else:
+                # Bitwise & | . ^ ! — only defined here for constants;
+                # masking a position term is non-affine.
+                if v[1] != 0 or r[1] != 0:
+                    raise _NotAffine
+                if op == "&":
+                    v = (v[0] & r[0], 0)
+                elif op in ("|", "."):
+                    v = (v[0] | r[0], 0)
+                else:  # "^" / "!"
+                    v = (v[0] ^ r[0], 0)
+        return v
+
+    @staticmethod
+    def _mul(a: tuple[int, int], b: tuple[int, int]) -> tuple[int, int]:
+        if a[1] == 0 and b[1] == 0:
+            return (a[0] * b[0], 0)
+        if a[1] == 0:           # const * (c + k·o)
+            return (a[0] * b[0], a[0] * b[1])
+        if b[1] == 0:
+            return (a[0] * b[0], b[0] * a[1])
+        raise _NotAffine        # position * position
+
+    def _factor(self) -> tuple[int, int]:
+        tok = self._peek()
+        if tok is None:
+            raise ValueError("unexpected end of expression")
+        if tok == "(":
+            self._eat()
+            v = self._sum()
+            if self._eat() != ")":
+                raise ValueError("expected ')'")
+            return v
+        if tok == "-":
+            self._eat()
+            a = self._factor()
+            return (-a[0], -a[1])
+        if tok == "+":
+            self._eat()
+            return self._factor()
+        self._eat()
+        if tok.startswith("$"):
+            return (int(tok[1:], 16), 0)
+        if tok.startswith("%"):
+            return (int(tok[1:], 2), 0)
+        if tok[0].isdigit():
+            return (int(tok, 10), 0)
+        if tok == "*":
+            if self.star is None:
+                raise ValueError("current-PC operator `*` not resolvable")
+            return (self.star, 1)
+        if tok in self.equates:     # equate wins over a same-named label
+            return (self.equates[tok], 0)
+        if tok in self.labels:
+            return (self.labels[tok], 1)
+        raise ValueError(f"undefined symbol: {tok}")
+
+
 # ---------------------------------------------------------------- parser
 
 
 _IGNORED_DIRECTIVES = {"lst", "tr", "xc", "mx"}
+
+# ---- location-counter sizing -----------------------------------------
+#
+# To resolve location-counter equates — `LABEL = *-table` / `a-b` table
+# sizes that POP uses as immediates (`cpx #maxgatevel`) — pass 0 tracks a
+# running program counter through each file's code and data, recording the
+# PC at every global label. The equate's value is then a PC difference,
+# which is origin-independent so the absolute base doesn't matter (only
+# correct *relative* sizing within the span between the label and the `*`).
+# We size the instruction forms and data directives POP actually uses; an
+# unrecognised line advances the PC by 0, which only perturbs the absolute
+# base and so cancels out of any difference.
+
+_IMPLIED_OPS = frozenset({
+    "clc", "sec", "cli", "sei", "cld", "sed", "clv", "nop", "rts", "rti",
+    "brk", "tax", "tay", "txa", "tya", "tsx", "txs", "dex", "dey", "inx",
+    "iny", "pha", "pla", "php", "plp", "phx", "phy", "plx", "ply",
+})
+
+_BRANCH_OPS = frozenset({
+    "bcc", "bcs", "beq", "bne", "bpl", "bmi", "bvc", "bvs", "bra",
+})
+
+# Every 6502/65C02 mnemonic the lifter recognises. A line whose mnemonic
+# isn't here (and isn't a data directive) is a macro invocation whose byte
+# size we can't know, so PC tracking advances by 0 for it rather than
+# guessing — see `_parse_file`.
+_OPCODES = _IMPLIED_OPS | _BRANCH_OPS | frozenset({
+    "lda", "ldx", "ldy", "sta", "stx", "sty", "stz",
+    "adc", "sbc", "and", "ora", "eor", "bit",
+    "cmp", "cpx", "cpy",
+    "asl", "lsr", "rol", "ror",
+    "inc", "dec",
+    "jmp", "jsr",
+    "tsb", "trb",
+})
+
+
+def _count_operands(operand: str | None) -> int:
+    """Count comma-separated top-level operands; commas inside a quoted
+    string don't split. `db 0,0,0,20` → 4."""
+    if not operand:
+        return 0
+    count = 1
+    quote: str | None = None
+    for c in operand:
+        if quote is not None:
+            if c == quote:
+                quote = None
+        elif c in ('"', "'"):
+            quote = c
+        elif c == ",":
+            count += 1
+    return count
+
+
+def _string_bytes(operand: str | None) -> int:
+    """Best-effort byte count for `asc`/`str`/`rev`/... — characters inside
+    the first delimited string plus any trailing comma-separated bytes.
+    (POP only uses these outside the spans we measure, so approximations
+    here cancel out of the differences.)"""
+    if not operand:
+        return 0
+    s = operand.strip()
+    if s[0] in ('"', "'"):
+        end = s.find(s[0], 1)
+        if end == -1:
+            return len(s) - 1
+        n = end - 1
+        rest = s[end + 1:].lstrip()
+        if rest.startswith(","):
+            n += _count_operands(rest[1:])
+        return n
+    return _count_operands(s)
+
+
+def _directive_size(mnemonic: str, operand: str | None, symbols: dict[str, int]) -> int | None:
+    """Byte size emitted by a data pseudo-op, or `None` if `mnemonic`
+    isn't one (the caller then tries instruction sizing)."""
+    if mnemonic in ("db", "dfb"):
+        return _count_operands(operand)
+    if mnemonic in ("dw", "da", "ddb"):
+        return 2 * _count_operands(operand)
+    if mnemonic == "ds":
+        try:
+            return int(eval_expr((operand or "0").split(",", 1)[0], symbols))
+        except ValueError:
+            return 0
+    if mnemonic == "hex":
+        return len(re.sub(r"[^0-9a-fA-F]", "", operand or "")) // 2
+    if mnemonic in ("asc", "dci", "str", "inv", "fls", "rev", "ascii"):
+        return _string_bytes(operand)
+    return None
+
+
+def _instr_size(mnemonic: str, operand: str | None, symbols: dict[str, int]) -> int:
+    """Encoded byte size of a 6502 instruction (1/2/3). Memory operands
+    are zero-page (2) when the base resolves below $100, else absolute
+    (3); an unresolved (forward-label) base is assumed absolute."""
+    if mnemonic in _IMPLIED_OPS:
+        return 1
+    op = (operand or "").strip()
+    if mnemonic in ("asl", "lsr", "rol", "ror") and op.lower() in ("", "a"):
+        return 1  # accumulator form
+    if mnemonic in _BRANCH_OPS:
+        return 2
+    if mnemonic in ("jmp", "jsr"):
+        return 3
+    if op.startswith("#"):
+        return 2  # immediate
+    if op.startswith("("):
+        return 2  # zero-page indirect ((zp),y / (zp,x) / (zp))
+    if not op:
+        return 1
+    base = op.split(",", 1)[0].strip().lstrip("<>/")
+    try:
+        return 2 if 0 <= eval_expr(base, symbols) < 0x100 else 3
+    except ValueError:
+        return 3  # forward / unresolved → assume absolute
 
 
 @dataclass
@@ -318,6 +574,10 @@ class Parser:
         self.ast = ProgramAST()
         self.search_paths = search_paths
         self._included: set[Path] = set()
+        # Running program counter and the PC recorded at each global
+        # label, for resolving location-counter (`*`) equates.
+        self._pc = 0
+        self._pc_of_label: dict[str, int] = {}
 
     def parse(self, path: Path) -> ProgramAST:
         self._parse_file(path.resolve())
@@ -341,6 +601,19 @@ class Parser:
 
             mnemonic = line.mnemonic
 
+            # Record the PC at every global label before the line emits
+            # any bytes, so a later `LABEL = *-thislabel` equate resolves.
+            # Skipped inside a `dum` overlay: those labels live in the
+            # overlay's own address space (and become equates via
+            # `_handle_ds`), not the main program counter.
+            if (
+                dum is None
+                and line.label
+                and not line.is_equate
+                and not line.label.startswith((":", "]"))
+            ):
+                self._pc_of_label[line.label] = self._pc
+
             # `LABEL = EXPR` equate
             if line.is_equate:
                 if not line.label or not line.operand:
@@ -349,12 +622,23 @@ class Parser:
                 try:
                     value = eval_expr(line.operand, self.ast.equates)
                 except ValueError as exc:
-                    self._warn(line, f"equate eval failed: {exc}")
-                    continue
+                    value = self._resolve_position_equate(line.operand)
+                    if value is None:
+                        self._warn(line, f"equate eval failed: {exc}")
+                        continue
                 self.ast.equates[line.label] = value
                 continue
 
             if mnemonic in _IGNORED_DIRECTIVES:
+                continue
+
+            if mnemonic == "org":
+                # Set the location counter to an absolute address.
+                if line.operand:
+                    try:
+                        self._pc = eval_expr(line.operand, self.ast.equates)
+                    except ValueError as exc:
+                        self._warn(line, f"org addr eval failed: {exc}")
                 continue
 
             if mnemonic == "put":
@@ -374,17 +658,40 @@ class Parser:
 
             if mnemonic == "ds":
                 if dum is None:
-                    # `ds` outside a `dum` block advances the regular
-                    # location counter; that's relevant only for files
-                    # that emit code/data, not the equate files we
-                    # focus on in pass 0.
+                    # `ds N` outside a `dum` block reserves N bytes and
+                    # advances the main location counter.
+                    try:
+                        self._pc += int(
+                            eval_expr((line.operand or "0").split(",", 1)[0],
+                                      self.ast.equates)
+                        )
+                    except ValueError:
+                        pass
                     continue
                 self._handle_ds(line, dum)
                 continue
 
-            # Anything else (real opcodes, db/dw/hex/asc/dfb, org, jmp,
-            # macros) is not yet processed by pass 0. The raw line stays
-            # on `file_ast.lines` for later passes.
+            # Inside a `dum` overlay no object bytes are emitted, so the
+            # main PC is frozen (the block tracks its own `lc`).
+            if dum is not None:
+                continue
+
+            # Real opcodes and data directives advance the PC so that
+            # location-counter equates resolve. A data directive is sized
+            # by its operands; a recognised opcode by its addressing mode.
+            # An unrecognised mnemonic is a macro whose expansion size we
+            # can't know, so it advances by 0 — which only shifts the
+            # absolute PC base and cancels out of the origin-independent
+            # equate differences we resolve. The raw line still stays on
+            # `file_ast.lines` for later passes.
+            if mnemonic is not None:
+                size = _directive_size(mnemonic, line.operand, self.ast.equates)
+                if size is None:
+                    size = (
+                        _instr_size(mnemonic, line.operand, self.ast.equates)
+                        if mnemonic in _OPCODES else 0
+                    )
+                self._pc += size
 
         # An open `dum` at end of file is implicitly closed.
 
@@ -430,6 +737,30 @@ class Parser:
             # equate at the current location counter.
             self.ast.equates[line.label] = dum.lc
         dum.lc += size
+
+    def _resolve_position_equate(self, expr: str) -> int | None:
+        """Resolve an equate the normal symbol table can't because it
+        references the location counter `*` or program labels (e.g.
+        `maxgatevel = *-gatevel-1`). Evaluated in PC coordinates: `*` is
+        the current PC and each global label is its recorded PC.
+
+        Only returns a value when the expression is *origin-independent*
+        — a true size/offset whose net position-coefficient is zero, as
+        determined by affine analysis (`_AffineExprParser`). An address-
+        valued expression (`label+1`) has a non-zero coefficient, and a
+        masked one (`label & $fff`) is non-affine; both are left
+        unresolved, so no real address is ever invented from the PC base.
+        Equates win over same-named labels, matching `symbols()`."""
+        try:
+            value, coeff = _AffineExprParser(
+                _tokenize_expr(expr),
+                self.ast.equates,
+                self._pc_of_label,
+                self._pc,
+            ).parse()
+        except (_NotAffine, ValueError):
+            return None
+        return value if coeff == 0 else None
 
     def _handle_put(self, current: Path, operand: str) -> None:
         # Strip a trailing comment if the lexer didn't already.

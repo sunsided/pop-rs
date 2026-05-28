@@ -8,36 +8,36 @@ use crate::sym;
 #[doc(alias = "lookup")]
 #[doc(alias = "endlook")]
 pub fn ZEROSOUND(cpu: &mut Cpu) {
-    cpu.reg.a = 0x00;
+    cpu.set_a(0x00);  // # sounds in table
     cpu.mem[sym::soundtable] = cpu.reg.a;
     return;
 }
 
 pub fn ADDSOUND(cpu: &mut Cpu) {
     cpu.mem[sym::savex] = cpu.reg.x;
-    cpu.reg.x = cpu.mem[sym::soundtable];
+    cpu.set_x(cpu.mem[sym::soundtable]);
     if cpu.reg.x < 0x20 {
-        cpu.reg.x = cpu.reg.x.wrapping_add(1);
-        cpu.mem[sym::soundtable + cpu.reg.x as usize] = cpu.reg.a;
+        cpu.set_x(cpu.reg.x.wrapping_add(1));
+        cpu.mem[(sym::soundtable + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
         cpu.mem[sym::soundtable] = cpu.reg.x;
     }
-    cpu.reg.x = cpu.mem[sym::savex];
+    cpu.set_x(cpu.mem[sym::savex]);
     return;
 }
 
 pub fn PLAYBACK(cpu: &mut Cpu) {
-    cpu.reg.a = cpu.mem[sym::soundon];
+    cpu.set_a(cpu.mem[sym::soundon]);
     if cpu.reg.a == 0x00 {
     } else {
-        cpu.reg.x = cpu.mem[sym::soundtable];
+        cpu.set_x(cpu.mem[sym::soundtable]);
         if cpu.reg.x == 0x00 {
         } else {
             loop {
-                cpu.reg.a = cpu.mem[sym::soundtable + cpu.reg.x as usize];
+                cpu.set_a(cpu.mem[(sym::soundtable + cpu.reg.x as usize) & 0xffff]);
                 cpu.mem[sym::savex] = cpu.reg.x;
                 makesound(cpu);
-                cpu.reg.x = cpu.mem[sym::savex];
-                cpu.reg.x = cpu.reg.x.wrapping_sub(1);
+                cpu.set_x(cpu.mem[sym::savex]);
+                cpu.set_x(cpu.reg.x.wrapping_sub(1));
                 if !(cpu.reg.x != 0x00) {
                     break;
                 }
@@ -49,48 +49,47 @@ pub fn PLAYBACK(cpu: &mut Cpu) {
 
 pub fn makesound(cpu: &mut Cpu) {
     cpu.flags.c = (cpu.reg.a >> 7) != 0;
-    cpu.reg.a = cpu.reg.a.wrapping_shl(1);
-    // raw: ??? cmp #maxaddr            ; SOUND.S:129
-    if cpu.flags.c {
+    cpu.set_a(cpu.reg.a.wrapping_shl(1));
+    if cpu.reg.a >= 0x28 {
         return;
     }
-    cpu.reg.x = cpu.reg.a;
-    cpu.reg.a = cpu.mem[sym::lookup + cpu.reg.x as usize];
-    // raw: patch *:sm+1 = a            ; SOUND.S:134
-    cpu.reg.a = cpu.mem[sym::lookup + 1 + cpu.reg.x as usize];
-    // raw: patch *:sm+2 = a            ; SOUND.S:136
+    cpu.set_x(cpu.reg.a);
+    cpu.set_a(cpu.mem[(sym::lookup + cpu.reg.x as usize) & 0xffff]);
+    cpu.local.insert((":sm", 1), cpu.reg.a);
+    cpu.set_a(cpu.mem[(sym::lookup + 1 + cpu.reg.x as usize) & 0xffff]);
+    cpu.local.insert((":sm", 2), cpu.reg.a);
     crate::ext::_24ffff(cpu);
     return;
 }
 
 pub fn DoPlateDown(cpu: &mut Cpu) {
-    cpu.reg.y = 0x46;
-    cpu.reg.x = 0x00;
-    cpu.reg.a = 0x04;
+    cpu.set_y(0x46);
+    cpu.set_x(0x00);
+    cpu.set_a(0x04);
     tone(cpu);
     return;
 }
 
 pub fn DoPlateUp(cpu: &mut Cpu) {
-    cpu.reg.y = 0x5a;
-    cpu.reg.x = 0x00;
-    cpu.reg.a = 0x04;
+    cpu.set_y(0x5a);
+    cpu.set_x(0x00);
+    cpu.set_a(0x04);
     tone(cpu);
     return;
 }
 
 pub fn DoGateDown(cpu: &mut Cpu) {
-    cpu.reg.y = 0x46;
-    cpu.reg.x = 0x00;
-    cpu.reg.a = 0x04;
+    cpu.set_y(0x46);
+    cpu.set_x(0x00);
+    cpu.set_a(0x04);
     tone(cpu);
     return;
 }
 
 pub fn DoJawsClash(cpu: &mut Cpu) {
-    cpu.reg.y = 0x0a;
-    cpu.reg.x = 0x00;
-    cpu.reg.a = 0x32;
+    cpu.set_y(0x0a);
+    cpu.set_x(0x00);
+    cpu.set_a(0x32);
     tone(cpu);
     return;
 }
@@ -98,25 +97,25 @@ pub fn DoJawsClash(cpu: &mut Cpu) {
 #[doc(alias = "DoSwordClash1")]
 #[doc(alias = "DoSwordClash2")]
 pub fn DoSpecialKey1(cpu: &mut Cpu) {
-    cpu.reg.y = 0x0f;
-    cpu.reg.x = 0x00;
-    cpu.reg.a = 0x32;
+    cpu.set_y(0x0f);
+    cpu.set_x(0x00);
+    cpu.set_a(0x32);
     tone(cpu);
     return;
 }
 
 pub fn DoSpecialKey2(cpu: &mut Cpu) {
-    cpu.reg.y = 0x28;
-    cpu.reg.x = 0x00;
-    cpu.reg.a = 0x32;
+    cpu.set_y(0x28);
+    cpu.set_x(0x00);
+    cpu.set_a(0x32);
     tone(cpu);
     return;
 }
 
 pub fn DoSplat(cpu: &mut Cpu) {
-    cpu.reg.y = 0xe8;
-    cpu.reg.x = 0x03;
-    cpu.reg.a = 0x03;
+    cpu.set_y(0xe8);
+    cpu.set_x(0x03);
+    cpu.set_a(0x03);
     tone(cpu);
     return;
 }
@@ -133,22 +132,22 @@ pub fn DoLooseCrash(cpu: &mut Cpu) {
 
 #[doc(alias = "DoFlashMsg")]
 pub fn DoGotKey(cpu: &mut Cpu) {
-    cpu.reg.a = 0x02;
+    cpu.set_a(0x02);
     loop {
         let tmp0 = cpu.reg.a;
-        cpu.reg.y = 0xf4;
-        cpu.reg.x = 0x01;
-        cpu.reg.a = 0x0f;
+        cpu.set_y(0xf4);
+        cpu.set_x(0x01);
+        cpu.set_a(0x0f);
         tone(cpu);
-        cpu.reg.y = 0x64;
-        cpu.reg.x = 0x00;
-        cpu.reg.a = 0x19;
+        cpu.set_y(0x64);
+        cpu.set_x(0x00);
+        cpu.set_a(0x19);
         tone(cpu);
         cpu.reg.a = tmp0;
         cpu.flags.c = true;
         let _r = (cpu.reg.a as u16) + (!0x01_u8) as u16 + (cpu.flags.c as u16);
-        cpu.reg.a = _r as u8;
         cpu.flags.c = (_r >> 8) != 0;
+        cpu.set_a(_r as u8);
         if !(cpu.reg.a != 0x00) {
             break;
         }
@@ -157,41 +156,41 @@ pub fn DoGotKey(cpu: &mut Cpu) {
 }
 
 pub fn DoFootstep(cpu: &mut Cpu) {
-    cpu.reg.y = 0x23;
-    cpu.reg.x = 0x00;
-    cpu.reg.a = 0x03;
+    cpu.set_y(0x23);
+    cpu.set_x(0x00);
+    cpu.set_a(0x03);
     tone(cpu);
     return;
 }
 
 pub fn DoRaisingExit(cpu: &mut Cpu) {
-    cpu.reg.y = 0x28;
-    cpu.reg.x = 0x00;
-    cpu.reg.a = 0x06;
+    cpu.set_y(0x28);
+    cpu.set_x(0x00);
+    cpu.set_a(0x06);
     tone(cpu);
     return;
 }
 
 pub fn DoRaisingGate(cpu: &mut Cpu) {
-    cpu.reg.y = 0x14;
-    cpu.reg.x = 0x00;
-    cpu.reg.a = 0x02;
+    cpu.set_y(0x14);
+    cpu.set_x(0x00);
+    cpu.set_a(0x02);
     tone(cpu);
     return;
 }
 
 pub fn DoLowerGate(cpu: &mut Cpu) {
-    cpu.reg.y = 0x07;
-    cpu.reg.x = 0x00;
-    cpu.reg.a = 0x08;
+    cpu.set_y(0x07);
+    cpu.set_x(0x00);
+    cpu.set_a(0x08);
     tone(cpu);
     return;
 }
 
 pub fn DoSmackWall(cpu: &mut Cpu) {
-    cpu.reg.y = 0xe8;
-    cpu.reg.x = 0x03;
-    cpu.reg.a = 0x03;
+    cpu.set_y(0xe8);
+    cpu.set_x(0x03);
+    cpu.set_a(0x03);
     tone(cpu);
     return;
 }
@@ -211,24 +210,27 @@ pub fn tone(cpu: &mut Cpu) {
     loop {
         match pc {
             0 => {
-                // raw: patch *:pitch = y            ; SOUND.S:332
-                // raw: patch *:pitch+1 = x            ; SOUND.S:333
+                cpu.local.insert((":pitch", 0), cpu.reg.y);
+                cpu.local.insert((":pitch", 1), cpu.reg.x);
                 pc = 1;
             }
             1 => {
                 let _o: u8 = cpu.mem[sym::spkr];
                 cpu.flags.z = (cpu.reg.a & _o) == 0;
                 cpu.flags.n = (_o >> 7) != 0;
-                cpu.reg.x = 0x00;
+                cpu.set_x(0x00);
                 pc = 2;
             }
             2 => {
-                cpu.reg.y = 0x00;
+                cpu.set_y(0x00);
                 pc = 3;
             }
             3 => {
-                cpu.reg.y = cpu.reg.y.wrapping_add(1);
-                // raw: ??? cpy :pitch            ; SOUND.S:341
+                cpu.set_y(cpu.reg.y.wrapping_add(1));
+                let _o: u8 = cpu.local.get(&(":pitch", 0)).copied().unwrap_or(0);
+                cpu.flags.c = cpu.reg.y >= _o;
+                cpu.flags.z = cpu.reg.y == _o;
+                cpu.flags.n = (cpu.reg.y.wrapping_sub(_o) >> 7) != 0;
                 if !cpu.flags.c {
                     pc = 3;
                 } else {
@@ -236,8 +238,11 @@ pub fn tone(cpu: &mut Cpu) {
                 }
             }
             4 => {
-                cpu.reg.x = cpu.reg.x.wrapping_add(1);
-                // raw: ??? cpx :pitch+1            ; SOUND.S:345
+                cpu.set_x(cpu.reg.x.wrapping_add(1));
+                let _o: u8 = cpu.local.get(&(":pitch", 1)).copied().unwrap_or(0);
+                cpu.flags.c = cpu.reg.x >= _o;
+                cpu.flags.z = cpu.reg.x == _o;
+                cpu.flags.n = (cpu.reg.x.wrapping_sub(_o) >> 7) != 0;
                 if !cpu.flags.c {
                     pc = 2;
                 } else {
@@ -247,8 +252,8 @@ pub fn tone(cpu: &mut Cpu) {
             5 => {
                 cpu.flags.c = true;
                 let _r = (cpu.reg.a as u16) + (!0x01_u8) as u16 + (cpu.flags.c as u16);
-                cpu.reg.a = _r as u8;
                 cpu.flags.c = (_r >> 8) != 0;
+                cpu.set_a(_r as u8);
                 if cpu.reg.a != 0x00 {
                     pc = 1;
                 } else {

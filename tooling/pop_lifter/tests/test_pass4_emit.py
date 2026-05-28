@@ -44,6 +44,7 @@ from pop_lifter.ir1 import (
     LoadIndexed,
     LoadIndirect,
     LocalRef,
+    Lsr,
     OpVarRef,
     Pha,
     Pla,
@@ -53,6 +54,7 @@ from pop_lifter.ir1 import (
     SbcImm,
     SbcIndirect,
     Sec,
+    ShiftMem,
     SourceRef,
     StoreAbs,
     StoreIndexed,
@@ -151,14 +153,14 @@ def test_value_abs_read():
 
 def test_value_indexed_read():
     iv = IndexedAbs(base=_abs("tbl", 0x0200), index=Reg.X)
-    assert _emit_value(iv) == "self.mem[0x0200 + self.reg.x as usize]"
+    assert _emit_value(iv) == "self.mem[(0x0200 + self.reg.x as usize) & 0xffff]"
 
 
 def test_value_indirect_y():
     out = _emit_value(IndirectY(ptr=_abs("ptr", 0x20)))
     assert out == (
-        "self.mem[(self.mem[0x0020] as usize "
-        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize]"
+        "self.mem[((self.mem[0x0020] as usize "
+        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize) & 0xffff]"
     )
 
 
@@ -207,14 +209,14 @@ def test_assign_abs_to_abs():
 def test_assign_indexed_target():
     tgt = IndexedAbs(base=_abs("tbl", 0x0200), index=Reg.Y)
     a = Assign(target=tgt, source=_imm(0), src=SRC)
-    assert _emit_one(a) == "self.mem[0x0200 + self.reg.y as usize] = 0x00;"
+    assert _emit_one(a) == "self.mem[(0x0200 + self.reg.y as usize) & 0xffff] = 0x00;"
 
 
 def test_assign_indirect_y_target():
     a = Assign(target=IndirectY(ptr=_abs("ptr", 0x20)), source=_imm(0), src=SRC)
     assert _emit_one(a) == (
-        "self.mem[(self.mem[0x0020] as usize "
-        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize] = 0x00;"
+        "self.mem[((self.mem[0x0020] as usize "
+        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize) & 0xffff] = 0x00;"
     )
 
 
@@ -224,7 +226,19 @@ def test_return_stmt():
 
 def test_raw_load_abs_is_lowered():
     raw = RawStmt(item=LoadAbs(reg=Reg.A, source=_abs("X", 0x10), src=SRC))
-    assert _emit_one(raw) == "self.reg.a = self.mem[0x0010];"
+    assert _emit_one(raw) == _loaded("a", "self.mem[0x0010]")
+
+
+def test_load_imm_surfaces_source_comment():
+    # A magic immediate keeps its source annotation as a trailing comment.
+    src = SourceRef(file="syn", line=0, raw="", comment='"stabbed"')
+    raw = RawStmt(item=LoadImm(reg=Reg.A, imm=_imm(0x63), src=src))
+    assert _emit_one(raw) == _loaded("a", "0x63", '  // "stabbed"')
+
+
+def test_load_imm_without_comment_has_no_suffix():
+    raw = RawStmt(item=LoadImm(reg=Reg.A, imm=_imm(5), src=SRC))
+    assert _emit_one(raw) == _loaded("a", "0x05")
 
 
 def test_raw_pha_pushes_value_stack():
@@ -237,19 +251,28 @@ def test_raw_pla_pops_and_sets_flags():
     # `pla` pops into A and sets Z/N from the byte, matching the 6502.
     lines = _emit_stmt(RawStmt(item=Pla(src=SRC)), 0)
     assert lines == [
-        'self.reg.a = self.stack.pop().expect("pla on empty stack");',
-        "self.flags.z = self.reg.a == 0;",
-        "self.flags.n = (self.reg.a >> 7) != 0;",
+        'let _v = self.stack.pop().expect("pla on empty stack");',
+        "self.set_a(_v);",
     ]
 
 
 def test_raw_deferred_atom_is_comment():
-    # An SMC operand patch needs a consumer model that isn't lowered yet,
-    # so it stays as a `// raw:` comment rather than emitting wrong code.
-    out = _emit_one(RawStmt(item=StoreLocal(
-        reg=Reg.A, target_label="smXCO", offset=1, src=SRC,
+    # An unrecognised SMC operand bump (`inc :smod+2` on a LocalRef) has
+    # no consumer model yet, so it stays a `// raw:` comment rather than
+    # emitting wrong code.
+    out = _emit_one(RawStmt(item=IncTarget(
+        target=LocalRef(label=":smod", offset=2), src=SRC,
     )))
     assert out.startswith("// raw: ")
+
+
+def test_store_local_lowers_to_local_insert():
+    # StoreLocal now backs the `self.local` keyed byte store that
+    # LoadLocal/CmpLocal read; it lowers instead of deferring.
+    out = _emit_one(RawStmt(item=StoreLocal(
+        reg=Reg.A, target_label="]flag", offset=0, src=SRC,
+    )))
+    assert out == 'self.local.insert(("]flag", 0), self.reg.a);'
 
 
 def test_call_stmt_lowered():
@@ -411,8 +434,8 @@ def test_lower_stats_counts_top_level():
         RawStmt(item=Clc(src=SRC)),  # lowered (carry op)
         RawStmt(item=CmpImm(reg=Reg.A, imm=_imm(0), src=SRC)),  # lowered (cmp flags)
         RawStmt(item=Pha(src=SRC)),  # lowered (stack)
-        RawStmt(item=StoreLocal(  # deferred (SMC operand patch)
-            reg=Reg.A, target_label="smXCO", offset=1, src=SRC)),
+        RawStmt(item=IncTarget(  # deferred (unrecognised SMC operand bump)
+            target=LocalRef(label=":smod", offset=2), src=SRC)),
         CallStmt(target="sub", src=SRC),  # lowered
         ReturnStmt(src=SRC),  # lowered
     ]
@@ -642,8 +665,14 @@ def _raw(item) -> str:
     return _emit_one(RawStmt(item=item))
 
 
+def _loaded(reg: str, rvalue: str, comment: str = "") -> str:
+    """Expected emit for a register write that sets Z/N: a `set_<reg>`
+    call (`Cpu::set_a`/`set_x`/`set_y` write the register + Z/N)."""
+    return f"self.set_{reg}({rvalue});{comment}"
+
+
 def test_raw_load_imm():
-    assert _raw(LoadImm(reg=Reg.X, imm=_imm(0x12), src=SRC)) == "self.reg.x = 0x12;"
+    assert _raw(LoadImm(reg=Reg.X, imm=_imm(0x12), src=SRC)) == _loaded("x", "0x12")
 
 
 def test_raw_load_imm_opvar_reads_operand_var():
@@ -651,7 +680,7 @@ def test_raw_load_imm_opvar_reads_operand_var():
     # variable field that the matching StoreOpVar writes.
     smc = Imm(value=0, text="#smXCO", opvar="smXCO")
     out = _raw(LoadImm(reg=Reg.A, imm=smc, src=SRC))
-    assert out == "self.reg.a = self.smc.smXCO;"
+    assert out == _loaded("a", "self.smc.smXCO")
 
 
 def test_raw_store_opvar_writes_operand_var():
@@ -670,19 +699,26 @@ def test_raw_store_op_addr_writes_byte_halves():
 def test_raw_inc_dec_op_var_ref_bumps_field():
     # inc/dec of a recognised operand var read-modify-writes the field;
     # `half` selects the immediate byte or an address byte.
-    assert _raw(IncTarget(target=OpVarRef(name="smBASE", half="hi"), src=SRC)) == \
-        "self.smc.smBASE_hi = self.smc.smBASE_hi.wrapping_add(1);"
-    assert _raw(DecTarget(target=OpVarRef(name="smXCO", half=None), src=SRC)) == \
-        "self.smc.smXCO = self.smc.smXCO.wrapping_sub(1);"
+    assert _raw(IncTarget(target=OpVarRef(name="smBASE", half="hi"), src=SRC)) == (
+        "let _v = self.smc.smBASE_hi.wrapping_add(1);\n"
+        "self.smc.smBASE_hi = _v;\n"
+        "self.set_nz(_v);"
+    )
+    assert _raw(DecTarget(target=OpVarRef(name="smXCO", half=None), src=SRC)) == (
+        "let _v = self.smc.smXCO.wrapping_sub(1);\n"
+        "self.smc.smXCO = _v;\n"
+        "self.set_nz(_v);"
+    )
 
 
 def test_address_opvar_operand_composes_runtime_base():
     # A fully-patched address opvar reads both byte halves from fields.
     base = Abs(name="$2000", addr=0x2000, opvar="smBASE", opvar_halves=("lo", "hi"))
     item = LoadIndexed(reg=Reg.A, base=base, index=Reg.Y, src=SRC)
-    assert _raw(item) == (
-        "self.reg.a = self.mem[((self.smc.smBASE_hi as usize) << 8 "
-        "| (self.smc.smBASE_lo as usize)) + self.reg.y as usize];"
+    assert _raw(item) == _loaded(
+        "a",
+        "self.mem[(((self.smc.smBASE_hi as usize) << 8 "
+        "| (self.smc.smBASE_lo as usize)) + self.reg.y as usize) & 0xffff]",
     )
 
 
@@ -692,12 +728,12 @@ def test_address_opvar_partial_patch_bakes_assembled_byte():
     # rather than reading an uninitialised `_hi` field.
     base = Abs(name="$12ab", addr=0x12ab, opvar="smodCD", opvar_halves=("lo",))
     item = LoadAbs(reg=Reg.A, source=base, src=SRC)
-    assert _raw(item) == "self.reg.a = self.mem[((0x12) << 8 | (self.smc.smodCD_lo as usize))];"
+    assert _raw(item) == _loaded("a", "self.mem[((0x12) << 8 | (self.smc.smodCD_lo as usize))]")
 
 
 def test_raw_load_indexed():
     item = LoadIndexed(reg=Reg.A, base=_abs("tbl", 0x0200), index=Reg.Y, src=SRC)
-    assert _raw(item) == "self.reg.a = self.mem[0x0200 + self.reg.y as usize];"
+    assert _raw(item) == _loaded("a", "self.mem[(0x0200 + self.reg.y as usize) & 0xffff]")
 
 
 def test_raw_store_abs():
@@ -706,36 +742,45 @@ def test_raw_store_abs():
 
 def test_raw_store_indexed():
     item = StoreIndexed(reg=Reg.A, base=_abs("tbl", 0x0200), index=Reg.X, src=SRC)
-    assert _raw(item) == "self.mem[0x0200 + self.reg.x as usize] = self.reg.a;"
+    assert _raw(item) == "self.mem[(0x0200 + self.reg.x as usize) & 0xffff] = self.reg.a;"
 
 
 def test_raw_transfer():
-    assert _raw(Transfer(src_reg=Reg.A, dst_reg=Reg.X, src=SRC)) == "self.reg.x = self.reg.a;"
+    assert _raw(Transfer(src_reg=Reg.A, dst_reg=Reg.X, src=SRC)) == "self.set_x(self.reg.a);"
 
 
 def test_raw_bitwise_and_or_eor():
-    assert _raw(Bitwise(op="and", source=_imm(0x0f), src=SRC)) == "self.reg.a &= 0x0f;"
-    assert _raw(Bitwise(op="or", source=_abs("M", 0x40), src=SRC)) == "self.reg.a |= self.mem[0x0040];"
+    assert _raw(Bitwise(op="and", source=_imm(0x0f), src=SRC)) == "self.set_a(self.reg.a & 0x0f);"
+    assert _raw(Bitwise(op="or", source=_abs("M", 0x40), src=SRC)) == "self.set_a(self.reg.a | self.mem[0x0040]);"
     eor_indexed = Bitwise(op="eor", source=IndexedAbs(base=_abs("t", 0x0200), index=Reg.X), src=SRC)
-    assert _raw(eor_indexed) == "self.reg.a ^= self.mem[0x0200 + self.reg.x as usize];"
+    assert _raw(eor_indexed) == "self.set_a(self.reg.a ^ self.mem[(0x0200 + self.reg.x as usize) & 0xffff]);"
 
 
 def test_raw_bitwise_indirect():
     item = Bitwise(op="and", source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
     assert _raw(item) == (
-        "self.reg.a &= self.mem[(self.mem[0x0020] as usize "
-        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize];"
+        "self.set_a(self.reg.a & self.mem[((self.mem[0x0020] as usize "
+        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize) & 0xffff]);"
     )
 
 
 def test_raw_inc_dec_register():
-    assert _raw(IncTarget(target=Reg.X, src=SRC)) == "self.reg.x = self.reg.x.wrapping_add(1);"
-    assert _raw(DecTarget(target=Reg.Y, src=SRC)) == "self.reg.y = self.reg.y.wrapping_sub(1);"
+    # inc/dec set Z/N from the post-update value (6502; matches the interp).
+    assert _raw(IncTarget(target=Reg.X, src=SRC)) == "self.set_x(self.reg.x.wrapping_add(1));"
+    assert _raw(DecTarget(target=Reg.Y, src=SRC)) == "self.set_y(self.reg.y.wrapping_sub(1));"
 
 
 def test_raw_inc_dec_memory():
-    assert _raw(IncTarget(target=_abs("M", 0x40), src=SRC)) == "self.mem[0x0040] = self.mem[0x0040].wrapping_add(1);"
-    assert _raw(DecTarget(target=_abs("M", 0x40), src=SRC)) == "self.mem[0x0040] = self.mem[0x0040].wrapping_sub(1);"
+    assert _raw(IncTarget(target=_abs("M", 0x40), src=SRC)) == (
+        "let _v = self.mem[0x0040].wrapping_add(1);\n"
+        "self.mem[0x0040] = _v;\n"
+        "self.set_nz(_v);"
+    )
+    assert _raw(DecTarget(target=_abs("M", 0x40), src=SRC)) == (
+        "let _v = self.mem[0x0040].wrapping_sub(1);\n"
+        "self.mem[0x0040] = _v;\n"
+        "self.set_nz(_v);"
+    )
 
 
 def test_raw_inc_local_ref_deferred():
@@ -746,24 +791,25 @@ def test_raw_inc_local_ref_deferred():
 
 def _indirect(name: str, addr: int) -> str:
     return (
-        f"self.mem[(self.mem[{addr:#06x}] as usize "
-        f"| (self.mem[{addr + 1:#06x}] as usize) << 8) + self.reg.y as usize]"
+        f"self.mem[((self.mem[{addr:#06x}] as usize "
+        f"| (self.mem[{addr + 1:#06x}] as usize) << 8) + self.reg.y as usize) & 0xffff]"
     )
 
 
 def test_raw_load_indirect():
     item = LoadIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
-    assert _raw(item) == f"self.reg.a = {_indirect('ptr', 0x20)};"
+    assert _raw(item) == _loaded("a", _indirect('ptr', 0x20))
 
 
 def test_raw_load_indirect_x_pre_indexed():
     # `(ptr,x)`: X indexes the zero-page pointer location (with zp wrap);
     # the fetched 16-bit pointer is the effective address (no post-index).
     item = LoadIndirect(reg=Reg.A, source=IndirectX(ptr=_abs("PAC", 0x00)), src=SRC)
-    assert _raw(item) == (
-        "self.reg.a = self.mem[(self.mem[(0x0000 + self.reg.x as usize) & 0xff] "
+    assert _raw(item) == _loaded(
+        "a",
+        "self.mem[(self.mem[(0x0000 + self.reg.x as usize) & 0xff] "
         "as usize | (self.mem[(0x0000 + self.reg.x as usize + 1) & 0xff] "
-        "as usize) << 8)];"
+        "as usize) << 8)]",
     )
 
 
@@ -776,11 +822,11 @@ def test_raw_sbc_indirect():
     item = SbcIndirect(source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
     lines = _emit_stmt(RawStmt(item=item), 0)
     assert lines[0] == (
-        "let _r = (self.reg.a as u16) + (!self.mem[(self.mem[0x0020] as usize "
-        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize]) as u16 + (self.flags.c as u16);"
+        "let _r = (self.reg.a as u16) + (!self.mem[((self.mem[0x0020] as usize "
+        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize) & 0xffff]) as u16 + (self.flags.c as u16);"
     )
-    assert lines[1] == "self.reg.a = _r as u8;"
-    assert lines[2] == "self.flags.c = (_r >> 8) != 0;"
+    assert lines[1] == "self.flags.c = (_r >> 8) != 0;"
+    assert lines[2] == "self.set_a(_r as u8);"
 
 
 def test_raw_sbc_imm_complement_is_byte_width():
@@ -804,8 +850,8 @@ def test_indirect_high_byte_resolves_to_symbol():
     lo = Assign(target=_abs("ztemp", 0xF0), source=_imm(0), src=SRC)
     load = RawStmt(item=LoadIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ztemp", 0xF0)), src=SRC))
     out = emit_module(_module([_routine([lo, load, ReturnStmt(src=SRC)], name="r")]))
-    assert "self.reg.a = self.mem[(self.mem[sym::ztemp] as usize " in out
-    assert "(self.mem[sym::ztemp + 1] as usize) << 8) + self.reg.y as usize];" in out
+    assert "self.set_a(self.mem[((self.mem[sym::ztemp] as usize " in out
+    assert "(self.mem[sym::ztemp + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);" in out
 
 
 def test_indirect_ptr_with_offset_folds_into_high_byte():
@@ -813,8 +859,8 @@ def test_indirect_ptr_with_offset_folds_into_high_byte():
     # the high byte is `ztemp+2`, not the unparseable `ztemp+1+1`.
     load = RawStmt(item=LoadIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ztemp+1", 0xF1)), src=SRC))
     out = emit_module(_module([_routine([load, ReturnStmt(src=SRC)], name="r")]))
-    assert "self.reg.a = self.mem[(self.mem[sym::ztemp + 1] as usize " in out
-    assert "(self.mem[sym::ztemp + 2] as usize) << 8) + self.reg.y as usize];" in out
+    assert "self.set_a(self.mem[((self.mem[sym::ztemp + 1] as usize " in out
+    assert "(self.mem[sym::ztemp + 2] as usize) << 8) + self.reg.y as usize) & 0xffff]);" in out
 
 
 # ---------------------------------------------------------------- cmp / bit flag lowering
@@ -842,15 +888,15 @@ def test_raw_cmp_abs_and_indexed():
     assert abs_lines[0] == "let _o: u8 = self.mem[0x0040];"
     idx = CmpIndexed(reg=Reg.A, base=_abs("tbl", 0x0200), index=Reg.X, src=SRC)
     idx_lines = _emit_stmt(RawStmt(item=idx), 0)
-    assert idx_lines[0] == "let _o: u8 = self.mem[0x0200 + self.reg.x as usize];"
+    assert idx_lines[0] == "let _o: u8 = self.mem[(0x0200 + self.reg.x as usize) & 0xffff];"
 
 
 def test_raw_cmp_indirect():
     item = CmpIndirect(reg=Reg.A, source=IndirectY(ptr=_abs("ptr", 0x20)), src=SRC)
     lines = _emit_stmt(RawStmt(item=item), 0)
     assert lines[0] == (
-        "let _o: u8 = self.mem[(self.mem[0x0020] as usize "
-        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize];"
+        "let _o: u8 = self.mem[((self.mem[0x0020] as usize "
+        "| (self.mem[0x0021] as usize) << 8) + self.reg.y as usize) & 0xffff];"
     )
     assert lines[1] == "self.flags.c = self.reg.a >= _o;"
 
@@ -887,8 +933,10 @@ def test_wide16_add():
         "self.mem[0x0030] = _lo as u8;",
         "let _hi = (self.mem[0x0021] as u16) + (0x33 as u16) + (_lo >> 8);",
         "self.mem[0x0031] = _hi as u8;",
-        "self.reg.a = _hi as u8;",
+        # high-byte result + carry, with Z/N from the high byte (a
+        # following `bne`/`beq` reads them — see grafix/CVTX).
         "self.flags.c = (_hi >> 8) != 0;",
+        "self.set_a(_hi as u8);",
     ]
 
 
@@ -898,7 +946,7 @@ def test_wide16_subtract_uses_complement_identity():
     lines = _emit_stmt(_wide16("-"), 0)
     assert lines[0] == "let _lo = (self.mem[0x0020] as u16) + (!0x44_u8 as u16) + 1;"
     assert lines[2] == "let _hi = (self.mem[0x0021] as u16) + (!0x33_u8 as u16) + (_lo >> 8);"
-    assert lines[4:] == ["self.reg.a = _hi as u8;", "self.flags.c = (_hi >> 8) != 0;"]
+    assert lines[4:] == ["self.flags.c = (_hi >> 8) != 0;", "self.set_a(_hi as u8);"]
 
 
 def test_wide16_memory_operand_not_u8_suffixed():
@@ -991,27 +1039,57 @@ def test_raw_clc_and_sec():
 
 def test_raw_adc_imm():
     lines = _emit_stmt(RawStmt(item=AdcImm(imm=_imm(0xbd), src=SRC)), 0)
-    assert lines[0] == "let _r = (self.reg.a as u16) + (0xbd) as u16 + (self.flags.c as u16);"
-    assert lines[1] == "self.reg.a = _r as u8;"
-    assert lines[2] == "self.flags.c = (_r >> 8) != 0;"
+    # adc/sbc set the result + carry + Z/N; `set_a` writes A and Z/N.
+    assert lines == [
+        "let _r = (self.reg.a as u16) + (0xbd) as u16 + (self.flags.c as u16);",
+        "self.flags.c = (_r >> 8) != 0;",
+        "self.set_a(_r as u8);",
+    ]
 
 
 def test_raw_asl_and_lsr():
-    asl_lines = _emit_stmt(RawStmt(item=Asl(src=SRC)), 0)
-    assert asl_lines[0] == "self.flags.c = (self.reg.a >> 7) != 0;"
-    assert asl_lines[1] == "self.reg.a = self.reg.a.wrapping_shl(1);"
-    lsr_lines = _emit_stmt(RawStmt(item=Ror(src=SRC)), 0)
-    assert lsr_lines[0] == "let _c = self.reg.a & 1;"
-    assert lsr_lines[2] == "self.flags.c = _c != 0;"
+    # Accumulator shifts: carry from the shifted-out bit, then `set_a`
+    # writes A and its Z/N.
+    assert _emit_stmt(RawStmt(item=Asl(src=SRC)), 0) == [
+        "self.flags.c = (self.reg.a >> 7) != 0;",
+        "self.set_a(self.reg.a.wrapping_shl(1));",
+    ]
+    assert _emit_stmt(RawStmt(item=Lsr(src=SRC)), 0) == [
+        "self.flags.c = (self.reg.a & 1) != 0;",
+        "self.set_a(self.reg.a.wrapping_shr(1));",
+    ]
 
 
 def test_raw_rol_and_ror():
-    rol = _emit_stmt(RawStmt(item=Rol(src=SRC)), 0)
-    assert rol[0] == "let _c = self.reg.a >> 7;"
-    assert rol[1] == "self.reg.a = self.reg.a.wrapping_shl(1) | (self.flags.c as u8);"
-    assert rol[2] == "self.flags.c = _c != 0;"
-    ror = _emit_stmt(RawStmt(item=Ror(src=SRC)), 0)
-    assert ror[1] == "self.reg.a = self.reg.a.wrapping_shr(1) | ((self.flags.c as u8) << 7);"
+    # Rotates read the old carry into the shifted byte (so `set_a`, which
+    # reads the current carry, runs before carry is updated to `_c`).
+    assert _emit_stmt(RawStmt(item=Rol(src=SRC)), 0) == [
+        "let _c = self.reg.a >> 7;",
+        "self.set_a(self.reg.a.wrapping_shl(1) | (self.flags.c as u8));",
+        "self.flags.c = _c != 0;",
+    ]
+    assert _emit_stmt(RawStmt(item=Ror(src=SRC)), 0) == [
+        "let _c = self.reg.a & 1;",
+        "self.set_a(self.reg.a.wrapping_shr(1) | ((self.flags.c as u8) << 7));",
+        "self.flags.c = _c != 0;",
+    ]
+
+
+def test_raw_shift_mem():
+    # Memory shift/rotate: result lands in memory, so Z/N go through
+    # `set_nz` (flags-only) rather than `set_a`.
+    place = "self.mem[0x0040]"
+    assert _raw(ShiftMem(op="asl", target=_abs("M", 0x40), src=SRC)) == "\n".join([
+        f"self.flags.c = ({place} >> 7) != 0;",
+        f"{place} = {place}.wrapping_shl(1);",
+        f"self.set_nz({place});",
+    ])
+    assert _raw(ShiftMem(op="ror", target=_abs("M", 0x40), src=SRC)) == "\n".join([
+        f"let _c = {place} & 1;",
+        f"{place} = {place}.wrapping_shr(1) | ((self.flags.c as u8) << 7);",
+        "self.flags.c = _c != 0;",
+        f"self.set_nz({place});",
+    ])
 
 
 # ---------------------------------------------------------------- multi-module emit

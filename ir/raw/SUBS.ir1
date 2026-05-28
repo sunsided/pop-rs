@@ -213,7 +213,7 @@ fn pstars {
 :loop:
   a = *(pstarcount@0x0347 + x)   ; SUBS.S:362
   if eq goto :ok       ; SUBS.S:363
-  ??? dec pstarcount,x            ; SUBS.S:364
+  *(pstarcount@0x0347 + x) -= 1                         ; SUBS.S:364
   if ne goto :ok       ; SUBS.S:365
   a = x                            ; SUBS.S:366
   push a                           ; SUBS.S:367

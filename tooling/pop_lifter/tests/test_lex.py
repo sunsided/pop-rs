@@ -75,3 +75,34 @@ def test_indented_ds_no_label():
     assert line.label is None
     assert line.mnemonic == "ds"
     assert line.operand == "15"
+
+
+def test_space_delimited_comment_after_operand():
+    # Merlin ends the operand at the first unquoted whitespace; the rest
+    # is a comment even without a `;` (POP does this with jokey labels).
+    line = L(" lda #99 \"stabbed\"")
+    assert line.mnemonic == "lda"
+    assert line.operand == "#99"
+    assert line.comment == '"stabbed"'
+
+
+def test_negative_immediate_with_space_comment():
+    line = L(" lda #-5 impaled")
+    assert line.mnemonic == "lda"
+    assert line.operand == "#-5"
+    assert line.comment == "impaled"
+
+
+def test_quoted_operand_keeps_internal_spaces():
+    # A quoted string operand (asc/dci/...) must keep its spaces — the
+    # split only triggers on whitespace *outside* quotes.
+    line = L(' asc "FOO BAR"')
+    assert line.mnemonic == "asc"
+    assert line.operand == '"FOO BAR"'
+    assert line.comment is None
+
+
+def test_indexed_operand_unaffected():
+    line = L(" sta table,x")
+    assert line.operand == "table,x"
+    assert line.comment is None

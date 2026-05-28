@@ -3,8 +3,9 @@
 Merlin's grammar is column-aware: a non-whitespace first character starts a
 label; otherwise the line has no label. After (optional) label/whitespace
 the next token is the mnemonic (an opcode, a pseudo-op, or `=` for an
-equate). Anything after the mnemonic up to a `;` or end-of-line is the
-operand. Lines beginning with `*` are full-line comments.
+equate). The operand runs from there up to a `;`, the first whitespace
+that isn't inside a quoted string, or end-of-line; anything after is a
+comment. Lines beginning with `*` are full-line comments.
 
 This module produces a flat `Line` per source line; expression evaluation
 and semantic interpretation happen in `pass0_parse`.
@@ -35,6 +36,24 @@ class Line:
     @property
     def is_equate(self) -> bool:
         return self.mnemonic == "="
+
+
+def _split_operand_comment(s: str) -> tuple[str, str | None]:
+    """Split an operand field from a trailing comment. Merlin ends the
+    operand at the first whitespace that isn't inside a quoted string;
+    everything after is a comment. This covers POP's no-`;` annotations
+    (`lda #99 "stabbed"`, `lda #-5 impaled`) while leaving a quoted
+    operand's internal spaces intact (`asc "FOO BAR"`)."""
+    quote: str | None = None
+    for i, c in enumerate(s):
+        if quote is not None:
+            if c == quote:
+                quote = None
+        elif c in ('"', "'"):
+            quote = c
+        elif c.isspace():
+            return s[:i], s[i + 1:].strip() or None
+    return s, None
 
 
 def lex_line(file: Path, lineno: int, raw: str) -> Line:
@@ -82,7 +101,14 @@ def lex_line(file: Path, lineno: int, raw: str) -> Line:
     # Otherwise split mnemonic from operand on the first run of whitespace.
     parts = rest.split(None, 1)
     mnemonic = parts[0].lower()
-    operand = parts[1].strip() if len(parts) == 2 else None
+    operand: str | None = None
+    if len(parts) == 2:
+        operand, op_comment = _split_operand_comment(parts[1])
+        operand = operand.strip() or None
+        # A space-delimited (no-`;`) comment after the operand — keep it,
+        # combining with any `;` comment already split off.
+        if op_comment:
+            comment = f"{op_comment} ; {comment}" if comment else op_comment
     return Line(file, lineno, raw, label, mnemonic, operand, comment)
 
 

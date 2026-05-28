@@ -804,7 +804,7 @@ fn PREAD {
 :1:
   a = *($c064@0xc064 + x)   ; GRAFIX.S:1207
   if pl goto :beat       ; GRAFIX.S:1208
-  ??? inc joyX,x            ; GRAFIX.S:1209
+  *(joyX@0x003b + x) += 1                         ; GRAFIX.S:1209
 :nextpdl:
   x -= 1                         ; GRAFIX.S:1210
   if pl goto :1       ; GRAFIX.S:1211
@@ -944,10 +944,10 @@ fn tone {
   y = #0x00                  ; GRAFIX.S:1348
 :inloop:
   y += 1                         ; GRAFIX.S:1349
-  ??? cpy :pitch            ; GRAFIX.S:1350
+  cmp y, *:pitch    ; GRAFIX.S:1350
   if cc goto :inloop       ; GRAFIX.S:1351
   x += 1                         ; GRAFIX.S:1352
-  ??? cpx :pitch+1            ; GRAFIX.S:1353
+  cmp x, *:pitch+1    ; GRAFIX.S:1353
   if cc goto :midloop       ; GRAFIX.S:1354
   c = 1                            ; GRAFIX.S:1355
   a = a - #0x01 - (1 - c)        ; GRAFIX.S:1356

@@ -692,7 +692,7 @@ fn SETUPCOMIX {
   *FCharY@0x0073 = a            ; GAMEBG.S:999
   goto :8                ; GAMEBG.S:1000
 :imp:
-  ??? lda #-5 impaled            ; GAMEBG.S:1004
+  a = #0xfb                  ; GAMEBG.S:1004
   if ne goto :9       ; GAMEBG.S:1005
 :8:
   a = #0x05                  ; GAMEBG.S:1006
@@ -909,7 +909,7 @@ fn :sub {
   *FCharY@0x0073 = a            ; GAMEBG.S:999
   goto :8                ; GAMEBG.S:1000
 :imp:
-  ??? lda #-5 impaled            ; GAMEBG.S:1004
+  a = #0xfb                  ; GAMEBG.S:1004
   if ne goto :9       ; GAMEBG.S:1005
 :8:
   a = #0x05                  ; GAMEBG.S:1006

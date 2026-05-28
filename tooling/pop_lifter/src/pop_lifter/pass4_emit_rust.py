@@ -103,6 +103,7 @@ from .ir1 import (
     CmpImm,
     CmpIndexed,
     CmpIndirect,
+    CmpLocal,
     Compare,
     DecTarget,
     FlagOp,
@@ -115,6 +116,7 @@ from .ir1 import (
     LoadImm,
     LoadIndexed,
     LoadIndirect,
+    LoadLocal,
     Lsr,
     MemBitOp,
     OpVarRef,
@@ -133,6 +135,7 @@ from .ir1 import (
     StoreAbs,
     StoreIndexed,
     StoreIndirect,
+    StoreLocal,
     StoreOpAddr,
     StoreOpVar,
     Transfer,
@@ -388,12 +391,48 @@ def _indirect_index(iy: IndirectY, syms: SymTable | None) -> str:
     address: fetch the 16-bit pointer from the zero-page bytes at `ptr`
     (low) and `ptr + 1` (high), then add Y. The high byte is rendered via
     `_offset_abs(ptr, 1)` so it resolves to `sym::<base> + <off+1>` even
-    when `ptr` itself carries an offset (`(ztemp+1),y`). Matches the
-    interpreter's permissive rule (no page wrap on the pointer, no 16-bit
-    wrap on `+ Y`) and the unmasked `IndexedAbs` form."""
+    when `ptr` itself carries an offset (`(ztemp+1),y`). The effective
+    address is wrapped to 16 bits (`& 0xffff`), matching the interpreter
+    (`_resolve_indirect_y`) so a high pointer plus Y wraps rather than
+    indexing past the end of `self.mem`."""
     lo = f"self.mem[{_abs_index(iy.ptr, syms)}]"
     hi = f"self.mem[{_abs_index(_offset_abs(iy.ptr, 1), syms)}]"
-    return f"({lo} as usize | ({hi} as usize) << 8) + self.reg.y as usize"
+    return f"(({lo} as usize | ({hi} as usize) << 8) + self.reg.y as usize) & 0xffff"
+
+
+def _indexed_place(base: str, idx) -> str:
+    """`self.mem[…]` for a `base,idx` indexed access, with the effective
+    address wrapped to 16 bits (`& 0xffff`) like the interpreter
+    (`_indexed_addr`). Without the wrap a base near the top of memory plus
+    a non-zero index would panic on an out-of-range `self.mem` index
+    instead of wrapping as the 6502 does."""
+    return f"self.mem[({base} + self.reg.{idx} as usize) & 0xffff]"
+
+
+def _set_zn_lines(place: str) -> list[str]:
+    """Set Z/N from `place` for an op that writes memory but still sets the
+    flags (inc/dec/shift on memory). Routes through `Cpu::set_nz` so the
+    flag rule lives in one spot."""
+    return [f"self.set_nz({place});"]
+
+
+def _load_with_flags(reg, rvalue: str, comment: str = "") -> list[str]:
+    """A register write that also sets Z/N from the stored byte (loads,
+    transfers, bitwise, shifts, adc/sbc, pulls). Emits `self.set_<reg>(v)`
+    — `Cpu::set_a`/`set_x`/`set_y` write the register and Z/N together — so
+    a flag live-out across a fusion-breaking `jsr`/`rts` stays correct and
+    the rule isn't duplicated at every call site. `comment` is an optional
+    trailing `// …`. The value `rvalue` must not itself borrow `self`
+    mutably (e.g. `stack.pop()`); such callers bind a temp first."""
+    return [f"self.set_{reg}({rvalue});{comment}"]
+
+
+def _local_key(label: str, offset: int) -> str:
+    """Render the `(label, offset)` key for the `self.local` byte store
+    shared by `StoreLocal` / `LoadLocal` / `CmpLocal`. Local (`:`) and
+    Merlin-variable (`]`) names have no resolved address, so the symbolic
+    name string itself is the key (`(":pitch", 1)`)."""
+    return f'("{label}", {offset})'
 
 
 def _indirect_x_index(ix: IndirectX, syms: SymTable | None) -> str:
@@ -416,7 +455,9 @@ def _cmp_operand(item, syms: SymTable | None) -> str:
     if isinstance(item, CmpAbs):
         return f"self.mem[{_abs_index(item.source, syms)}]"
     if isinstance(item, CmpIndexed):
-        return f"self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize]"
+        return _indexed_place(_abs_index(item.base, syms), item.index)
+    if isinstance(item, CmpLocal):
+        return f"self.local.get(&{_local_key(item.source_label, item.offset)}).copied().unwrap_or(0)"
     return f"self.mem[{_indirect_index(item.source, syms)}]"  # CmpIndirect
 
 
@@ -441,7 +482,7 @@ def _emit_value(v, syms: SymTable | None = None) -> str:
     if isinstance(v, Abs):
         return f"self.mem[{_abs_index(v, syms)}]"
     if isinstance(v, IndexedAbs):
-        return f"self.mem[{_abs_index(v.base, syms)} + self.reg.{v.index} as usize]"
+        return _indexed_place(_abs_index(v.base, syms), v.index)
     if isinstance(v, IndirectY):
         return f"self.mem[{_indirect_index(v, syms)}]"
     if isinstance(v, BinExpr):
@@ -472,7 +513,7 @@ def _emit_target(target, syms: SymTable | None = None) -> str | None:
     if isinstance(target, Abs):
         return f"self.mem[{_abs_index(target, syms)}]"
     if isinstance(target, IndexedAbs):
-        return f"self.mem[{_abs_index(target.base, syms)} + self.reg.{target.index} as usize]"
+        return _indexed_place(_abs_index(target.base, syms), target.index)
     if isinstance(target, IndirectY):
         return f"self.mem[{_indirect_index(target, syms)}]"
     return None  # anything else: deferred
@@ -544,14 +585,22 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
     `StoreOpAddr` 16-bit address). The opaque `StoreLocal` (offset-0
     opcode patches, branch / jump-target patches) stays deferred."""
     if isinstance(item, LoadImm):
-        return [f"self.reg.{item.reg} = {_emit_imm(item.imm)};"]
+        # Surface the source comment so a magic immediate keeps its name
+        # (`self.reg.a = 0x63; // "stabbed"`).
+        cmt = f"  // {item.src.comment}" if item.src.comment else ""
+        return _load_with_flags(item.reg, _emit_imm(item.imm), cmt)
 
     if isinstance(item, LoadAbs):
-        return [f"self.reg.{item.reg} = self.mem[{_abs_index(item.source, syms)}];"]
+        return _load_with_flags(item.reg, f"self.mem[{_abs_index(item.source, syms)}]")
+
+    if isinstance(item, LoadLocal):
+        key = _local_key(item.source_label, item.offset)
+        return _load_with_flags(
+            item.reg, f"self.local.get(&{key}).copied().unwrap_or(0)"
+        )
 
     if isinstance(item, LoadIndexed):
-        place = f"self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize]"
-        return [f"self.reg.{item.reg} = {place};"]
+        return _load_with_flags(item.reg, _indexed_place(_abs_index(item.base, syms), item.index))
 
     if isinstance(item, LoadIndirect):
         idx = (
@@ -559,43 +608,53 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             if isinstance(item.source, IndirectX)
             else _indirect_index(item.source, syms)
         )
-        return [f"self.reg.{item.reg} = self.mem[{idx}];"]
+        return _load_with_flags(item.reg, f"self.mem[{idx}]")
 
     if isinstance(item, StoreAbs):
         return [f"self.mem[{_abs_index(item.target, syms)}] = self.reg.{item.reg};"]
 
     if isinstance(item, StoreIndexed):
-        place = f"self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize]"
+        place = _indexed_place(_abs_index(item.base, syms), item.index)
         return [f"{place} = self.reg.{item.reg};"]
 
     if isinstance(item, StoreIndirect):
         return [f"self.mem[{_indirect_index(item.target, syms)}] = self.reg.{item.reg};"]
 
     if isinstance(item, Transfer):
-        return [f"self.reg.{item.dst_reg} = self.reg.{item.src_reg};"]
+        return [f"self.set_{item.dst_reg}(self.reg.{item.src_reg});"]
 
     if isinstance(item, Bitwise):
         op = _BITWISE_OPS.get(item.op)
         if op is None or not isinstance(item.source, (Imm, Abs, IndexedAbs, IndirectY)):
             return None
-        return [f"self.reg.a {op}= {_emit_value(item.source, syms)};"]
+        return [f"self.set_a(self.reg.a {op} {_emit_value(item.source, syms)});"]
 
     if isinstance(item, (IncTarget, DecTarget)):
         method = "wrapping_add" if isinstance(item, IncTarget) else "wrapping_sub"
         target = item.target
+        # inc/dec set Z/N from the post-update value (6502 semantics). For a
+        # register target `set_<reg>` writes the value and Z/N together; for
+        # memory the temp avoids recomputing an indexed place, and `set_nz`
+        # keeps an unfused `dec foo ; bne` reading the right Z.
         if isinstance(target, Reg):
-            return [f"self.reg.{target} = self.reg.{target}.{method}(1);"]
+            return [f"self.set_{target}(self.reg.{target}.{method}(1));"]
         if isinstance(target, Abs):
             place = f"self.mem[{_abs_index(target, syms)}]"
-            return [f"{place} = {place}.{method}(1);"]
-        if isinstance(target, OpVarRef):
+        elif isinstance(target, IndexedAbs):
+            place = _indexed_place(_abs_index(target.base, syms), target.index)
+        elif isinstance(target, OpVarRef):
             # Recognised SMC operand bump: read-modify-write the operand
             # variable the matching store wrote and the patched instruction
             # reads. `half` picks the immediate byte or an address byte.
             suffix = f"_{target.half}" if target.half else ""
             place = f"self.smc.{_mangle(target.name)}{suffix}"
-            return [f"{place} = {place}.{method}(1);"]
-        return None  # unrecognised LocalRef bump — deferred
+        else:
+            return None  # unrecognised LocalRef bump — deferred
+        return [
+            f"let _v = {place}.{method}(1);",
+            f"{place} = _v;",
+            "self.set_nz(_v);",
+        ]
 
     # ---- carry / flag operations ----------------------------------------
 
@@ -615,11 +674,11 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         elif isinstance(item, AdcAbs):
             rhs = f"self.mem[{_abs_index(item.source, syms)}] as u16"
         else:
-            rhs = f"self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize] as u16"
+            rhs = f"{_indexed_place(_abs_index(item.base, syms), item.index)} as u16"
         return [
             f"let _r = (self.reg.a as u16) + {rhs} + (self.flags.c as u16);",
-            "self.reg.a = _r as u8;",
             "self.flags.c = (_r >> 8) != 0;",
+            "self.set_a(_r as u8);",
         ]
 
     if isinstance(item, (SbcImm, SbcAbs, SbcIndexed, SbcIndirect)):
@@ -633,38 +692,38 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         elif isinstance(item, SbcAbs):
             rhs = f"(!self.mem[{_abs_index(item.source, syms)}]) as u16"
         elif isinstance(item, SbcIndexed):
-            rhs = f"(!self.mem[{_abs_index(item.base, syms)} + self.reg.{item.index} as usize]) as u16"
+            rhs = f"(!{_indexed_place(_abs_index(item.base, syms), item.index)}) as u16"
         else:
             rhs = f"(!self.mem[{_indirect_index(item.source, syms)}]) as u16"
         return [
             f"let _r = (self.reg.a as u16) + {rhs} + (self.flags.c as u16);",
-            "self.reg.a = _r as u8;",
             "self.flags.c = (_r >> 8) != 0;",
+            "self.set_a(_r as u8);",
         ]
 
     if isinstance(item, Asl):
         return [
             "self.flags.c = (self.reg.a >> 7) != 0;",
-            "self.reg.a = self.reg.a.wrapping_shl(1);",
+            "self.set_a(self.reg.a.wrapping_shl(1));",
         ]
 
     if isinstance(item, Lsr):
         return [
             "self.flags.c = (self.reg.a & 1) != 0;",
-            "self.reg.a = self.reg.a.wrapping_shr(1);",
+            "self.set_a(self.reg.a.wrapping_shr(1));",
         ]
 
     if isinstance(item, Rol):
         return [
             "let _c = self.reg.a >> 7;",
-            "self.reg.a = self.reg.a.wrapping_shl(1) | (self.flags.c as u8);",
+            "self.set_a(self.reg.a.wrapping_shl(1) | (self.flags.c as u8));",
             "self.flags.c = _c != 0;",
         ]
 
     if isinstance(item, Ror):
         return [
             "let _c = self.reg.a & 1;",
-            "self.reg.a = self.reg.a.wrapping_shr(1) | ((self.flags.c as u8) << 7);",
+            "self.set_a(self.reg.a.wrapping_shr(1) | ((self.flags.c as u8) << 7));",
             "self.flags.c = _c != 0;",
         ]
 
@@ -674,28 +733,32 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
             return [
                 f"self.flags.c = ({place} >> 7) != 0;",
                 f"{place} = {place}.wrapping_shl(1);",
+                *_set_zn_lines(place),
             ]
         if item.op == "lsr":
             return [
                 f"self.flags.c = ({place} & 1) != 0;",
                 f"{place} = {place}.wrapping_shr(1);",
+                *_set_zn_lines(place),
             ]
         if item.op == "rol":
             return [
                 f"let _c = {place} >> 7;",
                 f"{place} = {place}.wrapping_shl(1) | (self.flags.c as u8);",
                 "self.flags.c = _c != 0;",
+                *_set_zn_lines(place),
             ]
         if item.op == "ror":
             return [
                 f"let _c = {place} & 1;",
                 f"{place} = {place}.wrapping_shr(1) | ((self.flags.c as u8) << 7);",
                 "self.flags.c = _c != 0;",
+                *_set_zn_lines(place),
             ]
 
     # ---- flag-only comparisons ------------------------------------------
 
-    if isinstance(item, (CmpImm, CmpAbs, CmpIndexed, CmpIndirect)):
+    if isinstance(item, (CmpImm, CmpAbs, CmpIndexed, CmpIndirect, CmpLocal)):
         reg = f"self.reg.{item.reg}"
         return [
             f"let _o: u8 = {_cmp_operand(item, syms)};",
@@ -739,18 +802,31 @@ def _emit_raw(item, syms: SymTable | None = None) -> list[str] | None:
         ]
 
     if isinstance(item, Pla):
+        # `stack.pop()` borrows self mutably, so it can't be the argument
+        # to `set_a` (two-phase borrow); bind it first.
         return [
-            "self.reg.a = self.stack.pop().expect(\"pla on empty stack\");",
-            "self.flags.z = self.reg.a == 0;",
-            "self.flags.n = (self.reg.a >> 7) != 0;",
+            "let _v = self.stack.pop().expect(\"pla on empty stack\");",
+            "self.set_a(_v);",
+        ]
+
+    if isinstance(item, StoreLocal):
+        # Local-label / Merlin-variable store. The recognised SMC operand
+        # patches were already rewritten to StoreOpVar/StoreOpAddr by
+        # pass 3; what reaches here is local *data* stores (`sta ]flag`)
+        # plus unrecognised opcode/branch-target patches. All ride the
+        # `self.local` keyed byte store that LoadLocal/CmpLocal read back
+        # (a dead write for the patch cases, which have no modelled
+        # reader — we don't re-execute patched code).
+        return [
+            f"self.local.insert({_local_key(item.target_label, item.offset)}, "
+            f"self.reg.{item.reg});"
         ]
 
     # ---- self-modifying code (recognised immediate-operand patch) -------
     # `pass3_smc` rewrote `sta :label+1` (patching the `#imm` byte of the
     # instruction at `:label`) into a `StoreOpVar`, and marked that
     # instruction's `Imm.opvar` so it reads the same provisional operand
-    # variable (`self.<name>`) written here. The opaque `StoreLocal`
-    # (address/branch patches) has no consumer model yet and stays raw.
+    # variable (`self.<name>`) written here.
 
     if isinstance(item, StoreOpVar):
         return [f"self.smc.{_mangle(item.name)} = self.reg.{item.reg};"]
@@ -768,8 +844,9 @@ def _emit_wide16(stmt: Wide16Stmt, syms: SymTable | None) -> list[str]:
     indentation). `_lo` carries the low-byte result; its bit-8 is the
     carry into the high byte. Add uses a 0 carry-in (`clc`); subtract
     uses the `src + ~op + 1` identity (`sec`), so both reduce to `+`.
-    Preserves the idiom's full effect: both stores, plus A = high byte
-    and C = high carry-out (Z/N are not modelled for add/sbc)."""
+    Preserves the idiom's full effect: both stores, plus A = high byte,
+    C = high carry-out, and Z/N from the high-byte result (the final
+    `adc`/`sbc`'s flags, which a following `bne`/`beq` may read)."""
     complement = stmt.op == "-"
     lo_carry_in = " + 1" if complement else ""
     return [
@@ -779,8 +856,8 @@ def _emit_wide16(stmt: Wide16Stmt, syms: SymTable | None) -> list[str]:
         f"let _hi = {_wide_term(stmt.hi_src, syms, complement=False)}"
         f" + {_wide_term(stmt.hi_op, syms, complement=complement)} + (_lo >> 8);",
         f"{_emit_target(stmt.hi_dst, syms)} = _hi as u8;",
-        "self.reg.a = _hi as u8;",
         "self.flags.c = (_hi >> 8) != 0;",
+        "self.set_a(_hi as u8);",
     ]
 
 
@@ -1107,6 +1184,9 @@ def _emit_state_defs(smc_fields: list[str]) -> list[str]:
         "    pub mem: Box<[u8; 0x10000]>,",
         "    pub stack: Vec<u8>,",
         "    pub smc: Smc,",
+        "    // Local-label / Merlin-variable byte store, keyed by symbolic",
+        "    // `(name, offset)`: StoreLocal writes, LoadLocal/CmpLocal read.",
+        "    pub local: std::collections::HashMap<(&'static str, u8), u8>,",
         "}",
         "",
         "impl Cpu {",
@@ -1117,8 +1197,25 @@ def _emit_state_defs(smc_fields: list[str]) -> list[str]:
         "            mem: Box::new([0u8; 0x10000]),",
         "            stack: Vec::new(),",
         "            smc: Smc::default(),",
+        "            local: std::collections::HashMap::new(),",
         "        }",
         "    }",
+        "",
+        "    // Register loads/transfers/arith set Z (result == 0) and N",
+        "    // (bit 7) on the 6502; these helpers keep that in one place so",
+        "    // every reg write stays flag-faithful. `set_nz` is for ops that",
+        "    // write memory but still set Z/N (inc/dec/shift on memory).",
+        "    #[inline]",
+        "    pub fn set_nz(&mut self, v: u8) {",
+        "        self.flags.z = v == 0;",
+        "        self.flags.n = (v >> 7) != 0;",
+        "    }",
+        "    #[inline]",
+        "    pub fn set_a(&mut self, v: u8) { self.reg.a = v; self.set_nz(v); }",
+        "    #[inline]",
+        "    pub fn set_x(&mut self, v: u8) { self.reg.x = v; self.set_nz(v); }",
+        "    #[inline]",
+        "    pub fn set_y(&mut self, v: u8) { self.reg.y = v; self.set_nz(v); }",
         "}",
     ]
     return lines
@@ -1225,6 +1322,10 @@ _CRATE_ALLOWS = (
     "non_snake_case", "non_upper_case_globals", "dead_code",
     "unused_variables", "unused_mut", "unused_parens",
     "unused_assignments", "unused_comparisons",
+    # This is machine-generated code, so Clippy's style/correctness
+    # heuristics (e.g. `never_loop` on a lowered `loop { … break; }`)
+    # don't apply; silence the whole tool rather than chase them.
+    "clippy::all", "clippy::pedantic",
 )
 
 
@@ -1275,10 +1376,46 @@ def _render_lib_rs(modules: list[ModuleIR3]) -> str:
         "pub mod cpu;",
         "pub mod sym;",
         "pub mod ext;",
+        "pub mod dispatch;",
         "",
     ]
     lines += [f"pub mod {_module_mod_name(m)};" for m in modules]
     return "\n".join(lines) + "\n"
+
+
+def _render_dispatch_rs(modules: list[ModuleIR3]) -> str:
+    """Emit `src/dispatch.rs`: a `call((segment, source_name), cpu)`
+    entry point that invokes a lifted routine by its segment module name
+    and original source label. Routine names repeat across overlay
+    segments (`auto::DoBlock` vs `ctrl::DoBlock`), so the key is the
+    `(segment, name)` pair. Used by the differential test harness to run
+    any routine against the IR interpreter; returns `false` for an
+    unknown pair."""
+    lines = [
+        "// @generated by pop_lifter — DO NOT EDIT.",
+        "// Invoke a lifted routine by (segment, source-name); see",
+        "// `_render_dispatch_rs`. Returns false for an unknown pair.",
+        "use crate::cpu::Cpu;",
+        "",
+        "pub fn call(module: &str, name: &str, cpu: &mut Cpu) -> bool {",
+        "    match (module, name) {",
+    ]
+    for module in modules:
+        mod_name = _module_mod_name(module)
+        for r in module.routines:
+            key = r.name.replace("\\", "\\\\").replace('"', '\\"')
+            lines.append(
+                f'        ("{mod_name}", "{key}") => '
+                f"crate::{mod_name}::{_mangle(r.name)}(cpu),"
+            )
+    lines += [
+        "        _ => return false,",
+        "    }",
+        "    true",
+        "}",
+        "",
+    ]
+    return "\n".join(lines)
 
 
 def _render_cpu_rs(smc_fields: list[str]) -> str:
@@ -1464,6 +1601,7 @@ def emit_crate(modules: list[ModuleIR3]) -> dict[str, str]:
         "src/cpu.rs": _render_cpu_rs(smc_fields),
         "src/sym.rs": _render_sym_rs(syms),
         "src/ext.rs": _render_ext_rs(ext_names),
+        "src/dispatch.rs": _render_dispatch_rs(modules),
     }
     files.update(segment_files)
     return files

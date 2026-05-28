@@ -50,6 +50,7 @@ from .ir1 import (
     CmpImm,
     CmpIndexed,
     CmpIndirect,
+    CmpLocal,
     Compare,
     DecTarget,
     FlagOp,
@@ -65,6 +66,7 @@ from .ir1 import (
     LoadImm,
     LoadIndexed,
     LoadIndirect,
+    LoadLocal,
     LocalRef,
     Lsr,
     MemBitOp,
@@ -412,6 +414,18 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
             trace.y = value
         _set_zn(trace, value)
         return True
+    if isinstance(item, LoadLocal):
+        # Local-label read. Mirrors StoreLocal's side channel: the value
+        # is whatever a matching `sta :label+N` wrote (0 if never set).
+        value = trace.code_patches.get((item.source_label, item.offset), 0)
+        if item.reg is Reg.A:
+            trace.a = value
+        elif item.reg is Reg.X:
+            trace.x = value
+        else:
+            trace.y = value
+        _set_zn(trace, value)
+        return True
     if isinstance(item, LoadIndexed):
         idx_val = trace.x if item.index is Reg.X else trace.y
         addr = ((_abs_base(item.base, trace, item.src) + (idx_val & 0xff)) & 0xffff)
@@ -628,6 +642,13 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
         trace.c = 1 if reg_val >= rhs else 0
         _set_zn(trace, diff)
         return True
+    if isinstance(item, CmpLocal):
+        reg_val = {Reg.A: trace.a, Reg.X: trace.x, Reg.Y: trace.y}[item.reg]
+        rhs = trace.code_patches.get((item.source_label, item.offset), 0)
+        diff = (reg_val - rhs) & 0xff
+        trace.c = 1 if reg_val >= rhs else 0
+        _set_zn(trace, diff)
+        return True
     if isinstance(item, (IncTarget, DecTarget)):
         delta = 1 if isinstance(item, IncTarget) else -1
         if isinstance(item.target, Reg):
@@ -679,6 +700,12 @@ def exec_atom(item, trace: Trace, ram: bytearray) -> bool:
             key = (item.target.label, item.target.offset)
             new = (trace.code_patches.get(key, 0) + delta) & 0xff
             trace.code_patches[key] = new
+            _set_zn(trace, new)
+        elif isinstance(item.target, IndexedAbs):
+            addr = _indexed_addr(item.target, trace, item.src)
+            new = (ram[addr] + delta) & 0xff
+            ram[addr] = new
+            trace.writes[addr] = new
             _set_zn(trace, new)
         else:
             addr = _real_addr(item.target.addr, item.src)
