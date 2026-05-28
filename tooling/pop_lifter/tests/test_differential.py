@@ -194,7 +194,6 @@ def test_seeded_sweep_no_divergence(diffrun_bin, ir3_modules):
     if not hasattr(signal, "setitimer"):
         pytest.skip("signal.setitimer unavailable (non-POSIX)")
 
-    rng = random.Random(_SWEEP_RNG_SEED)
     prev = signal.signal(signal.SIGALRM, _on_alarm)
     divergences: list[str] = []
     compared = 0
@@ -203,7 +202,13 @@ def test_seeded_sweep_no_divergence(diffrun_bin, ir3_modules):
             seg = module.name.lower()
             ordered = [module] + [m for m in ir3_modules if m is not module]
             for r in module.routines:
-                for _ in range(_SWEEP_SEEDS_PER_ROUTINE):
+                for k in range(_SWEEP_SEEDS_PER_ROUTINE):
+                    # Per-combo RNG keyed by (segment, name, k) so each
+                    # start state is reproducible in isolation and does not
+                    # depend on iteration order or which earlier combos were
+                    # skipped (a machine-dependent timeout must not shift the
+                    # seeds of later combos).
+                    rng = random.Random(f"{_SWEEP_RNG_SEED}:{seg}:{r.name}:{k}")
                     a, x, y, c = (rng.randrange(256), rng.randrange(256),
                                   rng.randrange(256), rng.randrange(2))
                     ram0 = rng.randbytes(0x10000)
@@ -211,10 +216,12 @@ def test_seeded_sweep_no_divergence(diffrun_bin, ir3_modules):
                     try:
                         trace = ir3_run(ordered, r.name, ram=bytearray(ram0),
                                         a=a, x=x, y=y, c=c)
-                    except Exception:
+                    except (_Timeout, InterpError):
                         # Interpreter can't run this routine from this state
-                        # (synthetic-label access, unresolved vector call,
-                        # loop past the timeout, ...). Out of scope.
+                        # (synthetic-label access, unresolved vector call, or
+                        # a loop past the timeout). Out of scope. Any *other*
+                        # exception propagates and fails the test — it'd be a
+                        # real interpreter/harness regression, not a skip.
                         continue
                     finally:
                         signal.setitimer(signal.ITIMER_REAL, 0)
@@ -232,8 +239,13 @@ def test_seeded_sweep_no_divergence(diffrun_bin, ir3_modules):
                         continue
                     if p.returncode != 0:
                         # 3 = panic (e.g. an OOB index the interp wrapped),
-                        # 2 = unknown dispatch; both are real divergences.
-                        divergences.append(f"{tag}: diffrun exit {p.returncode}")
+                        # 2 = unknown dispatch; both are real divergences. The
+                        # crate's panic message (if any) lands on stderr.
+                        err = p.stderr.decode(errors="replace").strip()
+                        divergences.append(
+                            f"{tag}: diffrun exit {p.returncode}"
+                            + (f" — {err}" if err else "")
+                        )
                         continue
                     out = p.stdout
                     compared += 1
