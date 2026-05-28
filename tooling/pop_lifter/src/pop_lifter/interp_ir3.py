@@ -20,6 +20,8 @@ What the walker handles itself:
 
 from __future__ import annotations
 
+import sys
+
 from .interp_ir1 import (
     InterpError,
     Trace,
@@ -74,6 +76,13 @@ from .ir3 import (
     TailCallStmt,
     Wide16Stmt,
 )
+
+
+# Live `jsr` nesting beyond which a run is treated as non-terminating
+# (`InterpError`). Sized to the 6502's 256-byte stack (two bytes per
+# return address); a real program never nests this deep, so hitting it
+# means a call cycle the static name resolution can't break.
+_MAX_CALL_DEPTH = 128
 
 
 class _ReturnSignal(Exception):
@@ -147,18 +156,30 @@ def run(
     if routine is None:
         raise InterpError(f"entry {entry!r} not found in any module")
 
-    while True:
-        try:
-            _exec_routine(routine, modules, alias_idx, trace)
-            return trace
-        except _TailCallSignal as tc:
-            target = _resolve(modules, alias_idx, tc.target)
-            if target is None:
-                raise InterpError(
-                    f"tail-call target {tc.target!r} not found in any module"
-                )
-            routine = target
-            continue
+    # The structured walker uses one Python frame per nested block/call, so
+    # a legitimate `_MAX_CALL_DEPTH` chain needs headroom above CPython's
+    # default limit. Raise it for the duration of the run (restored below)
+    # and treat any overflow that still slips through as non-terminating
+    # rather than a hard crash.
+    prev_limit = sys.getrecursionlimit()
+    sys.setrecursionlimit(max(prev_limit, _MAX_CALL_DEPTH * 40 + 1000))
+    try:
+        while True:
+            try:
+                _exec_routine(routine, modules, alias_idx, trace)
+                return trace
+            except _TailCallSignal as tc:
+                target = _resolve(modules, alias_idx, tc.target)
+                if target is None:
+                    raise InterpError(
+                        f"tail-call target {tc.target!r} not found in any module"
+                    )
+                routine = target
+                continue
+    except RecursionError as e:
+        raise InterpError("Python recursion limit hit (non-terminating run)") from e
+    finally:
+        sys.setrecursionlimit(prev_limit)
 
 
 def _alias_index(modules) -> dict[str, str]:
@@ -341,21 +362,34 @@ def _exec_stmt(stmt: Stmt, modules, aliases, trace: Trace) -> None:
         callee = _resolve(modules, aliases, stmt.target)
         if callee is None:
             raise InterpError(f"call target {stmt.target!r} not found")
+        if trace.call_depth >= _MAX_CALL_DEPTH:
+            # A real 6502 would overflow its 256-byte stack long before
+            # this; an unbounded cycle here means the routine can't be run
+            # to completion (commonly a bank-switch trampoline whose
+            # soft-switch remap we don't model). Out of scope, not a crash.
+            raise InterpError(
+                f"call depth exceeded {_MAX_CALL_DEPTH} at {stmt.target!r} "
+                "(recursion / stack overflow)"
+            )
         # A `jsr` establishes a return boundary. If the callee tail-calls
         # (`jmp X`), X's `rts` returns to *this* caller — not further up —
         # so resolve the tail-call chain inside the call frame rather than
         # letting the signal unwind to the top-level loop (which would
         # abandon the rest of this routine). Mirrors `run`'s tail loop.
-        while True:
-            try:
-                _exec_routine(callee, modules, aliases, trace)
-                break
-            except _TailCallSignal as tc:
-                callee = _resolve(modules, aliases, tc.target)
-                if callee is None:
-                    raise InterpError(
-                        f"tail-call target {tc.target!r} not found in any module"
-                    )
+        trace.call_depth += 1
+        try:
+            while True:
+                try:
+                    _exec_routine(callee, modules, aliases, trace)
+                    break
+                except _TailCallSignal as tc:
+                    callee = _resolve(modules, aliases, tc.target)
+                    if callee is None:
+                        raise InterpError(
+                            f"tail-call target {tc.target!r} not found in any module"
+                        )
+        finally:
+            trace.call_depth -= 1
         return
     if isinstance(stmt, TailCallStmt):
         raise _TailCallSignal(stmt.target)
