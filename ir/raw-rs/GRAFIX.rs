@@ -1687,18 +1687,15 @@ impl Cpu {
     }
 
     fn MPLAY(&mut self) {
-        let mut pc: u32 = 0;
-        loop {
-            match pc {
-                0 => {
-                    self._5dbank1in();
-                    self.CALLMPLAY();
-                    self._5dbank2in();
-                    return;
-                }
-                _ => unreachable!(),
-            }
-        }
+        self._5dbank1in();
+        self.CALLMPLAY();
+        let _o: u8 = self.mem[sym::RWBANK2];
+        self.flags.z = (self.reg.a & _o) == 0;
+        self.flags.n = (_o >> 7) != 0;
+        let _o: u8 = self.mem[sym::RWBANK2];
+        self.flags.z = (self.reg.a & _o) == 0;
+        self.flags.n = (_o >> 7) != 0;
+        return;
     }
 
     fn XMINIT(&mut self) {
@@ -1768,75 +1765,63 @@ impl Cpu {
     }
 
     fn SAVEBLUE(&mut self) {
-        let mut pc: u32 = 0;
-        loop {
-            match pc {
-                0 => {
-                    self._5dbank1in();
-                    self.set_a(0xd7);
-                    self.set_x(0xb7);
-                    self.set_y(0xc0);
-                    self.movemem();
-                    self._5dbank2in();
-                    return;
-                }
-                _ => unreachable!(),
-            }
-        }
+        self._5dbank1in();
+        self.set_a(0xd7);
+        self.set_x(0xb7);
+        self.set_y(0xc0);
+        self.movemem();
+        let _o: u8 = self.mem[sym::RWBANK2];
+        self.flags.z = (self.reg.a & _o) == 0;
+        self.flags.n = (_o >> 7) != 0;
+        let _o: u8 = self.mem[sym::RWBANK2];
+        self.flags.z = (self.reg.a & _o) == 0;
+        self.flags.n = (_o >> 7) != 0;
+        return;
     }
 
     fn SAVEBINFO(&mut self) {
-        let mut pc: u32 = 0;
-        loop {
-            match pc {
-                0 => {
-                    self._5dbank1in();
-                    self.set_a(0xd0);
-                    self.set_x(0xa6);
-                    self.set_y(0xac);
-                    self.movemem();
-                    self._5dbank2in();
-                    return;
-                }
-                _ => unreachable!(),
-            }
-        }
+        self._5dbank1in();
+        self.set_a(0xd0);
+        self.set_x(0xa6);
+        self.set_y(0xac);
+        self.movemem();
+        let _o: u8 = self.mem[sym::RWBANK2];
+        self.flags.z = (self.reg.a & _o) == 0;
+        self.flags.n = (_o >> 7) != 0;
+        let _o: u8 = self.mem[sym::RWBANK2];
+        self.flags.z = (self.reg.a & _o) == 0;
+        self.flags.n = (_o >> 7) != 0;
+        return;
     }
 
     fn RELOADBLUE(&mut self) {
-        let mut pc: u32 = 0;
-        loop {
-            match pc {
-                0 => {
-                    self._5dbank1in();
-                    self.set_a(0xb7);
-                    self.set_x(0xd7);
-                    self.set_y(0xe0);
-                    self.movemem();
-                    self._5dbank2in();
-                    return;
-                }
-                _ => unreachable!(),
-            }
-        }
+        self._5dbank1in();
+        self.set_a(0xb7);
+        self.set_x(0xd7);
+        self.set_y(0xe0);
+        self.movemem();
+        let _o: u8 = self.mem[sym::RWBANK2];
+        self.flags.z = (self.reg.a & _o) == 0;
+        self.flags.n = (_o >> 7) != 0;
+        let _o: u8 = self.mem[sym::RWBANK2];
+        self.flags.z = (self.reg.a & _o) == 0;
+        self.flags.n = (_o >> 7) != 0;
+        return;
     }
 
     fn RELOADBINFO(&mut self) {
-        let mut pc: u32 = 0;
-        loop {
-            match pc {
-                0 => {
-                    self._5dbank1in();
-                    self.set_a(0xa6);
-                    self.set_x(0xd0);
-                    self.set_y(0xd6);
-                    self.movemem();
-                    self._5dbank2in();
-                    return;
-                }
-                _ => unreachable!(),
-            }
-        }
+        self._5dbank1in();
+        self.set_a(0xa6);
+        self.set_x(0xd0);
+        self.set_y(0xd6);
+        self.movemem();
+        let _o: u8 = self.mem[sym::RWBANK2];
+        self.flags.z = (self.reg.a & _o) == 0;
+        self.flags.n = (_o >> 7) != 0;
+        let _o: u8 = self.mem[sym::RWBANK2];
+        self.flags.z = (self.reg.a & _o) == 0;
+        self.flags.n = (_o >> 7) != 0;
+        return;
     }
 
     fn GR(&mut self) {

@@ -1555,18 +1555,15 @@ pub fn MINIT(cpu: &mut Cpu) {
 
 #[doc(alias = "mplay")]
 pub fn MPLAY(cpu: &mut Cpu) {
-    let mut pc: u32 = 0;
-    loop {
-        match pc {
-            0 => {
-                _5dbank1in(cpu);
-                CALLMPLAY(cpu);
-                crate::ext::_5dbank2in(cpu);
-                return;
-            }
-            _ => unreachable!(),
-        }
-    }
+    _5dbank1in(cpu);
+    CALLMPLAY(cpu);
+    let _o: u8 = cpu.mem[sym::RWBANK2];
+    cpu.flags.z = (cpu.reg.a & _o) == 0;
+    cpu.flags.n = (_o >> 7) != 0;
+    let _o: u8 = cpu.mem[sym::RWBANK2];
+    cpu.flags.z = (cpu.reg.a & _o) == 0;
+    cpu.flags.n = (_o >> 7) != 0;
+    return;
 }
 
 #[doc(alias = "xminit")]
@@ -1642,78 +1639,66 @@ pub fn posthr(cpu: &mut Cpu) {
 
 #[doc(alias = "saveblue")]
 pub fn SAVEBLUE(cpu: &mut Cpu) {
-    let mut pc: u32 = 0;
-    loop {
-        match pc {
-            0 => {
-                _5dbank1in(cpu);
-                cpu.set_a(0xd7);
-                cpu.set_x(0xb7);
-                cpu.set_y(0xc0);
-                crate::boot::movemem(cpu);
-                crate::ext::_5dbank2in(cpu);
-                return;
-            }
-            _ => unreachable!(),
-        }
-    }
+    _5dbank1in(cpu);
+    cpu.set_a(0xd7);
+    cpu.set_x(0xb7);
+    cpu.set_y(0xc0);
+    crate::boot::movemem(cpu);
+    let _o: u8 = cpu.mem[sym::RWBANK2];
+    cpu.flags.z = (cpu.reg.a & _o) == 0;
+    cpu.flags.n = (_o >> 7) != 0;
+    let _o: u8 = cpu.mem[sym::RWBANK2];
+    cpu.flags.z = (cpu.reg.a & _o) == 0;
+    cpu.flags.n = (_o >> 7) != 0;
+    return;
 }
 
 #[doc(alias = "savebinfo")]
 pub fn SAVEBINFO(cpu: &mut Cpu) {
-    let mut pc: u32 = 0;
-    loop {
-        match pc {
-            0 => {
-                _5dbank1in(cpu);
-                cpu.set_a(0xd0);
-                cpu.set_x(0xa6);
-                cpu.set_y(0xac);
-                crate::boot::movemem(cpu);
-                crate::ext::_5dbank2in(cpu);
-                return;
-            }
-            _ => unreachable!(),
-        }
-    }
+    _5dbank1in(cpu);
+    cpu.set_a(0xd0);
+    cpu.set_x(0xa6);
+    cpu.set_y(0xac);
+    crate::boot::movemem(cpu);
+    let _o: u8 = cpu.mem[sym::RWBANK2];
+    cpu.flags.z = (cpu.reg.a & _o) == 0;
+    cpu.flags.n = (_o >> 7) != 0;
+    let _o: u8 = cpu.mem[sym::RWBANK2];
+    cpu.flags.z = (cpu.reg.a & _o) == 0;
+    cpu.flags.n = (_o >> 7) != 0;
+    return;
 }
 
 #[doc(alias = "reloadblue")]
 pub fn RELOADBLUE(cpu: &mut Cpu) {
-    let mut pc: u32 = 0;
-    loop {
-        match pc {
-            0 => {
-                _5dbank1in(cpu);
-                cpu.set_a(0xb7);
-                cpu.set_x(0xd7);
-                cpu.set_y(0xe0);
-                crate::boot::movemem(cpu);
-                crate::ext::_5dbank2in(cpu);
-                return;
-            }
-            _ => unreachable!(),
-        }
-    }
+    _5dbank1in(cpu);
+    cpu.set_a(0xb7);
+    cpu.set_x(0xd7);
+    cpu.set_y(0xe0);
+    crate::boot::movemem(cpu);
+    let _o: u8 = cpu.mem[sym::RWBANK2];
+    cpu.flags.z = (cpu.reg.a & _o) == 0;
+    cpu.flags.n = (_o >> 7) != 0;
+    let _o: u8 = cpu.mem[sym::RWBANK2];
+    cpu.flags.z = (cpu.reg.a & _o) == 0;
+    cpu.flags.n = (_o >> 7) != 0;
+    return;
 }
 
 #[doc(alias = "reloadbinfo")]
 pub fn RELOADBINFO(cpu: &mut Cpu) {
-    let mut pc: u32 = 0;
-    loop {
-        match pc {
-            0 => {
-                _5dbank1in(cpu);
-                cpu.set_a(0xa6);
-                cpu.set_x(0xd0);
-                cpu.set_y(0xd6);
-                crate::boot::movemem(cpu);
-                crate::ext::_5dbank2in(cpu);
-                return;
-            }
-            _ => unreachable!(),
-        }
-    }
+    _5dbank1in(cpu);
+    cpu.set_a(0xa6);
+    cpu.set_x(0xd0);
+    cpu.set_y(0xd6);
+    crate::boot::movemem(cpu);
+    let _o: u8 = cpu.mem[sym::RWBANK2];
+    cpu.flags.z = (cpu.reg.a & _o) == 0;
+    cpu.flags.n = (_o >> 7) != 0;
+    let _o: u8 = cpu.mem[sym::RWBANK2];
+    cpu.flags.z = (cpu.reg.a & _o) == 0;
+    cpu.flags.n = (_o >> 7) != 0;
+    return;
 }
 
 #[doc(alias = "gr")]

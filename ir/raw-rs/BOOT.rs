@@ -228,39 +228,41 @@ impl Cpu {
                 }
                 1 => {
                     self.set_a(self.mem[(sym::MEMTEXT + self.reg.y as usize) & 0xffff]);
-                    if self.reg.a == 0x00 {
-                        self._2a();
-                        return;
-                    } else {
-                        pc = 2;
-                    }
+                    pc = 2;
                 }
                 2 => {
+                    if self.flags.z {
+                        pc = 2;
+                    } else {
+                        pc = 3;
+                    }
+                }
+                3 => {
                     self.cout();
                     let _o: u8 = 0x8d;
                     self.flags.c = self.reg.a >= _o;
                     self.flags.z = self.reg.a == _o;
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a != 0x8d {
-                        pc = 4;
+                        pc = 5;
                     } else {
-                        pc = 3;
+                        pc = 4;
                     }
                 }
-                3 => {
+                4 => {
                     self.set_a(0x04);
                     self.mem[0x0024] = self.reg.a;
-                    pc = 4;
+                    pc = 5;
                 }
-                4 => {
+                5 => {
                     self.set_y(self.reg.y.wrapping_add(1));
                     if self.reg.y != 0x00 {
                         pc = 1;
                     } else {
-                        pc = 5;
+                        pc = 6;
                     }
                 }
-                5 => {
+                6 => {
                     let _o: u8 = self.mem[0xc08b];
                     self.flags.z = (self.reg.a & _o) == 0;
                     self.flags.n = (_o >> 7) != 0;
@@ -270,9 +272,9 @@ impl Cpu {
                     self.set_a(0xd0);
                     self.set_x(0x30);
                     self.set_y(0x40);
-                    pc = 6;
+                    pc = 7;
                 }
-                6 => {
+                7 => {
                     self.mem[sym::dest + 1] = self.reg.a;
                     self.mem[sym::source + 1] = self.reg.x;
                     self.mem[sym::endsourc + 1] = self.reg.y;
@@ -280,19 +282,19 @@ impl Cpu {
                     self.mem[sym::dest] = self.reg.y;
                     self.mem[sym::source] = self.reg.y;
                     self.mem[sym::endsourc] = self.reg.y;
-                    pc = 7;
+                    pc = 8;
                 }
-                7 => {
+                8 => {
                     self.set_a(self.mem[((self.mem[sym::source] as usize | (self.mem[sym::source + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
                     self.mem[((self.mem[sym::dest] as usize | (self.mem[sym::dest + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.reg.a;
                     self.set_y(self.reg.y.wrapping_add(1));
                     if self.reg.y != 0x00 {
-                        pc = 7;
-                    } else {
                         pc = 8;
+                    } else {
+                        pc = 9;
                     }
                 }
-                8 => {
+                9 => {
                     let _v = self.mem[sym::source + 1].wrapping_add(1);
                     self.mem[sym::source + 1] = _v;
                     self.set_nz(_v);
@@ -305,12 +307,12 @@ impl Cpu {
                     self.flags.z = self.reg.a == _o;
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a != self.mem[sym::endsourc + 1] {
-                        pc = 7;
+                        pc = 8;
                     } else {
-                        pc = 9;
+                        pc = 10;
                     }
                 }
-                9 => {
+                10 => {
                     return;
                 }
                 _ => unreachable!(),

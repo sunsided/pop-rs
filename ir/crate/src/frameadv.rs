@@ -1528,26 +1528,34 @@ pub fn drawhalf(cpu: &mut Cpu) {
         return;
     }
     'b10: {
-        cpu.set_x(cpu.mem[sym::objid]);
-        if cpu.reg.x != 0x01 {
-            if cpu.reg.x != 0x13 {
-                if cpu.reg.x != 0x05 {
-                    if cpu.reg.x != 0x10 {
-                        cpu.set_a(cpu.mem[sym::BGset1]);
-                        if cpu.reg.a != 0x01 {
-                            crate::ext::_5ddrawflr(cpu);
-                            return;
-                        }
-                        if cpu.reg.x != 0x03 {
-                            if cpu.reg.x != 0x19 {
-                                crate::ext::_5ddrawflr(cpu);
-                                return;
+        'b9: {
+            cpu.set_x(cpu.mem[sym::objid]);
+            if cpu.reg.x != 0x01 {
+                if cpu.reg.x != 0x13 {
+                    if cpu.reg.x != 0x05 {
+                        if cpu.reg.x != 0x10 {
+                            'b15: {
+                                cpu.set_a(cpu.mem[sym::BGset1]);
+                                if cpu.reg.a == 0x01 {
+                                    if cpu.reg.x != 0x03 {
+                                        if cpu.reg.x != 0x19 {
+                                            break 'b15;
+                                        }
+                                    }
+                                    _3asub(cpu);
+                                    cpu.set_a(0x0e);
+                                    if cpu.reg.a != 0x00 {
+                                        break 'b10;
+                                    } else {
+                                        break 'b9;
+                                    }
+                                }
                             }
-                        }
-                        _3asub(cpu);
-                        cpu.set_a(0x0e);
-                        if cpu.reg.a != 0x00 {
-                            break 'b10;
+                            addamask(cpu);
+                            adda(cpu);
+                            drawma(cpu);
+                            drawd(cpu);
+                            return;
                         }
                     }
                 }
@@ -1575,53 +1583,20 @@ pub fn wipesq(cpu: &mut Cpu) {
 }
 
 pub fn wiped(cpu: &mut Cpu) {
-    let mut pc: u32 = 0;
-    loop {
-        match pc {
-            0 => {
-                cpu.set_a(cpu.mem[sym::objid]);
-                if cpu.reg.a == 0x09 {
-                    pc = 5;
-                } else {
-                    pc = 1;
-                }
-            }
-            1 => {
-                if cpu.reg.a == 0x07 {
-                    pc = 5;
-                } else {
-                    pc = 2;
-                }
-            }
-            2 => {
-                if cpu.reg.a == 0x0c {
-                    pc = 5;
-                } else {
-                    pc = 3;
-                }
-            }
-            3 => {
-                let _o: u8 = 0x14;
-                cpu.flags.c = cpu.reg.a >= _o;
-                cpu.flags.z = cpu.reg.a == _o;
-                cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
-                if cpu.reg.a == 0x14 {
-                    pc = 5;
-                } else {
-                    pc = 4;
-                }
-            }
-            4 => {
-                cpu.set_a(0x03);
-                crate::ext::_5dwipe(cpu);
-                return;
-            }
-            5 => {
-                return;
-            }
-            _ => unreachable!(),
+    cpu.set_a(cpu.mem[sym::objid]);
+    match cpu.reg.a {
+        0x09 | 0x07 | 0x0c | 0x14 => {
+            return;
         }
+        _ => {}
     }
+    cpu.mem[sym::height] = 0x03;
+    cpu.mem[sym::width] = 0x04;
+    cpu.mem[sym::XCO] = cpu.mem[sym::blockxco];
+    cpu.mem[sym::YCO] = cpu.mem[sym::Dy];
+    cpu.set_a(0x80);
+    crate::grafix::ADDWIPE(cpu);
+    return;
 }
 
 pub fn drawloosed(cpu: &mut Cpu) {
@@ -2423,7 +2398,7 @@ pub fn sortlist(cpu: &mut Cpu) {
                 cpu.set_a(0x00);
                 cpu.mem[sym::switches] = cpu.reg.a;
                 cpu.set_x(cpu.mem[sym::sortX]);
-                pc = 1;
+                pc = 8;
             }
             1 => {
                 let _o: u8 = 0x01;
@@ -2431,7 +2406,7 @@ pub fn sortlist(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.x == _o;
                 cpu.flags.n = (cpu.reg.x.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.x == 0x01 {
-                    pc = 5;
+                    pc = 12;
                 } else {
                     pc = 2;
                 }
@@ -2441,7 +2416,7 @@ pub fn sortlist(cpu: &mut Cpu) {
                 compare(cpu);
                 cpu.set_x(cpu.mem[sym::xsave]);
                 if !cpu.flags.c {
-                    pc = 4;
+                    pc = 11;
                 } else {
                     pc = 3;
                 }
@@ -2454,12 +2429,12 @@ pub fn sortlist(cpu: &mut Cpu) {
                 let _v = cpu.stack.pop().expect("pla on empty stack");
                 cpu.set_a(_v);
                 cpu.mem[(sym::sortX - 1 + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
-                pc = 4;
+                pc = 11;
             }
             4 => {
                 cpu.set_x(cpu.reg.x.wrapping_sub(1));
                 if cpu.reg.x != 0x00 {
-                    pc = 1;
+                    pc = 8;
                 } else {
                     pc = 5;
                 }
@@ -2467,13 +2442,68 @@ pub fn sortlist(cpu: &mut Cpu) {
             5 => {
                 cpu.set_a(cpu.mem[sym::switches]);
                 if cpu.reg.a != 0x00 {
-                    sortlist(cpu);
-                    return;
+                    pc = 7;
                 } else {
                     pc = 6;
                 }
             }
             6 => {
+                return;
+            }
+            7 => {
+                cpu.set_a(0x00);
+                cpu.mem[sym::switches] = cpu.reg.a;
+                cpu.set_x(cpu.mem[sym::sortX]);
+                pc = 8;
+            }
+            8 => {
+                let _o: u8 = 0x01;
+                cpu.flags.c = cpu.reg.x >= _o;
+                cpu.flags.z = cpu.reg.x == _o;
+                cpu.flags.n = (cpu.reg.x.wrapping_sub(_o) >> 7) != 0;
+                if cpu.reg.x == 0x01 {
+                    pc = 12;
+                } else {
+                    pc = 9;
+                }
+            }
+            9 => {
+                cpu.mem[sym::xsave] = cpu.reg.x;
+                compare(cpu);
+                cpu.set_x(cpu.mem[sym::xsave]);
+                if !cpu.flags.c {
+                    pc = 11;
+                } else {
+                    pc = 10;
+                }
+            }
+            10 => {
+                cpu.set_a(cpu.mem[(sym::sortX + cpu.reg.x as usize) & 0xffff]);
+                cpu.stack.push(cpu.reg.a);
+                cpu.set_a(cpu.mem[(sym::sortX - 1 + cpu.reg.x as usize) & 0xffff]);
+                cpu.mem[(sym::sortX + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
+                let _v = cpu.stack.pop().expect("pla on empty stack");
+                cpu.set_a(_v);
+                cpu.mem[(sym::sortX - 1 + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
+                pc = 11;
+            }
+            11 => {
+                cpu.set_x(cpu.reg.x.wrapping_sub(1));
+                if cpu.reg.x != 0x00 {
+                    pc = 8;
+                } else {
+                    pc = 12;
+                }
+            }
+            12 => {
+                cpu.set_a(cpu.mem[sym::switches]);
+                if cpu.reg.a != 0x00 {
+                    pc = 7;
+                } else {
+                    pc = 13;
+                }
+            }
+            13 => {
                 return;
             }
             _ => unreachable!(),

@@ -146,39 +146,41 @@ pub fn NOT128K(cpu: &mut Cpu) {
             }
             1 => {
                 cpu.set_a(cpu.mem[(sym::MEMTEXT + cpu.reg.y as usize) & 0xffff]);
-                if cpu.reg.a == 0x00 {
-                    crate::ext::_2a(cpu);
-                    return;
-                } else {
-                    pc = 2;
-                }
+                pc = 2;
             }
             2 => {
+                if cpu.flags.z {
+                    pc = 2;
+                } else {
+                    pc = 3;
+                }
+            }
+            3 => {
                 crate::ext::cout(cpu);
                 let _o: u8 = 0x8d;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a != 0x8d {
-                    pc = 4;
+                    pc = 5;
                 } else {
-                    pc = 3;
+                    pc = 4;
                 }
             }
-            3 => {
+            4 => {
                 cpu.set_a(0x04);
                 cpu.mem[0x0024] = cpu.reg.a;
-                pc = 4;
+                pc = 5;
             }
-            4 => {
+            5 => {
                 cpu.set_y(cpu.reg.y.wrapping_add(1));
                 if cpu.reg.y != 0x00 {
                     pc = 1;
                 } else {
-                    pc = 5;
+                    pc = 6;
                 }
             }
-            5 => {
+            6 => {
                 let _o: u8 = cpu.mem[0xc08b];
                 cpu.flags.z = (cpu.reg.a & _o) == 0;
                 cpu.flags.n = (_o >> 7) != 0;
@@ -188,9 +190,9 @@ pub fn NOT128K(cpu: &mut Cpu) {
                 cpu.set_a(0xd0);
                 cpu.set_x(0x30);
                 cpu.set_y(0x40);
-                pc = 6;
+                pc = 7;
             }
-            6 => {
+            7 => {
                 cpu.mem[sym::dest + 1] = cpu.reg.a;
                 cpu.mem[sym::source + 1] = cpu.reg.x;
                 cpu.mem[sym::endsourc + 1] = cpu.reg.y;
@@ -198,19 +200,19 @@ pub fn NOT128K(cpu: &mut Cpu) {
                 cpu.mem[sym::dest] = cpu.reg.y;
                 cpu.mem[sym::source] = cpu.reg.y;
                 cpu.mem[sym::endsourc] = cpu.reg.y;
-                pc = 7;
+                pc = 8;
             }
-            7 => {
+            8 => {
                 cpu.set_a(cpu.mem[((cpu.mem[sym::source] as usize | (cpu.mem[sym::source + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
                 cpu.mem[((cpu.mem[sym::dest] as usize | (cpu.mem[sym::dest + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
                 cpu.set_y(cpu.reg.y.wrapping_add(1));
                 if cpu.reg.y != 0x00 {
-                    pc = 7;
-                } else {
                     pc = 8;
+                } else {
+                    pc = 9;
                 }
             }
-            8 => {
+            9 => {
                 let _v = cpu.mem[sym::source + 1].wrapping_add(1);
                 cpu.mem[sym::source + 1] = _v;
                 cpu.set_nz(_v);
@@ -223,12 +225,12 @@ pub fn NOT128K(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a != cpu.mem[sym::endsourc + 1] {
-                    pc = 7;
+                    pc = 8;
                 } else {
-                    pc = 9;
+                    pc = 10;
                 }
             }
-            9 => {
+            10 => {
                 return;
             }
             _ => unreachable!(),

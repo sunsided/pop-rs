@@ -1687,7 +1687,10 @@ pub fn usealtsets(cpu: &mut Cpu) {
 #[doc(alias = "markred")]
 pub fn MARKRED(cpu: &mut Cpu) {
     if cpu.flags.c {
-        crate::ext::_5dos(cpu);
+        if cpu.reg.y >= 0x0a {
+            return;
+        }
+        cpu.mem[(sym::topbuf + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
         return;
     }
     cpu.mem[(sym::redbuf + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
@@ -1733,7 +1736,10 @@ pub fn MARKWIPE(cpu: &mut Cpu) {
 #[doc(alias = "markmove")]
 pub fn MARKMOVE(cpu: &mut Cpu) {
     if cpu.flags.c {
-        crate::ext::_5dos(cpu);
+        if cpu.reg.y >= 0x0a {
+            return;
+        }
+        cpu.mem[(sym::topbuf + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
         return;
     }
     cpu.mem[(sym::movebuf + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
@@ -1743,7 +1749,10 @@ pub fn MARKMOVE(cpu: &mut Cpu) {
 #[doc(alias = "markfloor")]
 pub fn MARKFLOOR(cpu: &mut Cpu) {
     if cpu.flags.c {
-        crate::ext::_5dos(cpu);
+        if cpu.reg.y >= 0x0a {
+            return;
+        }
+        cpu.mem[(sym::topbuf + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
         return;
     }
     cpu.mem[(sym::floorbuf + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
@@ -1753,7 +1762,10 @@ pub fn MARKFLOOR(cpu: &mut Cpu) {
 #[doc(alias = "markhalf")]
 pub fn MARKHALF(cpu: &mut Cpu) {
     if cpu.flags.c {
-        crate::ext::_5dos(cpu);
+        if cpu.reg.y >= 0x0a {
+            return;
+        }
+        cpu.mem[(sym::topbuf + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
         return;
     }
     cpu.mem[(sym::halfbuf + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;

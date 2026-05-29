@@ -1045,6 +1045,11 @@ fn drawhalf {
   tail_call add                ; FRAMEADV.S:1317
 ]rts:
   return                           ; FRAMEADV.S:1246
+]drawflr:
+  call addamask                  ; FRAMEADV.S:1256
+  call adda                  ; FRAMEADV.S:1257
+  call drawma                  ; FRAMEADV.S:1258
+  tail_call drawd                ; FRAMEADV.S:1259
 }
 
 fn wipesq {
@@ -1068,12 +1073,21 @@ fn wiped {
   if a == #pillartop goto ]rts  ; FRAMEADV.S:1351
   if a == #panelwif goto ]rts  ; FRAMEADV.S:1353
   if a == #panelwof goto ]rts  ; FRAMEADV.S:1355
-  cmp a, #block              ; FRAMEADV.S:1356
   if a == #block goto ]rts  ; FRAMEADV.S:1357
   a = #0x03                  ; FRAMEADV.S:1359
   goto ]wipe                ; FRAMEADV.S:1360
 ]rts:
   return                           ; FRAMEADV.S:1341
+]wipe:
+  *height@0x0004 = a            ; FRAMEADV.S:1328
+  a = #0x04                  ; FRAMEADV.S:1330
+  *width@0x0005 = a            ; FRAMEADV.S:1331
+  a = *blockxco@0x00f3        ; FRAMEADV.S:1333
+  *XCO@0x0001 = a            ; FRAMEADV.S:1334
+  a = *Dy@0x00ef        ; FRAMEADV.S:1336
+  *YCO@0x0002 = a            ; FRAMEADV.S:1337
+  a = #0x80                  ; FRAMEADV.S:1339
+  tail_call addwipe                ; FRAMEADV.S:1340
 }
 
 fn drawloosed {
@@ -1661,6 +1675,31 @@ fn sortlist  (aka :newpass) {
   if a != #0x00 goto :newpass  ; FRAMEADV.S:2168
 :rts:
   return                           ; FRAMEADV.S:2172
+:newpass:
+  a = #0x00                  ; FRAMEADV.S:2138
+  *switches@0x00f4 = a            ; FRAMEADV.S:2139
+  x = *sortX@0x03c0        ; FRAMEADV.S:2141
+:loop:
+  cmp x, #0x01              ; FRAMEADV.S:2143
+  if x == #0x01 goto :attop  ; FRAMEADV.S:2144
+  *xsave@0x00e8 = x            ; FRAMEADV.S:2146
+  call compare                  ; FRAMEADV.S:2148
+  x = *xsave@0x00e8        ; FRAMEADV.S:2150
+  if cc goto :ok       ; FRAMEADV.S:2152
+  a = *(sortX@0x03c0 + x)   ; FRAMEADV.S:2154
+  push a                           ; FRAMEADV.S:2155
+  a = *(sortX-1@0x03bf + x)   ; FRAMEADV.S:2156
+  *(sortX@0x03c0 + x) = a   ; FRAMEADV.S:2157
+  a = pop                          ; FRAMEADV.S:2158
+  *(sortX-1@0x03bf + x) = a   ; FRAMEADV.S:2159
+:ok:
+  x -= 1                         ; FRAMEADV.S:2161
+  if x != #0x00 goto :loop  ; FRAMEADV.S:2162
+:attop:
+  a = *switches@0x00f4        ; FRAMEADV.S:2167
+  if a != #0x00 goto :newpass  ; FRAMEADV.S:2168
+:rts:
+  return                           ; FRAMEADV.S:2172
 }
 
 fn compare {
@@ -1871,6 +1910,19 @@ drawa:
   if x != #panelwof goto :nomask  ; FRAMEADV.S:1153
   a = #archpanel                  ; FRAMEADV.S:1154
   tail_call adda1                ; FRAMEADV.S:1155
+:cont1:
+  *IMAGE@0x0004 = a            ; FRAMEADV.S:1076
+  a = *(pieceby@0x0053 + x)   ; FRAMEADV.S:1077
+:cont:
+  c = 0                            ; FRAMEADV.S:1078
+  a = a + *Ay@0x00ee + c    ; FRAMEADV.S:1079
+:cont2:
+  *YCO@0x0002 = a            ; FRAMEADV.S:1080
+  a = *blockxco@0x00f3        ; FRAMEADV.S:1081
+  *XCO@0x0001 = a            ; FRAMEADV.S:1082
+  a = #ora                  ; FRAMEADV.S:1083
+  *OPACITY@0x0006 = a            ; FRAMEADV.S:1084
+  tail_call add                ; FRAMEADV.S:1085
 }
 
 fn drawflaska {

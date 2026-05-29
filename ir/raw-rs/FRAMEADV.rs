@@ -1713,26 +1713,34 @@ impl Cpu {
             return;
         }
         'b10: {
-            self.set_x(self.mem[sym::objid]);
-            if self.reg.x != 0x01 {
-                if self.reg.x != 0x13 {
-                    if self.reg.x != 0x05 {
-                        if self.reg.x != 0x10 {
-                            self.set_a(self.mem[sym::BGset1]);
-                            if self.reg.a != 0x01 {
-                                self._5ddrawflr();
-                                return;
-                            }
-                            if self.reg.x != 0x03 {
-                                if self.reg.x != 0x19 {
-                                    self._5ddrawflr();
-                                    return;
+            'b9: {
+                self.set_x(self.mem[sym::objid]);
+                if self.reg.x != 0x01 {
+                    if self.reg.x != 0x13 {
+                        if self.reg.x != 0x05 {
+                            if self.reg.x != 0x10 {
+                                'b15: {
+                                    self.set_a(self.mem[sym::BGset1]);
+                                    if self.reg.a == 0x01 {
+                                        if self.reg.x != 0x03 {
+                                            if self.reg.x != 0x19 {
+                                                break 'b15;
+                                            }
+                                        }
+                                        self._3asub();
+                                        self.set_a(0x0e);
+                                        if self.reg.a != 0x00 {
+                                            break 'b10;
+                                        } else {
+                                            break 'b9;
+                                        }
+                                    }
                                 }
-                            }
-                            self._3asub();
-                            self.set_a(0x0e);
-                            if self.reg.a != 0x00 {
-                                break 'b10;
+                                self.addamask();
+                                self.adda();
+                                self.drawma();
+                                self.drawd();
+                                return;
                             }
                         }
                     }
@@ -1760,53 +1768,20 @@ impl Cpu {
     }
 
     fn wiped(&mut self) {
-        let mut pc: u32 = 0;
-        loop {
-            match pc {
-                0 => {
-                    self.set_a(self.mem[sym::objid]);
-                    if self.reg.a == 0x09 {
-                        pc = 5;
-                    } else {
-                        pc = 1;
-                    }
-                }
-                1 => {
-                    if self.reg.a == 0x07 {
-                        pc = 5;
-                    } else {
-                        pc = 2;
-                    }
-                }
-                2 => {
-                    if self.reg.a == 0x0c {
-                        pc = 5;
-                    } else {
-                        pc = 3;
-                    }
-                }
-                3 => {
-                    let _o: u8 = 0x14;
-                    self.flags.c = self.reg.a >= _o;
-                    self.flags.z = self.reg.a == _o;
-                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                    if self.reg.a == 0x14 {
-                        pc = 5;
-                    } else {
-                        pc = 4;
-                    }
-                }
-                4 => {
-                    self.set_a(0x03);
-                    self._5dwipe();
-                    return;
-                }
-                5 => {
-                    return;
-                }
-                _ => unreachable!(),
+        self.set_a(self.mem[sym::objid]);
+        match self.reg.a {
+            0x09 | 0x07 | 0x0c | 0x14 => {
+                return;
             }
+            _ => {}
         }
+        self.mem[sym::height] = 0x03;
+        self.mem[sym::width] = 0x04;
+        self.mem[sym::XCO] = self.mem[sym::blockxco];
+        self.mem[sym::YCO] = self.mem[sym::Dy];
+        self.set_a(0x80);
+        self.addwipe();
+        return;
     }
 
     fn drawloosed(&mut self) {
@@ -2608,7 +2583,7 @@ impl Cpu {
                     self.set_a(0x00);
                     self.mem[sym::switches] = self.reg.a;
                     self.set_x(self.mem[sym::sortX]);
-                    pc = 1;
+                    pc = 8;
                 }
                 1 => {
                     let _o: u8 = 0x01;
@@ -2616,7 +2591,7 @@ impl Cpu {
                     self.flags.z = self.reg.x == _o;
                     self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.x == 0x01 {
-                        pc = 5;
+                        pc = 12;
                     } else {
                         pc = 2;
                     }
@@ -2626,7 +2601,7 @@ impl Cpu {
                     self.compare();
                     self.set_x(self.mem[sym::xsave]);
                     if !self.flags.c {
-                        pc = 4;
+                        pc = 11;
                     } else {
                         pc = 3;
                     }
@@ -2639,12 +2614,12 @@ impl Cpu {
                     let _v = self.stack.pop().expect("pla on empty stack");
                     self.set_a(_v);
                     self.mem[(sym::sortX - 1 + self.reg.x as usize) & 0xffff] = self.reg.a;
-                    pc = 4;
+                    pc = 11;
                 }
                 4 => {
                     self.set_x(self.reg.x.wrapping_sub(1));
                     if self.reg.x != 0x00 {
-                        pc = 1;
+                        pc = 8;
                     } else {
                         pc = 5;
                     }
@@ -2652,13 +2627,68 @@ impl Cpu {
                 5 => {
                     self.set_a(self.mem[sym::switches]);
                     if self.reg.a != 0x00 {
-                        self.sortlist();
-                        return;
+                        pc = 7;
                     } else {
                         pc = 6;
                     }
                 }
                 6 => {
+                    return;
+                }
+                7 => {
+                    self.set_a(0x00);
+                    self.mem[sym::switches] = self.reg.a;
+                    self.set_x(self.mem[sym::sortX]);
+                    pc = 8;
+                }
+                8 => {
+                    let _o: u8 = 0x01;
+                    self.flags.c = self.reg.x >= _o;
+                    self.flags.z = self.reg.x == _o;
+                    self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
+                    if self.reg.x == 0x01 {
+                        pc = 12;
+                    } else {
+                        pc = 9;
+                    }
+                }
+                9 => {
+                    self.mem[sym::xsave] = self.reg.x;
+                    self.compare();
+                    self.set_x(self.mem[sym::xsave]);
+                    if !self.flags.c {
+                        pc = 11;
+                    } else {
+                        pc = 10;
+                    }
+                }
+                10 => {
+                    self.set_a(self.mem[(sym::sortX + self.reg.x as usize) & 0xffff]);
+                    self.stack.push(self.reg.a);
+                    self.set_a(self.mem[(sym::sortX - 1 + self.reg.x as usize) & 0xffff]);
+                    self.mem[(sym::sortX + self.reg.x as usize) & 0xffff] = self.reg.a;
+                    let _v = self.stack.pop().expect("pla on empty stack");
+                    self.set_a(_v);
+                    self.mem[(sym::sortX - 1 + self.reg.x as usize) & 0xffff] = self.reg.a;
+                    pc = 11;
+                }
+                11 => {
+                    self.set_x(self.reg.x.wrapping_sub(1));
+                    if self.reg.x != 0x00 {
+                        pc = 8;
+                    } else {
+                        pc = 12;
+                    }
+                }
+                12 => {
+                    self.set_a(self.mem[sym::switches]);
+                    if self.reg.a != 0x00 {
+                        pc = 7;
+                    } else {
+                        pc = 13;
+                    }
+                }
+                13 => {
                     return;
                 }
                 _ => unreachable!(),

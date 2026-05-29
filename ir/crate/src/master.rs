@@ -35,20 +35,13 @@ pub fn loadmusic1(cpu: &mut Cpu) {
 }
 
 pub fn loadmusic2(cpu: &mut Cpu) {
-    let mut pc: u32 = 0;
-    loop {
-        match pc {
-            0 => {
-                setmain(cpu);
-                cpu.set_a(0x14);
-                cpu.mem[sym::track] = cpu.reg.a;
-                crate::ext::rw18(cpu);
-                crate::ext::_5dmm(cpu);
-                return;
-            }
-            _ => unreachable!(),
-        }
-    }
+    setmain(cpu);
+    cpu.set_a(0x14);
+    cpu.mem[sym::track] = cpu.reg.a;
+    crate::ext::rw18(cpu);
+    setaux(cpu);
+    crate::grafix::XMOVEMUSIC(cpu);
+    return;
 }
 
 pub fn loadmusic3(cpu: &mut Cpu) {
@@ -620,24 +613,34 @@ pub fn unpacksplash(cpu: &mut Cpu) {
 }
 
 pub fn SuperEpilog(cpu: &mut Cpu) {
-    cpu.set_a(0x01);  // aux
-    crate::unpack::FADEIN(cpu);
-    setaux(cpu);
-    cpu.set_a(0x01);
-    PlaySongNI(cpu);
-    crate::ext::fadeout(cpu);
-    cpu.set_a(0x00);  // main
-    crate::unpack::FADEIN(cpu);
-    setaux(cpu);
-    cpu.set_a(0x50);
-    pauseNI(cpu);
-    cpu.set_a(0x02);
-    PlaySongNI(cpu);
-    cpu.set_a(0xff);
-    pauseNI(cpu);
-    crate::ext::fadeout(cpu);
-    crate::ext::_2a(cpu);
-    return;
+    let mut pc: u32 = 0;
+    loop {
+        match pc {
+            0 => {
+                cpu.set_a(0x01);  // aux
+                crate::unpack::FADEIN(cpu);
+                setaux(cpu);
+                cpu.set_a(0x01);
+                PlaySongNI(cpu);
+                crate::ext::fadeout(cpu);
+                cpu.set_a(0x00);  // main
+                crate::unpack::FADEIN(cpu);
+                setaux(cpu);
+                cpu.set_a(0x50);
+                pauseNI(cpu);
+                cpu.set_a(0x02);
+                PlaySongNI(cpu);
+                cpu.set_a(0xff);
+                pauseNI(cpu);
+                crate::ext::fadeout(cpu);
+                pc = 1;
+            }
+            1 => {
+                pc = 1;
+            }
+            _ => unreachable!(),
+        }
+    }
 }
 
 pub fn Demo(cpu: &mut Cpu) {
@@ -688,14 +691,21 @@ pub fn pauseNI(cpu: &mut Cpu) {
                 cpu.flags.c = (_r >> 8) != 0;
                 cpu.set_a(_r as u8);
                 if cpu.reg.a != 0x00 {
-                    pauseNI(cpu);
-                    return;
+                    pc = 6;
                 } else {
                     pc = 5;
                 }
             }
             5 => {
                 return;
+            }
+            6 => {
+                cpu.set_a(cpu.mem[0xc000]);
+                if (cpu.reg.a as i8) >= 0 {
+                    pc = 6;
+                } else {
+                    return;
+                }
             }
             _ => unreachable!(),
         }
@@ -985,8 +995,7 @@ pub fn LoadStage2B(cpu: &mut Cpu) {
                 driveon(cpu);
                 cpu.set_a(0x18);
                 if cpu.reg.a != 0x00 {
-                    crate::ext::_5dls2(cpu);
-                    return;
+                    pc = 5;
                 } else {
                     pc = 1;
                 }
@@ -1031,6 +1040,22 @@ pub fn LoadStage2B(cpu: &mut Cpu) {
                 loadmusic2(cpu);
                 setaux(cpu);
                 return;
+            }
+            5 => {
+                cpu.mem[sym::track] = cpu.reg.a;
+                pc = 6;
+            }
+            6 => {
+                crate::ext::rw18(cpu);
+                if !cpu.flags.c {
+                    pc = 4;
+                } else {
+                    pc = 7;
+                }
+            }
+            7 => {
+                error(cpu);
+                pc = 6;
             }
             _ => unreachable!(),
         }
@@ -1237,13 +1262,28 @@ pub fn tpause(cpu: &mut Cpu) {
                 cpu.flags.c = (_r >> 8) != 0;
                 cpu.set_a(_r as u8);
                 if cpu.reg.a != 0x00 {
-                    pauseNI(cpu);
-                    return;
+                    pc = 6;
                 } else {
                     pc = 5;
                 }
             }
             5 => {
+                return;
+            }
+            6 => {
+                StartGame_3f(cpu);
+                crate::grafix::XMPLAY(cpu);
+                let _o: u8 = 0x00;
+                cpu.flags.c = cpu.reg.a >= _o;
+                cpu.flags.z = cpu.reg.a == _o;
+                cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
+                if cpu.reg.a != 0x00 {
+                    pc = 6;
+                } else {
+                    pc = 7;
+                }
+            }
+            7 => {
                 return;
             }
             _ => unreachable!(),

@@ -675,7 +675,7 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a == 0x18 {
-                    pc = 34;
+                    pc = 37;
                 } else {
                     pc = 1;
                 }
@@ -698,8 +698,7 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a != 0x0c {
-                    crate::ext::_5dsafe(cpu);
-                    return;
+                    pc = 36;
                 } else {
                     pc = 3;
                 }
@@ -707,8 +706,7 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
             3 => {
                 cpu.set_a(cpu.mem[sym::KidPosn]);
                 if cpu.reg.a == 0x00 {
-                    crate::ext::_5dsafe(cpu);
-                    return;
+                    pc = 36;
                 } else {
                     pc = 4;
                 }
@@ -730,8 +728,7 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a < 0xe5 {
-                    crate::ext::_5dsafe(cpu);
-                    return;
+                    pc = 36;
                 } else {
                     pc = 6;
                 }
@@ -743,8 +740,7 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a == 0x56 {
-                    crate::ext::_5dsafe(cpu);
-                    return;
+                    pc = 36;
                 } else {
                     pc = 7;
                 }
@@ -753,8 +749,7 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
                 cpu.set_a(cpu.mem[sym::KidLife]);
                 cpu.set_a(cpu.reg.a & cpu.mem[sym::ShadLife]);
                 if (cpu.reg.a as i8) >= 0 {
-                    crate::ext::_5dsafe(cpu);
-                    return;
+                    pc = 36;
                 } else {
                     pc = 8;
                 }
@@ -766,8 +761,7 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a != cpu.mem[sym::ShadScrn] {
-                    crate::ext::_5dsafe(cpu);
-                    return;
+                    pc = 36;
                 } else {
                     pc = 9;
                 }
@@ -779,8 +773,7 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a != cpu.mem[sym::ShadBlockY] {
-                    crate::ext::_5dsafe(cpu);
-                    return;
+                    pc = 36;
                 } else {
                     pc = 10;
                 }
@@ -1019,7 +1012,7 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
                 }
             }
             31 => {
-                pc = 34;
+                pc = 37;
             }
             32 => {
                 return;
@@ -1027,7 +1020,7 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
             33 => {
                 cpu.set_a(0x00);
                 cpu.mem[sym::EnemyAlert] = cpu.reg.a;
-                pc = 34;
+                pc = 37;
             }
             34 => {
                 return;
@@ -1038,6 +1031,14 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
                 cpu.set_y(cpu.mem[sym::KidBlockY]);
                 cpu.set_a(cpu.mem[sym::KidScrn]);
                 crate::ctrlsubs::RDBLOCK(cpu);
+                return;
+            }
+            36 => {
+                cpu.set_a(0x00);
+                cpu.mem[sym::EnemyAlert] = cpu.reg.a;
+                pc = 37;
+            }
+            37 => {
                 return;
             }
             _ => unreachable!(),

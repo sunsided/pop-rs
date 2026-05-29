@@ -195,6 +195,15 @@ GETSPIKES:
   a = #0x02                  ; MOVER.S:381
 ]rts:
   return                           ; MOVER.S:382
+]cont:
+  *trdirec@0xb640 = x            ; MOVER.S:335
+  *trloc@0xb600 = y            ; MOVER.S:336
+  a = *tempscrn@0x0093        ; MOVER.S:338
+  *trscrn@0xb620 = a            ; MOVER.S:339
+  call addtrob                  ; MOVER.S:341
+  call redspikes                  ; MOVER.S:342
+  a = #GateDown                  ; MOVER.S:344
+  tail_call addsound                ; MOVER.S:345
 }
 
 fn GETSPIKES {
@@ -378,6 +387,7 @@ trigger:
 fn trigger  (aka :loop) {
   x = *linkindex@0x00f3        ; MOVER.S:507
   a = *(LINKLOC@0xbca0 + x)   ; MOVER.S:509
+  cmp a, #0xff              ; MOVER.S:510
   if a == #0xff goto :rts  ; MOVER.S:511
   call getloc                  ; MOVER.S:513
   *trloc@0xb600 = a            ; MOVER.S:514
@@ -398,6 +408,18 @@ fn trigger  (aka :loop) {
   if eq goto :loop       ; MOVER.S:535
 :rts:
   return                           ; MOVER.S:537
+:loop:
+  a = *(trloc@0xb600 + x)   ; MOVER.S:109
+  cmp a, *trloc@0xb600    ; MOVER.S:110
+  if a != *trloc@0xb600 goto :next  ; MOVER.S:111
+  a = *(trscrn@0xb620 + x)   ; MOVER.S:112
+  cmp a, *trscrn@0xb620    ; MOVER.S:113
+  if a == *trscrn@0xb620 goto :rts  ; MOVER.S:114
+:next:
+  x -= 1                         ; MOVER.S:116
+  if x != #0x00 goto :loop  ; MOVER.S:117
+:rts:
+  return                           ; MOVER.S:119
 }
 
 fn trigobj {
@@ -823,6 +845,9 @@ fn animsword {
   tail_call redsword                ; MOVER.S:1055
 ]rts:
   return                           ; MOVER.S:1056
+]purge:
+:purge:
+  tail_call stopobj                ; MOVER.S:1035
 }
 
 fn animtorch {
@@ -836,6 +861,9 @@ fn animtorch {
   tail_call redtorch                ; MOVER.S:1075
 ]rts:
   return                           ; MOVER.S:1056
+]purge:
+:purge:
+  tail_call stopobj                ; MOVER.S:1035
 }
 
 fn GETFLAMEFRAME {
@@ -1029,55 +1057,108 @@ fn check {
   if a != *VisScrn@0x00cb goto ]above  ; MOVER.S:1363
   y = *trloc@0xb600        ; MOVER.S:1365
   return                           ; MOVER.S:1367
+]above:
+  if a != *scrnAbove@0x0033 goto ]rts  ; MOVER.S:1347
+  a = *trloc@0xb600        ; MOVER.S:1349
+  c = 1                            ; MOVER.S:1350
+  a = a - #0x14 - (1 - c)        ; MOVER.S:1351
+  y = a                            ; MOVER.S:1352
+  return                           ; MOVER.S:1355
+]rts:
+  return                           ; MOVER.S:1344
 }
 
 fn checkleft {
   a = *trscrn@0xb620        ; MOVER.S:1373
+  cmp a, *VisScrn@0x00cb    ; MOVER.S:1374
   if a != *VisScrn@0x00cb goto :notonscrn  ; MOVER.S:1375
+  cmp y, #0x00              ; MOVER.S:1377
   if y == #0x00 goto ]no  ; MOVER.S:1378
+  cmp y, #0x0a              ; MOVER.S:1379
   if y == #0x0a goto ]no  ; MOVER.S:1380
+  cmp y, #0x14              ; MOVER.S:1381
   if y == #0x14 goto ]no  ; MOVER.S:1382
   y -= 1                         ; MOVER.S:1384
+  c = 0                            ; MOVER.S:1385
   return                           ; MOVER.S:1386
 :notonscrn:
+  cmp a, *scrnRight@0x0032    ; MOVER.S:1389
   if a != *scrnRight@0x0032 goto ]above  ; MOVER.S:1390
   y = *trloc@0xb600        ; MOVER.S:1392
+  cmp y, #0x00              ; MOVER.S:1393
   if y == #0x00 goto :yesr  ; MOVER.S:1394
+  cmp y, #0x0a              ; MOVER.S:1395
   if y == #0x0a goto :yesr  ; MOVER.S:1396
+  cmp y, #0x14              ; MOVER.S:1397
   if y != #0x14 goto :yesr  ; MOVER.S:1398
 :yesr:
   a = y                            ; MOVER.S:1400
   c = 0                            ; MOVER.S:1401
   a = a + #0x09 + c              ; MOVER.S:1402
   y = a                            ; MOVER.S:1403
+  c = 0                            ; MOVER.S:1405
   return                           ; MOVER.S:1406
+]no:
+  y = #0x1e                  ; MOVER.S:1342
+  c = 1                            ; MOVER.S:1343
+]rts:
+  return                           ; MOVER.S:1344
+]above:
+  cmp a, *scrnAbove@0x0033    ; MOVER.S:1346
+  if a != *scrnAbove@0x0033 goto ]rts  ; MOVER.S:1347
+  a = *trloc@0xb600        ; MOVER.S:1349
+  c = 1                            ; MOVER.S:1350
+  a = a - #0x14 - (1 - c)        ; MOVER.S:1351
+  y = a                            ; MOVER.S:1352
+  c = 1                            ; MOVER.S:1354
+  return                           ; MOVER.S:1355
 }
 
 fn checkright {
   a = *trscrn@0xb620        ; MOVER.S:1412
+  cmp a, *VisScrn@0x00cb    ; MOVER.S:1413
   if a != *VisScrn@0x00cb goto :notonscrn  ; MOVER.S:1414
   y = *trloc@0xb600        ; MOVER.S:1416
+  cmp y, #0x09              ; MOVER.S:1417
   if y == #0x09 goto ]no  ; MOVER.S:1418
+  cmp y, #0x13              ; MOVER.S:1420
   if y == #0x13 goto ]no  ; MOVER.S:1421
+  cmp y, #0x1d              ; MOVER.S:1423
   if y == #0x1d goto ]no  ; MOVER.S:1424
   y += 1                         ; MOVER.S:1426
+  c = 0                            ; MOVER.S:1427
   return                           ; MOVER.S:1428
 :notonscrn:
+  cmp a, *scrnLeft@0x0031    ; MOVER.S:1431
   if a != *scrnLeft@0x0031 goto ]above  ; MOVER.S:1432
   y = *trloc@0xb600        ; MOVER.S:1434
+  cmp y, #0x09              ; MOVER.S:1435
   if y == #0x09 goto :yesl  ; MOVER.S:1436
+  cmp y, #0x13              ; MOVER.S:1438
   if y == #0x13 goto :yesl  ; MOVER.S:1439
+  cmp y, #0x1d              ; MOVER.S:1441
   if y != #0x1d goto ]no  ; MOVER.S:1442
 :yesl:
   a = y                            ; MOVER.S:1444
   c = 1                            ; MOVER.S:1445
   a = a - #0x09 - (1 - c)        ; MOVER.S:1446
   y = a                            ; MOVER.S:1447
+  c = 0                            ; MOVER.S:1449
   return                           ; MOVER.S:1450
 ]no:
   y = #0x1e                  ; MOVER.S:1452
+  c = 1                            ; MOVER.S:1453
 ]rts:
   return                           ; MOVER.S:1454
+]above:
+  cmp a, *scrnAbove@0x0033    ; MOVER.S:1346
+  if a != *scrnAbove@0x0033 goto ]rts  ; MOVER.S:1347
+  a = *trloc@0xb600        ; MOVER.S:1349
+  c = 1                            ; MOVER.S:1350
+  a = a - #0x14 - (1 - c)        ; MOVER.S:1351
+  y = a                            ; MOVER.S:1352
+  c = 1                            ; MOVER.S:1354
+  return                           ; MOVER.S:1355
 }
 
 fn checkabover {
@@ -1125,6 +1206,10 @@ fn checkabover {
   if y != #0x09 goto ]no  ; MOVER.S:1535
   y = #0x14                  ; MOVER.S:1537
   return                           ; MOVER.S:1539
+]no:
+  y = #0x1e                  ; MOVER.S:1452
+]rts:
+  return                           ; MOVER.S:1454
 ]rts:
   return                           ; MOVER.S:1454
 }

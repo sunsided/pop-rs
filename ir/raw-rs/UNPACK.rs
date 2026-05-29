@@ -425,9 +425,11 @@ impl Cpu {
         self.set_a(0x00);
         self.mem[sym::XClmPos] = self.reg.a;
         loop {
-            self.mem[sym::YScrPos] = 0x00;
+            self.set_a(0x00);
+            self.mem[sym::YScrPos] = self.reg.a;
             self.ExpandClm();
-            self.mem[sym::YScrPos] = 0x01;
+            self.set_a(0x01);
+            self.mem[sym::YScrPos] = self.reg.a;
             self.ExpandClm();
             let _v = self.mem[sym::XClmPos].wrapping_add(1);
             self.mem[sym::XClmPos] = _v;
@@ -589,47 +591,180 @@ impl Cpu {
 
     // aliases: :Loop
     fn ExpandClm(&mut self) {
-        self.set_y(0x00);
-        self.set_a(self.mem[((self.mem[sym::CrnDatPtr] as usize | (self.mem[sym::CrnDatPtr + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
-        self.mem[sym::ByteHld] = self.reg.a;
-        self.set_a(self.reg.a & 0x80);
-        if self.reg.a == 0x00 {
-            self.set_a(self.mem[sym::ByteHld]);
-            self.set_x(0x01);
-            self.ExpClmSeq();
-            let _v = self.mem[sym::CrnDatPtr].wrapping_add(1);
-            self.mem[sym::CrnDatPtr] = _v;
-            self.set_nz(_v);
-            if self.flags.z {
-                let _v = self.mem[sym::CrnDatPtr + 1].wrapping_add(1);
-                self.mem[sym::CrnDatPtr + 1] = _v;
-                self.set_nz(_v);
-            }
-        } else {
-            self.set_y(0x01);
-            self.set_a(self.mem[((self.mem[sym::CrnDatPtr] as usize | (self.mem[sym::CrnDatPtr + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
-            self.set_x(self.reg.a);
-            self.set_a(self.mem[sym::ByteHld]);
-            self.set_a(self.reg.a & 0x7f);
-            self.ExpClmSeq();
-            self.flags.c = false;
-            self.set_a(self.mem[sym::CrnDatPtr]);
-            let _r = (self.reg.a as u16) + (0x02) as u16 + (self.flags.c as u16);
-            self.flags.c = (_r >> 8) != 0;
-            self.set_a(_r as u8);
-            self.mem[sym::CrnDatPtr] = self.reg.a;
-            if self.flags.c {
-                let _v = self.mem[sym::CrnDatPtr + 1].wrapping_add(1);
-                self.mem[sym::CrnDatPtr + 1] = _v;
-                self.set_nz(_v);
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.set_y(0x00);
+                    self.set_a(self.mem[((self.mem[sym::CrnDatPtr] as usize | (self.mem[sym::CrnDatPtr + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
+                    self.mem[sym::ByteHld] = self.reg.a;
+                    self.set_a(self.reg.a & 0x80);
+                    if self.reg.a == 0x00 {
+                        pc = 4;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.set_y(0x01);
+                    self.set_a(self.mem[((self.mem[sym::CrnDatPtr] as usize | (self.mem[sym::CrnDatPtr + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
+                    self.set_x(self.reg.a);
+                    self.set_a(self.mem[sym::ByteHld]);
+                    self.set_a(self.reg.a & 0x7f);
+                    self.ExpClmSeq();
+                    self.flags.c = false;
+                    self.set_a(self.mem[sym::CrnDatPtr]);
+                    let _r = (self.reg.a as u16) + (0x02) as u16 + (self.flags.c as u16);
+                    self.flags.c = (_r >> 8) != 0;
+                    self.set_a(_r as u8);
+                    self.mem[sym::CrnDatPtr] = self.reg.a;
+                    if !self.flags.c {
+                        pc = 14;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    let _v = self.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+                    self.mem[sym::CrnDatPtr + 1] = _v;
+                    self.set_nz(_v);
+                    pc = 14;
+                }
+                3 => {
+                    pc = 7;
+                }
+                4 => {
+                    self.set_a(self.mem[sym::ByteHld]);
+                    self.set_x(0x01);
+                    self.ExpClmSeq();
+                    let _v = self.mem[sym::CrnDatPtr].wrapping_add(1);
+                    self.mem[sym::CrnDatPtr] = _v;
+                    self.set_nz(_v);
+                    if !self.flags.z {
+                        pc = 6;
+                    } else {
+                        pc = 5;
+                    }
+                }
+                5 => {
+                    let _v = self.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+                    self.mem[sym::CrnDatPtr + 1] = _v;
+                    self.set_nz(_v);
+                    pc = 6;
+                }
+                6 => {
+                    pc = 7;
+                }
+                7 => {
+                    self.set_a(self.mem[sym::YScrPos]);
+                    let _o: u8 = 0xc0;
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if self.reg.a < 0xc0 {
+                        pc = 9;
+                    } else {
+                        pc = 8;
+                    }
+                }
+                8 => {
+                    return;
+                }
+                9 => {
+                    self.set_y(0x00);
+                    self.set_a(self.mem[((self.mem[sym::CrnDatPtr] as usize | (self.mem[sym::CrnDatPtr + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
+                    let _o: u8 = 0xff;
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if self.reg.a == 0xff {
+                        pc = 15;
+                    } else {
+                        pc = 10;
+                    }
+                }
+                10 => {
+                    self.mem[sym::ByteHld] = self.reg.a;
+                    self.set_a(self.reg.a & 0x80);
+                    if self.reg.a == 0x00 {
+                        pc = 4;
+                    } else {
+                        pc = 11;
+                    }
+                }
+                11 => {
+                    self.set_a(self.mem[sym::ByteHld]);
+                    self.set_a(self.reg.a & 0x7f);
+                    if self.reg.a == 0x00 {
+                        pc = 17;
+                    } else {
+                        pc = 12;
+                    }
+                }
+                12 => {
+                    self.set_x(self.reg.a);
+                    self.set_y(0x01);
+                    self.set_a(self.mem[((self.mem[sym::CrnDatPtr] as usize | (self.mem[sym::CrnDatPtr + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
+                    self.ExpClmSeq1();
+                    self.flags.c = false;
+                    self.set_a(self.mem[sym::CrnDatPtr]);
+                    let _r = (self.reg.a as u16) + (0x02) as u16 + (self.flags.c as u16);
+                    self.flags.c = (_r >> 8) != 0;
+                    self.set_a(_r as u8);
+                    self.mem[sym::CrnDatPtr] = self.reg.a;
+                    if !self.flags.c {
+                        pc = 14;
+                    } else {
+                        pc = 13;
+                    }
+                }
+                13 => {
+                    let _v = self.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+                    self.mem[sym::CrnDatPtr + 1] = _v;
+                    self.set_nz(_v);
+                    pc = 14;
+                }
+                14 => {
+                    pc = 7;
+                }
+                15 => {
+                    self.mem[sym::RAMRDmain] = self.reg.a;
+                    pc = 16;
+                }
+                16 => {
+                    return;
+                }
+                17 => {
+                    self.set_y(0x01);
+                    self.set_a(self.mem[((self.mem[sym::CrnDatPtr] as usize | (self.mem[sym::CrnDatPtr + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
+                    self.mem[sym::XClmPos] = self.reg.a;
+                    self.set_y(0x02);
+                    self.set_a(self.mem[((self.mem[sym::CrnDatPtr] as usize | (self.mem[sym::CrnDatPtr + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
+                    self.mem[sym::YScrPos] = self.reg.a;
+                    self.flags.c = false;
+                    self.set_a(self.mem[sym::CrnDatPtr]);
+                    let _r = (self.reg.a as u16) + (0x03) as u16 + (self.flags.c as u16);
+                    self.flags.c = (_r >> 8) != 0;
+                    self.set_a(_r as u8);
+                    self.mem[sym::CrnDatPtr] = self.reg.a;
+                    if !self.flags.c {
+                        pc = 19;
+                    } else {
+                        pc = 18;
+                    }
+                }
+                18 => {
+                    let _v = self.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+                    self.mem[sym::CrnDatPtr + 1] = _v;
+                    self.set_nz(_v);
+                    pc = 19;
+                }
+                19 => {
+                    pc = 7;
+                }
+                _ => unreachable!(),
             }
         }
-        self.set_a(self.mem[sym::YScrPos]);
-        if self.reg.a < 0xc0 {
-            self.ExpandClm();
-            return;
-        }
-        return;
     }
 
     fn ExpClmSeq(&mut self) {
@@ -733,17 +868,12 @@ impl Cpu {
     }
 
     fn DELTAEXPWIPE(&mut self) {
-        let mut pc: u32 = 0;
-        loop {
-            match pc {
-                0 => {
-                    self.mem[sym::PAGE2off] = self.reg.a;
-                    self._5dDE();
-                    return;
-                }
-                _ => unreachable!(),
-            }
-        }
+        self.mem[sym::PAGE2off] = self.reg.a;
+        self.DeltaExp();
+        self.mem[sym::PAGE2off] = self.reg.a;
+        self.mem[sym::RAMRDaux] = self.reg.a;
+        self.mem[sym::RAMWRTaux] = self.reg.a;
+        return;
     }
 
     fn INVERTY(&mut self) {

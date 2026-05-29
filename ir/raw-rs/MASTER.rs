@@ -140,20 +140,13 @@ impl Cpu {
     }
 
     fn loadmusic2(&mut self) {
-        let mut pc: u32 = 0;
-        loop {
-            match pc {
-                0 => {
-                    self.setmain();
-                    self.set_a(0x14);
-                    self.mem[sym::track] = self.reg.a;
-                    self.rw18();
-                    self._5dmm();
-                    return;
-                }
-                _ => unreachable!(),
-            }
-        }
+        self.setmain();
+        self.set_a(0x14);
+        self.mem[sym::track] = self.reg.a;
+        self.rw18();
+        self.setaux();
+        self.xmovemusic();
+        return;
     }
 
     fn loadmusic3(&mut self) {
@@ -718,24 +711,34 @@ impl Cpu {
     }
 
     fn SuperEpilog(&mut self) {
-        self.set_a(0x01);  // aux
-        self.fadein();
-        self.setaux();
-        self.set_a(0x01);
-        self.PlaySongNI();
-        self.fadeout();
-        self.set_a(0x00);  // main
-        self.fadein();
-        self.setaux();
-        self.set_a(0x50);
-        self.pauseNI();
-        self.set_a(0x02);
-        self.PlaySongNI();
-        self.set_a(0xff);
-        self.pauseNI();
-        self.fadeout();
-        self._2a();
-        return;
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.set_a(0x01);  // aux
+                    self.fadein();
+                    self.setaux();
+                    self.set_a(0x01);
+                    self.PlaySongNI();
+                    self.fadeout();
+                    self.set_a(0x00);  // main
+                    self.fadein();
+                    self.setaux();
+                    self.set_a(0x50);
+                    self.pauseNI();
+                    self.set_a(0x02);
+                    self.PlaySongNI();
+                    self.set_a(0xff);
+                    self.pauseNI();
+                    self.fadeout();
+                    pc = 1;
+                }
+                1 => {
+                    pc = 1;
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 
     fn Demo(&mut self) {
@@ -786,14 +789,21 @@ impl Cpu {
                     self.flags.c = (_r >> 8) != 0;
                     self.set_a(_r as u8);
                     if self.reg.a != 0x00 {
-                        self.pauseNI();
-                        return;
+                        pc = 6;
                     } else {
                         pc = 5;
                     }
                 }
                 5 => {
                     return;
+                }
+                6 => {
+                    self.set_a(self.mem[0xc000]);
+                    if (self.reg.a as i8) >= 0 {
+                        pc = 6;
+                    } else {
+                        return;
+                    }
                 }
                 _ => unreachable!(),
             }
@@ -1082,8 +1092,7 @@ impl Cpu {
                     self.driveon();
                     self.set_a(0x18);
                     if self.reg.a != 0x00 {
-                        self._5dls2();
-                        return;
+                        pc = 5;
                     } else {
                         pc = 1;
                     }
@@ -1128,6 +1137,22 @@ impl Cpu {
                     self.loadmusic2();
                     self.setaux();
                     return;
+                }
+                5 => {
+                    self.mem[sym::track] = self.reg.a;
+                    pc = 6;
+                }
+                6 => {
+                    self.rw18();
+                    if !self.flags.c {
+                        pc = 4;
+                    } else {
+                        pc = 7;
+                    }
+                }
+                7 => {
+                    self.error();
+                    pc = 6;
                 }
                 _ => unreachable!(),
             }
@@ -1334,13 +1359,28 @@ impl Cpu {
                     self.flags.c = (_r >> 8) != 0;
                     self.set_a(_r as u8);
                     if self.reg.a != 0x00 {
-                        self.pauseNI();
-                        return;
+                        pc = 6;
                     } else {
                         pc = 5;
                     }
                 }
                 5 => {
+                    return;
+                }
+                6 => {
+                    self.StartGame_3f();
+                    self.xmplay();
+                    let _o: u8 = 0x00;
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if self.reg.a != 0x00 {
+                        pc = 6;
+                    } else {
+                        pc = 7;
+                    }
+                }
+                7 => {
                     return;
                 }
                 _ => unreachable!(),

@@ -36,6 +36,9 @@ fn loadmusic2 {
   *track@0x00fe = a            ; MASTER.S:269
   call rw18                  ; MASTER.S:270
   goto ]mm                ; MASTER.S:274
+]mm:
+  call setaux                  ; MASTER.S:260
+  tail_call xmovemusic                ; MASTER.S:261
 }
 
 fn loadmusic3 {
@@ -238,7 +241,8 @@ fn rdbg2 {
   call rw18                  ; MASTER.S:549
   return                           ; MASTER.S:551
 ]rts:
-  return                           ; MASTER.S:488
+:rts:
+  return                           ; MASTER.S:541
 }
 
 fn rdch4 {
@@ -518,7 +522,8 @@ fn SuperEpilog {
   a = #0xff                  ; MASTER.S:945
   call pauseNI                  ; MASTER.S:946
   call fadeout                  ; MASTER.S:948
-  tail_call *                ; MASTER.S:950
+:__self950:
+  goto :__self950                ; MASTER.S:950
 }
 
 fn Demo {
@@ -547,6 +552,9 @@ fn pauseNI  (aka :loop) {
   if a != #0x00 goto :loop  ; MASTER.S:988
 ]rts:
   return                           ; MASTER.S:989
+:loop:
+  a = *$c000@0xc000        ; MASTER.S:676
+  if a >=0 goto :loop  ; MASTER.S:677
 }
 
 fn StartGame? {
@@ -555,7 +563,6 @@ fn StartGame? {
   if a != #kdemo goto :1  ; MASTER.S:1004
   tail_call Demo                ; MASTER.S:1005
 :1:
-  cmp a, #kprincess              ; MASTER.S:1006
   if a != #kprincess goto :2  ; MASTER.S:1007
   goto ]princess                ; MASTER.S:1008
 :2:
@@ -580,6 +587,12 @@ DOSTARTGAME:
   tail_call start                ; MASTER.S:1060
 ]rts:
   return                           ; MASTER.S:989
+]princess:
+  call PrincessScene                  ; MASTER.S:701
+  call SetupDHires                  ; MASTER.S:703
+  call Prolog2                  ; MASTER.S:705
+  call SilentTitle                  ; MASTER.S:707
+  tail_call Demo                ; MASTER.S:709
 }
 
 fn :3  (aka DOSTARTGAME) {
@@ -787,6 +800,13 @@ LoadStage3:
   *CHset@0x0305 = a            ; MASTER.S:1363
   call loadmusic2                  ; MASTER.S:1365
   tail_call setaux                ; MASTER.S:1367
+]ls2:
+  *track@0x00fe = a            ; MASTER.S:1257
+:test:
+  call rw18                  ; MASTER.S:1259
+  if cc goto :ok       ; MASTER.S:1261
+  call error                  ; MASTER.S:1262
+  goto :test                ; MASTER.S:1263
 }
 
 fn LoadStage3 {
@@ -887,6 +907,13 @@ fn tpause  (aka :loop) {
   if a != #0x00 goto :loop  ; MASTER.S:1426
 ]rts:
   return                           ; MASTER.S:1427
+:loop:
+  call StartGame?                  ; MASTER.S:1400
+  call xmplay                  ; MASTER.S:1401
+  cmp a, #0x00              ; MASTER.S:1402
+  if a != #0x00 goto :loop  ; MASTER.S:1403
+]rts:
+  return                           ; MASTER.S:1404
 }
 
 fn error {
