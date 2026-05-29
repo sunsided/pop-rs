@@ -50,7 +50,14 @@ def test_pass4_emits_65816_platform_stub():
     assert "for _ in 0..count" in body
     assert "self.mem[self.reg.x as usize]" in body
     assert "self.mem[self.reg.y as usize] = b" in body
-    assert "self.set_a(self.reg.a.wrapping_sub(1))" in body
+    # `mvn` does not affect status flags on the 65816, so the lowering
+    # uses direct register writes (no `set_*` Z/N side effects).
+    assert "self.reg.a = self.reg.a.wrapping_sub(1)" in body
+    assert "self.reg.x = self.reg.x.wrapping_add(1)" in body
+    assert "self.reg.y = self.reg.y.wrapping_add(1)" in body
+    assert "self.set_a" not in body
+    assert "self.set_x" not in body
+    assert "self.set_y" not in body
 
 
 def test_ir1_dump_keeps_source_ref_for_65816():

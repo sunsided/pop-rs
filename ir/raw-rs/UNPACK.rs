@@ -1147,9 +1147,9 @@ impl Cpu {
             for _ in 0..count {
                 let b = self.mem[self.reg.x as usize];
                 self.mem[self.reg.y as usize] = b;
-                self.set_x(self.reg.x.wrapping_add(1));
-                self.set_y(self.reg.y.wrapping_add(1));
-                self.set_a(self.reg.a.wrapping_sub(1));
+                self.reg.x = self.reg.x.wrapping_add(1);
+                self.reg.y = self.reg.y.wrapping_add(1);
+                self.reg.a = self.reg.a.wrapping_sub(1);
             }
         }
         // 65816 (IIgs-only, not modeled): plb  ; UNPACK.S:715
@@ -1168,9 +1168,9 @@ impl Cpu {
             for _ in 0..count {
                 let b = self.mem[self.reg.x as usize];
                 self.mem[self.reg.y as usize] = b;
-                self.set_x(self.reg.x.wrapping_add(1));
-                self.set_y(self.reg.y.wrapping_add(1));
-                self.set_a(self.reg.a.wrapping_sub(1));
+                self.reg.x = self.reg.x.wrapping_add(1);
+                self.reg.y = self.reg.y.wrapping_add(1);
+                self.reg.a = self.reg.a.wrapping_sub(1);
             }
         }
         // 65816 (IIgs-only, not modeled): plb  ; UNPACK.S:731

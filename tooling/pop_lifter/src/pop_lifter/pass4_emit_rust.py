@@ -935,9 +935,12 @@ def _emit_iigs_unsupported(item, pad: str) -> list[str]:
         f"{item.mnemonic}{op}  ; {item.src.short()}"
     )
     if item.mnemonic == "mvn":
-        # `mvn dst,src` Merlin syntax. Symbolic 8-bit loop; banks ignored.
-        # Uses `self.` accessors — `emit_crate` rewrites them to `cpu.`
-        # for the assembled-crate form.
+        # `mvn` — Merlin syntax is `mvn dst_bank, src_bank` (the order
+        # matches the 65816 byte encoding, opposite of WDC's `src, dst`
+        # assembly convention). Symbolic 8-bit loop; banks ignored. Uses
+        # `self.` accessors — `emit_crate` rewrites them to `cpu.` for
+        # the assembled-crate form. Direct register writes (not
+        # `set_*`): `mvn` doesn't affect status flags.
         return [
             header,
             f"{pad}// mvn block move (IIgs Super Hires): copy A+1 bytes from "
@@ -948,9 +951,9 @@ def _emit_iigs_unsupported(item, pad: str) -> list[str]:
             f"{pad}    for _ in 0..count {{",
             f"{pad}        let b = self.mem[self.reg.x as usize];",
             f"{pad}        self.mem[self.reg.y as usize] = b;",
-            f"{pad}        self.set_x(self.reg.x.wrapping_add(1));",
-            f"{pad}        self.set_y(self.reg.y.wrapping_add(1));",
-            f"{pad}        self.set_a(self.reg.a.wrapping_sub(1));",
+            f"{pad}        self.reg.x = self.reg.x.wrapping_add(1);",
+            f"{pad}        self.reg.y = self.reg.y.wrapping_add(1);",
+            f"{pad}        self.reg.a = self.reg.a.wrapping_sub(1);",
             f"{pad}    }}",
             f"{pad}}}",
         ]

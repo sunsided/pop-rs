@@ -1053,9 +1053,9 @@ pub fn FADEIN(cpu: &mut Cpu) {
         for _ in 0..count {
             let b = cpu.mem[cpu.reg.x as usize];
             cpu.mem[cpu.reg.y as usize] = b;
-            cpu.set_x(cpu.reg.x.wrapping_add(1));
-            cpu.set_y(cpu.reg.y.wrapping_add(1));
-            cpu.set_a(cpu.reg.a.wrapping_sub(1));
+            cpu.reg.x = cpu.reg.x.wrapping_add(1);
+            cpu.reg.y = cpu.reg.y.wrapping_add(1);
+            cpu.reg.a = cpu.reg.a.wrapping_sub(1);
         }
     }
     // 65816 (IIgs-only, not modeled): plb  ; UNPACK.S:715
@@ -1074,9 +1074,9 @@ pub fn FADEIN(cpu: &mut Cpu) {
         for _ in 0..count {
             let b = cpu.mem[cpu.reg.x as usize];
             cpu.mem[cpu.reg.y as usize] = b;
-            cpu.set_x(cpu.reg.x.wrapping_add(1));
-            cpu.set_y(cpu.reg.y.wrapping_add(1));
-            cpu.set_a(cpu.reg.a.wrapping_sub(1));
+            cpu.reg.x = cpu.reg.x.wrapping_add(1);
+            cpu.reg.y = cpu.reg.y.wrapping_add(1);
+            cpu.reg.a = cpu.reg.a.wrapping_sub(1);
         }
     }
     // 65816 (IIgs-only, not modeled): plb  ; UNPACK.S:731

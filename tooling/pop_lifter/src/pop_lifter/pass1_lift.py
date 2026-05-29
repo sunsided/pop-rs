@@ -933,6 +933,7 @@ def lift_file(
                             file=str(line.file),
                             line=line.lineno,
                             raw=line.raw.rstrip("\n"),
+                            comment=line.comment,
                         ),
                     )
                     routine.body.append(instr)
