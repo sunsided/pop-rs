@@ -2157,6 +2157,7 @@ impl Cpu {
         self.stack.push(self.reg.a);
         self.stack.push(self.reg.y);
         self.set_x(0x03);
+        // 65816 (IIgs-only, not modeled): jsl $e10000  ; GRAFIX.S:2098
         let _v = self.stack.pop().expect("pla on empty stack");
         self.set_a(_v);
         self.flags.c = true;
@@ -2173,6 +2174,7 @@ impl Cpu {
         self.stack.push(self.reg.a);
         self.stack.push(self.reg.y);
         self.set_x(0x03);
+        // 65816 (IIgs-only, not modeled): jsl $e10000  ; GRAFIX.S:2120
         self.flags.c = true;
         // 65816 (IIgs-only, not modeled): xce  ; GRAFIX.S:2122
         return;

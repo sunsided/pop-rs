@@ -1562,6 +1562,7 @@ getparam:
   push a                           ; GRAFIX.S:2095
   push y                           ; GRAFIX.S:2096
   x = #0x03                  ; GRAFIX.S:2097
+  jsl $e10000            ; 65816/IIgs op (not modeled) — GRAFIX.S:2098
   a = pop                          ; GRAFIX.S:2099
   c = 1                            ; GRAFIX.S:2100
   xce             ; 65816/IIgs op (not modeled) — GRAFIX.S:2101
@@ -1580,6 +1581,7 @@ fn getparam {
   push a                           ; GRAFIX.S:2095
   push y                           ; GRAFIX.S:2096
   x = #0x03                  ; GRAFIX.S:2097
+  jsl $e10000            ; 65816/IIgs op (not modeled) — GRAFIX.S:2098
   a = pop                          ; GRAFIX.S:2099
   c = 1                            ; GRAFIX.S:2100
   xce             ; 65816/IIgs op (not modeled) — GRAFIX.S:2101
@@ -1597,6 +1599,7 @@ fn setparam {
   push a                           ; GRAFIX.S:2117
   push y                           ; GRAFIX.S:2118
   x = #0x03                  ; GRAFIX.S:2119
+  jsl $e10000            ; 65816/IIgs op (not modeled) — GRAFIX.S:2120
   c = 1                            ; GRAFIX.S:2121
   xce             ; 65816/IIgs op (not modeled) — GRAFIX.S:2122
   return                           ; GRAFIX.S:2123

@@ -34,13 +34,23 @@ def test_ir1_dump_labels_65816_not_as_unknown():
 
 
 def test_pass4_emits_65816_platform_stub():
-    # The stub keeps the source ref so readers can jump back to the .S line.
-    out = _emit_stmt(RawStmt(item=_unsup("mvn", "$E1,1")), 0)
-    assert out == ["// 65816 (IIgs-only, not modeled): mvn $E1,1  ; syn:1"]
-    # No operand → just the mnemonic.
+    # Most 65816 ops just become a documenting comment that keeps the
+    # source ref so readers can jump back to the .S line.
     assert _emit_stmt(RawStmt(item=_unsup("xce")), 0) == [
         "// 65816 (IIgs-only, not modeled): xce  ; syn:1"
     ]
+    # `mvn` — UNPACK/FADEIN's `rep $30 ; ... ; mvn` Super Hires block
+    # move — is the one piece of real computation: lower to a symbolic
+    # 8-bit copy loop so the intent shows in the lifted body. The
+    # header comment still pins the mnemonic / operand / source ref.
+    out = _emit_stmt(RawStmt(item=_unsup("mvn", "$E1,1")), 0)
+    assert out[0] == "// 65816 (IIgs-only, not modeled): mvn $E1,1  ; syn:1"
+    assert any("mvn block move (IIgs Super Hires)" in line for line in out)
+    body = "\n".join(out)
+    assert "for _ in 0..count" in body
+    assert "self.mem[self.reg.x as usize]" in body
+    assert "self.mem[self.reg.y as usize] = b" in body
+    assert "self.set_a(self.reg.a.wrapping_sub(1))" in body
 
 
 def test_ir1_dump_keeps_source_ref_for_65816():
