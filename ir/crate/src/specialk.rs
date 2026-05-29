@@ -5,6 +5,7 @@
 use crate::cpu::Cpu;
 use crate::sym;
 
+#[doc(alias = "keys")]
 pub fn KEYS(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::SINGSTEP]);
     if cpu.reg.a == 0x00 {
@@ -126,7 +127,7 @@ pub fn KEYS1(cpu: &mut Cpu) {
                         return;
                     }
                     cpu.mem[sym::NextLevel] = cpu.reg.a;
-                    crate::ext::shortentime(cpu);
+                    SHORTENTIME(cpu);
                     return;
                 }
             }
@@ -155,7 +156,7 @@ pub fn KEYS1(cpu: &mut Cpu) {
                 let _v = cpu.mem[sym::NextLevel].wrapping_add(1);
                 cpu.mem[sym::NextLevel] = _v;
                 cpu.set_nz(_v);
-                crate::ext::shortentime(cpu);
+                SHORTENTIME(cpu);
             }
         }
         LegitKeys(cpu);
@@ -165,7 +166,7 @@ pub fn KEYS1(cpu: &mut Cpu) {
     }
     cpu.set_a(0x01);
     cpu.mem[sym::develment] = cpu.reg.a;
-    crate::ext::gtone(cpu);
+    crate::grafix::GTONE(cpu);
     return;
 }
 
@@ -231,7 +232,7 @@ pub fn KEYS2(cpu: &mut Cpu) {
                         return;
                     }
                     cpu.mem[sym::NextLevel] = cpu.reg.a;
-                    crate::ext::shortentime(cpu);
+                    SHORTENTIME(cpu);
                     return;
                 }
             }
@@ -260,7 +261,7 @@ pub fn KEYS2(cpu: &mut Cpu) {
                 let _v = cpu.mem[sym::NextLevel].wrapping_add(1);
                 cpu.mem[sym::NextLevel] = _v;
                 cpu.set_nz(_v);
-                crate::ext::shortentime(cpu);
+                SHORTENTIME(cpu);
             }
         }
         LegitKeys(cpu);
@@ -270,7 +271,7 @@ pub fn KEYS2(cpu: &mut Cpu) {
     }
     cpu.set_a(0x01);
     cpu.mem[sym::develment] = cpu.reg.a;
-    crate::ext::gtone(cpu);
+    crate::grafix::GTONE(cpu);
     return;
 }
 
@@ -294,10 +295,10 @@ pub fn LegitKeys(cpu: &mut Cpu) {
                 crate::ext::_3a1b(cpu);
                 return;
             }
-            crate::ext::restart(cpu);
+            crate::topctrl::RESTART(cpu);
             return;
         }
-        crate::ext::goattract(cpu);
+        crate::topctrl::GOATTRACT(cpu);
         return;
     }
     freeze(cpu);
@@ -569,6 +570,7 @@ pub fn KREAD(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "facejstk")]
 pub fn FACEJSTK(cpu: &mut Cpu) {
     cpu.set_a(0x00);
     cpu.flags.c = true;
@@ -583,6 +585,7 @@ pub fn FACEJSTK(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "SaveSelect")]
 pub fn SAVESELECT(cpu: &mut Cpu) {
     cpu.reg.x = 0x04;
     loop {
@@ -596,6 +599,7 @@ pub fn SAVESELECT(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "LoadSelect")]
 pub fn LOADSELECT(cpu: &mut Cpu) {
     cpu.reg.x = 0x04;
     loop {
@@ -609,6 +613,7 @@ pub fn LOADSELECT(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "SaveDesel")]
 pub fn SAVEDESEL(cpu: &mut Cpu) {
     cpu.reg.x = 0x04;
     loop {
@@ -622,6 +627,7 @@ pub fn SAVEDESEL(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "LoadDesel")]
 pub fn LOADDESEL(cpu: &mut Cpu) {
     cpu.reg.x = 0x04;
     loop {
@@ -635,6 +641,7 @@ pub fn LOADDESEL(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "initinput")]
 pub fn INITINPUT(cpu: &mut Cpu) {
     cpu.set_a(0x00);
     cpu.reg.x = 0x04;
@@ -649,6 +656,7 @@ pub fn INITINPUT(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "clrjstk")]
 pub fn CLRJSTK(cpu: &mut Cpu) {
     'b6: {
         cpu.set_a(cpu.mem[sym::clrF]);
@@ -753,12 +761,14 @@ pub fn CLRJSTK(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "zerosound")]
 pub fn ZEROSOUND(cpu: &mut Cpu) {
     cpu.set_a(0x00);  // # sounds in table
     cpu.mem[sym::soundtable] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "addsound")]
 pub fn ADDSOUND(cpu: &mut Cpu) {
     cpu.local.insert(("]temp1", 0), cpu.reg.x);
     cpu.set_x(cpu.mem[sym::soundtable]);
@@ -771,6 +781,7 @@ pub fn ADDSOUND(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "demokeys")]
 pub fn DEMOKEYS(cpu: &mut Cpu) {
     'b6: {
         cpu.set_a(cpu.mem[sym::level]);
@@ -799,6 +810,7 @@ pub fn DEMOKEYS(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "listtorches")]
 pub fn LISTTORCHES(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -807,7 +819,7 @@ pub fn LISTTORCHES(cpu: &mut Cpu) {
                 cpu.set_a(0x00);
                 cpu.mem[0x00f0] = cpu.reg.a;
                 cpu.set_a(cpu.mem[sym::VisScrn]);
-                crate::ext::calcblue(cpu);
+                crate::grafix::CALCBLUE(cpu);
                 cpu.set_y(0x1d);
                 pc = 1;
             }
@@ -863,7 +875,7 @@ pub fn LISTTORCHES(cpu: &mut Cpu) {
                 cpu.mem[sym::BOTCUT] = cpu.reg.a;
                 cpu.set_a(cpu.reg.y);
                 cpu.stack.push(cpu.reg.a);
-                crate::ext::unindex(cpu);
+                crate::ctrlsubs::UNINDEX(cpu);
                 cpu.stack.push(cpu.reg.a);
                 cpu.set_a(cpu.reg.x);
                 cpu.set_x(cpu.mem[0x00f0]);
@@ -916,6 +928,7 @@ pub fn LISTTORCHES(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "burn")]
 pub fn BURN(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::torchx]);
     if (cpu.reg.a as i8) < 0 {
@@ -932,13 +945,13 @@ pub fn BURN(cpu: &mut Cpu) {
     cpu.mem[sym::YCO] = cpu.mem[(sym::torchy + cpu.reg.x as usize) & 0xffff];
     cpu.mem[sym::BOTCUT] = cpu.mem[(sym::torchclip + cpu.reg.x as usize) & 0xffff];
     cpu.set_a(cpu.mem[(sym::torchstate + cpu.reg.x as usize) & 0xffff]);
-    crate::ext::getflameframe(cpu);
+    crate::mover::GETFLAMEFRAME(cpu);
     cpu.mem[(sym::torchstate + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
     cpu.set_x(cpu.reg.a);
-    crate::ext::setupflame(cpu);
+    crate::gamebg::SETUPFLAME(cpu);
     cpu.set_a(cpu.mem[sym::BOTCUT]);
     if cpu.reg.a != 0x00 {
-        crate::ext::initlay(cpu);
+        crate::gamebg::INITLAY(cpu);
         cpu.mem[sym::OFFSET] = 0x00;
         cpu.set_a(cpu.mem[sym::YCO]);
         cpu.flags.c = true;
@@ -953,6 +966,7 @@ pub fn BURN(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "getminleft")]
 pub fn GETMINLEFT(cpu: &mut Cpu) {
     cpu.mem[0x00f1] = 0x00;
     cpu.mem[0x00f2] = 0x00;
@@ -980,6 +994,7 @@ pub fn GETMINLEFT(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "keeptime")]
 pub fn KEEPTIME(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::level]);
     if cpu.reg.a == 0x00 {
@@ -1037,6 +1052,7 @@ pub fn KEEPTIME(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "shortentime")]
 pub fn SHORTENTIME(cpu: &mut Cpu) {
     cpu.set_y(cpu.mem[sym::NextTimeMsg]);
     if cpu.reg.y >= 0x14 {
@@ -1050,6 +1066,7 @@ pub fn SHORTENTIME(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "cuesong")]
 pub fn CUESONG(cpu: &mut Cpu) {
     cpu.mem[sym::SongCue] = cpu.reg.a;
     cpu.mem[sym::SongCount] = cpu.reg.x;
@@ -1057,9 +1074,10 @@ pub fn CUESONG(cpu: &mut Cpu) {
 }
 
 #[doc(alias = "STROBE")]
+#[doc(alias = "dloop")]
 pub fn DLOOP(cpu: &mut Cpu) {
-    crate::ext::keys(cpu);
-    crate::ext::controller(cpu);
+    KEYS(cpu);
+    crate::grafix::CONTROLLER(cpu);
     return;
 }
 
@@ -1120,7 +1138,7 @@ pub fn TempDevel(cpu: &mut Cpu) {
                                         cpu.flags.c = (_r >> 8) != 0;
                                         cpu.set_a(_r as u8);
                                         cpu.mem[sym::guardprog] = cpu.reg.a;
-                                        crate::ext::gtone(cpu);
+                                        crate::grafix::GTONE(cpu);
                                         return;
                                     }
                                 }
@@ -1237,10 +1255,10 @@ pub fn TempDevel(cpu: &mut Cpu) {
                                                 return;
                                             }
                                             cpu.set_a(cpu.mem[sym::PAGE]);
-                                            crate::ext::screendump(cpu);
+                                            crate::grafix::SCREENDUMP(cpu);
                                             return;
                                         }
-                                        crate::ext::gtone(cpu);
+                                        crate::grafix::GTONE(cpu);
                                         cpu.set_a(cpu.mem[sym::SPEED]);
                                         cpu.flags.c = false;
                                         let _r = (cpu.reg.a as u16) + (0x04) as u16 + (cpu.flags.c as u16);
@@ -1264,13 +1282,13 @@ pub fn TempDevel(cpu: &mut Cpu) {
                                     cpu.flags.c = (_r >> 8) != 0;
                                     cpu.set_a(_r as u8);
                                     cpu.mem[sym::SPEED] = cpu.reg.a;
-                                    crate::ext::gtone(cpu);
+                                    crate::grafix::GTONE(cpu);
                                     return;
                                 }
                                 preload(cpu);
                                 cpu.set_a(0x02);
                                 cpu.mem[sym::redrawflg] = cpu.reg.a;
-                                crate::ext::reload(cpu);
+                                crate::grafix::RELOAD(cpu);
                                 postload(cpu);
                                 return;
                             }
@@ -1287,7 +1305,7 @@ pub fn TempDevel(cpu: &mut Cpu) {
                         cpu.set_nz(_v);
                         return;
                     }
-                    crate::ext::boostmeter(cpu);
+                    crate::ctrlsubs::BOOSTMETER(cpu);
                     return;
                 }
                 let _v = cpu.mem[sym::ChgKidStr].wrapping_add(1);

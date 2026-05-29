@@ -5,12 +5,14 @@
 use crate::cpu::Cpu;
 use crate::sym;
 
+#[doc(alias = "yellow")]
 pub fn YELLOW(cpu: &mut Cpu) {
     cpu.set_a(0x80);
     cpu.mem[sym::yellowflag] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "timeleftmsg")]
 pub fn TIMELEFTMSG(cpu: &mut Cpu) {
     cpu.set_a(0x71);
     cpu.set_x(0x01);
@@ -39,7 +41,7 @@ pub fn TIMELEFTMSG(cpu: &mut Cpu) {
     cpu.mem[sym::OPACITY] = 0x00;
     cpu.set_a(0x01);
     cpu.mem[sym::OPACITY] = cpu.reg.a;
-    crate::ext::getminleft(cpu);
+    crate::specialk::GETMINLEFT(cpu);
     cpu.set_a(cpu.mem[sym::MinLeft]);
     if cpu.reg.a < 0x02 {
         cpu.set_a(cpu.mem[sym::SecLeft]);
@@ -57,7 +59,7 @@ pub fn TIMELEFTMSG(cpu: &mut Cpu) {
         cpu.set_x(cpu.reg.a);
         cpu.set_a(cpu.mem[(sym::digit2 + cpu.reg.x as usize) & 0xffff]);
         cpu.mem[sym::IMAGE] = cpu.reg.a;
-        crate::ext::addmsg(cpu);
+        crate::grafix::ADDMSG(cpu);
     }
     cpu.set_a(cpu.mem[sym::XCO]);
     cpu.flags.c = false;
@@ -70,7 +72,7 @@ pub fn TIMELEFTMSG(cpu: &mut Cpu) {
     cpu.set_x(cpu.reg.a);
     cpu.set_a(cpu.mem[(sym::digit2 + cpu.reg.x as usize) & 0xffff]);
     cpu.mem[sym::IMAGE] = cpu.reg.a;
-    crate::ext::addmsg(cpu);
+    crate::grafix::ADDMSG(cpu);
     cpu.set_a(cpu.mem[sym::MinLeft]);
     if cpu.reg.a >= 0x02 {
         return;
@@ -84,10 +86,11 @@ pub fn TIMELEFTMSG(cpu: &mut Cpu) {
     cpu.mem[sym::YCO] = cpu.reg.a;
     cpu.set_a(0x02);
     cpu.mem[sym::OPACITY] = cpu.reg.a;
-    crate::ext::addmsg(cpu);
+    crate::grafix::ADDMSG(cpu);
     return;
 }
 
+#[doc(alias = "printlevel")]
 pub fn PRINTLEVEL(cpu: &mut Cpu) {
     cpu.set_a(0x6e);
     cpu.set_x(0x01);
@@ -102,7 +105,7 @@ pub fn PRINTLEVEL(cpu: &mut Cpu) {
     }
     cpu.set_a(0x01);
     cpu.mem[sym::OPACITY] = cpu.reg.a;
-    crate::ext::addmsg(cpu);
+    crate::grafix::ADDMSG(cpu);
     cpu.set_a(cpu.mem[sym::XCO]);
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + (0x06) as u16 + (cpu.flags.c as u16);
@@ -115,7 +118,7 @@ pub fn PRINTLEVEL(cpu: &mut Cpu) {
         cpu.mem[sym::IMAGE] = cpu.reg.a;
         cpu.set_a(0x01);
         cpu.mem[sym::OPACITY] = cpu.reg.a;
-        crate::ext::addmsg(cpu);
+        crate::grafix::ADDMSG(cpu);
         cpu.set_a(cpu.mem[sym::XCO]);
         cpu.flags.c = false;
         let _r = (cpu.reg.a as u16) + (0x01) as u16 + (cpu.flags.c as u16);
@@ -127,7 +130,7 @@ pub fn PRINTLEVEL(cpu: &mut Cpu) {
     cpu.mem[sym::IMAGE] = cpu.mem[(sym::digit2 + cpu.reg.x as usize) & 0xffff];
     cpu.set_a(0x01);
     cpu.mem[sym::OPACITY] = cpu.reg.a;
-    crate::ext::addmsg(cpu);
+    crate::grafix::ADDMSG(cpu);
     return;
 }
 
@@ -139,6 +142,7 @@ pub fn getlevelno(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "continuemsg")]
 pub fn CONTINUEMSG(cpu: &mut Cpu) {
     cpu.set_a(0x6d);
     cpu.set_x(0x01);
@@ -154,6 +158,7 @@ pub fn CONTINUEMSG(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "flipdiskmsg")]
 pub fn FLIPDISKMSG(cpu: &mut Cpu) {
     cpu.set_a(0x70);
     cpu.set_x(0x01);
@@ -165,14 +170,14 @@ pub fn superimage(cpu: &mut Cpu) {
     setupimage(cpu);
     cpu.set_a(0x42);
     cpu.mem[sym::OPACITY] = cpu.reg.a;
-    crate::ext::addmsg(cpu);
+    crate::grafix::ADDMSG(cpu);
     return;
 }
 
 pub fn superim1(cpu: &mut Cpu) {
     cpu.set_a(0x42);
     cpu.mem[sym::OPACITY] = cpu.reg.a;
-    crate::ext::addmsg(cpu);
+    crate::grafix::ADDMSG(cpu);
     return;
 }
 
@@ -191,6 +196,7 @@ pub fn setupimage(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "DrawKid")]
 pub fn DRAWKID(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::backtolife]);
     if cpu.reg.a != 0x00 {
@@ -213,11 +219,13 @@ pub fn DRAWKID(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "DrawSword")]
 pub fn DRAWSWORD(cpu: &mut Cpu) {
     DrawNormal(cpu);
     return;
 }
 
+#[doc(alias = "DrawShad")]
 pub fn DRAWSHAD(cpu: &mut Cpu) {
     DrawEored(cpu);
     return;
@@ -226,7 +234,7 @@ pub fn DRAWSHAD(cpu: &mut Cpu) {
 pub fn DrawNormal(cpu: &mut Cpu) {
     cpu.mem[sym::OPACITY] = 0x04;
     cpu.set_a(0x82);
-    crate::ext::addmid(cpu);
+    crate::grafix::ADDMID(cpu);
     return;
 }
 
@@ -235,14 +243,14 @@ pub fn DrawShifted(cpu: &mut Cpu) {
     chgoffset(cpu);
     cpu.mem[sym::OPACITY] = 0x04;
     cpu.set_a(0x82);
-    crate::ext::addmid(cpu);
+    crate::grafix::ADDMID(cpu);
     return;
 }
 
 pub fn DrawEored(cpu: &mut Cpu) {
     cpu.mem[sym::OPACITY] = 0x03;
     cpu.set_a(0x82);
-    crate::ext::addmid(cpu);
+    crate::grafix::ADDMID(cpu);
     return;
 }
 
@@ -264,19 +272,21 @@ pub fn chgoffset(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "updatemeters")]
 pub fn UPDATEMETERS(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::redkidmeter]);
     if cpu.reg.a != 0x00 {
-        crate::ext::DrawKidMeter(cpu);
+        DRAWKIDMETER(cpu);
     }
     cpu.set_a(cpu.mem[sym::redoppmeter]);
     if cpu.reg.a == 0x00 {
         return;
     }
-    crate::ext::DrawOppMeter(cpu);
+    DRAWOPPMETER(cpu);
     return;
 }
 
+#[doc(alias = "DrawKidMeter")]
 pub fn DRAWKIDMETER(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -417,7 +427,7 @@ pub fn DRAWKIDMETER(cpu: &mut Cpu) {
                 cpu.mem[sym::XCO] = cpu.reg.a;
                 cpu.set_a(cpu.mem[(sym::KidStrOFF + cpu.reg.x as usize) & 0xffff]);
                 cpu.mem[sym::OFFSET] = cpu.reg.a;
-                crate::ext::addmsg(cpu);
+                crate::grafix::ADDMSG(cpu);
                 return;
             }
             16 => {
@@ -458,6 +468,7 @@ pub fn DRAWKIDMETER(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "DrawOppMeter")]
 pub fn DRAWOPPMETER(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -648,7 +659,7 @@ pub fn DRAWOPPMETER(cpu: &mut Cpu) {
                 cpu.mem[sym::XCO] = cpu.reg.a;
                 cpu.set_a(cpu.mem[(sym::OppStrOFF + cpu.reg.x as usize) & 0xffff]);
                 cpu.mem[sym::OFFSET] = cpu.reg.a;
-                crate::ext::addmsg(cpu);
+                crate::grafix::ADDMSG(cpu);
                 return;
             }
             20 => {
@@ -667,6 +678,7 @@ pub fn DRAWOPPMETER(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "setupflask")]
 pub fn SETUPFLASK(cpu: &mut Cpu) {
     cpu.mem[sym::OFFSET] = 0x02;
     cpu.set_a(cpu.reg.x);
@@ -754,6 +766,7 @@ pub fn SETUPFLASK(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "setupflame")]
 pub fn SETUPFLAME(cpu: &mut Cpu) {
     if cpu.reg.x >= 0x12 {
         return;
@@ -775,6 +788,7 @@ pub fn SETUPFLAME(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "psetupflame")]
 pub fn PSETUPFLAME(cpu: &mut Cpu) {
     if cpu.reg.x >= 0x12 {
         return;
@@ -782,13 +796,14 @@ pub fn PSETUPFLAME(cpu: &mut Cpu) {
     cpu.mem[sym::IMAGE] = cpu.mem[(sym::ptorchflame + cpu.reg.x as usize) & 0xffff];
     cpu.set_a(0x02);
     cpu.mem[sym::OPACITY] = cpu.reg.a;
-    crate::ext::initlay(cpu);
+    INITLAY(cpu);
     cpu.mem[sym::TABLE] = 0x00;
     cpu.set_a(0x60);
     cpu.mem[sym::TABLE + 1] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "twinkle")]
 pub fn TWINKLE(cpu: &mut Cpu) {
     cpu.mem[sym::XCO] = 0x02;
     cpu.mem[sym::YCO] = cpu.mem[(sym::stary + cpu.reg.x as usize) & 0xffff];
@@ -806,26 +821,29 @@ pub fn TWINKLE(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "drawpost")]
 pub fn DRAWPOST(cpu: &mut Cpu) {
     cpu.mem[sym::XCO] = 0x1f;
     cpu.mem[sym::YCO] = 0x98;
     cpu.mem[sym::IMAGE] = 0x0c;
     cpu.mem[sym::OPACITY] = 0x01;
     _5dsetch6(cpu);
-    crate::ext::addfore(cpu);
+    crate::grafix::ADDFORE(cpu);
     return;
 }
 
+#[doc(alias = "drawglass")]
 pub fn DRAWGLASS(cpu: &mut Cpu) {
     cpu.mem[sym::XCO] = 0x13;
     cpu.mem[sym::YCO] = 0x97;
     cpu.mem[sym::IMAGE] = cpu.mem[(sym::glassimg + cpu.reg.x as usize) & 0xffff];
     cpu.mem[sym::OPACITY] = 0x02;
     _5dsetch6(cpu);
-    crate::ext::addback(cpu);
+    crate::grafix::ADDBACK(cpu);
     return;
 }
 
+#[doc(alias = "pmask")]
 pub fn PMASK(cpu: &mut Cpu) {
     'b7: {
         cpu.set_x(cpu.mem[sym::CharPosn]);
@@ -859,29 +877,31 @@ pub fn PMASK(cpu: &mut Cpu) {
     cpu.mem[sym::TABLE] = 0x05;
     cpu.mem[sym::OPACITY] = 0x00;
     cpu.set_a(0x82);
-    crate::ext::addmid(cpu);
+    crate::grafix::ADDMID(cpu);
     return;
 }
 
+#[doc(alias = "recheckyel")]
 pub fn RECHECKYEL(cpu: &mut Cpu) {
     cpu.mem[sym::tempblockx] = cpu.reg.a;
     cpu.mem[sym::tempblocky] = cpu.reg.a;
-    crate::ext::indexblock(cpu);
+    crate::ctrlsubs::INDEXBLOCK(cpu);
     cpu.set_a(cpu.mem[((cpu.mem[sym::locals] as usize | (cpu.mem[sym::locals + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
     if cpu.reg.a == 0x00 {
         return;
     }
     cpu.set_x(0x05);
-    crate::ext::yellow(cpu);
+    YELLOW(cpu);
     cpu.set_a(0xff);
     return;
 }
 
+#[doc(alias = "flow")]
 pub fn FLOW(cpu: &mut Cpu) {
     if cpu.reg.y >= 0x08 {
         return;
     }
-    crate::ext::initlay(cpu);
+    INITLAY(cpu);
     cpu.set_a(0x97);
     cpu.flags.c = true;
     let _r = (cpu.reg.a as u16) + (!cpu.mem[(sym::sandht + cpu.reg.y as usize) & 0xffff]) as u16 + (cpu.flags.c as u16);
@@ -924,6 +944,7 @@ pub fn restoreFChar(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "setupcomix")]
 pub fn SETUPCOMIX(cpu: &mut Cpu) {
     saveFChar(cpu);
     _3asub(cpu);
@@ -931,6 +952,7 @@ pub fn SETUPCOMIX(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "addcharobj")]
 pub fn ADDCHAROBJ(cpu: &mut Cpu) {
     cpu.set_x(cpu.mem[sym::objX]);
     cpu.set_x(cpu.reg.x.wrapping_add(1));
@@ -943,7 +965,7 @@ pub fn ADDCHAROBJ(cpu: &mut Cpu) {
     cpu.mem[sym::OFFSET] = cpu.mem[sym::FCharX + 1];
     cpu.set_a(cpu.reg.x);
     let tmp0 = cpu.reg.a;
-    crate::ext::cvtx(cpu);
+    crate::grafix::CVTX(cpu);
     cpu.reg.a = tmp0;
     cpu.set_x(cpu.reg.a);
     cpu.mem[(sym::objX + cpu.reg.x as usize) & 0xffff] = cpu.mem[sym::XCO];
@@ -960,6 +982,7 @@ pub fn ADDCHAROBJ(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "setobjindx")]
 pub fn SETOBJINDX(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::FCharIndex]);
     cpu.mem[(sym::objINDX + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
@@ -973,13 +996,14 @@ pub fn SETOBJINDX(cpu: &mut Cpu) {
 }
 
 pub fn pretext(cpu: &mut Cpu) {
-    crate::ext::initlay(cpu);
+    INITLAY(cpu);
     cpu.mem[sym::TABLE] = 0x00;
     cpu.set_a(0x84);
     cpu.mem[sym::TABLE + 1] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "setrecheck0")]
 pub fn SETRECHECK0(cpu: &mut Cpu) {
     cpu.mem[sym::locals] = 0xf8;
     cpu.mem[sym::locals + 1] = 0x03;
@@ -992,6 +1016,7 @@ pub fn SETRECHECK0(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "initlay")]
 pub fn INITLAY(cpu: &mut Cpu) {
     cpu.mem[sym::BANK] = 0x03;
     cpu.mem[sym::RIGHTCUT] = 0x28;
@@ -1029,7 +1054,7 @@ pub fn _3adraw(cpu: &mut Cpu) {
     cpu.mem[sym::XCO] = cpu.mem[(sym::OppStrX + cpu.reg.x as usize) & 0xffff];
     cpu.set_a(cpu.mem[(sym::OppStrOFF + cpu.reg.x as usize) & 0xffff]);
     cpu.mem[sym::OFFSET] = cpu.reg.a;
-    crate::ext::addmsg(cpu);
+    crate::grafix::ADDMSG(cpu);
     return;
 }
 
@@ -1037,7 +1062,7 @@ pub fn _3adrawimg(cpu: &mut Cpu) {
     cpu.mem[sym::XCO] = cpu.mem[(sym::OppStrX + cpu.reg.x as usize) & 0xffff];
     cpu.set_a(cpu.mem[(sym::OppStrOFF + cpu.reg.x as usize) & 0xffff]);
     cpu.mem[sym::OFFSET] = cpu.reg.a;
-    crate::ext::addmsg(cpu);
+    crate::grafix::ADDMSG(cpu);
     return;
 }
 
@@ -1095,7 +1120,7 @@ pub fn _3asub(cpu: &mut Cpu) {
         }
         cpu.set_a(0x05);
     }
-    crate::ext::addfcharx(cpu);
+    crate::ctrlsubs::ADDFCHARX(cpu);
     cpu.set_a(cpu.mem[sym::CharID]);
     if cpu.reg.a != 0x00 {
         cpu.set_a(0x01);  // opponents: 1
@@ -1120,6 +1145,6 @@ pub fn _3asub(cpu: &mut Cpu) {
     cpu.mem[sym::FCharCR] = 0x28;
     cpu.mem[sym::FCharCD] = 0xc0;
     cpu.set_a(0x05);
-    crate::ext::addcharobj(cpu);
+    ADDCHAROBJ(cpu);
     return;
 }

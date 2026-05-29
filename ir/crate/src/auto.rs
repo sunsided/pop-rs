@@ -5,6 +5,7 @@
 use crate::cpu::Cpu;
 use crate::sym;
 
+#[doc(alias = "AutoCtrl")]
 pub fn AUTOCTRL(cpu: &mut Cpu) {
     DoRelease(cpu);
     cpu.set_a(cpu.mem[sym::CharID]);
@@ -67,8 +68,8 @@ pub fn MouseProg(cpu: &mut Cpu) {
             return;
         }
         cpu.set_a(0x6b);
-        crate::ext::jumpseq(cpu);
-        crate::ext::animchar(cpu);
+        crate::ctrlsubs::JUMPSEQ(cpu);
+        crate::coll::ANIMCHAR(cpu);
         return;
     }
     if cpu.reg.a != 0x06 {
@@ -152,7 +153,7 @@ pub fn Shad5(cpu: &mut Cpu) {
         cpu.set_a(0x18);
         cpu.set_x(0x01);  // x
         cpu.set_y(0x00);  // y
-        crate::ext::rdblock(cpu);
+        crate::ctrlsubs::RDBLOCK(cpu);
         cpu.set_a(cpu.mem[((cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
         if cpu.reg.a < 0x14 {
             return;
@@ -162,12 +163,12 @@ pub fn Shad5(cpu: &mut Cpu) {
     }
     cpu.set_a(0x3a);
     cpu.set_x(0x00);
-    crate::ext::AutoPlayback(cpu);
+    AUTOPLAYBACK(cpu);
     cpu.set_a(cpu.mem[sym::CharX]);
     if cpu.reg.a >= 0x0f {
         return;
     }
-    crate::ext::VanishChar(cpu);
+    crate::misc::VANISHCHAR(cpu);
     return;
 }
 
@@ -178,7 +179,7 @@ pub fn ShadLevel4(cpu: &mut Cpu) {
     }
     cpu.set_a(cpu.mem[sym::CharX]);
     if cpu.reg.a < 0x50 {
-        crate::ext::VanishChar(cpu);
+        crate::misc::VANISHCHAR(cpu);
         return;
     }
     DoAdvance(cpu);
@@ -225,20 +226,20 @@ pub fn FinalShad(cpu: &mut Cpu) {
     if cpu.reg.a < 0x02 {
         cpu.set_a(cpu.mem[sym::offguard]);
         if cpu.reg.a != 0x00 {
-            crate::ext::getopdist(cpu);
+            crate::ctrlsubs::GETOPDIST(cpu);
             if cpu.flags.n {
                 cpu.mem[sym::lightcolor] = 0xff;
                 cpu.set_a(0x0a);
                 cpu.mem[sym::lightning] = cpu.reg.a;
-                crate::ext::boostmeter(cpu);
+                crate::ctrlsubs::BOOSTMETER(cpu);
                 cpu.set_a(0x05);
                 cpu.set_x(0x55);
-                crate::ext::cuesong(cpu);
+                crate::specialk::CUESONG(cpu);
                 cpu.mem[sym::mergetimer] = 0x2a;
                 cpu.set_a(0x00);
                 cpu.mem[sym::CharID] = cpu.reg.a;
-                crate::ext::SaveKid(cpu);
-                crate::ext::VanishChar(cpu);
+                crate::ctrlsubs::SAVEKID(cpu);
+                crate::misc::VANISHCHAR(cpu);
                 return;
             }
             cpu.set_a(cpu.mem[sym::EnemyAlert]);
@@ -262,7 +263,7 @@ pub fn FinalShad(cpu: &mut Cpu) {
     }
     cpu.set_a(cpu.mem[sym::EnemyAlert]);
     if cpu.reg.a >= 0x02 {
-        crate::ext::getopdist(cpu);
+        crate::ctrlsubs::GETOPDIST(cpu);
         if cpu.reg.a < 0x5a {
             cpu.set_a(cpu.mem[sym::CharPosn]);
             if cpu.reg.a != 0x0f {
@@ -272,7 +273,7 @@ pub fn FinalShad(cpu: &mut Cpu) {
             return;
         }
     }
-    crate::ext::getopdist(cpu);
+    crate::ctrlsubs::GETOPDIST(cpu);
     if !cpu.flags.n {
         return;
     }
@@ -301,7 +302,7 @@ pub fn Alert(cpu: &mut Cpu) {
         return;
     }
     'b9: {
-        crate::ext::getopdist(cpu);
+        crate::ctrlsubs::GETOPDIST(cpu);
         cpu.set_x(cpu.mem[sym::OpBlockY]);
         if cpu.reg.x == cpu.mem[sym::CharBlockY] {
             if cpu.reg.a >= 0xf8 {
@@ -364,7 +365,7 @@ pub fn EnGarde(cpu: &mut Cpu) {
     cpu.flags.z = cpu.reg.a == _o;
     cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
     if cpu.reg.a >= 0x02 {
-        crate::ext::getopdist(cpu);
+        crate::ctrlsubs::GETOPDIST(cpu);
         if !cpu.flags.n {
             let _o: u8 = 0x0c;
             cpu.flags.c = cpu.reg.a >= _o;
@@ -394,7 +395,7 @@ pub fn EnGarde(cpu: &mut Cpu) {
                 }
             }
         }
-        crate::ext::getopdist(cpu);
+        crate::ctrlsubs::GETOPDIST(cpu);
         let _o: u8 = 0x23;
         cpu.flags.c = cpu.reg.a >= _o;
         cpu.flags.z = cpu.reg.a == _o;
@@ -421,7 +422,7 @@ pub fn EnGarde(cpu: &mut Cpu) {
                     cpu.flags.z = cpu.reg.a == _o;
                     cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if cpu.reg.a < 0x0f {
-                        crate::ext::getopdist(cpu);
+                        crate::ctrlsubs::GETOPDIST(cpu);
                         let _o: u8 = 0x28;
                         cpu.flags.c = cpu.reg.a >= _o;
                         cpu.flags.z = cpu.reg.a == _o;
@@ -443,7 +444,7 @@ pub fn EnGarde(cpu: &mut Cpu) {
                     cpu.flags.z = cpu.reg.a == _o;
                     cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if cpu.reg.a < 0x2c {
-                        crate::ext::getopdist(cpu);
+                        crate::ctrlsubs::GETOPDIST(cpu);
                         let _o: u8 = 0x32;
                         cpu.flags.c = cpu.reg.a >= _o;
                         cpu.flags.z = cpu.reg.a == _o;
@@ -456,14 +457,14 @@ pub fn EnGarde(cpu: &mut Cpu) {
                     }
                 }
             }
-            crate::ext::getinfront(cpu);
-            crate::ext::cmpspace(cpu);
+            crate::ctrlsubs::GETINFRONT(cpu);
+            crate::ctrlsubs::CMPSPACE(cpu);
             if cpu.flags.z {
                 DoRetreat(cpu);
                 return;
             }
-            crate::ext::get2infront(cpu);
-            crate::ext::cmpspace(cpu);
+            crate::ctrlsubs::GET2INFRONT(cpu);
+            crate::ctrlsubs::CMPSPACE(cpu);
             if !cpu.flags.z {
                 DoAdvance(cpu);
                 return;
@@ -539,25 +540,25 @@ pub fn FollowKid(cpu: &mut Cpu) {
         }
         _ => {}
     }
-    crate::ext::getinfront(cpu);
+    crate::ctrlsubs::GETINFRONT(cpu);
     cpu.mem[sym::ztemp] = cpu.reg.a;
-    crate::ext::cmpbarr(cpu);
+    crate::ctrlsubs::CMPBARR(cpu);
     if cpu.flags.z {
         cpu.set_a(cpu.mem[sym::ztemp]);
-        crate::ext::cmpspace(cpu);
+        crate::ctrlsubs::CMPSPACE(cpu);
         if cpu.flags.z {
-            crate::ext::getinfront(cpu);
+            crate::ctrlsubs::GETINFRONT(cpu);
             let _v = cpu.mem[sym::tempblocky].wrapping_add(1);
             cpu.mem[sym::tempblocky] = _v;
             cpu.set_nz(_v);
-            crate::ext::rdblock1(cpu);
+            crate::ctrlsubs::RDBLOCK1(cpu);
             cpu.mem[sym::ztemp] = cpu.reg.a;
             if cpu.reg.a != 0x02 {
                 if cpu.reg.a != 0x0b {
-                    crate::ext::cmpbarr(cpu);
+                    crate::ctrlsubs::CMPBARR(cpu);
                     if cpu.flags.z {
                         cpu.set_a(cpu.mem[sym::ztemp]);
-                        crate::ext::cmpspace(cpu);
+                        crate::ctrlsubs::CMPSPACE(cpu);
                         if !cpu.flags.z {
                             cpu.set_a(cpu.mem[sym::CharBlockY]);
                             cpu.flags.c = false;
@@ -592,7 +593,7 @@ pub fn InRange(cpu: &mut Cpu) {
     if cpu.reg.a != 0x00 {
         return;
     }
-    crate::ext::getopdist(cpu);
+    crate::ctrlsubs::GETOPDIST(cpu);
     if cpu.reg.a < 0x1d {
         DoStrike(cpu);
         return;
@@ -602,7 +603,7 @@ pub fn InRange(cpu: &mut Cpu) {
 }
 
 pub fn GenFight(cpu: &mut Cpu) {
-    crate::ext::getopdist(cpu);
+    crate::ctrlsubs::GETOPDIST(cpu);
     if cpu.reg.a < 0x0a {
         MaybeAdvance(cpu);
         return;
@@ -616,7 +617,7 @@ pub fn GenFight(cpu: &mut Cpu) {
     if cpu.reg.a != 0x00 {
         return;
     }
-    crate::ext::getopdist(cpu);
+    crate::ctrlsubs::GETOPDIST(cpu);
     if cpu.reg.a < 0x0c {
         MaybeAdvance(cpu);
         return;
@@ -811,10 +812,11 @@ pub fn DoRelBtn(cpu: &mut Cpu) {
 
 pub fn rndp(cpu: &mut Cpu) {
     cpu.set_x(cpu.mem[sym::guardprog]);
-    crate::ext::rnd(cpu);
+    crate::grafix::RND(cpu);
     return;
 }
 
+#[doc(alias = "checkstrike")]
 pub fn CHECKSTRIKE(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::KidPosn]);
     if cpu.reg.a == 0x00 {
@@ -825,12 +827,12 @@ pub fn CHECKSTRIKE(cpu: &mut Cpu) {
             return;
         }
     }
-    crate::ext::LoadShadwOp(cpu);
+    crate::ctrlsubs::LOADSHADWOP(cpu);
     TestStrike(cpu);
-    crate::ext::SaveShadwOp(cpu);
-    crate::ext::LoadKidwOp(cpu);
+    crate::ctrlsubs::SAVESHADWOP(cpu);
+    crate::ctrlsubs::LOADKIDWOP(cpu);
     TestStrike(cpu);
-    crate::ext::SaveKidwOp(cpu);
+    crate::ctrlsubs::SAVEKIDWOP(cpu);
     return;
 }
 
@@ -847,7 +849,7 @@ pub fn TestStrike(cpu: &mut Cpu) {
     match cpu.reg.a {
         0x99 | 0x9a => {
             'b12: {
-                crate::ext::getopdist(cpu);
+                crate::ctrlsubs::GETOPDIST(cpu);
                 if cpu.reg.a >= 0x00 {
                     if cpu.reg.a < 0x1d {
                         cpu.set_a(cpu.mem[sym::OpPosn]);
@@ -865,8 +867,8 @@ pub fn TestStrike(cpu: &mut Cpu) {
                             cpu.mem[sym::justblocked] = cpu.reg.a;
                         }
                         cpu.set_a(0x45);
-                        crate::ext::jumpseq(cpu);
-                        crate::ext::animchar(cpu);
+                        crate::ctrlsubs::JUMPSEQ(cpu);
+                        crate::coll::ANIMCHAR(cpu);
                         return;
                     }
                 }
@@ -875,7 +877,7 @@ pub fn TestStrike(cpu: &mut Cpu) {
             if cpu.reg.a != 0x9a {
                 return;
             }
-            crate::ext::getopdist(cpu);
+            crate::ctrlsubs::GETOPDIST(cpu);
             cpu.set_x(cpu.mem[sym::OpSword]);
             if cpu.reg.x >= 0x02 {
                 if cpu.reg.a < 0x0c {
@@ -898,6 +900,7 @@ pub fn TestStrike(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "checkstab")]
 pub fn CHECKSTAB(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::ShadAction]);
     let _o: u8 = 0x63;
@@ -917,9 +920,9 @@ pub fn CHECKSTAB(cpu: &mut Cpu) {
                 return;
             }
         }
-        crate::ext::LoadShad(cpu);
+        crate::ctrlsubs::LOADSHAD(cpu);
         crate::ext::StabChar(cpu);
-        crate::ext::SaveShad(cpu);
+        crate::ctrlsubs::SAVESHAD(cpu);
         rndp(cpu);
         cpu.set_a(cpu.mem[(sym::refractimer + cpu.reg.x as usize) & 0xffff]);
         cpu.mem[sym::refract] = cpu.reg.a;
@@ -932,9 +935,9 @@ pub fn CHECKSTAB(cpu: &mut Cpu) {
     if cpu.reg.a != 0x63 {
         return;
     }
-    crate::ext::LoadKid(cpu);
+    crate::ctrlsubs::LOADKID(cpu);
     crate::ext::StabChar(cpu);
-    crate::ext::SaveKid(cpu);
+    crate::ctrlsubs::SAVEKID(cpu);
     return;
 }
 
@@ -951,7 +954,7 @@ pub fn chgshadposn(cpu: &mut Cpu) {
     }
     cpu.set_y(0x07);
     cpu.set_a(cpu.mem[((cpu.mem[sym::ztemp] as usize | (cpu.mem[sym::ztemp + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
-    crate::ext::jumpseq(cpu);
+    crate::ctrlsubs::JUMPSEQ(cpu);
     cpu.mem[sym::CharID] = 0x01;
     cpu.set_a(0x00);
     cpu.mem[sym::PlayCount] = cpu.reg.a;
@@ -964,10 +967,11 @@ pub fn csps(cpu: &mut Cpu) {
     cpu.set_a(0x04);
     cpu.mem[sym::MaxOppStr] = cpu.reg.a;
     cpu.mem[sym::OppStrength] = cpu.reg.a;
-    crate::ext::SaveShad(cpu);
+    crate::ctrlsubs::SAVESHAD(cpu);
     return;
 }
 
+#[doc(alias = "AutoPlayback")]
 pub fn AUTOPLAYBACK(cpu: &mut Cpu) {
     'b13: {
         cpu.mem[sym::ProgStart] = cpu.reg.a;
@@ -1001,7 +1005,7 @@ pub fn AUTOPLAYBACK(cpu: &mut Cpu) {
             cpu.flags.z = cpu.reg.a == _o;
             cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
             if cpu.reg.a == 0xff {
-                crate::ext::attractmode(cpu);
+                crate::grafix::ATTRACTMODE(cpu);
                 return;
             }
             let _o: u8 = 0x00;
@@ -1121,15 +1125,15 @@ pub fn AUTOPLAYBACK(cpu: &mut Cpu) {
 pub fn _3aendpb(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::CUTTIMER]);
     if cpu.reg.a == 0x00 {
-        crate::ext::LoadKid(cpu);
-        crate::ext::setupchar(cpu);
-        crate::ext::getedges(cpu);
+        crate::ctrlsubs::LOADKID(cpu);
+        crate::ctrlsubs::SETUPCHAR(cpu);
+        crate::ctrlsubs::GETEDGES(cpu);
         cutchar(cpu);
         if cpu.flags.n {
             return;
         }
         cpu.mem[0x00ec] = cpu.reg.a;
-        crate::ext::SaveKid(cpu);
+        crate::ctrlsubs::SAVEKID(cpu);
         cpu.mem[sym::cutscrn] = cpu.mem[sym::CharScrn];
         cpu.set_a(cpu.mem[sym::ShadFace]);
         let _o: u8 = 0x56;
@@ -1240,10 +1244,10 @@ pub fn transferguard(cpu: &mut Cpu) {
     cpu.mem[(sym::GdStartBlock - 1 + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
     cpu.set_x(cpu.mem[sym::ShadScrn]);
     cpu.mem[(sym::GdStartBlock - 1 + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
-    crate::ext::LoadShad(cpu);
+    crate::ctrlsubs::LOADSHAD(cpu);
     cpu.set_a(cpu.mem[0x00ec]);
-    crate::ext::cut(cpu);
-    crate::ext::SaveShad(cpu);
+    CUT(cpu);
+    crate::ctrlsubs::SAVESHAD(cpu);
     return;
 }
 
@@ -1264,7 +1268,7 @@ pub fn updateguard(cpu: &mut Cpu) {
         cpu.mem[sym::tempblockx] = cpu.reg.a;
         cpu.set_a(cpu.mem[sym::ShadBlockY]);
         cpu.mem[sym::tempblocky] = cpu.reg.a;
-        crate::ext::indexblock(cpu);
+        crate::ctrlsubs::INDEXBLOCK(cpu);
         cpu.set_a(cpu.reg.y);
         cpu.set_x(cpu.mem[sym::ShadScrn]);
         cpu.mem[(sym::GdStartBlock - 1 + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
@@ -1293,6 +1297,7 @@ pub fn updateguard(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "cutguard")]
 pub fn CUTGUARD(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::ShadFace]);
     let _o: u8 = 0x56;
@@ -1317,7 +1322,7 @@ pub fn CUTGUARD(cpu: &mut Cpu) {
     cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
     if cpu.reg.a == 0x04 {
         cpu.set_a(cpu.mem[sym::ShadScrn]);
-        crate::ext::getdown(cpu);
+        crate::ctrlsubs::GETDOWN(cpu);
         cpu.mem[sym::ShadScrn] = cpu.reg.a;
         let _o: u8 = 0x03;
         cpu.flags.c = cpu.reg.a >= _o;
@@ -1325,7 +1330,7 @@ pub fn CUTGUARD(cpu: &mut Cpu) {
         cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
         if cpu.reg.a == 0x03 {
             cpu.set_a(0x05);
-            crate::ext::addsound(cpu);
+            crate::specialk::ADDSOUND(cpu);
             cpu.mem[sym::ShadX] = 0x85;
             cpu.mem[sym::ShadBlockY] = 0x01;
             cpu.mem[sym::ShadFace] = 0x00;
@@ -1347,13 +1352,13 @@ pub fn CUTGUARD(cpu: &mut Cpu) {
             if cpu.reg.a != 0x04 {
                 return;
             }
-            crate::ext::LoadShad(cpu);
-            crate::ext::VanishChar(cpu);
-            crate::ext::SaveShad(cpu);
+            crate::ctrlsubs::LOADSHAD(cpu);
+            crate::misc::VANISHCHAR(cpu);
+            crate::ctrlsubs::SAVESHAD(cpu);
             return;
         }
     }
-    crate::ext::deadenemy(cpu);
+    crate::subs::DEADENEMY(cpu);
     cpu.set_x(cpu.mem[sym::VisScrn]);
     cpu.mem[(sym::GdStartBlock - 1 + cpu.reg.x as usize) & 0xffff] = 0xff;
     cpu.mem[sym::ShadFace] = 0x56;
@@ -1504,7 +1509,7 @@ pub fn cutchar(cpu: &mut Cpu) {
                                     cpu.set_a(cpu.mem[sym::CharScrn]);
                                     cpu.set_x(0x09);
                                     cpu.set_y(cpu.mem[sym::CharBlockY]);
-                                    crate::ext::rdblock(cpu);
+                                    crate::ctrlsubs::RDBLOCK(cpu);
                                     let _o: u8 = 0x07;
                                     cpu.flags.c = cpu.reg.a >= _o;
                                     cpu.flags.z = cpu.reg.a == _o;
@@ -1580,7 +1585,7 @@ pub fn cutchar(cpu: &mut Cpu) {
         return;
     }
     let tmp0 = cpu.reg.a;
-    crate::ext::cut(cpu);
+    CUT(cpu);
     cpu.reg.a = tmp0;
     return;
 }
@@ -1616,7 +1621,7 @@ pub fn stealsword(cpu: &mut Cpu) {
     cpu.set_a(0x0f);
     cpu.set_x(0x01);
     cpu.set_y(0x00);
-    crate::ext::rdblock(cpu);
+    crate::ctrlsubs::RDBLOCK(cpu);
     cpu.set_a(0x01);
     cpu.mem[((cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
     return;
@@ -1637,7 +1642,7 @@ pub fn jaffmusic(cpu: &mut Cpu) {
     }
     cpu.set_a(0x0a);
     cpu.set_x(0x19);
-    crate::ext::cuesong(cpu);
+    crate::specialk::CUESONG(cpu);
     return;
 }
 
@@ -1657,7 +1662,7 @@ pub fn mirrmusic(cpu: &mut Cpu) {
             if cpu.reg.a == 0x0b {
                 cpu.set_a(0x03);
                 cpu.set_x(0x32);
-                crate::ext::cuesong(cpu);
+                crate::specialk::CUESONG(cpu);
                 cpu.set_a(0x4d);
                 cpu.mem[sym::exitopen] = cpu.reg.a;
             }
@@ -1666,6 +1671,7 @@ pub fn mirrmusic(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "cut")]
 pub fn CUT(cpu: &mut Cpu) {
     match cpu.reg.a {
         0x03 => {
@@ -1683,7 +1689,7 @@ pub fn CUT(cpu: &mut Cpu) {
         _ => {}
     }
     cpu.set_a(cpu.mem[sym::CharScrn]);
-    crate::ext::getleft(cpu);
+    crate::ctrlsubs::GETLEFT(cpu);
     cpu.mem[sym::CharScrn] = cpu.reg.a;
     cpu.set_a(0x8c);
     cpu.flags.c = false;
@@ -1697,7 +1703,7 @@ pub fn CUT(cpu: &mut Cpu) {
 
 pub fn Cleft(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::CharScrn]);
-    crate::ext::getleft(cpu);
+    crate::ctrlsubs::GETLEFT(cpu);
     cpu.mem[sym::CharScrn] = cpu.reg.a;
     cpu.set_a(0x8c);
     cpu.flags.c = false;
@@ -1711,7 +1717,7 @@ pub fn Cleft(cpu: &mut Cpu) {
 
 pub fn Cright(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::CharScrn]);
-    crate::ext::getright(cpu);
+    crate::ctrlsubs::GETRIGHT(cpu);
     cpu.mem[sym::CharScrn] = cpu.reg.a;
     cpu.set_a(cpu.mem[sym::CharX]);
     cpu.flags.c = true;
@@ -1725,7 +1731,7 @@ pub fn Cright(cpu: &mut Cpu) {
 
 pub fn Cup(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::CharScrn]);
-    crate::ext::getup(cpu);
+    crate::ctrlsubs::GETUP(cpu);
     cpu.mem[sym::CharScrn] = cpu.reg.a;
     cpu.mem[sym::CharBlockY] = (cpu.mem[sym::CharBlockY]).wrapping_add(0x03);
     cpu.set_a(cpu.mem[sym::CharY]);
@@ -1740,7 +1746,7 @@ pub fn Cup(cpu: &mut Cpu) {
 
 pub fn Cdown(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::CharScrn]);
-    crate::ext::getdown(cpu);
+    crate::ctrlsubs::GETDOWN(cpu);
     cpu.mem[sym::CharScrn] = cpu.reg.a;
     cpu.mem[sym::CharBlockY] = (cpu.mem[sym::CharBlockY]).wrapping_sub(0x03);
     cpu.set_a(cpu.mem[sym::CharY]);
@@ -1753,6 +1759,7 @@ pub fn Cdown(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "addguard")]
 pub fn ADDGUARD(cpu: &mut Cpu) {
     'b28: {
         cpu.set_a(0x00);
@@ -1784,7 +1791,7 @@ pub fn ADDGUARD(cpu: &mut Cpu) {
                     if cpu.reg.a == 0x18 {
                         cpu.set_x(0x03);
                         cpu.set_y(0x00);
-                        crate::ext::rdblock(cpu);
+                        crate::ctrlsubs::RDBLOCK(cpu);
                         let _o: u8 = 0x0a;
                         cpu.flags.c = cpu.reg.a >= _o;
                         cpu.flags.z = cpu.reg.a == _o;
@@ -1814,7 +1821,7 @@ pub fn ADDGUARD(cpu: &mut Cpu) {
                     if cpu.reg.a != 0x4d {
                         cpu.set_a(0x03);
                         cpu.set_x(0x32);
-                        crate::ext::cuesong(cpu);
+                        crate::specialk::CUESONG(cpu);
                         cpu.set_a(0x4d);
                         cpu.mem[sym::exitopen] = cpu.reg.a;
                     }
@@ -1835,14 +1842,14 @@ pub fn ADDGUARD(cpu: &mut Cpu) {
             }
             'b22: {
                 cpu.mem[sym::CharScrn] = cpu.reg.x;
-                crate::ext::unindex(cpu);
+                crate::ctrlsubs::UNINDEX(cpu);
                 cpu.mem[sym::CharBlockY] = cpu.reg.x;
                 cpu.set_a(cpu.mem[(sym::FloorY + 1 + cpu.reg.x as usize) & 0xffff]);
                 cpu.mem[sym::CharY] = cpu.reg.a;
                 cpu.set_x(cpu.mem[sym::VisScrn]);
                 cpu.set_a(cpu.mem[(sym::GdStartX - 1 + cpu.reg.x as usize) & 0xffff]);
                 cpu.mem[sym::CharX] = cpu.reg.a;
-                crate::ext::getblockxp(cpu);
+                crate::ctrlsubs::GETBLOCKXP(cpu);
                 cpu.mem[sym::CharBlockX] = cpu.reg.a;
                 cpu.set_x(cpu.mem[sym::VisScrn]);
                 cpu.set_a(cpu.mem[(sym::GdStartFace - 1 + cpu.reg.x as usize) & 0xffff]);
@@ -1881,7 +1888,7 @@ pub fn ADDGUARD(cpu: &mut Cpu) {
                     cpu.mem[sym::CharSword] = cpu.reg.a;
                     cpu.set_a(0x4d);  // guard
                 }
-                crate::ext::jumpseq(cpu);
+                crate::ctrlsubs::JUMPSEQ(cpu);
                 break 'b28;
             }
         } else {
@@ -1903,7 +1910,7 @@ pub fn ADDGUARD(cpu: &mut Cpu) {
         cpu.mem[sym::CharSeq] = cpu.reg.a;
     }
     'b33: {
-        crate::ext::animchar(cpu);
+        crate::coll::ANIMCHAR(cpu);
         cpu.set_a(cpu.mem[sym::CharPosn]);
         let _o: u8 = 0xb9;
         cpu.flags.c = cpu.reg.a >= _o;
@@ -1954,7 +1961,7 @@ pub fn ADDGUARD(cpu: &mut Cpu) {
     cpu.set_x(cpu.mem[sym::guardprog]);
     cpu.set_a(cpu.reg.a ^ cpu.mem[(sym::specialcolor + cpu.reg.x as usize) & 0xffff]);
     cpu.mem[sym::GuardColor] = cpu.reg.a;
-    crate::ext::SaveShad(cpu);
+    crate::ctrlsubs::SAVESHAD(cpu);
     return;
 }
 
@@ -1967,14 +1974,14 @@ pub fn _3anot5(cpu: &mut Cpu) {
     }
     'b4: {
         cpu.mem[sym::CharScrn] = cpu.reg.x;
-        crate::ext::unindex(cpu);
+        crate::ctrlsubs::UNINDEX(cpu);
         cpu.mem[sym::CharBlockY] = cpu.reg.x;
         cpu.set_a(cpu.mem[(sym::FloorY + 1 + cpu.reg.x as usize) & 0xffff]);
         cpu.mem[sym::CharY] = cpu.reg.a;
         cpu.set_x(cpu.mem[sym::VisScrn]);
         cpu.set_a(cpu.mem[(sym::GdStartX - 1 + cpu.reg.x as usize) & 0xffff]);
         cpu.mem[sym::CharX] = cpu.reg.a;
-        crate::ext::getblockxp(cpu);
+        crate::ctrlsubs::GETBLOCKXP(cpu);
         cpu.mem[sym::CharBlockX] = cpu.reg.a;
         cpu.set_x(cpu.mem[sym::VisScrn]);
         cpu.set_a(cpu.mem[(sym::GdStartFace - 1 + cpu.reg.x as usize) & 0xffff]);
@@ -2009,10 +2016,10 @@ pub fn _3anot5(cpu: &mut Cpu) {
             cpu.mem[sym::CharSword] = cpu.reg.a;
             cpu.set_a(0x4d);  // guard
         }
-        crate::ext::jumpseq(cpu);
+        crate::ctrlsubs::JUMPSEQ(cpu);
     }
     'b15: {
-        crate::ext::animchar(cpu);
+        crate::coll::ANIMCHAR(cpu);
         cpu.set_a(cpu.mem[sym::CharPosn]);
         if cpu.reg.a != 0xb9 {
             if cpu.reg.a != 0xb1 {
@@ -2047,7 +2054,7 @@ pub fn _3anot5(cpu: &mut Cpu) {
     cpu.set_x(cpu.mem[sym::guardprog]);
     cpu.set_a(cpu.reg.a ^ cpu.mem[(sym::specialcolor + cpu.reg.x as usize) & 0xffff]);
     cpu.mem[sym::GuardColor] = cpu.reg.a;
-    crate::ext::SaveShad(cpu);
+    crate::ctrlsubs::SAVESHAD(cpu);
     return;
 }
 

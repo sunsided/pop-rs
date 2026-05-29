@@ -10,6 +10,7 @@ pub fn VBLvect(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "addback")]
 pub fn ADDBACK(cpu: &mut Cpu) {
     cpu.set_x(cpu.mem[sym::bgX]);
     cpu.set_x(cpu.reg.x.wrapping_add(1));
@@ -27,6 +28,7 @@ pub fn ADDBACK(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "addfore")]
 pub fn ADDFORE(cpu: &mut Cpu) {
     cpu.set_x(cpu.mem[sym::fgX]);
     cpu.set_x(cpu.reg.x.wrapping_add(1));
@@ -46,6 +48,7 @@ pub fn ADDFORE(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "addmsg")]
 pub fn ADDMSG(cpu: &mut Cpu) {
     cpu.set_x(cpu.mem[sym::msgX]);
     cpu.set_x(cpu.reg.x.wrapping_add(1));
@@ -62,6 +65,7 @@ pub fn ADDMSG(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "addwipe")]
 pub fn ADDWIPE(cpu: &mut Cpu) {
     cpu.set_x(cpu.mem[sym::wipeX]);
     cpu.set_x(cpu.reg.x.wrapping_add(1));
@@ -83,6 +87,7 @@ pub fn ADDWIPE(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "addmid")]
 pub fn ADDMID(cpu: &mut Cpu) {
     cpu.set_x(cpu.mem[sym::midX]);
     cpu.set_x(cpu.reg.x.wrapping_add(1));
@@ -109,6 +114,7 @@ pub fn ADDMID(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "addmidez")]
 pub fn ADDMIDEZ(cpu: &mut Cpu) {
     cpu.set_a(0x00);
     cpu.mem[sym::OFFSET] = cpu.reg.a;
@@ -133,6 +139,7 @@ pub fn ADDMIDEZ(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "addmidezo")]
 pub fn ADDMIDEZO(cpu: &mut Cpu) {
     cpu.set_x(cpu.mem[sym::midX]);
     cpu.set_x(cpu.reg.x.wrapping_add(1));
@@ -155,6 +162,7 @@ pub fn ADDMIDEZO(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "addpeel")]
 pub fn ADDPEEL(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::PEELIMG + 1]);
     if cpu.reg.a == 0x00 {
@@ -190,6 +198,7 @@ pub fn ADDPEEL(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "drawall")]
 pub fn DRAWALL(cpu: &mut Cpu) {
     DOGEN(cpu);
     cpu.set_a(cpu.mem[sym::blackflag]);
@@ -408,6 +417,7 @@ pub fn DRAWFORE(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "sngpeel")]
 pub fn SNGPEEL(cpu: &mut Cpu) {
     cpu.set_x(cpu.mem[sym::PAGE]);
     if cpu.reg.x == 0x00 {
@@ -688,6 +698,7 @@ pub fn setcharimg(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "dimchar")]
 pub fn DIMCHAR(cpu: &mut Cpu) {
     cpu.mem[sym::IMAGE] = cpu.reg.a;
     cpu.mem[sym::TABLE] = cpu.reg.x;
@@ -696,6 +707,7 @@ pub fn DIMCHAR(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "cvtx")]
 pub fn CVTX(cpu: &mut Cpu) {
     cpu.mem[0x00f0] = 0x00;
     cpu.set_a(cpu.mem[0x0003]);
@@ -753,6 +765,7 @@ pub fn CVTX(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "zerolsts")]
 pub fn ZEROLSTS(cpu: &mut Cpu) {
     cpu.set_a(0x00);
     cpu.mem[sym::genCLS] = cpu.reg.a;
@@ -765,6 +778,7 @@ pub fn ZEROLSTS(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "zeropeels")]
 pub fn ZEROPEELS(cpu: &mut Cpu) {
     cpu.set_a(0x00);
     cpu.mem[sym::peelX] = cpu.reg.a;
@@ -772,6 +786,7 @@ pub fn ZEROPEELS(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "zeropeel")]
 pub fn ZEROPEEL(cpu: &mut Cpu) {
     cpu.set_a(0x00);
     cpu.set_x(cpu.mem[sym::PAGE]);
@@ -789,6 +804,7 @@ pub fn ZEROPEEL(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "getselect")]
 pub fn GETSELECT(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::joyon]);
     if cpu.reg.a == 0x00 {
@@ -815,6 +831,7 @@ pub fn GETSELECT(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "getdesel")]
 pub fn GETDESEL(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::joyon]);
     if cpu.reg.a != 0x00 {
@@ -858,6 +875,7 @@ pub fn getkbd(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "controller")]
 pub fn CONTROLLER(cpu: &mut Cpu) {
     JREAD(cpu);
     BREAD(cpu);
@@ -939,6 +957,7 @@ pub fn cvtpdl(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "pread")]
 pub fn PREAD(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -1006,7 +1025,7 @@ pub fn PREAD(cpu: &mut Cpu) {
                 }
             }
             9 => {
-                crate::ext::normspeed(cpu);
+                NORMSPEED(cpu);
                 cpu.set_a(0xff);
                 cpu.mem[sym::joyon] = cpu.reg.a;
                 cpu.set_a(0x00);
@@ -1062,8 +1081,9 @@ pub fn PREAD(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "setcenter")]
 pub fn SETCENTER(cpu: &mut Cpu) {
-    crate::ext::normspeed(cpu);
+    NORMSPEED(cpu);
     cpu.mem[sym::joyon] = 0xff;
     cpu.set_a(0x00);
     cpu.mem[sym::jvert] = cpu.reg.a;
@@ -1139,6 +1159,7 @@ pub fn MOVEMEM(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "gtone")]
 pub fn GTONE(cpu: &mut Cpu) {
     cpu.set_y(0x0f);
     cpu.set_x(0x00);
@@ -1147,6 +1168,7 @@ pub fn GTONE(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "whoop")]
 pub fn WHOOP(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -1256,7 +1278,7 @@ pub fn tone(cpu: &mut Cpu) {
                 cpu.mem[sym::IMAGE + 1] = cpu.reg.a;
                 cpu.set_a(cpu.reg.a ^ 0x60);
                 cpu.mem[sym::IMAGE] = cpu.reg.a;
-                crate::ext::copy2000(cpu);
+                COPY2000(cpu);
                 return;
             }
             _ => unreachable!(),
@@ -1264,6 +1286,7 @@ pub fn tone(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "copyscrn")]
 pub fn COPYSCRN(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::PAGE]);
     cpu.flags.c = false;
@@ -1273,10 +1296,11 @@ pub fn COPYSCRN(cpu: &mut Cpu) {
     cpu.mem[sym::IMAGE + 1] = cpu.reg.a;
     cpu.set_a(cpu.reg.a ^ 0x60);
     cpu.mem[sym::IMAGE] = cpu.reg.a;
-    crate::ext::copy2000(cpu);
+    COPY2000(cpu);
     return;
 }
 
+#[doc(alias = "rnd")]
 pub fn RND(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::RNDseed]);
     cpu.flags.c = (cpu.reg.a >> 7) != 0;
@@ -1295,27 +1319,31 @@ pub fn RND(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "loadlevel")]
 pub fn LOADLEVEL(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_loadlevel(cpu);
+    crate::master::LOADLEVEL(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "attractmode")]
 pub fn ATTRACTMODE(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_attractmode(cpu);
+    crate::master::ATTRACTMODE(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "cutprincess")]
 pub fn CUTPRINCESS(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_cutprincess(cpu);
+    crate::master::CUTPRINCESS(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "reload")]
 pub fn RELOAD(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
     crate::ext::_reload(cpu);
@@ -1323,46 +1351,53 @@ pub fn RELOAD(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "loadstage2")]
 pub fn LOADSTAGE2(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_loadstage2(cpu);
+    crate::master::LoadStage2(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "savegame")]
 pub fn SAVEGAME(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_savegame(cpu);
+    crate::master::SAVEGAME(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "loadgame")]
 pub fn LOADGAME(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_loadgame(cpu);
+    crate::master::LOADGAME(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "dostartgame")]
 pub fn DOSTARTGAME(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
     crate::ext::_dostartgame(cpu);
     return;
 }
 
+#[doc(alias = "epilog")]
 pub fn EPILOG(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_epilog(cpu);
+    crate::master::EPILOG(cpu);
     return;
 }
 
+#[doc(alias = "loadaltset")]
 pub fn LOADALTSET(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_loadaltset(cpu);
+    crate::master::LOADALTSET(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "screendump")]
 pub fn SCREENDUMP(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
     crate::ext::_screendump(cpu);
@@ -1376,6 +1411,7 @@ pub fn SCREENDUMP(cpu: &mut Cpu) {
 #[doc(alias = "GOBUILD")]
 #[doc(alias = "GOGAME")]
 #[doc(alias = "EDREBOOT")]
+#[doc(alias = "savelevel")]
 pub fn SAVELEVEL(cpu: &mut Cpu) {
     return;
 }
@@ -1383,7 +1419,7 @@ pub fn SAVELEVEL(cpu: &mut Cpu) {
 pub fn CLS(cpu: &mut Cpu) {
     prehr(cpu);
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_cls(cpu);
+    crate::hires::cls(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
@@ -1391,7 +1427,7 @@ pub fn CLS(cpu: &mut Cpu) {
 pub fn LAY(cpu: &mut Cpu) {
     prehr(cpu);
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_lay(cpu);
+    crate::hires::lay(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
@@ -1399,7 +1435,7 @@ pub fn LAY(cpu: &mut Cpu) {
 pub fn FASTLAY(cpu: &mut Cpu) {
     prehr(cpu);
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_fastlay(cpu);
+    crate::hires::fastlay(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
@@ -1407,7 +1443,7 @@ pub fn FASTLAY(cpu: &mut Cpu) {
 pub fn LAYRSAVE(cpu: &mut Cpu) {
     prehr(cpu);
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_layrsave(cpu);
+    crate::hires::layrsave(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     posthr(cpu);
     return;
@@ -1416,7 +1452,7 @@ pub fn LAYRSAVE(cpu: &mut Cpu) {
 pub fn LRCLS(cpu: &mut Cpu) {
     cpu.mem[sym::scrncolor] = cpu.reg.a;
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_lrcls(cpu);
+    crate::hires::lrcls(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
@@ -1424,7 +1460,7 @@ pub fn LRCLS(cpu: &mut Cpu) {
 pub fn FASTMASK(cpu: &mut Cpu) {
     prehr(cpu);
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_fastmask(cpu);
+    crate::hires::fastmask(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
@@ -1432,7 +1468,7 @@ pub fn FASTMASK(cpu: &mut Cpu) {
 pub fn FASTBLACK(cpu: &mut Cpu) {
     prehr(cpu);
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_fastblack(cpu);
+    crate::hires::fastblack(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
@@ -1440,7 +1476,7 @@ pub fn FASTBLACK(cpu: &mut Cpu) {
 pub fn PEEL(cpu: &mut Cpu) {
     prehr(cpu);
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_peel(cpu);
+    crate::hires::peel(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
@@ -1448,56 +1484,63 @@ pub fn PEEL(cpu: &mut Cpu) {
 pub fn GETWIDTH(cpu: &mut Cpu) {
     prehr(cpu);
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_getwidth(cpu);
+    crate::hires::getwidth(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "copy2000")]
 pub fn COPY2000(cpu: &mut Cpu) {
     prehr(cpu);
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_copy2000(cpu);
+    crate::hires::copyscrnMM(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "copy2000am")]
 pub fn COPY2000AM(cpu: &mut Cpu) {
     prehr(cpu);
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_copy2000am(cpu);
+    crate::hires::copyscrnAM(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "copy2000ma")]
 pub fn COPY2000MA(cpu: &mut Cpu) {
     prehr(cpu);
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_copy2000ma(cpu);
+    crate::hires::copyscrnMA(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "setfastaux")]
 pub fn SETFASTAUX(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_setfastaux(cpu);
+    crate::hires::SETFASTAUX(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "setfastmain")]
 pub fn SETFASTMAIN(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_setfastmain(cpu);
+    crate::hires::SETFASTMAIN(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "inverty")]
 pub fn INVERTY(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
-    crate::ext::_inverty(cpu);
+    crate::unpack::INVERTY(cpu);
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "minit")]
 pub fn MINIT(cpu: &mut Cpu) {
     _5dbank1in(cpu);
     CALLMINIT(cpu);
@@ -1510,6 +1553,7 @@ pub fn MINIT(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "mplay")]
 pub fn MPLAY(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -1525,6 +1569,7 @@ pub fn MPLAY(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "xminit")]
 pub fn XMINIT(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     MINIT(cpu);
@@ -1532,6 +1577,7 @@ pub fn XMINIT(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "xmplay")]
 pub fn XMPLAY(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     MPLAY(cpu);
@@ -1539,6 +1585,7 @@ pub fn XMPLAY(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "xtitle")]
 pub fn XTITLE(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
     crate::ext::titlescreen(cpu);
@@ -1546,16 +1593,18 @@ pub fn XTITLE(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "xplaycut")]
 pub fn XPLAYCUT(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
-    crate::ext::playcut(cpu);
+    crate::subs::PLAYCUT(cpu);
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
     return;
 }
 
+#[doc(alias = "xmovemusic")]
 pub fn XMOVEMUSIC(cpu: &mut Cpu) {
     cpu.mem[sym::ALTZPon] = cpu.reg.a;
-    crate::ext::movemusic(cpu);
+    crate::misc::MOVEMUSIC(cpu);
     cpu.mem[sym::ALTZPoff] = cpu.reg.a;
     return;
 }
@@ -1591,6 +1640,7 @@ pub fn posthr(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "saveblue")]
 pub fn SAVEBLUE(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -1609,6 +1659,7 @@ pub fn SAVEBLUE(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "savebinfo")]
 pub fn SAVEBINFO(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -1627,6 +1678,7 @@ pub fn SAVEBINFO(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "reloadblue")]
 pub fn RELOADBLUE(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -1645,6 +1697,7 @@ pub fn RELOADBLUE(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "reloadbinfo")]
 pub fn RELOADBINFO(cpu: &mut Cpu) {
     let mut pc: u32 = 0;
     loop {
@@ -1663,11 +1716,13 @@ pub fn RELOADBINFO(cpu: &mut Cpu) {
     }
 }
 
+#[doc(alias = "gr")]
 pub fn GR(cpu: &mut Cpu) {
-    crate::ext::gtone(cpu);
+    GTONE(cpu);
     return;
 }
 
+#[doc(alias = "calcblue")]
 pub fn CALCBLUE(cpu: &mut Cpu) {
     if cpu.reg.a == 0x00 {
         calcmenu(cpu);
@@ -1704,6 +1759,7 @@ pub fn calcmenu(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "zerored")]
 pub fn ZERORED(cpu: &mut Cpu) {
     cpu.set_a(0x00);
     cpu.reg.y = 0x1d;
@@ -1770,6 +1826,7 @@ pub fn CALLMPLAY(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "musickeys")]
 pub fn MUSICKEYS(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[0xc000]);
     cpu.mem[sym::keypress] = cpu.reg.a;
@@ -1813,7 +1870,7 @@ pub fn MUSICKEYS(cpu: &mut Cpu) {
             cpu.mem[sym::musicon] = cpu.reg.a;
             if cpu.flags.z {
             } else {
-                crate::ext::gtone(cpu);
+                GTONE(cpu);
             }
             cpu.set_a(0x00);
             return;
@@ -1823,7 +1880,7 @@ pub fn MUSICKEYS(cpu: &mut Cpu) {
         cpu.mem[sym::soundon] = cpu.reg.a;
         if cpu.flags.z {
         } else {
-            crate::ext::gtone(cpu);
+            GTONE(cpu);
         }
         cpu.set_a(0x00);
         return;
@@ -1865,7 +1922,7 @@ pub fn MUSICKEYS(cpu: &mut Cpu) {
             cpu.mem[sym::musicon] = cpu.reg.a;
             if cpu.flags.z {
             } else {
-                crate::ext::gtone(cpu);
+                GTONE(cpu);
             }
             cpu.set_a(0x00);
             return;
@@ -1875,7 +1932,7 @@ pub fn MUSICKEYS(cpu: &mut Cpu) {
         cpu.mem[sym::soundon] = cpu.reg.a;
         if cpu.flags.z {
         } else {
-            crate::ext::gtone(cpu);
+            GTONE(cpu);
         }
         cpu.set_a(0x00);
         return;
@@ -1885,6 +1942,7 @@ pub fn MUSICKEYS(cpu: &mut Cpu) {
 }
 
 #[doc(alias = ":loop1")]
+#[doc(alias = "vblank")]
 pub fn VBLANK(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[0xc019]);
     if (cpu.reg.a as i8) >= 0 {
@@ -1928,6 +1986,7 @@ pub fn VBLANKIIc(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "vbli")]
 pub fn VBLI(cpu: &mut Cpu) {
     let _o: u8 = cpu.mem[0xc019];
     cpu.flags.z = (cpu.reg.a & _o) == 0;
@@ -1960,6 +2019,7 @@ pub fn InitVBLANK(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "fastspeed")]
 pub fn FASTSPEED(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::IIGS]);
     if cpu.reg.a == 0x00 {
@@ -1971,6 +2031,7 @@ pub fn FASTSPEED(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "normspeed")]
 pub fn NORMSPEED(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::IIGS]);
     if cpu.reg.a == 0x00 {

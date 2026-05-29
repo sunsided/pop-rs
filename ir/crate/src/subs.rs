@@ -5,6 +5,7 @@
 use crate::cpu::Cpu;
 use crate::sym;
 
+#[doc(alias = "crumble")]
 pub fn CRUMBLE(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::level]);
     let _o: u8 = 0x0d;
@@ -66,9 +67,10 @@ pub fn CRUMBLE(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "addtorches")]
 pub fn ADDTORCHES(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::VisScrn]);
-    crate::ext::calcblue(cpu);
+    crate::grafix::CALCBLUE(cpu);
     cpu.set_y(0x1d);
     loop {
         cpu.set_a(cpu.mem[((cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
@@ -92,7 +94,7 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                     cpu.set_a(cpu.reg.y);
                     let tmp0 = cpu.reg.a;
                     cpu.set_a(cpu.mem[sym::VisScrn]);
-                    crate::ext::trigsword(cpu);
+                    crate::mover::TRIGSWORD(cpu);
                     cpu.reg.a = tmp0;
                     cpu.set_y(cpu.reg.a);
                 }
@@ -100,7 +102,7 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                 cpu.set_a(cpu.reg.y);
                 let tmp2 = cpu.reg.a;
                 cpu.set_a(cpu.mem[sym::VisScrn]);
-                crate::ext::trigflask(cpu);
+                crate::mover::TRIGFLASK(cpu);
                 cpu.reg.a = tmp2;
                 cpu.set_y(cpu.reg.a);
                 if (cpu.reg.y as i8) >= 0 {
@@ -114,7 +116,7 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                         cpu.set_a(cpu.reg.y);
                         let tmp1 = cpu.reg.a;
                         cpu.set_a(cpu.mem[sym::VisScrn]);
-                        crate::ext::trigsword(cpu);
+                        crate::mover::TRIGSWORD(cpu);
                         cpu.reg.a = tmp1;
                         cpu.set_y(cpu.reg.a);
                     }
@@ -124,7 +126,7 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
             cpu.set_a(cpu.reg.y);
             let tmp6 = cpu.reg.a;
             cpu.set_a(cpu.mem[sym::VisScrn]);
-            crate::ext::trigtorch(cpu);
+            crate::mover::TRIGTORCH(cpu);
             cpu.reg.a = tmp6;
             cpu.set_y(cpu.reg.a);
             if (cpu.reg.y as i8) >= 0 {
@@ -143,7 +145,7 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                         cpu.set_a(cpu.reg.y);
                         let tmp3 = cpu.reg.a;
                         cpu.set_a(cpu.mem[sym::VisScrn]);
-                        crate::ext::trigsword(cpu);
+                        crate::mover::TRIGSWORD(cpu);
                         cpu.reg.a = tmp3;
                         cpu.set_y(cpu.reg.a);
                     }
@@ -151,7 +153,7 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                     cpu.set_a(cpu.reg.y);
                     let tmp5 = cpu.reg.a;
                     cpu.set_a(cpu.mem[sym::VisScrn]);
-                    crate::ext::trigflask(cpu);
+                    crate::mover::TRIGFLASK(cpu);
                     cpu.reg.a = tmp5;
                     cpu.set_y(cpu.reg.a);
                     if (cpu.reg.y as i8) >= 0 {
@@ -165,7 +167,7 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
                             cpu.set_a(cpu.reg.y);
                             let tmp4 = cpu.reg.a;
                             cpu.set_a(cpu.mem[sym::VisScrn]);
-                            crate::ext::trigsword(cpu);
+                            crate::mover::TRIGSWORD(cpu);
                             cpu.reg.a = tmp4;
                             cpu.set_y(cpu.reg.a);
                         }
@@ -182,6 +184,7 @@ pub fn ADDTORCHES(cpu: &mut Cpu) {
 }
 
 #[doc(alias = ":outer")]
+#[doc(alias = "pause")]
 pub fn PAUSE(cpu: &mut Cpu) {
     cpu.stack.push(cpu.reg.a);
     cpu.reg.x = 0x00;
@@ -201,16 +204,18 @@ pub fn PAUSE(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "doflashon")]
 pub fn DOFLASHON(cpu: &mut Cpu) {
-    crate::ext::lrclse(cpu);
-    crate::ext::vblank(cpu);
+    LRCLSE(cpu);
+    crate::grafix::VBLANK(cpu);
     cpu.set_a(cpu.mem[0xc054]);
     cpu.set_a(cpu.mem[0xc056]);
     return;
 }
 
+#[doc(alias = "doflashoff")]
 pub fn DOFLASHOFF(cpu: &mut Cpu) {
-    crate::ext::vblank(cpu);
+    crate::grafix::VBLANK(cpu);
     cpu.set_a(cpu.mem[sym::PAGE]);
     if cpu.reg.a == 0x00 {
         cpu.set_a(cpu.mem[0xc055]);
@@ -219,6 +224,7 @@ pub fn DOFLASHOFF(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "lrclse")]
 pub fn LRCLSE(cpu: &mut Cpu) {
     if cpu.reg.a == cpu.mem[sym::scrncolor] {
         return;
@@ -227,10 +233,11 @@ pub fn LRCLSE(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "addslicers")]
 pub fn ADDSLICERS(cpu: &mut Cpu) {
     cpu.mem[sym::tempstate] = 0x0f;
     cpu.set_a(cpu.mem[sym::CharScrn]);
-    crate::ext::calcblue(cpu);
+    crate::grafix::CALCBLUE(cpu);
     cpu.set_y(cpu.mem[sym::CharBlockY]);
     let _o: u8 = 0x03;
     cpu.flags.c = cpu.reg.y >= _o;
@@ -261,7 +268,7 @@ pub fn ADDSLICERS(cpu: &mut Cpu) {
                     cpu.set_a(cpu.reg.x);
                     cpu.set_a(cpu.reg.a & 0x80);
                     cpu.set_a(cpu.reg.a | cpu.mem[sym::tempstate]);
-                    crate::ext::trigslicer(cpu);
+                    crate::mover::TRIGSLICER(cpu);
                     getnextstate(cpu);
                 } else {
                     let _o: u8 = 0x06;
@@ -273,7 +280,7 @@ pub fn ADDSLICERS(cpu: &mut Cpu) {
                         cpu.set_a(cpu.reg.x);
                         cpu.set_a(cpu.reg.a & 0x80);
                         cpu.set_a(cpu.reg.a | cpu.mem[sym::tempstate]);
-                        crate::ext::trigslicer(cpu);
+                        crate::mover::TRIGSLICER(cpu);
                         getnextstate(cpu);
                     }
                 }
@@ -319,10 +326,10 @@ pub fn pburn(cpu: &mut Cpu) {
     cpu.mem[sym::OFFSET] = cpu.mem[(sym::ptorchoff + cpu.reg.x as usize) & 0xffff];
     cpu.mem[sym::YCO] = cpu.mem[(sym::ptorchy + cpu.reg.x as usize) & 0xffff];
     cpu.set_a(cpu.mem[(sym::ptorchstate + cpu.reg.x as usize) & 0xffff]);
-    crate::ext::getflameframe(cpu);
+    crate::mover::GETFLAMEFRAME(cpu);
     cpu.mem[(sym::ptorchstate + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
     cpu.set_x(cpu.reg.a);
-    crate::ext::psetupflame(cpu);
+    crate::gamebg::PSETUPFLAME(cpu);
     crate::hires::lay(cpu);
     return;
 }
@@ -338,7 +345,7 @@ pub fn pflow(cpu: &mut Cpu) {
     }
     cpu.mem[sym::psandcount] = cpu.reg.x;
     cpu.set_y(cpu.mem[sym::GlassState]);
-    crate::ext::flow(cpu);
+    crate::gamebg::FLOW(cpu);
     return;
 }
 
@@ -355,7 +362,7 @@ pub fn pstars(cpu: &mut Cpu) {
             } else {
                 cpu.set_a(cpu.reg.x);
                 let tmp0 = cpu.reg.a;
-                crate::ext::twinkle(cpu);
+                crate::gamebg::TWINKLE(cpu);
                 cpu.reg.a = tmp0;
                 cpu.set_x(cpu.reg.a);
             }
@@ -365,7 +372,7 @@ pub fn pstars(cpu: &mut Cpu) {
             break;
         }
     }
-    crate::ext::rnd(cpu);
+    crate::grafix::RND(cpu);
     let _o: u8 = 0x0a;
     cpu.flags.c = cpu.reg.a >= _o;
     cpu.flags.z = cpu.reg.a == _o;
@@ -373,25 +380,26 @@ pub fn pstars(cpu: &mut Cpu) {
     if cpu.reg.a >= 0x0a {
         return;
     }
-    crate::ext::rnd(cpu);
+    crate::grafix::RND(cpu);
     cpu.set_a(cpu.reg.a & 0x03);
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + (0x05) as u16 + (cpu.flags.c as u16);
     cpu.flags.c = (_r >> 8) != 0;
     cpu.set_a(_r as u8);
     let tmp1 = cpu.reg.a;
-    crate::ext::rnd(cpu);
-    crate::ext::rnd(cpu);
+    crate::grafix::RND(cpu);
+    crate::grafix::RND(cpu);
     cpu.set_a(cpu.reg.a & 0x03);
     cpu.set_x(cpu.reg.a);
     cpu.reg.a = tmp1;
     cpu.mem[(sym::pstarcount + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
-    crate::ext::twinkle(cpu);
+    crate::gamebg::TWINKLE(cpu);
     return;
 }
 
+#[doc(alias = "PageFlip")]
 pub fn PAGEFLIP(cpu: &mut Cpu) {
-    crate::ext::normspeed(cpu);
+    crate::grafix::NORMSPEED(cpu);
     cpu.set_a(cpu.mem[sym::PAGE]);
     if cpu.reg.a != 0x00 {
         cpu.mem[sym::PAGE] = 0x00;
@@ -411,6 +419,7 @@ pub fn PAGEFLIP(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "playcut")]
 pub fn PLAYCUT(cpu: &mut Cpu) {
     let tmp0 = cpu.reg.a;
     initit(cpu);
@@ -424,9 +433,9 @@ pub fn PlayCut8(cpu: &mut Cpu) {
     getglass(cpu);
     addglass(cpu);
     startP8(cpu);
-    crate::ext::SaveShad(cpu);
+    crate::ctrlsubs::SAVESHAD(cpu);
     startM8(cpu);
-    crate::ext::SaveKid(cpu);
+    crate::ctrlsubs::SAVEKID(cpu);
     cpu.set_a(0x14);
     play(cpu);
     cpu.set_a(0x6b);
@@ -448,9 +457,9 @@ pub fn PlayCut4(cpu: &mut Cpu) {
     getglass(cpu);
     addglass(cpu);
     startP4(cpu);
-    crate::ext::SaveShad(cpu);
+    crate::ctrlsubs::SAVESHAD(cpu);
     startM4(cpu);
-    crate::ext::SaveKid(cpu);
+    crate::ctrlsubs::SAVEKID(cpu);
     cpu.set_a(0x05);
     play(cpu);
     cpu.set_a(0x70);
@@ -469,11 +478,11 @@ pub fn PlayCut7(cpu: &mut Cpu) {
     cpu.mem[sym::soundon] = 0x01;
     cpu.mem[sym::musicon] = 0x01;
     startP7(cpu);
-    crate::ext::SaveShad(cpu);
+    crate::ctrlsubs::SAVESHAD(cpu);
     cpu.set_a(0x08);
     play(cpu);
     startK7(cpu);
-    crate::ext::SaveKid(cpu);
+    crate::ctrlsubs::SAVEKID(cpu);
     cpu.set_a(0x08);
     play(cpu);
     cpu.set_a(0x6c);
@@ -490,7 +499,7 @@ pub fn PlayCut7(cpu: &mut Cpu) {
     cpu.set_a(0x0f);
     PlaySong(cpu);
     startM7(cpu);
-    crate::ext::SaveKid(cpu);
+    crate::ctrlsubs::SAVEKID(cpu);
     cpu.set_a(0x0c);
     play(cpu);
     cpu.set_a(0x65);
@@ -527,7 +536,7 @@ pub fn Ominous(cpu: &mut Cpu) {
     getglass(cpu);
     addglass(cpu);
     startP5(cpu);
-    crate::ext::SaveShad(cpu);
+    crate::ctrlsubs::SAVESHAD(cpu);
     cpu.set_a(0x02);
     play(cpu);
     cpu.set_x(0x32);
@@ -547,7 +556,7 @@ pub fn PlayCut2(cpu: &mut Cpu) {
     getglass(cpu);
     addglass(cpu);
     startP2(cpu);
-    crate::ext::SaveShad(cpu);
+    crate::ctrlsubs::SAVESHAD(cpu);
     cpu.set_a(0x02);
     play(cpu);
     cpu.set_x(0x32);
@@ -561,7 +570,7 @@ pub fn PlayCut1(cpu: &mut Cpu) {
     getglass(cpu);
     addglass(cpu);
     startP1(cpu);
-    crate::ext::SaveShad(cpu);
+    crate::ctrlsubs::SAVESHAD(cpu);
     cpu.set_a(0x02);
     play(cpu);
     cpu.set_x(0x32);
@@ -572,9 +581,9 @@ pub fn PlayCut1(cpu: &mut Cpu) {
 
 pub fn PlayCut0(cpu: &mut Cpu) {
     startV0(cpu);
-    crate::ext::SaveKid(cpu);
+    crate::ctrlsubs::SAVEKID(cpu);
     startP0(cpu);
-    crate::ext::SaveShad(cpu);
+    crate::ctrlsubs::SAVESHAD(cpu);
     cpu.set_a(0x02);
     play(cpu);
     cpu.set_a(0x07);
@@ -694,7 +703,7 @@ pub fn PlaySongX(cpu: &mut Cpu) {
                 pc = 3;
             }
             3 => {
-                crate::ext::minit(cpu);
+                crate::grafix::MINIT(cpu);
                 swpage(cpu);
                 pc = 4;
             }
@@ -714,7 +723,7 @@ pub fn PlaySongX(cpu: &mut Cpu) {
                 pburn(cpu);
                 pstars(cpu);
                 pflow(cpu);
-                crate::ext::mplay(cpu);
+                crate::grafix::MPLAY(cpu);
                 let _o: u8 = 0x00;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -739,7 +748,7 @@ pub fn PlaySong(cpu: &mut Cpu) {
     loop {
         match pc {
             0 => {
-                crate::ext::minit(cpu);
+                crate::grafix::MINIT(cpu);
                 swpage(cpu);
                 pc = 1;
             }
@@ -759,7 +768,7 @@ pub fn PlaySong(cpu: &mut Cpu) {
                 pburn(cpu);
                 pstars(cpu);
                 pflow(cpu);
-                crate::ext::mplay(cpu);
+                crate::grafix::MPLAY(cpu);
                 let _o: u8 = 0x00;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -807,12 +816,12 @@ pub fn PlaySongI(cpu: &mut Cpu) {
             }
             3 => {
                 cpu.set_a(cpu.reg.y);
-                crate::ext::minit(cpu);
+                crate::grafix::MINIT(cpu);
                 swpage(cpu);
                 pc = 4;
             }
             4 => {
-                crate::ext::musickeys(cpu);
+                crate::grafix::MUSICKEYS(cpu);
                 let _o: u8 = 0x80;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -827,7 +836,7 @@ pub fn PlaySongI(cpu: &mut Cpu) {
                 pburn(cpu);
                 pstars(cpu);
                 pflow(cpu);
-                crate::ext::mplay(cpu);
+                crate::grafix::MPLAY(cpu);
                 let _o: u8 = 0x00;
                 cpu.flags.c = cpu.reg.a >= _o;
                 cpu.flags.z = cpu.reg.a == _o;
@@ -843,7 +852,7 @@ pub fn PlaySongI(cpu: &mut Cpu) {
                 return;
             }
             7 => {
-                crate::ext::dostartgame(cpu);
+                crate::grafix::DOSTARTGAME(cpu);
                 return;
             }
             8 => {
@@ -867,7 +876,7 @@ pub fn flashon(cpu: &mut Cpu) {
         return;
     }
     cpu.set_a(cpu.mem[sym::lightcolor]);
-    crate::ext::doflashon(cpu);
+    DOFLASHON(cpu);
     return;
 }
 
@@ -879,7 +888,7 @@ pub fn flashoff(cpu: &mut Cpu) {
     let _v = cpu.mem[sym::lightning].wrapping_sub(1);
     cpu.mem[sym::lightning] = _v;
     cpu.set_nz(_v);
-    crate::ext::doflashoff(cpu);
+    DOFLASHOFF(cpu);
     return;
 }
 
@@ -892,9 +901,9 @@ pub fn play(cpu: &mut Cpu) {
                 pc = 1;
             }
             1 => {
-                crate::ext::rnd(cpu);
+                crate::grafix::RND(cpu);
                 cpu.set_a(cpu.mem[sym::SPEED]);
-                crate::ext::pause(cpu);
+                PAUSE(cpu);
                 crate::ext::strobe(cpu);
                 cpu.set_a(cpu.mem[sym::level]);
                 if cpu.reg.a != 0x00 {
@@ -904,7 +913,7 @@ pub fn play(cpu: &mut Cpu) {
                 }
             }
             2 => {
-                crate::ext::demokeys(cpu);
+                crate::specialk::DEMOKEYS(cpu);
                 if !cpu.flags.n {
                     pc = 5;
                 } else {
@@ -913,7 +922,7 @@ pub fn play(cpu: &mut Cpu) {
             }
             3 => {
                 cpu.set_a(0x01);
-                crate::ext::dostartgame(cpu);
+                crate::grafix::DOSTARTGAME(cpu);
                 return;
             }
             4 => {
@@ -939,8 +948,8 @@ pub fn play(cpu: &mut Cpu) {
                 }
             }
             6 => {
-                crate::ext::playback(cpu);
-                crate::ext::zerosound(cpu);
+                crate::sound::PLAYBACK(cpu);
+                crate::specialk::ZEROSOUND(cpu);
                 pc = 7;
             }
             7 => {
@@ -965,9 +974,9 @@ pub fn play(cpu: &mut Cpu) {
 }
 
 pub fn playloop(cpu: &mut Cpu) {
-    crate::ext::rnd(cpu);
+    crate::grafix::RND(cpu);
     cpu.set_a(cpu.mem[sym::SPEED]);
-    crate::ext::pause(cpu);
+    PAUSE(cpu);
     crate::ext::strobe(cpu);
     cpu.set_a(cpu.mem[sym::level]);
     if cpu.reg.a != 0x00 {
@@ -978,10 +987,10 @@ pub fn playloop(cpu: &mut Cpu) {
             return;
         }
     } else {
-        crate::ext::demokeys(cpu);
+        crate::specialk::DEMOKEYS(cpu);
         if cpu.flags.n {
             cpu.set_a(0x01);
-            crate::ext::dostartgame(cpu);
+            crate::grafix::DOSTARTGAME(cpu);
             return;
         }
     }
@@ -991,8 +1000,8 @@ pub fn playloop(cpu: &mut Cpu) {
     flashoff(cpu);
     cpu.set_a(cpu.mem[sym::soundon]);
     if cpu.reg.a != 0x00 {
-        crate::ext::playback(cpu);
-        crate::ext::zerosound(cpu);
+        crate::sound::PLAYBACK(cpu);
+        crate::specialk::ZEROSOUND(cpu);
     }
     let _v = cpu.mem[sym::SceneCount].wrapping_sub(1);
     cpu.mem[sym::SceneCount] = _v;
@@ -1012,32 +1021,32 @@ pub fn NextFrame(cpu: &mut Cpu) {
 
 pub fn FrameAdv(cpu: &mut Cpu) {
     DoFast(cpu);
-    crate::ext::vblank(cpu);
-    crate::ext::PageFlip(cpu);
+    crate::grafix::VBLANK(cpu);
+    PAGEFLIP(cpu);
     return;
 }
 
 pub fn DoKid(cpu: &mut Cpu) {
-    crate::ext::LoadKid(cpu);
+    crate::ctrlsubs::LOADKID(cpu);
     cpu.set_a(cpu.mem[sym::CharPosn]);
     if cpu.reg.a == 0x00 {
         return;
     }
     ctrlkidchar(cpu);
-    crate::ext::animchar(cpu);
-    crate::ext::SaveKid(cpu);
+    crate::coll::ANIMCHAR(cpu);
+    crate::ctrlsubs::SAVEKID(cpu);
     return;
 }
 
 pub fn DoShad(cpu: &mut Cpu) {
-    crate::ext::LoadShadwOp(cpu);
+    crate::ctrlsubs::LOADSHADWOP(cpu);
     cpu.set_a(cpu.mem[sym::CharPosn]);
     if cpu.reg.a == 0x00 {
         return;
     }
     ctrlshadchar(cpu);
-    crate::ext::animchar(cpu);
-    crate::ext::SaveShad(cpu);
+    crate::coll::ANIMCHAR(cpu);
+    crate::ctrlsubs::SAVESHAD(cpu);
     return;
 }
 
@@ -1050,48 +1059,48 @@ pub fn ctrlshadchar(cpu: &mut Cpu) {
 }
 
 pub fn DoFast(cpu: &mut Cpu) {
-    crate::ext::zerolsts(cpu);
+    crate::grafix::ZEROLSTS(cpu);
     cpu.set_a(cpu.mem[sym::redrawglass]);
     if cpu.reg.a != 0x00 {
         let _v = cpu.mem[sym::redrawglass].wrapping_sub(1);
         cpu.mem[sym::redrawglass] = _v;
         cpu.set_nz(_v);
         cpu.set_x(cpu.mem[sym::GlassState]);
-        crate::ext::drawglass(cpu);
+        crate::gamebg::DRAWGLASS(cpu);
     }
-    crate::ext::LoadKid(cpu);
+    crate::ctrlsubs::LOADKID(cpu);
     cpu.set_a(cpu.mem[sym::CharPosn]);
     if cpu.reg.a != 0x00 {
-        crate::ext::setupchar(cpu);
+        crate::ctrlsubs::SETUPCHAR(cpu);
         cpu.set_a(0x1e);
         cpu.mem[sym::FCharIndex] = cpu.reg.a;
-        crate::ext::addkidobj(cpu);
+        crate::ctrlsubs::ADDKIDOBJ(cpu);
     }
-    crate::ext::LoadShad(cpu);
+    crate::ctrlsubs::LOADSHAD(cpu);
     cpu.set_a(cpu.mem[sym::CharPosn]);
     if cpu.reg.a != 0x00 {
-        crate::ext::setupchar(cpu);
+        crate::ctrlsubs::SETUPCHAR(cpu);
         cpu.set_a(0x1e);
         cpu.mem[sym::FCharIndex] = cpu.reg.a;
-        crate::ext::addkidobj(cpu);
-        crate::ext::pmask(cpu);
+        crate::ctrlsubs::ADDKIDOBJ(cpu);
+        crate::gamebg::PMASK(cpu);
     }
-    crate::ext::fast(cpu);
-    crate::ext::drawpost(cpu);
+    crate::frameadv::FAST(cpu);
+    crate::gamebg::DRAWPOST(cpu);
     pburn(cpu);
     pburn(cpu);
     pstars(cpu);
-    crate::ext::drawall(cpu);
+    crate::grafix::DRAWALL(cpu);
     pflow(cpu);
     return;
 }
 
 pub fn pjumpseq(cpu: &mut Cpu) {
     let tmp0 = cpu.reg.a;
-    crate::ext::LoadShad(cpu);
+    crate::ctrlsubs::LOADSHAD(cpu);
     cpu.reg.a = tmp0;
-    crate::ext::jumpseq(cpu);
-    crate::ext::SaveShad(cpu);
+    crate::ctrlsubs::JUMPSEQ(cpu);
+    crate::ctrlsubs::SAVESHAD(cpu);
     return;
 }
 
@@ -1099,10 +1108,10 @@ pub fn pjumpseq(cpu: &mut Cpu) {
 #[doc(alias = "vjumpseq")]
 pub fn kjumpseq(cpu: &mut Cpu) {
     let tmp0 = cpu.reg.a;
-    crate::ext::LoadKid(cpu);
+    crate::ctrlsubs::LOADKID(cpu);
     cpu.reg.a = tmp0;
-    crate::ext::jumpseq(cpu);
-    crate::ext::SaveKid(cpu);
+    crate::ctrlsubs::JUMPSEQ(cpu);
+    crate::ctrlsubs::SAVEKID(cpu);
     return;
 }
 
@@ -1110,8 +1119,8 @@ pub fn startM8(cpu: &mut Cpu) {
     startM4(cpu);
     cpu.mem[sym::CharX] = 0x90;
     cpu.set_a(0x6a);
-    crate::ext::jumpseq(cpu);
-    crate::ext::animchar(cpu);
+    crate::ctrlsubs::JUMPSEQ(cpu);
+    crate::coll::ANIMCHAR(cpu);
     return;
 }
 
@@ -1121,8 +1130,8 @@ pub fn startM4(cpu: &mut Cpu) {
     cpu.mem[sym::CharY] = 0x98;
     cpu.mem[sym::CharFace] = 0xff;
     cpu.set_a(0x69);
-    crate::ext::jumpseq(cpu);
-    crate::ext::animchar(cpu);
+    crate::ctrlsubs::JUMPSEQ(cpu);
+    crate::coll::ANIMCHAR(cpu);
     return;
 }
 
@@ -1131,8 +1140,8 @@ pub fn startP8(cpu: &mut Cpu) {
     cpu.mem[sym::CharX] = 0x82;
     cpu.mem[sym::CharY] = 0x9a;
     cpu.set_a(0x6e);
-    crate::ext::jumpseq(cpu);
-    crate::ext::animchar(cpu);
+    crate::ctrlsubs::JUMPSEQ(cpu);
+    crate::coll::ANIMCHAR(cpu);
     return;
 }
 
@@ -1141,8 +1150,8 @@ pub fn startP4(cpu: &mut Cpu) {
     cpu.mem[sym::CharX] = 0x8e;
     cpu.mem[sym::CharY] = 0x9a;
     cpu.set_a(0x5e);
-    crate::ext::jumpseq(cpu);
-    crate::ext::animchar(cpu);
+    crate::ctrlsubs::JUMPSEQ(cpu);
+    crate::coll::ANIMCHAR(cpu);
     return;
 }
 
@@ -1158,8 +1167,8 @@ pub fn startP2(cpu: &mut Cpu) {
     cpu.mem[sym::CharX] = 0x59;
     cpu.mem[sym::CharY] = 0x97;
     cpu.set_a(0x67);
-    crate::ext::jumpseq(cpu);
-    crate::ext::animchar(cpu);
+    crate::ctrlsubs::JUMPSEQ(cpu);
+    crate::coll::ANIMCHAR(cpu);
     return;
 }
 
@@ -1179,8 +1188,8 @@ pub fn startP7(cpu: &mut Cpu) {
     if cpu.reg.x != cpu.mem[sym::purpleflag] {
         cpu.set_a(0x78);  // crash (copy protect)
     }
-    crate::ext::jumpseq(cpu);
-    crate::ext::animchar(cpu);
+    crate::ctrlsubs::JUMPSEQ(cpu);
+    crate::coll::ANIMCHAR(cpu);
     return;
 }
 
@@ -1197,8 +1206,8 @@ pub fn startP0(cpu: &mut Cpu) {
     cpu.mem[sym::CharY] = 0x97;
     cpu.mem[sym::CharFace] = 0xff;
     cpu.set_a(0x5e);
-    crate::ext::jumpseq(cpu);
-    crate::ext::animchar(cpu);
+    crate::ctrlsubs::JUMPSEQ(cpu);
+    crate::coll::ANIMCHAR(cpu);
     return;
 }
 
@@ -1208,8 +1217,8 @@ pub fn startV0(cpu: &mut Cpu) {
     cpu.mem[sym::CharY] = 0x97;
     cpu.mem[sym::CharFace] = 0xff;
     cpu.set_a(0x5f);
-    crate::ext::jumpseq(cpu);
-    crate::ext::animchar(cpu);
+    crate::ctrlsubs::JUMPSEQ(cpu);
+    crate::coll::ANIMCHAR(cpu);
     return;
 }
 
@@ -1219,15 +1228,16 @@ pub fn startK7(cpu: &mut Cpu) {
     cpu.mem[sym::CharY] = 0x95;
     cpu.mem[sym::CharFace] = 0xff;
     cpu.set_a(0x01);
-    crate::ext::jumpseq(cpu);
-    crate::ext::animchar(cpu);
+    crate::ctrlsubs::JUMPSEQ(cpu);
+    crate::coll::ANIMCHAR(cpu);
     return;
 }
 
+#[doc(alias = "demo")]
 pub fn DEMO(cpu: &mut Cpu) {
     cpu.set_a(0x79);
     cpu.set_x(0x03);
-    crate::ext::AutoPlayback(cpu);
+    crate::auto::AUTOPLAYBACK(cpu);
     return;
 }
 
@@ -1250,14 +1260,14 @@ pub fn initit(cpu: &mut Cpu) {
     cpu.mem[sym::psandcount] = 0xff;
     cpu.set_a(0x0c);
     cpu.mem[sym::SPEED] = cpu.reg.a;
-    crate::ext::zeropeels(cpu);
-    crate::ext::zerored(cpu);
-    crate::ext::zerosound(cpu);
+    crate::grafix::ZEROPEELS(cpu);
+    crate::grafix::ZERORED(cpu);
+    crate::specialk::ZEROSOUND(cpu);
     return;
 }
 
 pub fn getglass(cpu: &mut Cpu) {
-    crate::ext::getminleft(cpu);
+    crate::specialk::GETMINLEFT(cpu);
     cpu.set_x(0x07);
     cpu.set_a(cpu.mem[sym::MinLeft]);
     if cpu.reg.a >= 0x06 {
@@ -1275,6 +1285,7 @@ pub fn getglass(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "showtime")]
 pub fn SHOWTIME(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::timerequest]);
     if cpu.reg.a == 0x00 {
@@ -1285,7 +1296,7 @@ pub fn SHOWTIME(cpu: &mut Cpu) {
         return;
     }
     'b7: {
-        crate::ext::getminleft(cpu);
+        crate::specialk::GETMINLEFT(cpu);
         cpu.set_a(cpu.mem[sym::MinLeft]);
         let _o: u8 = 0x02;
         cpu.flags.c = cpu.reg.a >= _o;
@@ -1365,6 +1376,7 @@ pub fn SHOWTIME(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "addlowersound")]
 pub fn ADDLOWERSOUND(cpu: &mut Cpu) {
     cpu.flags.c = (cpu.reg.a & 1) != 0;
     cpu.set_a(cpu.reg.a.wrapping_shr(1));
@@ -1446,10 +1458,11 @@ pub fn ADDLOWERSOUND(cpu: &mut Cpu) {
         }
     }
     cpu.set_a(0x0c);
-    crate::ext::addsound(cpu);
+    crate::specialk::ADDSOUND(cpu);
     return;
 }
 
+#[doc(alias = "RemoveObj")]
 pub fn REMOVEOBJ(cpu: &mut Cpu) {
     cpu.mem[sym::lastpotion] = cpu.reg.a;
     cpu.set_x(0x01);
@@ -1458,11 +1471,12 @@ pub fn REMOVEOBJ(cpu: &mut Cpu) {
     cpu.mem[((cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = 0x00;
     cpu.mem[sym::height] = 0x23;
     cpu.set_a(0x02);
-    crate::ext::markwipe(cpu);
-    crate::ext::markred(cpu);
+    crate::ctrlsubs::MARKWIPE(cpu);
+    crate::ctrlsubs::MARKRED(cpu);
     return;
 }
 
+#[doc(alias = "setinitials")]
 pub fn SETINITIALS(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::INFO]);
     cpu.flags.c = true;
@@ -1484,10 +1498,10 @@ pub fn SETINITIALS(cpu: &mut Cpu) {
 
 pub fn DoScrn(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::SCRNUM]);
-    crate::ext::calcblue(cpu);
+    crate::grafix::CALCBLUE(cpu);
     cpu.set_y(0x1d);
     loop {
-        crate::ext::getinitobj(cpu);
+        crate::frameadv::GETINITOBJ(cpu);
         if !cpu.flags.c {
         } else {
             cpu.mem[((cpu.mem[sym::BlueSpec] as usize | (cpu.mem[sym::BlueSpec + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
@@ -1500,6 +1514,7 @@ pub fn DoScrn(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "startkid")]
 pub fn STARTKID(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::level]);
     if cpu.reg.a == 0x03 {
@@ -1511,18 +1526,18 @@ pub fn STARTKID(cpu: &mut Cpu) {
             cpu.set_a(0x07);
             cpu.set_x(0x04);
             cpu.set_y(0x00);
-            crate::ext::rdblock(cpu);
+            crate::ctrlsubs::RDBLOCK(cpu);
             cpu.set_a(0x00);
             cpu.mem[((cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = cpu.reg.a;
         }
     }
     cpu.mem[sym::CharScrn] = cpu.mem[sym::KidStartScrn];
     cpu.set_a(cpu.mem[sym::KidStartBlock]);
-    crate::ext::unindex(cpu);
+    crate::ctrlsubs::UNINDEX(cpu);
     cpu.mem[sym::CharBlockX] = cpu.reg.a;
     cpu.mem[sym::CharBlockY] = cpu.reg.x;
     cpu.set_a(cpu.mem[sym::CharBlockX]);
-    crate::ext::getblockej(cpu);
+    crate::ctrlsubs::GETBLOCKEJ(cpu);
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + (0x0e) as u16 + (cpu.flags.c as u16);
     cpu.flags.c = (_r >> 8) != 0;
@@ -1539,7 +1554,7 @@ pub fn STARTKID(cpu: &mut Cpu) {
     cpu.mem[sym::MaxKidStr] = cpu.reg.a;
     cpu.mem[sym::KidStrength] = cpu.reg.a;
     cpu.set_a(0x05);
-    crate::ext::jumpseq(cpu);
+    crate::ctrlsubs::JUMPSEQ(cpu);
     cpu.set_x(cpu.mem[sym::CharBlockY]);
     cpu.mem[sym::CharY] = cpu.mem[(sym::FloorY + 1 + cpu.reg.x as usize) & 0xffff];
     cpu.mem[sym::CharLife] = 0xff;
@@ -1554,10 +1569,10 @@ pub fn STARTKID(cpu: &mut Cpu) {
     cpu.mem[sym::droppedout] = cpu.reg.a;
     cpu.mem[sym::CharSword] = cpu.reg.a;
     cpu.mem[sym::offguard] = cpu.reg.a;
-    crate::ext::animchar(cpu);
+    crate::coll::ANIMCHAR(cpu);
     cpu.set_a(cpu.mem[sym::level]);
     if cpu.reg.a != 0x07 {
-        crate::ext::SaveKid(cpu);
+        crate::ctrlsubs::SAVEKID(cpu);
         return;
     }
     cpu.set_a(cpu.mem[sym::yellowflag]);
@@ -1567,15 +1582,16 @@ pub fn STARTKID(cpu: &mut Cpu) {
     }
     cpu.set_a(cpu.mem[sym::CharScrn]);
     if cpu.reg.a != 0x11 {
-        crate::ext::SaveKid(cpu);
+        crate::ctrlsubs::SAVEKID(cpu);
         return;
     }
     cpu.set_a(0x03);  // down
-    crate::ext::cut(cpu);
-    crate::ext::SaveKid(cpu);
+    crate::auto::CUT(cpu);
+    crate::ctrlsubs::SAVEKID(cpu);
     return;
 }
 
+#[doc(alias = "startkid1")]
 pub fn STARTKID1(cpu: &mut Cpu) {
     cpu.set_x(cpu.mem[sym::CharBlockY]);
     cpu.mem[sym::CharY] = cpu.mem[(sym::FloorY + 1 + cpu.reg.x as usize) & 0xffff];
@@ -1591,10 +1607,10 @@ pub fn STARTKID1(cpu: &mut Cpu) {
     cpu.mem[sym::droppedout] = cpu.reg.a;
     cpu.mem[sym::CharSword] = cpu.reg.a;
     cpu.mem[sym::offguard] = cpu.reg.a;
-    crate::ext::animchar(cpu);
+    crate::coll::ANIMCHAR(cpu);
     cpu.set_a(cpu.mem[sym::level]);
     if cpu.reg.a != 0x07 {
-        crate::ext::SaveKid(cpu);
+        crate::ctrlsubs::SAVEKID(cpu);
         return;
     }
     cpu.set_a(cpu.mem[sym::yellowflag]);
@@ -1604,15 +1620,16 @@ pub fn STARTKID1(cpu: &mut Cpu) {
     }
     cpu.set_a(cpu.mem[sym::CharScrn]);
     if cpu.reg.a != 0x11 {
-        crate::ext::SaveKid(cpu);
+        crate::ctrlsubs::SAVEKID(cpu);
         return;
     }
     cpu.set_a(0x03);  // down
-    crate::ext::cut(cpu);
-    crate::ext::SaveKid(cpu);
+    crate::auto::CUT(cpu);
+    crate::ctrlsubs::SAVEKID(cpu);
     return;
 }
 
+#[doc(alias = "gravity")]
 pub fn GRAVITY(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::CharAction]);
     let _o: u8 = 0x04;
@@ -1646,9 +1663,9 @@ pub fn GRAVITY(cpu: &mut Cpu) {
                     return;
                 }
                 cpu.set_a(cpu.mem[sym::CharXVel]);
-                crate::ext::addcharx(cpu);
+                crate::ctrlsubs::ADDCHARX(cpu);
                 cpu.mem[sym::CharX] = cpu.reg.a;
-                crate::ext::rereadblocks(cpu);
+                crate::ctrl::REREADBLOCKS(cpu);
                 return;
             }
         }
@@ -1670,6 +1687,7 @@ pub fn GRAVITY(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "addfall")]
 pub fn ADDFALL(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::CharYVel]);
     cpu.flags.c = false;
@@ -1682,12 +1700,13 @@ pub fn ADDFALL(cpu: &mut Cpu) {
         return;
     }
     cpu.set_a(cpu.mem[sym::CharXVel]);
-    crate::ext::addcharx(cpu);
+    crate::ctrlsubs::ADDCHARX(cpu);
     cpu.mem[sym::CharX] = cpu.reg.a;
-    crate::ext::rereadblocks(cpu);
+    crate::ctrl::REREADBLOCKS(cpu);
     return;
 }
 
+#[doc(alias = "initialguards")]
 pub fn INITIALGUARDS(cpu: &mut Cpu) {
     cpu.set_y(0x18);  // screen #
     loop {
@@ -1698,8 +1717,8 @@ pub fn INITIALGUARDS(cpu: &mut Cpu) {
         cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
         if cpu.reg.a >= 0x1e {
         } else {
-            crate::ext::unindex(cpu);
-            crate::ext::getblockej(cpu);
+            crate::ctrlsubs::UNINDEX(cpu);
+            crate::ctrlsubs::GETBLOCKEJ(cpu);
             cpu.flags.c = false;
             let _r = (cpu.reg.a as u16) + (0x0e) as u16 + (cpu.flags.c as u16);
             cpu.flags.c = (_r >> 8) != 0;
@@ -1716,6 +1735,7 @@ pub fn INITIALGUARDS(cpu: &mut Cpu) {
     return;
 }
 
+#[doc(alias = "deadenemy")]
 pub fn DEADENEMY(cpu: &mut Cpu) {
     cpu.set_a(cpu.mem[sym::level]);
     match cpu.reg.a {
@@ -1729,7 +1749,7 @@ pub fn DEADENEMY(cpu: &mut Cpu) {
         0x0d => {
             cpu.set_a(0x09);
             cpu.set_x(0x19);
-            crate::ext::cuesong(cpu);
+            crate::specialk::CUESONG(cpu);
             cpu.mem[sym::lightcolor] = 0xff;
             cpu.mem[sym::lightning] = 0x0a;
             cpu.mem[sym::exitopen] = 0x01;
@@ -1737,8 +1757,8 @@ pub fn DEADENEMY(cpu: &mut Cpu) {
             cpu.set_a(0x18);
             cpu.set_x(0x00);
             cpu.set_y(0x00);
-            crate::ext::rdblock(cpu);
-            crate::ext::pushpp(cpu);
+            crate::ctrlsubs::RDBLOCK(cpu);
+            crate::mover::PUSHPP(cpu);
             return;
         }
         _ => {}
@@ -1749,22 +1769,22 @@ pub fn DEADENEMY(cpu: &mut Cpu) {
     }
     cpu.set_a(0x07);
     cpu.set_x(0x19);
-    crate::ext::cuesong(cpu);
+    crate::specialk::CUESONG(cpu);
     return;
 }
 
 pub fn _3atrigloose(cpu: &mut Cpu) {
-    crate::ext::rdblock1(cpu);
+    crate::ctrlsubs::RDBLOCK1(cpu);
     if cpu.reg.a != 0x0b {
         return;
     }
-    crate::ext::rnd(cpu);
+    crate::grafix::RND(cpu);
     cpu.set_a(cpu.reg.a & 0x0f);
     cpu.set_a(cpu.reg.a ^ 0xff);
     cpu.flags.c = false;
     let _r = (cpu.reg.a as u16) + (0x01) as u16 + (cpu.flags.c as u16);
     cpu.flags.c = (_r >> 8) != 0;
     cpu.set_a(_r as u8);
-    crate::ext::breakloose1(cpu);
+    crate::mover::BREAKLOOSE1(cpu);
     return;
 }

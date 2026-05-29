@@ -133,6 +133,18 @@ class Trace:
     writes: dict[int, int] = field(default_factory=dict)  # addr -> last value
     steps: int = 0
     max_stack_depth: int = 0
+    # Live `jsr`/`rts` call nesting, tracked by the IR3 interpreter so a
+    # runaway call cycle (e.g. a bank-switch trampoline whose soft-switch
+    # semantics we don't model) is cut off as a `InterpError` instead of
+    # blowing the Python stack. The real 6502 caps nesting at ~128 (a
+    # 256-byte stack, two bytes per return address).
+    call_depth: int = 0
+    # Name of the module the currently-executing routine belongs to. The
+    # IR3 interpreter threads this so inter-routine calls resolve with the
+    # same caller-sensitive policy the emitted crate uses (intra-module
+    # preferred, then unique cross-module, else external). `None` until a
+    # run sets it; the IR1 interpreter doesn't use it.
+    home_module: str | None = None
     # PHA/PLA byte stack — see `ir1.Pha` for the two-stack design
     # rationale. Kept distinct from the JSR/RTS call-stack tracking
     # (a local `stack` list inside `run()`) so each routine's pushed
@@ -372,12 +384,14 @@ def _resolve_indirect_x(ind: IndirectX, trace: Trace, ram: bytearray) -> int:
 
 def _indexed_addr(ix: IndexedAbs, trace: Trace, src) -> int:
     """Compute the effective address for an `base,x` / `base,y`
-    indexed operand. Mirrors the load/store path: validate the base
-    against the synthetic-label gate, then add the 8-bit index and
-    wrap the result at 16 bits. See `_real_addr` for why we don't
-    push the un-wrapped sum through the gate.
+    indexed operand. Resolve the base through `_abs_base` so a
+    self-modifying-code address operand (`opvar` set) uses its patched
+    bytes — `_abs_base` falls back to the synthetic-label gate for an
+    ordinary operand — then add the 8-bit index and wrap at 16 bits.
+    See `_real_addr` for why we don't push the un-wrapped sum through
+    the gate.
     """
-    base = _real_addr(ix.base.addr, src)
+    base = _abs_base(ix.base, trace, src)
     idx_val = trace.x if ix.index is Reg.X else trace.y
     return (base + (idx_val & 0xff)) & 0xffff
 

@@ -31,6 +31,7 @@ from .pass3_match import match_stats, recognize_module
 from .pass3_smc import recognize_smc, smc_store_count, smc_var_count
 from .pass3_temps import recover_temps, temp_stats
 from .pass4_emit_rust import emit_crate, emit_module, emit_modules, lower_stats
+from .slot_aliases import apply_slot_aliases
 
 DEFAULT_SOURCE_REL = Path("01 POP Source/Source")
 
@@ -1059,6 +1060,7 @@ def lift_all_modules(src_dir: Path) -> list[ir3_mod.ModuleIR3]:
         recovered = _recovered_module(file_ast, symbols, entries)
         if recovered is not None:
             modules.append(recovered)
+    apply_slot_aliases(modules, ast)
     return modules
 
 
