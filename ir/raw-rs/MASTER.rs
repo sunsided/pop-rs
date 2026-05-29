@@ -1381,7 +1381,7 @@ impl Cpu {
                     }
                 }
                 7 => {
-                    return;
+                    pc = 5;
                 }
                 _ => unreachable!(),
             }

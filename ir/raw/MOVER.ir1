@@ -423,8 +423,7 @@ fn trigger  (aka :loop) {
 :next:
   x -= 1                         ; MOVER.S:116
   if ne goto :loop       ; MOVER.S:117
-:rts:
-  return                           ; MOVER.S:119
+  goto :rts                ; MOVER.S:119
 }
 
 fn trigobj {
@@ -1263,8 +1262,6 @@ fn checkabover {
 ]no:
   y = #0x1e                  ; MOVER.S:1452
   c = 1                            ; MOVER.S:1453
-]rts:
-  return                           ; MOVER.S:1454
 ]rts:
   return                           ; MOVER.S:1454
 }

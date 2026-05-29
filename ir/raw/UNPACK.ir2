@@ -264,8 +264,7 @@ fn ExpandClm  (aka :Loop) {
   *CrnDatPtr@0x00f0 = a            ; UNPACK.S:318
   if cc goto :a4       ; UNPACK.S:319
   *CrnDatPtr+1@0x00f1 += 1                         ; UNPACK.S:320
-:a4:
-  goto :Next                ; UNPACK.S:322
+  goto :a4                ; UNPACK.S:321
 :Done:
   *RAMRDmain@0xc002 = a            ; UNPACK.S:356
 ]rts:

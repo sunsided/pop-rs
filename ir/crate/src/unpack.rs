@@ -515,7 +515,7 @@ pub fn ExpandClm(cpu: &mut Cpu) {
                 cpu.set_a(_r as u8);
                 cpu.mem[sym::CrnDatPtr] = cpu.reg.a;
                 if !cpu.flags.c {
-                    pc = 14;
+                    pc = 3;
                 } else {
                     pc = 2;
                 }
@@ -524,7 +524,7 @@ pub fn ExpandClm(cpu: &mut Cpu) {
                 let _v = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
                 cpu.mem[sym::CrnDatPtr + 1] = _v;
                 cpu.set_nz(_v);
-                pc = 14;
+                pc = 3;
             }
             3 => {
                 pc = 7;
@@ -574,7 +574,7 @@ pub fn ExpandClm(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a == 0xff {
-                    pc = 15;
+                    pc = 14;
                 } else {
                     pc = 10;
                 }
@@ -592,7 +592,7 @@ pub fn ExpandClm(cpu: &mut Cpu) {
                 cpu.set_a(cpu.mem[sym::ByteHld]);
                 cpu.set_a(cpu.reg.a & 0x7f);
                 if cpu.reg.a == 0x00 {
-                    pc = 17;
+                    pc = 16;
                 } else {
                     pc = 12;
                 }
@@ -609,7 +609,7 @@ pub fn ExpandClm(cpu: &mut Cpu) {
                 cpu.set_a(_r as u8);
                 cpu.mem[sym::CrnDatPtr] = cpu.reg.a;
                 if !cpu.flags.c {
-                    pc = 14;
+                    pc = 3;
                 } else {
                     pc = 13;
                 }
@@ -618,19 +618,16 @@ pub fn ExpandClm(cpu: &mut Cpu) {
                 let _v = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
                 cpu.mem[sym::CrnDatPtr + 1] = _v;
                 cpu.set_nz(_v);
-                pc = 14;
+                pc = 3;
             }
             14 => {
-                pc = 7;
+                cpu.mem[sym::RAMRDmain] = cpu.reg.a;
+                pc = 15;
             }
             15 => {
-                cpu.mem[sym::RAMRDmain] = cpu.reg.a;
-                pc = 16;
-            }
-            16 => {
                 return;
             }
-            17 => {
+            16 => {
                 cpu.set_y(0x01);
                 cpu.set_a(cpu.mem[((cpu.mem[sym::CrnDatPtr] as usize | (cpu.mem[sym::CrnDatPtr + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
                 cpu.mem[sym::XClmPos] = cpu.reg.a;
@@ -644,18 +641,18 @@ pub fn ExpandClm(cpu: &mut Cpu) {
                 cpu.set_a(_r as u8);
                 cpu.mem[sym::CrnDatPtr] = cpu.reg.a;
                 if !cpu.flags.c {
-                    pc = 19;
-                } else {
                     pc = 18;
+                } else {
+                    pc = 17;
                 }
             }
-            18 => {
+            17 => {
                 let _v = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
                 cpu.mem[sym::CrnDatPtr + 1] = _v;
                 cpu.set_nz(_v);
-                pc = 19;
+                pc = 18;
             }
-            19 => {
+            18 => {
                 pc = 7;
             }
             _ => unreachable!(),

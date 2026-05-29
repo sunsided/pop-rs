@@ -619,7 +619,7 @@ impl Cpu {
                     self.set_a(_r as u8);
                     self.mem[sym::CrnDatPtr] = self.reg.a;
                     if !self.flags.c {
-                        pc = 14;
+                        pc = 3;
                     } else {
                         pc = 2;
                     }
@@ -628,7 +628,7 @@ impl Cpu {
                     let _v = self.mem[sym::CrnDatPtr + 1].wrapping_add(1);
                     self.mem[sym::CrnDatPtr + 1] = _v;
                     self.set_nz(_v);
-                    pc = 14;
+                    pc = 3;
                 }
                 3 => {
                     pc = 7;
@@ -678,7 +678,7 @@ impl Cpu {
                     self.flags.z = self.reg.a == _o;
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a == 0xff {
-                        pc = 15;
+                        pc = 14;
                     } else {
                         pc = 10;
                     }
@@ -696,7 +696,7 @@ impl Cpu {
                     self.set_a(self.mem[sym::ByteHld]);
                     self.set_a(self.reg.a & 0x7f);
                     if self.reg.a == 0x00 {
-                        pc = 17;
+                        pc = 16;
                     } else {
                         pc = 12;
                     }
@@ -713,7 +713,7 @@ impl Cpu {
                     self.set_a(_r as u8);
                     self.mem[sym::CrnDatPtr] = self.reg.a;
                     if !self.flags.c {
-                        pc = 14;
+                        pc = 3;
                     } else {
                         pc = 13;
                     }
@@ -722,19 +722,16 @@ impl Cpu {
                     let _v = self.mem[sym::CrnDatPtr + 1].wrapping_add(1);
                     self.mem[sym::CrnDatPtr + 1] = _v;
                     self.set_nz(_v);
-                    pc = 14;
+                    pc = 3;
                 }
                 14 => {
-                    pc = 7;
+                    self.mem[sym::RAMRDmain] = self.reg.a;
+                    pc = 15;
                 }
                 15 => {
-                    self.mem[sym::RAMRDmain] = self.reg.a;
-                    pc = 16;
-                }
-                16 => {
                     return;
                 }
-                17 => {
+                16 => {
                     self.set_y(0x01);
                     self.set_a(self.mem[((self.mem[sym::CrnDatPtr] as usize | (self.mem[sym::CrnDatPtr + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
                     self.mem[sym::XClmPos] = self.reg.a;
@@ -748,18 +745,18 @@ impl Cpu {
                     self.set_a(_r as u8);
                     self.mem[sym::CrnDatPtr] = self.reg.a;
                     if !self.flags.c {
-                        pc = 19;
-                    } else {
                         pc = 18;
+                    } else {
+                        pc = 17;
                     }
                 }
-                18 => {
+                17 => {
                     let _v = self.mem[sym::CrnDatPtr + 1].wrapping_add(1);
                     self.mem[sym::CrnDatPtr + 1] = _v;
                     self.set_nz(_v);
-                    pc = 19;
+                    pc = 18;
                 }
-                19 => {
+                18 => {
                     pc = 7;
                 }
                 _ => unreachable!(),

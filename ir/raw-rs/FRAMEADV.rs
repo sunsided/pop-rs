@@ -2583,7 +2583,7 @@ impl Cpu {
                     self.set_a(0x00);
                     self.mem[sym::switches] = self.reg.a;
                     self.set_x(self.mem[sym::sortX]);
-                    pc = 8;
+                    pc = 1;
                 }
                 1 => {
                     let _o: u8 = 0x01;
@@ -2591,7 +2591,7 @@ impl Cpu {
                     self.flags.z = self.reg.x == _o;
                     self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.x == 0x01 {
-                        pc = 12;
+                        pc = 5;
                     } else {
                         pc = 2;
                     }
@@ -2601,7 +2601,7 @@ impl Cpu {
                     self.compare();
                     self.set_x(self.mem[sym::xsave]);
                     if !self.flags.c {
-                        pc = 11;
+                        pc = 4;
                     } else {
                         pc = 3;
                     }
@@ -2614,12 +2614,12 @@ impl Cpu {
                     let _v = self.stack.pop().expect("pla on empty stack");
                     self.set_a(_v);
                     self.mem[(sym::sortX - 1 + self.reg.x as usize) & 0xffff] = self.reg.a;
-                    pc = 11;
+                    pc = 4;
                 }
                 4 => {
                     self.set_x(self.reg.x.wrapping_sub(1));
                     if self.reg.x != 0x00 {
-                        pc = 8;
+                        pc = 1;
                     } else {
                         pc = 5;
                     }
@@ -2639,57 +2639,7 @@ impl Cpu {
                     self.set_a(0x00);
                     self.mem[sym::switches] = self.reg.a;
                     self.set_x(self.mem[sym::sortX]);
-                    pc = 8;
-                }
-                8 => {
-                    let _o: u8 = 0x01;
-                    self.flags.c = self.reg.x >= _o;
-                    self.flags.z = self.reg.x == _o;
-                    self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
-                    if self.reg.x == 0x01 {
-                        pc = 12;
-                    } else {
-                        pc = 9;
-                    }
-                }
-                9 => {
-                    self.mem[sym::xsave] = self.reg.x;
-                    self.compare();
-                    self.set_x(self.mem[sym::xsave]);
-                    if !self.flags.c {
-                        pc = 11;
-                    } else {
-                        pc = 10;
-                    }
-                }
-                10 => {
-                    self.set_a(self.mem[(sym::sortX + self.reg.x as usize) & 0xffff]);
-                    self.stack.push(self.reg.a);
-                    self.set_a(self.mem[(sym::sortX - 1 + self.reg.x as usize) & 0xffff]);
-                    self.mem[(sym::sortX + self.reg.x as usize) & 0xffff] = self.reg.a;
-                    let _v = self.stack.pop().expect("pla on empty stack");
-                    self.set_a(_v);
-                    self.mem[(sym::sortX - 1 + self.reg.x as usize) & 0xffff] = self.reg.a;
-                    pc = 11;
-                }
-                11 => {
-                    self.set_x(self.reg.x.wrapping_sub(1));
-                    if self.reg.x != 0x00 {
-                        pc = 8;
-                    } else {
-                        pc = 12;
-                    }
-                }
-                12 => {
-                    self.set_a(self.mem[sym::switches]);
-                    if self.reg.a != 0x00 {
-                        pc = 7;
-                    } else {
-                        pc = 13;
-                    }
-                }
-                13 => {
-                    return;
+                    pc = 1;
                 }
                 _ => unreachable!(),
             }

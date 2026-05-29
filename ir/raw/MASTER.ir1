@@ -923,8 +923,7 @@ fn tpause  (aka :loop) {
   call xmplay                  ; MASTER.S:1401
   cmp a, #0x00              ; MASTER.S:1402
   if ne goto :loop       ; MASTER.S:1403
-]rts:
-  return                           ; MASTER.S:1404
+  goto ]rts                ; MASTER.S:1404
 }
 
 fn error {

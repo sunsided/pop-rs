@@ -675,7 +675,7 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a == 0x18 {
-                    pc = 37;
+                    pc = 34;
                 } else {
                     pc = 1;
                 }
@@ -1012,7 +1012,7 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
                 }
             }
             31 => {
-                pc = 37;
+                pc = 34;
             }
             32 => {
                 return;
@@ -1020,7 +1020,7 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
             33 => {
                 cpu.set_a(0x00);
                 cpu.mem[sym::EnemyAlert] = cpu.reg.a;
-                pc = 37;
+                pc = 34;
             }
             34 => {
                 return;
@@ -1036,10 +1036,7 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
             36 => {
                 cpu.set_a(0x00);
                 cpu.mem[sym::EnemyAlert] = cpu.reg.a;
-                pc = 37;
-            }
-            37 => {
-                return;
+                pc = 34;
             }
             _ => unreachable!(),
         }

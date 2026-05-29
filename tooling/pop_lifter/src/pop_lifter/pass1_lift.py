@@ -783,7 +783,9 @@ def lift_file(
             # binding wins. That matches Merlin's pass-2 assemble order.
             label_to_instr_index[lab] = i
 
-    def _extract_local_block(target: str, before_idx: int) -> list | None:
+    def _extract_local_block(
+        target: str, before_idx: int, defined: set[str]
+    ) -> list | None:
         """Return the code block for local label `target`, resolved by its
         nearest definition at or before `before_idx`: a `Label(target)`
         followed by the lifted instructions through the block's terminator
@@ -796,7 +798,14 @@ def lift_file(
         'nearest prior to the branch site' picks the binding actually in
         effect. Returns `None` if no definition is found before
         `before_idx` (the branch stays unresolved; the interpreter then
-        surfaces a clear error)."""
+        surfaces a clear error).
+
+        `defined` lists labels the routine already carries. If the block
+        falls through into one of them (commonly the shared `]rts:`
+        trailer that `]no` flows into when `]rts` was inlined separately),
+        stop and emit a local `Goto` to it rather than re-emitting the
+        label and its code — otherwise the routine would carry a duplicate
+        `Label` that downstream name-keyed passes silently collapse."""
         def_idx = None
         scan = before_idx - 1
         while scan >= 0:
@@ -821,13 +830,20 @@ def lift_file(
                 line=ln.lineno,
                 raw=ln.raw.rstrip("\n"),
             )
-            if ln.label:
+            if ln.label and ln.label != target:
+                if ln.label in defined:
+                    # Fall-through into a block already present in the
+                    # routine — preserve the edge with a local jump, don't
+                    # duplicate the label/code.
+                    out.append(Goto(target=ln.label, kind="local", src=ref))
+                    return out
                 # Falling through into a new global-named routine ends the
                 # shared block (helper blocks end in their own terminator
                 # before the next entry, but defend against the rare
                 # fall-through).
                 if emitted_instr and not _is_local_label(ln.label):
                     break
+            if ln.label:
                 out.append(Label(name=ln.label, src=ref))
             if ln.mnemonic is None or ln.mnemonic in _NON_CODE_DIRECTIVES:
                 i += 1
@@ -983,9 +999,16 @@ def lift_file(
                 return
             progress = False
             for target in missing:
-                block = _extract_local_block(target, start_idx)
+                if target in defined:
+                    # Defined by an earlier inline in this same pass (a
+                    # block that fell through into it) — don't inline again.
+                    continue
+                block = _extract_local_block(target, start_idx, defined)
                 if block:
                     routine.body.extend(block)
+                    defined.update(
+                        it.name for it in block if isinstance(it, Label)
+                    )
                     progress = True
             if not progress:
                 # Remaining targets have no definition before the entry —

@@ -520,7 +520,7 @@ pub fn trigger(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a == 0xff {
-                    pc = 8;
+                    pc = 4;
                 } else {
                     pc = 1;
                 }
@@ -580,7 +580,7 @@ pub fn trigger(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.a == _o;
                 cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.a == cpu.mem[sym::trscrn] {
-                    pc = 8;
+                    pc = 4;
                 } else {
                     pc = 7;
                 }
@@ -594,7 +594,7 @@ pub fn trigger(cpu: &mut Cpu) {
                 }
             }
             8 => {
-                return;
+                pc = 4;
             }
             _ => unreachable!(),
         }

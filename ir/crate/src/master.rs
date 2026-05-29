@@ -1284,7 +1284,7 @@ pub fn tpause(cpu: &mut Cpu) {
                 }
             }
             7 => {
-                return;
+                pc = 5;
             }
             _ => unreachable!(),
         }

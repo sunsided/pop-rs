@@ -730,8 +730,7 @@ fn CHECKALERT {
 ]safe:
   a = #0x00                  ; MISC.S:823
   *EnemyAlert@0x00d1 = a            ; MISC.S:824
-]rts:
-  return                           ; MISC.S:825
+  goto ]rts                ; MISC.S:825
 }
 
 fn DISPVERSION {

@@ -635,7 +635,7 @@ impl Cpu {
                     self.flags.z = self.reg.a == _o;
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a == 0xff {
-                        pc = 8;
+                        pc = 4;
                     } else {
                         pc = 1;
                     }
@@ -695,7 +695,7 @@ impl Cpu {
                     self.flags.z = self.reg.a == _o;
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a == self.mem[sym::trscrn] {
-                        pc = 8;
+                        pc = 4;
                     } else {
                         pc = 7;
                     }
@@ -709,7 +709,7 @@ impl Cpu {
                     }
                 }
                 8 => {
-                    return;
+                    pc = 4;
                 }
                 _ => unreachable!(),
             }

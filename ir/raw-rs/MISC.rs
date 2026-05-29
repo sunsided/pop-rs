@@ -826,7 +826,7 @@ impl Cpu {
                     self.flags.z = self.reg.a == _o;
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a == 0x18 {
-                        pc = 37;
+                        pc = 34;
                     } else {
                         pc = 1;
                     }
@@ -1163,7 +1163,7 @@ impl Cpu {
                     }
                 }
                 31 => {
-                    pc = 37;
+                    pc = 34;
                 }
                 32 => {
                     return;
@@ -1171,7 +1171,7 @@ impl Cpu {
                 33 => {
                     self.set_a(0x00);
                     self.mem[sym::EnemyAlert] = self.reg.a;
-                    pc = 37;
+                    pc = 34;
                 }
                 34 => {
                     return;
@@ -1187,10 +1187,7 @@ impl Cpu {
                 36 => {
                     self.set_a(0x00);
                     self.mem[sym::EnemyAlert] = self.reg.a;
-                    pc = 37;
-                }
-                37 => {
-                    return;
+                    pc = 34;
                 }
                 _ => unreachable!(),
             }

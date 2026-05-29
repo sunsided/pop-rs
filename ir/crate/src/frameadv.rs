@@ -2398,7 +2398,7 @@ pub fn sortlist(cpu: &mut Cpu) {
                 cpu.set_a(0x00);
                 cpu.mem[sym::switches] = cpu.reg.a;
                 cpu.set_x(cpu.mem[sym::sortX]);
-                pc = 8;
+                pc = 1;
             }
             1 => {
                 let _o: u8 = 0x01;
@@ -2406,7 +2406,7 @@ pub fn sortlist(cpu: &mut Cpu) {
                 cpu.flags.z = cpu.reg.x == _o;
                 cpu.flags.n = (cpu.reg.x.wrapping_sub(_o) >> 7) != 0;
                 if cpu.reg.x == 0x01 {
-                    pc = 12;
+                    pc = 5;
                 } else {
                     pc = 2;
                 }
@@ -2416,7 +2416,7 @@ pub fn sortlist(cpu: &mut Cpu) {
                 compare(cpu);
                 cpu.set_x(cpu.mem[sym::xsave]);
                 if !cpu.flags.c {
-                    pc = 11;
+                    pc = 4;
                 } else {
                     pc = 3;
                 }
@@ -2429,12 +2429,12 @@ pub fn sortlist(cpu: &mut Cpu) {
                 let _v = cpu.stack.pop().expect("pla on empty stack");
                 cpu.set_a(_v);
                 cpu.mem[(sym::sortX - 1 + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
-                pc = 11;
+                pc = 4;
             }
             4 => {
                 cpu.set_x(cpu.reg.x.wrapping_sub(1));
                 if cpu.reg.x != 0x00 {
-                    pc = 8;
+                    pc = 1;
                 } else {
                     pc = 5;
                 }
@@ -2454,57 +2454,7 @@ pub fn sortlist(cpu: &mut Cpu) {
                 cpu.set_a(0x00);
                 cpu.mem[sym::switches] = cpu.reg.a;
                 cpu.set_x(cpu.mem[sym::sortX]);
-                pc = 8;
-            }
-            8 => {
-                let _o: u8 = 0x01;
-                cpu.flags.c = cpu.reg.x >= _o;
-                cpu.flags.z = cpu.reg.x == _o;
-                cpu.flags.n = (cpu.reg.x.wrapping_sub(_o) >> 7) != 0;
-                if cpu.reg.x == 0x01 {
-                    pc = 12;
-                } else {
-                    pc = 9;
-                }
-            }
-            9 => {
-                cpu.mem[sym::xsave] = cpu.reg.x;
-                compare(cpu);
-                cpu.set_x(cpu.mem[sym::xsave]);
-                if !cpu.flags.c {
-                    pc = 11;
-                } else {
-                    pc = 10;
-                }
-            }
-            10 => {
-                cpu.set_a(cpu.mem[(sym::sortX + cpu.reg.x as usize) & 0xffff]);
-                cpu.stack.push(cpu.reg.a);
-                cpu.set_a(cpu.mem[(sym::sortX - 1 + cpu.reg.x as usize) & 0xffff]);
-                cpu.mem[(sym::sortX + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
-                let _v = cpu.stack.pop().expect("pla on empty stack");
-                cpu.set_a(_v);
-                cpu.mem[(sym::sortX - 1 + cpu.reg.x as usize) & 0xffff] = cpu.reg.a;
-                pc = 11;
-            }
-            11 => {
-                cpu.set_x(cpu.reg.x.wrapping_sub(1));
-                if cpu.reg.x != 0x00 {
-                    pc = 8;
-                } else {
-                    pc = 12;
-                }
-            }
-            12 => {
-                cpu.set_a(cpu.mem[sym::switches]);
-                if cpu.reg.a != 0x00 {
-                    pc = 7;
-                } else {
-                    pc = 13;
-                }
-            }
-            13 => {
-                return;
+                pc = 1;
             }
             _ => unreachable!(),
         }

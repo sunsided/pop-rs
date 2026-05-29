@@ -1737,27 +1737,7 @@ fn sortlist  (aka :newpass) {
   a = #0x00                  ; FRAMEADV.S:2138
   *switches@0x00f4 = a            ; FRAMEADV.S:2139
   x = *sortX@0x03c0        ; FRAMEADV.S:2141
-:loop:
-  cmp x, #0x01              ; FRAMEADV.S:2143
-  if eq goto :attop       ; FRAMEADV.S:2144
-  *xsave@0x00e8 = x            ; FRAMEADV.S:2146
-  call compare                  ; FRAMEADV.S:2148
-  x = *xsave@0x00e8        ; FRAMEADV.S:2150
-  if cc goto :ok       ; FRAMEADV.S:2152
-  a = *(sortX@0x03c0 + x)   ; FRAMEADV.S:2154
-  push a                           ; FRAMEADV.S:2155
-  a = *(sortX-1@0x03bf + x)   ; FRAMEADV.S:2156
-  *(sortX@0x03c0 + x) = a   ; FRAMEADV.S:2157
-  a = pop                          ; FRAMEADV.S:2158
-  *(sortX-1@0x03bf + x) = a   ; FRAMEADV.S:2159
-:ok:
-  x -= 1                         ; FRAMEADV.S:2161
-  if ne goto :loop       ; FRAMEADV.S:2162
-:attop:
-  a = *switches@0x00f4        ; FRAMEADV.S:2167
-  if ne goto :newpass       ; FRAMEADV.S:2168
-:rts:
-  return                           ; FRAMEADV.S:2172
+  goto :loop                ; FRAMEADV.S:2143
 }
 
 fn compare {
