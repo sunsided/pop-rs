@@ -321,9 +321,11 @@ pub fn WipeRgtExp(cpu: &mut Cpu) {
     cpu.set_a(0x00);
     cpu.mem[sym::XClmPos] = cpu.reg.a;
     loop {
-        cpu.mem[sym::YScrPos] = 0x00;
+        cpu.set_a(0x00);
+        cpu.mem[sym::YScrPos] = cpu.reg.a;
         ExpandClm(cpu);
-        cpu.mem[sym::YScrPos] = 0x01;
+        cpu.set_a(0x01);
+        cpu.mem[sym::YScrPos] = cpu.reg.a;
         ExpandClm(cpu);
         let _v = cpu.mem[sym::XClmPos].wrapping_add(1);
         cpu.mem[sym::XClmPos] = _v;
@@ -485,47 +487,177 @@ pub fn DeltaExp(cpu: &mut Cpu) {
 
 #[doc(alias = ":Loop")]
 pub fn ExpandClm(cpu: &mut Cpu) {
-    cpu.set_y(0x00);
-    cpu.set_a(cpu.mem[((cpu.mem[sym::CrnDatPtr] as usize | (cpu.mem[sym::CrnDatPtr + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
-    cpu.mem[sym::ByteHld] = cpu.reg.a;
-    cpu.set_a(cpu.reg.a & 0x80);
-    if cpu.reg.a == 0x00 {
-        cpu.set_a(cpu.mem[sym::ByteHld]);
-        cpu.set_x(0x01);
-        ExpClmSeq(cpu);
-        let _v = cpu.mem[sym::CrnDatPtr].wrapping_add(1);
-        cpu.mem[sym::CrnDatPtr] = _v;
-        cpu.set_nz(_v);
-        if cpu.flags.z {
-            let _v = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
-            cpu.mem[sym::CrnDatPtr + 1] = _v;
-            cpu.set_nz(_v);
-        }
-    } else {
-        cpu.set_y(0x01);
-        cpu.set_a(cpu.mem[((cpu.mem[sym::CrnDatPtr] as usize | (cpu.mem[sym::CrnDatPtr + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
-        cpu.set_x(cpu.reg.a);
-        cpu.set_a(cpu.mem[sym::ByteHld]);
-        cpu.set_a(cpu.reg.a & 0x7f);
-        ExpClmSeq(cpu);
-        cpu.flags.c = false;
-        cpu.set_a(cpu.mem[sym::CrnDatPtr]);
-        let _r = (cpu.reg.a as u16) + (0x02) as u16 + (cpu.flags.c as u16);
-        cpu.flags.c = (_r >> 8) != 0;
-        cpu.set_a(_r as u8);
-        cpu.mem[sym::CrnDatPtr] = cpu.reg.a;
-        if cpu.flags.c {
-            let _v = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
-            cpu.mem[sym::CrnDatPtr + 1] = _v;
-            cpu.set_nz(_v);
+    let mut pc: u32 = 0;
+    loop {
+        match pc {
+            0 => {
+                cpu.set_y(0x00);
+                cpu.set_a(cpu.mem[((cpu.mem[sym::CrnDatPtr] as usize | (cpu.mem[sym::CrnDatPtr + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
+                cpu.mem[sym::ByteHld] = cpu.reg.a;
+                cpu.set_a(cpu.reg.a & 0x80);
+                if cpu.reg.a == 0x00 {
+                    pc = 4;
+                } else {
+                    pc = 1;
+                }
+            }
+            1 => {
+                cpu.set_y(0x01);
+                cpu.set_a(cpu.mem[((cpu.mem[sym::CrnDatPtr] as usize | (cpu.mem[sym::CrnDatPtr + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
+                cpu.set_x(cpu.reg.a);
+                cpu.set_a(cpu.mem[sym::ByteHld]);
+                cpu.set_a(cpu.reg.a & 0x7f);
+                ExpClmSeq(cpu);
+                cpu.flags.c = false;
+                cpu.set_a(cpu.mem[sym::CrnDatPtr]);
+                let _r = (cpu.reg.a as u16) + (0x02) as u16 + (cpu.flags.c as u16);
+                cpu.flags.c = (_r >> 8) != 0;
+                cpu.set_a(_r as u8);
+                cpu.mem[sym::CrnDatPtr] = cpu.reg.a;
+                if !cpu.flags.c {
+                    pc = 3;
+                } else {
+                    pc = 2;
+                }
+            }
+            2 => {
+                let _v = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+                cpu.mem[sym::CrnDatPtr + 1] = _v;
+                cpu.set_nz(_v);
+                pc = 3;
+            }
+            3 => {
+                pc = 7;
+            }
+            4 => {
+                cpu.set_a(cpu.mem[sym::ByteHld]);
+                cpu.set_x(0x01);
+                ExpClmSeq(cpu);
+                let _v = cpu.mem[sym::CrnDatPtr].wrapping_add(1);
+                cpu.mem[sym::CrnDatPtr] = _v;
+                cpu.set_nz(_v);
+                if !cpu.flags.z {
+                    pc = 6;
+                } else {
+                    pc = 5;
+                }
+            }
+            5 => {
+                let _v = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+                cpu.mem[sym::CrnDatPtr + 1] = _v;
+                cpu.set_nz(_v);
+                pc = 6;
+            }
+            6 => {
+                pc = 7;
+            }
+            7 => {
+                cpu.set_a(cpu.mem[sym::YScrPos]);
+                let _o: u8 = 0xc0;
+                cpu.flags.c = cpu.reg.a >= _o;
+                cpu.flags.z = cpu.reg.a == _o;
+                cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
+                if cpu.reg.a < 0xc0 {
+                    pc = 9;
+                } else {
+                    pc = 8;
+                }
+            }
+            8 => {
+                return;
+            }
+            9 => {
+                cpu.set_y(0x00);
+                cpu.set_a(cpu.mem[((cpu.mem[sym::CrnDatPtr] as usize | (cpu.mem[sym::CrnDatPtr + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
+                let _o: u8 = 0xff;
+                cpu.flags.c = cpu.reg.a >= _o;
+                cpu.flags.z = cpu.reg.a == _o;
+                cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
+                if cpu.reg.a == 0xff {
+                    pc = 14;
+                } else {
+                    pc = 10;
+                }
+            }
+            10 => {
+                cpu.mem[sym::ByteHld] = cpu.reg.a;
+                cpu.set_a(cpu.reg.a & 0x80);
+                if cpu.reg.a == 0x00 {
+                    pc = 4;
+                } else {
+                    pc = 11;
+                }
+            }
+            11 => {
+                cpu.set_a(cpu.mem[sym::ByteHld]);
+                cpu.set_a(cpu.reg.a & 0x7f);
+                if cpu.reg.a == 0x00 {
+                    pc = 16;
+                } else {
+                    pc = 12;
+                }
+            }
+            12 => {
+                cpu.set_x(cpu.reg.a);
+                cpu.set_y(0x01);
+                cpu.set_a(cpu.mem[((cpu.mem[sym::CrnDatPtr] as usize | (cpu.mem[sym::CrnDatPtr + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
+                ExpClmSeq1(cpu);
+                cpu.flags.c = false;
+                cpu.set_a(cpu.mem[sym::CrnDatPtr]);
+                let _r = (cpu.reg.a as u16) + (0x02) as u16 + (cpu.flags.c as u16);
+                cpu.flags.c = (_r >> 8) != 0;
+                cpu.set_a(_r as u8);
+                cpu.mem[sym::CrnDatPtr] = cpu.reg.a;
+                if !cpu.flags.c {
+                    pc = 3;
+                } else {
+                    pc = 13;
+                }
+            }
+            13 => {
+                let _v = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+                cpu.mem[sym::CrnDatPtr + 1] = _v;
+                cpu.set_nz(_v);
+                pc = 3;
+            }
+            14 => {
+                cpu.mem[sym::RAMRDmain] = cpu.reg.a;
+                pc = 15;
+            }
+            15 => {
+                return;
+            }
+            16 => {
+                cpu.set_y(0x01);
+                cpu.set_a(cpu.mem[((cpu.mem[sym::CrnDatPtr] as usize | (cpu.mem[sym::CrnDatPtr + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
+                cpu.mem[sym::XClmPos] = cpu.reg.a;
+                cpu.set_y(0x02);
+                cpu.set_a(cpu.mem[((cpu.mem[sym::CrnDatPtr] as usize | (cpu.mem[sym::CrnDatPtr + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff]);
+                cpu.mem[sym::YScrPos] = cpu.reg.a;
+                cpu.flags.c = false;
+                cpu.set_a(cpu.mem[sym::CrnDatPtr]);
+                let _r = (cpu.reg.a as u16) + (0x03) as u16 + (cpu.flags.c as u16);
+                cpu.flags.c = (_r >> 8) != 0;
+                cpu.set_a(_r as u8);
+                cpu.mem[sym::CrnDatPtr] = cpu.reg.a;
+                if !cpu.flags.c {
+                    pc = 18;
+                } else {
+                    pc = 17;
+                }
+            }
+            17 => {
+                let _v = cpu.mem[sym::CrnDatPtr + 1].wrapping_add(1);
+                cpu.mem[sym::CrnDatPtr + 1] = _v;
+                cpu.set_nz(_v);
+                pc = 18;
+            }
+            18 => {
+                pc = 7;
+            }
+            _ => unreachable!(),
         }
     }
-    cpu.set_a(cpu.mem[sym::YScrPos]);
-    if cpu.reg.a < 0xc0 {
-        ExpandClm(cpu);
-        return;
-    }
-    return;
 }
 
 pub fn ExpClmSeq(cpu: &mut Cpu) {
@@ -632,17 +764,12 @@ pub fn DELTAEXPPOP(cpu: &mut Cpu) {
 
 #[doc(alias = "DeltaExpWipe")]
 pub fn DELTAEXPWIPE(cpu: &mut Cpu) {
-    let mut pc: u32 = 0;
-    loop {
-        match pc {
-            0 => {
-                cpu.mem[sym::PAGE2off] = cpu.reg.a;
-                crate::ext::_5dDE(cpu);
-                return;
-            }
-            _ => unreachable!(),
-        }
-    }
+    cpu.mem[sym::PAGE2off] = cpu.reg.a;
+    DeltaExp(cpu);
+    cpu.mem[sym::PAGE2off] = cpu.reg.a;
+    cpu.mem[sym::RAMRDaux] = cpu.reg.a;
+    cpu.mem[sym::RAMWRTaux] = cpu.reg.a;
+    return;
 }
 
 #[doc(alias = "_inverty")]

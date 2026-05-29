@@ -35,7 +35,7 @@ pass 2.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .ir1 import (
@@ -783,23 +783,81 @@ def lift_file(
             # binding wins. That matches Merlin's pass-2 assemble order.
             label_to_instr_index[lab] = i
 
-    def _nearest_macro_label_before(start_idx: int, name: str) -> Line | None:
-        """Walk backwards from `start_idx` looking for `name` defined on
-        its own code line (`]rts rts` and similar). Returns the matching
-        `Line`, or `None` if nothing's found before the file start.
+    def _extract_local_block(
+        target: str, before_idx: int, defined: set[str]
+    ) -> list | None:
+        """Return the code block for local label `target`, resolved by its
+        nearest definition at or before `before_idx`: a `Label(target)`
+        followed by the lifted instructions through the block's terminator
+        (inclusive), surfacing any intervening labels so chained branches
+        resolve.
 
-        Used to attach the implicit `]rts:` trampoline that Merlin
-        routines branch to but don't define locally."""
-        scan = start_idx - 1
+        Merlin clusters routines after shared `]name` / `:name` helper
+        blocks that precede the entry points (e.g. `]no ldy #30 ... ]rts
+        rts`), and reuses the same `]name` for the next cluster — so
+        'nearest prior to the branch site' picks the binding actually in
+        effect. Returns `None` if no definition is found before
+        `before_idx` (the branch stays unresolved; the interpreter then
+        surfaces a clear error).
+
+        `defined` lists labels the routine already carries. If the block
+        falls through into one of them (commonly the shared `]rts:`
+        trailer that `]no` flows into when `]rts` was inlined separately),
+        stop and emit a local `Goto` to it rather than re-emitting the
+        label and its code — otherwise the routine would carry a duplicate
+        `Label` that downstream name-keyed passes silently collapse."""
+        def_idx = None
+        scan = before_idx - 1
         while scan >= 0:
             ln = lines[scan]
-            if ln.is_blank:
-                scan -= 1
-                continue
-            if ln.label == name and ln.mnemonic == "rts":
-                return ln
+            if not ln.is_blank and ln.label == target:
+                def_idx = scan
+                break
             scan -= 1
-        return None
+        if def_idx is None:
+            return None
+
+        out: list = []
+        emitted_instr = False
+        i = def_idx
+        while i < len(lines):
+            ln = lines[i]
+            if ln.is_blank:
+                i += 1
+                continue
+            ref = SourceRef(
+                file=str(ln.file),
+                line=ln.lineno,
+                raw=ln.raw.rstrip("\n"),
+            )
+            if ln.label and ln.label != target:
+                if ln.label in defined:
+                    # Fall-through into a block already present in the
+                    # routine — preserve the edge with a local jump, don't
+                    # duplicate the label/code.
+                    out.append(Goto(target=ln.label, kind="local", src=ref))
+                    return out
+                # Falling through into a new global-named routine ends the
+                # shared block (helper blocks end in their own terminator
+                # before the next entry, but defend against the rare
+                # fall-through).
+                if emitted_instr and not _is_local_label(ln.label):
+                    break
+            if ln.label:
+                out.append(Label(name=ln.label, src=ref))
+            if ln.mnemonic is None or ln.mnemonic in _NON_CODE_DIRECTIVES:
+                i += 1
+                continue
+            instr = _lift_instr(ln, equates, entry_set)
+            if instr is None:
+                i += 1
+                continue
+            out.append(instr)
+            emitted_instr = True
+            if ln.mnemonic in _TERMINATORS:
+                break
+            i += 1
+        return out
 
     def walk_from(start_idx: int, entry_labels: list[str]) -> Routine:
         # First label in source order is the canonical name.
@@ -855,6 +913,19 @@ def lift_file(
                 idx += 1
                 continue
 
+            # `*` is Merlin's location counter — the address of *this*
+            # instruction. `jmp *` is the classic deliberate hang and
+            # `beq *` a branch-to-self; both are tight self-loops, not
+            # calls to an external `*` symbol. Label this instruction and
+            # retarget the branch/jump at it so the relooper sees the
+            # back-edge.
+            if isinstance(instr, (Branch, Goto)) and instr.target == "*":
+                self_label = f":__self{line.lineno}"
+                routine.body.append(Label(name=self_label, src=instr.src))
+                instr = replace(instr, target=self_label)
+                if isinstance(instr, Goto):
+                    instr = replace(instr, kind="local")
+
             routine.body.append(instr)
             first = False
 
@@ -897,40 +968,52 @@ def lift_file(
 
         return routine
 
-    def _attach_macro_returns(routine: Routine, start_idx: int) -> None:
-        """Merlin's shared `]rts rts` trampolines live *before* a
-        routine's entry point, so the lifter doesn't naturally include
-        them in the body. If the routine branches to a macro label like
-        `]rts` and doesn't define it locally, synthesize the trampoline:
-        a `Label` + `Return` tail attached after the routine's last
-        terminator. Source-ref points at the original trampoline line
-        (or, if none was found, the routine's first instruction).
-        """
-        wanted: set[str] = set()
-        defined: set[str] = set()
-        for item in routine.body:
-            if isinstance(item, Label):
-                defined.add(item.name)
-            elif isinstance(item, Branch):
-                if item.target.startswith("]"):
-                    wanted.add(item.target)
-        needed = wanted - defined
-        if not needed:
-            return
-        for target in sorted(needed):
-            origin = _nearest_macro_label_before(start_idx, target)
-            if origin is None:
-                # No matching trampoline anywhere — leave the branch
-                # unresolved; the interpreter will surface a clear
-                # error pointing at the branch site.
-                continue
-            ref = SourceRef(
-                file=str(origin.file),
-                line=origin.lineno,
-                raw=origin.raw.rstrip("\n"),
-            )
-            routine.body.append(Label(name=target, src=ref))
-            routine.body.append(Return(src=ref))
+    def _attach_local_blocks(routine: Routine, start_idx: int) -> None:
+        """Inline shared local-label blocks the routine branches to but
+        doesn't define in its own body.
+
+        Merlin clusters routines after shared `]name` / `:name` helper
+        blocks that precede the entry points — e.g. `]no ldy #30 ... ]rts
+        rts` ahead of the `check*` cluster, branched to via `beq ]no`.
+        Those blocks aren't in the routine's sliced (`entry`…terminator)
+        body, so the branch target has no local `Label` and would degrade
+        to an external tail-call (a no-op stub in the crate). Resolve each
+        by nearest-prior definition and append its block.
+
+        Iterates to a fixpoint: an inlined block may branch to further
+        local labels (`]above`→`]rts`). The generalized `]rts rts` case
+        subsumes the old return-trampoline handling."""
+        for _ in range(64):  # fixpoint guard; chains are short in practice
+            defined = {it.name for it in routine.body if isinstance(it, Label)}
+            missing: list[str] = []
+            for item in routine.body:
+                tgt: str | None = None
+                if isinstance(item, Branch):
+                    tgt = item.target
+                elif isinstance(item, Goto) and item.kind == "local":
+                    tgt = item.target
+                if (tgt and _is_local_label(tgt)
+                        and tgt not in defined and tgt not in missing):
+                    missing.append(tgt)
+            if not missing:
+                return
+            progress = False
+            for target in missing:
+                if target in defined:
+                    # Defined by an earlier inline in this same pass (a
+                    # block that fell through into it) — don't inline again.
+                    continue
+                block = _extract_local_block(target, start_idx, defined)
+                if block:
+                    routine.body.extend(block)
+                    defined.update(
+                        it.name for it in block if isinstance(it, Label)
+                    )
+                    progress = True
+            if not progress:
+                # Remaining targets have no definition before the entry —
+                # leave them unresolved (interpreter surfaces a clear error).
+                return
 
     while requested:
         name = requested.pop(0)
@@ -990,7 +1073,7 @@ def lift_file(
                 ordered.append(extra)
 
         routine = walk_from(idx, ordered)
-        _attach_macro_returns(routine, idx)
+        _attach_local_blocks(routine, idx)
         module.routines.append(routine)
         for n in routine.all_entry_names():
             lifted_names.add(n)

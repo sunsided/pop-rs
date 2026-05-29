@@ -192,7 +192,8 @@ fn DRAWKID {
 :1:
   tail_call DrawNormal                ; GAMEBG.S:403
 ]rts:
-  return                           ; GAMEBG.S:328
+:rts:
+  return                           ; GAMEBG.S:386
 }
 
 fn DRAWSWORD {
@@ -845,6 +846,12 @@ fn :drawimg {
   *IMAGE@0x0004 = a            ; GAMEBG.S:657
   x = *xsave@0x00e8        ; GAMEBG.S:658
   goto :drawimg                ; GAMEBG.S:659
+:drawimg:
+  a = *(KidStrX@0x015d + x)   ; GAMEBG.S:553
+  *XCO@0x0001 = a            ; GAMEBG.S:554
+  a = *(KidStrOFF@0x015e + x)   ; GAMEBG.S:555
+  *OFFSET@0x0003 = a            ; GAMEBG.S:556
+  tail_call addmsg                ; GAMEBG.S:557
 }
 
 fn ]setch6 {

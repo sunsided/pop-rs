@@ -754,6 +754,10 @@ fn CHECKALERT {
   y = *KidBlockY@0x0055        ; MISC.S:976
   a = *KidScrn@0x005b        ; MISC.S:977
   tail_call rdblock                ; MISC.S:978
+]safe:
+  a = #0x00                  ; MISC.S:823
+  *EnemyAlert@0x00d1 = a            ; MISC.S:824
+  goto ]rts                ; MISC.S:825
 }
 
 fn DISPVERSION {

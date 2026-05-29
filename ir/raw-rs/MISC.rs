@@ -849,8 +849,7 @@ impl Cpu {
                     self.flags.z = self.reg.a == _o;
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a != 0x0c {
-                        self._5dsafe();
-                        return;
+                        pc = 36;
                     } else {
                         pc = 3;
                     }
@@ -858,8 +857,7 @@ impl Cpu {
                 3 => {
                     self.set_a(self.mem[sym::KidPosn]);
                     if self.reg.a == 0x00 {
-                        self._5dsafe();
-                        return;
+                        pc = 36;
                     } else {
                         pc = 4;
                     }
@@ -881,8 +879,7 @@ impl Cpu {
                     self.flags.z = self.reg.a == _o;
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a < 0xe5 {
-                        self._5dsafe();
-                        return;
+                        pc = 36;
                     } else {
                         pc = 6;
                     }
@@ -894,8 +891,7 @@ impl Cpu {
                     self.flags.z = self.reg.a == _o;
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a == 0x56 {
-                        self._5dsafe();
-                        return;
+                        pc = 36;
                     } else {
                         pc = 7;
                     }
@@ -904,8 +900,7 @@ impl Cpu {
                     self.set_a(self.mem[sym::KidLife]);
                     self.set_a(self.reg.a & self.mem[sym::ShadLife]);
                     if (self.reg.a as i8) >= 0 {
-                        self._5dsafe();
-                        return;
+                        pc = 36;
                     } else {
                         pc = 8;
                     }
@@ -917,8 +912,7 @@ impl Cpu {
                     self.flags.z = self.reg.a == _o;
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a != self.mem[sym::ShadScrn] {
-                        self._5dsafe();
-                        return;
+                        pc = 36;
                     } else {
                         pc = 9;
                     }
@@ -930,8 +924,7 @@ impl Cpu {
                     self.flags.z = self.reg.a == _o;
                     self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.a != self.mem[sym::ShadBlockY] {
-                        self._5dsafe();
-                        return;
+                        pc = 36;
                     } else {
                         pc = 10;
                     }
@@ -1190,6 +1183,11 @@ impl Cpu {
                     self.set_a(self.mem[sym::KidScrn]);
                     self.rdblock();
                     return;
+                }
+                36 => {
+                    self.set_a(0x00);
+                    self.mem[sym::EnemyAlert] = self.reg.a;
+                    pc = 34;
                 }
                 _ => unreachable!(),
             }

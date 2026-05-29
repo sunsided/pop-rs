@@ -84,49 +84,28 @@ pub fn copyscrnMM(cpu: &mut Cpu) {
 
 #[doc(alias = "_copy2000aux")]
 pub fn copyscrnAA(cpu: &mut Cpu) {
-    let mut pc: u32 = 0;
-    loop {
-        match pc {
-            0 => {
-                auxmem(cpu);
-                crate::ext::_5dcopyscrn(cpu);
-                return;
-            }
-            _ => unreachable!(),
-        }
-    }
+    auxmem(cpu);
+    COPYSCRN(cpu);
+    auxmem(cpu);
+    return;
 }
 
 #[doc(alias = "_copy2000ma")]
 pub fn copyscrnMA(cpu: &mut Cpu) {
-    let mut pc: u32 = 0;
-    loop {
-        match pc {
-            0 => {
-                cpu.mem[0xc002] = cpu.reg.a;
-                cpu.mem[0xc005] = cpu.reg.a;
-                crate::ext::_5dcopyscrn(cpu);
-                return;
-            }
-            _ => unreachable!(),
-        }
-    }
+    cpu.mem[0xc002] = cpu.reg.a;
+    cpu.mem[0xc005] = cpu.reg.a;
+    COPYSCRN(cpu);
+    auxmem(cpu);
+    return;
 }
 
 #[doc(alias = "_copy2000am")]
 pub fn copyscrnAM(cpu: &mut Cpu) {
-    let mut pc: u32 = 0;
-    loop {
-        match pc {
-            0 => {
-                cpu.mem[0xc003] = cpu.reg.a;
-                cpu.mem[0xc004] = cpu.reg.a;
-                crate::ext::_5dcopyscrn(cpu);
-                return;
-            }
-            _ => unreachable!(),
-        }
-    }
+    cpu.mem[0xc003] = cpu.reg.a;
+    cpu.mem[0xc004] = cpu.reg.a;
+    COPYSCRN(cpu);
+    auxmem(cpu);
+    return;
 }
 
 pub fn mainmem(cpu: &mut Cpu) {
@@ -1365,8 +1344,7 @@ pub fn LayMask(cpu: &mut Cpu) {
                 PREPREP(cpu);
                 CROP(cpu);
                 if cpu.flags.n {
-                    crate::ext::_5ddone(cpu);
-                    return;
+                    pc = 28;
                 } else {
                     pc = 1;
                 }
@@ -1592,6 +1570,10 @@ pub fn LayMask(cpu: &mut Cpu) {
                 pc = 2;
             }
             27 => {
+                DONE(cpu);
+                return;
+            }
+            28 => {
                 DONE(cpu);
                 return;
             }
@@ -3042,8 +3024,7 @@ pub fn SETFASTAUX(cpu: &mut Cpu) {
             0 => {
                 cpu.set_a(0x03);  // RAMRD aux
                 if cpu.reg.a != 0x00 {
-                    crate::ext::_5dsetfast(cpu);
-                    return;
+                    pc = 12;
                 } else {
                     pc = 1;
                 }
@@ -3125,6 +3106,14 @@ pub fn SETFASTAUX(cpu: &mut Cpu) {
                 }
             }
             11 => {
+                return;
+            }
+            12 => {
+                cpu.local.insert(("]ramrd1", 1), cpu.reg.a);
+                cpu.local.insert(("]ramrd2", 1), cpu.reg.a);
+                cpu.local.insert(("]ramrd3", 1), cpu.reg.a);
+                cpu.local.insert(("]ramrd4", 1), cpu.reg.a);
+                cpu.local.insert(("]ramrd5", 1), cpu.reg.a);
                 return;
             }
             _ => unreachable!(),

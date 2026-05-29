@@ -227,47 +227,26 @@ impl Cpu {
     }
 
     fn copyscrnAA(&mut self) {
-        let mut pc: u32 = 0;
-        loop {
-            match pc {
-                0 => {
-                    self.auxmem();
-                    self._5dcopyscrn();
-                    return;
-                }
-                _ => unreachable!(),
-            }
-        }
+        self.auxmem();
+        self.COPYSCRN();
+        self.auxmem();
+        return;
     }
 
     fn copyscrnMA(&mut self) {
-        let mut pc: u32 = 0;
-        loop {
-            match pc {
-                0 => {
-                    self.mem[0xc002] = self.reg.a;
-                    self.mem[0xc005] = self.reg.a;
-                    self._5dcopyscrn();
-                    return;
-                }
-                _ => unreachable!(),
-            }
-        }
+        self.mem[0xc002] = self.reg.a;
+        self.mem[0xc005] = self.reg.a;
+        self.COPYSCRN();
+        self.auxmem();
+        return;
     }
 
     fn copyscrnAM(&mut self) {
-        let mut pc: u32 = 0;
-        loop {
-            match pc {
-                0 => {
-                    self.mem[0xc003] = self.reg.a;
-                    self.mem[0xc004] = self.reg.a;
-                    self._5dcopyscrn();
-                    return;
-                }
-                _ => unreachable!(),
-            }
-        }
+        self.mem[0xc003] = self.reg.a;
+        self.mem[0xc004] = self.reg.a;
+        self.COPYSCRN();
+        self.auxmem();
+        return;
     }
 
     fn mainmem(&mut self) {
@@ -1506,8 +1485,7 @@ impl Cpu {
                     self.PREPREP();
                     self.CROP();
                     if self.flags.n {
-                        self._5ddone();
-                        return;
+                        pc = 28;
                     } else {
                         pc = 1;
                     }
@@ -1733,6 +1711,10 @@ impl Cpu {
                     pc = 2;
                 }
                 27 => {
+                    self.DONE();
+                    return;
+                }
+                28 => {
                     self.DONE();
                     return;
                 }
@@ -3181,8 +3163,7 @@ impl Cpu {
                 0 => {
                     self.set_a(0x03);  // RAMRD aux
                     if self.reg.a != 0x00 {
-                        self._5dsetfast();
-                        return;
+                        pc = 12;
                     } else {
                         pc = 1;
                     }
@@ -3264,6 +3245,14 @@ impl Cpu {
                     }
                 }
                 11 => {
+                    return;
+                }
+                12 => {
+                    self.local.insert(("]ramrd1", 1), self.reg.a);
+                    self.local.insert(("]ramrd2", 1), self.reg.a);
+                    self.local.insert(("]ramrd3", 1), self.reg.a);
+                    self.local.insert(("]ramrd4", 1), self.reg.a);
+                    self.local.insert(("]ramrd5", 1), self.reg.a);
                     return;
                 }
                 _ => unreachable!(),

@@ -1221,6 +1221,13 @@ fn MARKRED {
   if cs goto ]os       ; CTRLSUBS.S:1735
   *(redbuf@0x5e5a + y) = a   ; CTRLSUBS.S:1736
   return                           ; CTRLSUBS.S:1737
+]os:
+  cmp y, #0x0a              ; CTRLSUBS.S:1728
+  if cs goto ]rts       ; CTRLSUBS.S:1729
+  *(topbuf@0x5f2c + y) = a   ; CTRLSUBS.S:1730
+  c = 1                            ; CTRLSUBS.S:1731
+]rts:
+  return                           ; CTRLSUBS.S:1732
 }
 
 fn MARKFRED {
@@ -1255,18 +1262,39 @@ fn MARKMOVE {
   if cs goto ]os       ; CTRLSUBS.S:1760
   *(movebuf@0x5ed2 + y) = a   ; CTRLSUBS.S:1761
   return                           ; CTRLSUBS.S:1762
+]os:
+  cmp y, #0x0a              ; CTRLSUBS.S:1728
+  if cs goto ]rts       ; CTRLSUBS.S:1729
+  *(topbuf@0x5f2c + y) = a   ; CTRLSUBS.S:1730
+  c = 1                            ; CTRLSUBS.S:1731
+]rts:
+  return                           ; CTRLSUBS.S:1732
 }
 
 fn MARKFLOOR {
   if cs goto ]os       ; CTRLSUBS.S:1765
   *(floorbuf@0x5e96 + y) = a   ; CTRLSUBS.S:1766
   return                           ; CTRLSUBS.S:1767
+]os:
+  cmp y, #0x0a              ; CTRLSUBS.S:1728
+  if cs goto ]rts       ; CTRLSUBS.S:1729
+  *(topbuf@0x5f2c + y) = a   ; CTRLSUBS.S:1730
+  c = 1                            ; CTRLSUBS.S:1731
+]rts:
+  return                           ; CTRLSUBS.S:1732
 }
 
 fn MARKHALF {
   if cs goto ]os       ; CTRLSUBS.S:1770
   *(halfbuf@0x5e3c + y) = a   ; CTRLSUBS.S:1771
   return                           ; CTRLSUBS.S:1772
+]os:
+  cmp y, #0x0a              ; CTRLSUBS.S:1728
+  if cs goto ]rts       ; CTRLSUBS.S:1729
+  *(topbuf@0x5f2c + y) = a   ; CTRLSUBS.S:1730
+  c = 1                            ; CTRLSUBS.S:1731
+]rts:
+  return                           ; CTRLSUBS.S:1732
 }
 
 fn ZERORED {

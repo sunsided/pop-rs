@@ -1806,7 +1806,10 @@ impl Cpu {
 
     fn MARKRED(&mut self) {
         if self.flags.c {
-            self._5dos();
+            if self.reg.y >= 0x0a {
+                return;
+            }
+            self.mem[(sym::topbuf + self.reg.y as usize) & 0xffff] = self.reg.a;
             return;
         }
         self.mem[(sym::redbuf + self.reg.y as usize) & 0xffff] = self.reg.a;
@@ -1849,7 +1852,10 @@ impl Cpu {
 
     fn MARKMOVE(&mut self) {
         if self.flags.c {
-            self._5dos();
+            if self.reg.y >= 0x0a {
+                return;
+            }
+            self.mem[(sym::topbuf + self.reg.y as usize) & 0xffff] = self.reg.a;
             return;
         }
         self.mem[(sym::movebuf + self.reg.y as usize) & 0xffff] = self.reg.a;
@@ -1858,7 +1864,10 @@ impl Cpu {
 
     fn MARKFLOOR(&mut self) {
         if self.flags.c {
-            self._5dos();
+            if self.reg.y >= 0x0a {
+                return;
+            }
+            self.mem[(sym::topbuf + self.reg.y as usize) & 0xffff] = self.reg.a;
             return;
         }
         self.mem[(sym::floorbuf + self.reg.y as usize) & 0xffff] = self.reg.a;
@@ -1867,7 +1876,10 @@ impl Cpu {
 
     fn MARKHALF(&mut self) {
         if self.flags.c {
-            self._5dos();
+            if self.reg.y >= 0x0a {
+                return;
+            }
+            self.mem[(sym::topbuf + self.reg.y as usize) & 0xffff] = self.reg.a;
             return;
         }
         self.mem[(sym::halfbuf + self.reg.y as usize) & 0xffff] = self.reg.a;

@@ -104,7 +104,8 @@ fn NOT128K {
   y = #0x00                  ; BOOT.S:178
 :0:
   a = *(MEMTEXT@0x0079 + y)   ; BOOT.S:179
-  if a == #0x00 goto *  ; BOOT.S:180
+:__self180:
+  if eq goto :__self180       ; BOOT.S:180
   call cout                  ; BOOT.S:181
   cmp a, #0x8d              ; BOOT.S:182
   if a != #0x8d goto :1  ; BOOT.S:183

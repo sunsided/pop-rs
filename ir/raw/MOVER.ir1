@@ -200,6 +200,15 @@ GETSPIKES:
   a = #0x02                  ; MOVER.S:381
 ]rts:
   return                           ; MOVER.S:382
+]cont:
+  *trdirec@0xb640 = x            ; MOVER.S:335
+  *trloc@0xb600 = y            ; MOVER.S:336
+  a = *tempscrn@0x0093        ; MOVER.S:338
+  *trscrn@0xb620 = a            ; MOVER.S:339
+  call addtrob                  ; MOVER.S:341
+  call redspikes                  ; MOVER.S:342
+  a = #GateDown                  ; MOVER.S:344
+  tail_call addsound                ; MOVER.S:345
 }
 
 fn GETSPIKES {
@@ -404,6 +413,17 @@ fn trigger  (aka :loop) {
   if eq goto :loop       ; MOVER.S:535
 :rts:
   return                           ; MOVER.S:537
+:loop:
+  a = *(trloc@0xb600 + x)   ; MOVER.S:109
+  cmp a, *trloc@0xb600    ; MOVER.S:110
+  if ne goto :next       ; MOVER.S:111
+  a = *(trscrn@0xb620 + x)   ; MOVER.S:112
+  cmp a, *trscrn@0xb620    ; MOVER.S:113
+  if eq goto :rts       ; MOVER.S:114
+:next:
+  x -= 1                         ; MOVER.S:116
+  if ne goto :loop       ; MOVER.S:117
+  goto :rts                ; MOVER.S:119
 }
 
 fn trigobj {
@@ -851,6 +871,9 @@ fn animsword {
   tail_call redsword                ; MOVER.S:1055
 ]rts:
   return                           ; MOVER.S:1056
+]purge:
+:purge:
+  tail_call stopobj                ; MOVER.S:1035
 }
 
 fn animtorch {
@@ -865,6 +888,9 @@ fn animtorch {
   tail_call redtorch                ; MOVER.S:1075
 ]rts:
   return                           ; MOVER.S:1056
+]purge:
+:purge:
+  tail_call stopobj                ; MOVER.S:1035
 }
 
 fn GETFLAMEFRAME {
@@ -1064,6 +1090,17 @@ fn check {
   y = *trloc@0xb600        ; MOVER.S:1365
   cmp y, #0x1e              ; MOVER.S:1366
   return                           ; MOVER.S:1367
+]above:
+  cmp a, *scrnAbove@0x0033    ; MOVER.S:1346
+  if ne goto ]rts       ; MOVER.S:1347
+  a = *trloc@0xb600        ; MOVER.S:1349
+  c = 1                            ; MOVER.S:1350
+  a = a - #0x14 - (1 - c)        ; MOVER.S:1351
+  y = a                            ; MOVER.S:1352
+  c = 1                            ; MOVER.S:1354
+  return                           ; MOVER.S:1355
+]rts:
+  return                           ; MOVER.S:1344
 }
 
 fn checkleft {
@@ -1096,6 +1133,20 @@ fn checkleft {
   y = a                            ; MOVER.S:1403
   c = 0                            ; MOVER.S:1405
   return                           ; MOVER.S:1406
+]no:
+  y = #0x1e                  ; MOVER.S:1342
+  c = 1                            ; MOVER.S:1343
+]rts:
+  return                           ; MOVER.S:1344
+]above:
+  cmp a, *scrnAbove@0x0033    ; MOVER.S:1346
+  if ne goto ]rts       ; MOVER.S:1347
+  a = *trloc@0xb600        ; MOVER.S:1349
+  c = 1                            ; MOVER.S:1350
+  a = a - #0x14 - (1 - c)        ; MOVER.S:1351
+  y = a                            ; MOVER.S:1352
+  c = 1                            ; MOVER.S:1354
+  return                           ; MOVER.S:1355
 }
 
 fn checkright {
@@ -1134,6 +1185,15 @@ fn checkright {
   c = 1                            ; MOVER.S:1453
 ]rts:
   return                           ; MOVER.S:1454
+]above:
+  cmp a, *scrnAbove@0x0033    ; MOVER.S:1346
+  if ne goto ]rts       ; MOVER.S:1347
+  a = *trloc@0xb600        ; MOVER.S:1349
+  c = 1                            ; MOVER.S:1350
+  a = a - #0x14 - (1 - c)        ; MOVER.S:1351
+  y = a                            ; MOVER.S:1352
+  c = 1                            ; MOVER.S:1354
+  return                           ; MOVER.S:1355
 }
 
 fn checkabover {
@@ -1199,6 +1259,9 @@ fn checkabover {
   y = #0x14                  ; MOVER.S:1537
   c = 0                            ; MOVER.S:1538
   return                           ; MOVER.S:1539
+]no:
+  y = #0x1e                  ; MOVER.S:1452
+  c = 1                            ; MOVER.S:1453
 ]rts:
   return                           ; MOVER.S:1454
 }

@@ -243,6 +243,47 @@ fn ExpandClm  (aka :Loop) {
   cmp a, #0xc0              ; UNPACK.S:399
   if cc goto :Loop       ; UNPACK.S:400
   return                           ; UNPACK.S:402
+:Loop:
+  y = #0x00                  ; UNPACK.S:296
+  a = *(CrnDatPtr@0x00f0)[y]   ; UNPACK.S:297
+  cmp a, #0xff              ; UNPACK.S:298
+  if eq goto :Done       ; UNPACK.S:299
+  *ByteHld@0x00f4 = a            ; UNPACK.S:301
+  a = a & #0x80              ; UNPACK.S:302
+  if eq goto :ExpandOne       ; UNPACK.S:303
+  a = *ByteHld@0x00f4        ; UNPACK.S:305
+  a = a & #0x7f              ; UNPACK.S:306
+  if eq goto :NewCoord       ; UNPACK.S:307
+  x = a                            ; UNPACK.S:309
+  y = #0x01                  ; UNPACK.S:311
+  a = *(CrnDatPtr@0x00f0)[y]   ; UNPACK.S:312
+  call ExpClmSeq1                  ; UNPACK.S:313
+  c = 0                            ; UNPACK.S:315
+  a = *CrnDatPtr@0x00f0        ; UNPACK.S:316
+  a = a + #0x02 + c              ; UNPACK.S:317
+  *CrnDatPtr@0x00f0 = a            ; UNPACK.S:318
+  if cc goto :a4       ; UNPACK.S:319
+  *CrnDatPtr+1@0x00f1 += 1                         ; UNPACK.S:320
+  goto :a4                ; UNPACK.S:321
+:Done:
+  *RAMRDmain@0xc002 = a            ; UNPACK.S:356
+]rts:
+  return                           ; UNPACK.S:357
+:NewCoord:
+  y = #0x01                  ; UNPACK.S:325
+  a = *(CrnDatPtr@0x00f0)[y]   ; UNPACK.S:326
+  *XClmPos@0x00f2 = a            ; UNPACK.S:327
+  y = #0x02                  ; UNPACK.S:329
+  a = *(CrnDatPtr@0x00f0)[y]   ; UNPACK.S:330
+  *YScrPos@0x00f3 = a            ; UNPACK.S:331
+  c = 0                            ; UNPACK.S:333
+  a = *CrnDatPtr@0x00f0        ; UNPACK.S:334
+  a = a + #0x03 + c              ; UNPACK.S:335
+  *CrnDatPtr@0x00f0 = a            ; UNPACK.S:336
+  if cc goto :a7       ; UNPACK.S:337
+  *CrnDatPtr+1@0x00f1 += 1                         ; UNPACK.S:338
+:a7:
+  goto :Next                ; UNPACK.S:340
 }
 
 fn ExpClmSeq {
@@ -362,6 +403,13 @@ fn DELTAEXPPOP {
 fn DELTAEXPWIPE {
   *PAGE2off@0xc054 = a            ; UNPACK.S:532
   goto ]DE                ; UNPACK.S:533
+]DE:
+  call DeltaExp                  ; UNPACK.S:525
+  *PAGE2off@0xc054 = a            ; UNPACK.S:526
+  *RAMRDaux@0xc003 = a            ; UNPACK.S:527
+  *RAMWRTaux@0xc005 = a            ; UNPACK.S:528
+]rts:
+  return                           ; UNPACK.S:529
 }
 
 fn INVERTY {

@@ -1195,6 +1195,10 @@ fn MPLAY {
   call ]bank1in                  ; GRAFIX.S:1623
   call CALLMPLAY                  ; GRAFIX.S:1624
   goto ]bank2in                ; GRAFIX.S:1625
+]bank2in:
+  bit *RWBANK2@0xc083                ; GRAFIX.S:1619
+  bit *RWBANK2@0xc083                ; GRAFIX.S:1620
+  return                           ; GRAFIX.S:1621
 }
 
 fn XMINIT {
@@ -1265,6 +1269,10 @@ fn SAVEBLUE {
   y = #>$b700+$900                  ; GRAFIX.S:1701
   call movemem                  ; GRAFIX.S:1702
   goto ]bank2in                ; GRAFIX.S:1703
+]bank2in:
+  bit *RWBANK2@0xc083                ; GRAFIX.S:1619
+  bit *RWBANK2@0xc083                ; GRAFIX.S:1620
+  return                           ; GRAFIX.S:1621
 }
 
 fn SAVEBINFO {
@@ -1274,6 +1282,10 @@ fn SAVEBINFO {
   y = #>$a600+$600                  ; GRAFIX.S:1709
   call movemem                  ; GRAFIX.S:1710
   goto ]bank2in                ; GRAFIX.S:1711
+]bank2in:
+  bit *RWBANK2@0xc083                ; GRAFIX.S:1619
+  bit *RWBANK2@0xc083                ; GRAFIX.S:1620
+  return                           ; GRAFIX.S:1621
 }
 
 fn RELOADBLUE {
@@ -1283,6 +1295,10 @@ fn RELOADBLUE {
   y = #>$d700+$900                  ; GRAFIX.S:1722
   call movemem                  ; GRAFIX.S:1723
   goto ]bank2in                ; GRAFIX.S:1724
+]bank2in:
+  bit *RWBANK2@0xc083                ; GRAFIX.S:1619
+  bit *RWBANK2@0xc083                ; GRAFIX.S:1620
+  return                           ; GRAFIX.S:1621
 }
 
 fn RELOADBINFO {
@@ -1292,6 +1308,10 @@ fn RELOADBINFO {
   y = #>$d000+$600                  ; GRAFIX.S:1730
   call movemem                  ; GRAFIX.S:1731
   goto ]bank2in                ; GRAFIX.S:1732
+]bank2in:
+  bit *RWBANK2@0xc083                ; GRAFIX.S:1619
+  bit *RWBANK2@0xc083                ; GRAFIX.S:1620
+  return                           ; GRAFIX.S:1621
 }
 
 fn GR {

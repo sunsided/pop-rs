@@ -114,6 +114,7 @@ mod sym {
     pub const objX: usize = 0xb493;
     pub const objY: usize = 0xb4bb;
     pub const pptype: usize = 0x00f4;
+    pub const scrnAbove: usize = 0x0033;
     pub const scrnBelow: usize = 0x0034;
     pub const scrnBelowL: usize = 0x0035;
     pub const scrnLeft: usize = 0x0031;
@@ -333,11 +334,17 @@ impl Cpu {
     }
 
     fn JAMSPIKES(&mut self) {
-        self.set_a(0xff);
-        self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = self.reg.a;
+        self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = 0xff;
         self.set_x(0xff);  // stop object
         if (self.reg.x as i8) < 0 {
-            self._5dcont();
+            self.mem[sym::trdirec] = self.reg.x;
+            self.mem[sym::trloc] = self.reg.y;
+            self.set_a(self.mem[sym::tempscrn]);
+            self.mem[sym::trscrn] = self.reg.a;
+            self.addtrob();
+            self.redspikes();
+            self.set_a(0x02);  // TEMP
+            self.addsound();
             return;
         }
         self.set_a(self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
@@ -617,34 +624,96 @@ impl Cpu {
 
     // aliases: :loop
     fn trigger(&mut self) {
-        self.set_x(self.mem[sym::linkindex]);
-        self.set_a(self.mem[(sym::LINKLOC + self.reg.x as usize) & 0xffff]);
-        if self.reg.a == 0xff {
-            return;
+        let mut pc: u32 = 0;
+        loop {
+            match pc {
+                0 => {
+                    self.set_x(self.mem[sym::linkindex]);
+                    self.set_a(self.mem[(sym::LINKLOC + self.reg.x as usize) & 0xffff]);
+                    let _o: u8 = 0xff;
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if self.reg.a == 0xff {
+                        pc = 4;
+                    } else {
+                        pc = 1;
+                    }
+                }
+                1 => {
+                    self.getloc();
+                    self.mem[sym::trloc] = self.reg.a;
+                    self.getscrn();
+                    self.mem[sym::trscrn] = self.reg.a;
+                    self.calcblue();
+                    self.set_y(self.mem[sym::trloc]);
+                    self.set_a(self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
+                    self.set_a(self.reg.a & 0x1f);
+                    self.trigobj();
+                    self.set_a(self.mem[sym::trdirec]);
+                    if (self.reg.a as i8) < 0 {
+                        pc = 3;
+                    } else {
+                        pc = 2;
+                    }
+                }
+                2 => {
+                    self.addtrob();
+                    pc = 3;
+                }
+                3 => {
+                    self.set_x(self.mem[sym::linkindex]);
+                    let _v = self.mem[sym::linkindex].wrapping_add(1);
+                    self.mem[sym::linkindex] = _v;
+                    self.set_nz(_v);
+                    self.getlastflag();
+                    if self.flags.z {
+                        pc = 5;
+                    } else {
+                        pc = 4;
+                    }
+                }
+                4 => {
+                    return;
+                }
+                5 => {
+                    self.set_a(self.mem[(sym::trloc + self.reg.x as usize) & 0xffff]);
+                    let _o: u8 = self.mem[sym::trloc];
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if self.reg.a != self.mem[sym::trloc] {
+                        pc = 7;
+                    } else {
+                        pc = 6;
+                    }
+                }
+                6 => {
+                    self.set_a(self.mem[(sym::trscrn + self.reg.x as usize) & 0xffff]);
+                    let _o: u8 = self.mem[sym::trscrn];
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if self.reg.a == self.mem[sym::trscrn] {
+                        pc = 4;
+                    } else {
+                        pc = 7;
+                    }
+                }
+                7 => {
+                    self.set_x(self.reg.x.wrapping_sub(1));
+                    if self.reg.x != 0x00 {
+                        pc = 5;
+                    } else {
+                        pc = 8;
+                    }
+                }
+                8 => {
+                    pc = 4;
+                }
+                _ => unreachable!(),
+            }
         }
-        self.getloc();
-        self.mem[sym::trloc] = self.reg.a;
-        self.getscrn();
-        self.mem[sym::trscrn] = self.reg.a;
-        self.calcblue();
-        self.set_y(self.mem[sym::trloc]);
-        self.set_a(self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
-        self.set_a(self.reg.a & 0x1f);
-        self.trigobj();
-        self.set_a(self.mem[sym::trdirec]);
-        if (self.reg.a as i8) >= 0 {
-            self.addtrob();
-        }
-        self.set_x(self.mem[sym::linkindex]);
-        let _v = self.mem[sym::linkindex].wrapping_add(1);
-        self.mem[sym::linkindex] = _v;
-        self.set_nz(_v);
-        self.getlastflag();
-        if self.flags.z {
-            self.trigger();
-            return;
-        }
-        return;
     }
 
     fn trigobj(&mut self) {
@@ -1353,7 +1422,7 @@ impl Cpu {
     fn animsword(&mut self) {
         self.set_a(self.mem[sym::trscrn]);
         if self.reg.a != self.mem[sym::VisScrn] {
-            self._5dpurge();
+            self.stopobj();
             return;
         }
         let _v = self.mem[sym::state].wrapping_sub(1);
@@ -1381,7 +1450,7 @@ impl Cpu {
         }
         self.set_a(self.mem[sym::trscrn]);
         if self.reg.a != self.mem[sym::VisScrn] {
-            self._5dpurge();
+            self.stopobj();
             return;
         }
         self.set_a(self.mem[sym::state]);
@@ -1628,7 +1697,15 @@ impl Cpu {
     fn check(&mut self) {
         self.set_a(self.mem[sym::trscrn]);
         if self.reg.a != self.mem[sym::VisScrn] {
-            self._5dabove();
+            if self.reg.a != self.mem[sym::scrnAbove] {
+                return;
+            }
+            self.set_a(self.mem[sym::trloc]);
+            self.flags.c = true;
+            let _r = (self.reg.a as u16) + (!0x14_u8) as u16 + (self.flags.c as u16);
+            self.flags.c = (_r >> 8) != 0;
+            self.set_a(_r as u8);
+            self.set_y(self.reg.a);
             return;
         }
         self.set_y(self.mem[sym::trloc]);
@@ -1637,23 +1714,50 @@ impl Cpu {
 
     fn checkleft(&mut self) {
         self.set_a(self.mem[sym::trscrn]);
+        let _o: u8 = self.mem[sym::VisScrn];
+        self.flags.c = self.reg.a >= _o;
+        self.flags.z = self.reg.a == _o;
+        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
         if self.reg.a != self.mem[sym::VisScrn] {
+            let _o: u8 = self.mem[sym::scrnRight];
+            self.flags.c = self.reg.a >= _o;
+            self.flags.z = self.reg.a == _o;
+            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
             if self.reg.a != self.mem[sym::scrnRight] {
-                self._5dabove();
+                let _o: u8 = self.mem[sym::scrnAbove];
+                self.flags.c = self.reg.a >= _o;
+                self.flags.z = self.reg.a == _o;
+                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                if self.reg.a != self.mem[sym::scrnAbove] {
+                    return;
+                }
+                self.set_a(self.mem[sym::trloc]);
+                self.flags.c = true;
+                let _r = (self.reg.a as u16) + (!0x14_u8) as u16 + (self.flags.c as u16);
+                self.flags.c = (_r >> 8) != 0;
+                self.set_a(_r as u8);
+                self.set_y(self.reg.a);
+                self.flags.c = true;
                 return;
             }
             self.set_y(self.mem[sym::trloc]);
-            match self.reg.y {
-                0x00 | 0x0a | 0x14 => {
-                    self.set_a(self.reg.y);
-                    self.flags.c = false;
-                    let _r = (self.reg.a as u16) + (0x09) as u16 + (self.flags.c as u16);
-                    self.flags.c = (_r >> 8) != 0;
-                    self.set_a(_r as u8);
-                    self.set_y(self.reg.a);
-                    return;
+            let _o: u8 = 0x00;
+            self.flags.c = self.reg.y >= _o;
+            self.flags.z = self.reg.y == _o;
+            self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
+            if self.reg.y != 0x00 {
+                let _o: u8 = 0x0a;
+                self.flags.c = self.reg.y >= _o;
+                self.flags.z = self.reg.y == _o;
+                self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
+                if self.reg.y != 0x0a {
+                    let _o: u8 = 0x14;
+                    self.flags.c = self.reg.y >= _o;
+                    self.flags.z = self.reg.y == _o;
+                    self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
+                    if self.reg.y != 0x14 {
+                    }
                 }
-                _ => {}
             }
             self.set_a(self.reg.y);
             self.flags.c = false;
@@ -1661,38 +1765,79 @@ impl Cpu {
             self.flags.c = (_r >> 8) != 0;
             self.set_a(_r as u8);
             self.set_y(self.reg.a);
+            self.flags.c = false;
             return;
         }
-        match self.reg.y {
-            0x00 => {
-                self._5dno();
-                return;
+        let _o: u8 = 0x00;
+        self.flags.c = self.reg.y >= _o;
+        self.flags.z = self.reg.y == _o;
+        self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
+        if self.reg.y != 0x00 {
+            let _o: u8 = 0x0a;
+            self.flags.c = self.reg.y >= _o;
+            self.flags.z = self.reg.y == _o;
+            self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
+            if self.reg.y != 0x0a {
+                let _o: u8 = 0x14;
+                self.flags.c = self.reg.y >= _o;
+                self.flags.z = self.reg.y == _o;
+                self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
+                if self.reg.y != 0x14 {
+                    self.set_y(self.reg.y.wrapping_sub(1));
+                    self.flags.c = false;
+                    return;
+                }
             }
-            0x0a => {
-                self._5dno();
-                return;
-            }
-            0x14 => {
-                self._5dno();
-                return;
-            }
-            _ => {}
         }
-        self.set_y(self.reg.y.wrapping_sub(1));
+        self.set_y(0x1e);
+        self.flags.c = true;
         return;
     }
 
     fn checkright(&mut self) {
         'b10: {
             self.set_a(self.mem[sym::trscrn]);
+            let _o: u8 = self.mem[sym::VisScrn];
+            self.flags.c = self.reg.a >= _o;
+            self.flags.z = self.reg.a == _o;
+            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
             if self.reg.a != self.mem[sym::VisScrn] {
+                let _o: u8 = self.mem[sym::scrnLeft];
+                self.flags.c = self.reg.a >= _o;
+                self.flags.z = self.reg.a == _o;
+                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if self.reg.a != self.mem[sym::scrnLeft] {
-                    self._5dabove();
+                    let _o: u8 = self.mem[sym::scrnAbove];
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if self.reg.a != self.mem[sym::scrnAbove] {
+                        return;
+                    }
+                    self.set_a(self.mem[sym::trloc]);
+                    self.flags.c = true;
+                    let _r = (self.reg.a as u16) + (!0x14_u8) as u16 + (self.flags.c as u16);
+                    self.flags.c = (_r >> 8) != 0;
+                    self.set_a(_r as u8);
+                    self.set_y(self.reg.a);
+                    self.flags.c = true;
                     return;
                 }
                 self.set_y(self.mem[sym::trloc]);
+                let _o: u8 = 0x09;
+                self.flags.c = self.reg.y >= _o;
+                self.flags.z = self.reg.y == _o;
+                self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
                 if self.reg.y != 0x09 {
+                    let _o: u8 = 0x13;
+                    self.flags.c = self.reg.y >= _o;
+                    self.flags.z = self.reg.y == _o;
+                    self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.y != 0x13 {
+                        let _o: u8 = 0x1d;
+                        self.flags.c = self.reg.y >= _o;
+                        self.flags.z = self.reg.y == _o;
+                        self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
                         if self.reg.y != 0x1d {
                             break 'b10;
                         }
@@ -1704,58 +1849,74 @@ impl Cpu {
                 self.flags.c = (_r >> 8) != 0;
                 self.set_a(_r as u8);
                 self.set_y(self.reg.a);
+                self.flags.c = false;
                 return;
             }
             self.set_y(self.mem[sym::trloc]);
+            let _o: u8 = 0x09;
+            self.flags.c = self.reg.y >= _o;
+            self.flags.z = self.reg.y == _o;
+            self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
             if self.reg.y != 0x09 {
+                let _o: u8 = 0x13;
+                self.flags.c = self.reg.y >= _o;
+                self.flags.z = self.reg.y == _o;
+                self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
                 if self.reg.y != 0x13 {
+                    let _o: u8 = 0x1d;
+                    self.flags.c = self.reg.y >= _o;
+                    self.flags.z = self.reg.y == _o;
+                    self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
                     if self.reg.y != 0x1d {
                         self.set_y(self.reg.y.wrapping_add(1));
+                        self.flags.c = false;
                         return;
                     }
                 }
             }
         }
         self.set_y(0x1e);
+        self.flags.c = true;
         return;
     }
 
     fn checkabover(&mut self) {
-        self.set_a(self.mem[sym::trscrn]);
-        if self.reg.a != self.mem[sym::VisScrn] {
-            if self.reg.a != self.mem[sym::scrnLeft] {
-                if self.reg.a != self.mem[sym::scrnBelow] {
-                    if self.reg.a != self.mem[sym::scrnBelowL] {
-                        return;
+        'b18: {
+            self.set_a(self.mem[sym::trscrn]);
+            if self.reg.a != self.mem[sym::VisScrn] {
+                if self.reg.a != self.mem[sym::scrnLeft] {
+                    if self.reg.a != self.mem[sym::scrnBelow] {
+                        if self.reg.a != self.mem[sym::scrnBelowL] {
+                            return;
+                        }
+                        self.set_y(self.mem[sym::trloc]);
+                        if self.reg.y == 0x09 {
+                            self.set_y(0x14);
+                            return;
+                        }
+                    } else {
+                        self.set_y(self.mem[sym::trloc]);
+                        if self.reg.y < 0x09 {
+                            self.set_a(self.reg.y);
+                            self.flags.c = false;
+                            let _r = (self.reg.a as u16) + (0x15) as u16 + (self.flags.c as u16);
+                            self.flags.c = (_r >> 8) != 0;
+                            self.set_a(_r as u8);
+                            self.set_y(self.reg.a);
+                            return;
+                        }
                     }
+                } else {
                     self.set_y(self.mem[sym::trloc]);
-                    if self.reg.y != 0x09 {
-                        self._5dno();
+                    if self.reg.y == 0x09 {
+                        self.set_y(0x00);
                         return;
                     }
-                    self.set_y(0x14);
-                    return;
-                }
-                self.set_y(self.mem[sym::trloc]);
-                if self.reg.y >= 0x09 {
-                    self._5dno();
-                    return;
-                }
-                self.set_a(self.reg.y);
-                self.flags.c = false;
-                let _r = (self.reg.a as u16) + (0x15) as u16 + (self.flags.c as u16);
-                self.flags.c = (_r >> 8) != 0;
-                self.set_a(_r as u8);
-                self.set_y(self.reg.a);
-                return;
-            }
-            self.set_y(self.mem[sym::trloc]);
-            if self.reg.y == 0x09 {
-                self.set_y(0x00);
-                return;
-            }
-            match self.reg.y {
-                0x13 | 0x1d => {
+                    if self.reg.y != 0x13 {
+                        if self.reg.y != 0x1d {
+                            break 'b18;
+                        }
+                    }
                     self.set_a(self.reg.y);
                     self.flags.c = true;
                     let _r = (self.reg.a as u16) + (!0x13_u8) as u16 + (self.flags.c as u16);
@@ -1764,33 +1925,26 @@ impl Cpu {
                     self.set_y(self.reg.a);
                     return;
                 }
-                _ => {}
+            } else {
+                self.set_y(self.mem[sym::trloc]);
+                if self.reg.y < 0x0a {
+                    self.set_y(self.reg.y.wrapping_add(1));
+                    return;
+                }
+                if self.reg.y != 0x13 {
+                    if self.reg.y != 0x1d {
+                        self.set_a(self.reg.y);
+                        self.flags.c = true;
+                        let _r = (self.reg.a as u16) + (!0x09_u8) as u16 + (self.flags.c as u16);
+                        self.flags.c = (_r >> 8) != 0;
+                        self.set_a(_r as u8);
+                        self.set_y(self.reg.a);
+                        return;
+                    }
+                }
             }
-            self._5dno();
-            return;
         }
-        self.set_y(self.mem[sym::trloc]);
-        if self.reg.y < 0x0a {
-            self.set_y(self.reg.y.wrapping_add(1));
-            return;
-        }
-        match self.reg.y {
-            0x13 => {
-                self._5dno();
-                return;
-            }
-            0x1d => {
-                self._5dno();
-                return;
-            }
-            _ => {}
-        }
-        self.set_a(self.reg.y);
-        self.flags.c = true;
-        let _r = (self.reg.a as u16) + (!0x09_u8) as u16 + (self.flags.c as u16);
-        self.flags.c = (_r >> 8) != 0;
-        self.set_a(_r as u8);
-        self.set_y(self.reg.a);
+        self.set_y(0x1e);
         return;
     }
 

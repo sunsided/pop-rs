@@ -61,18 +61,27 @@ fn copyscrnMM {
 fn copyscrnAA {
   call auxmem                  ; HIRES.S:131
   goto ]copyscrn                ; HIRES.S:132
+]copyscrn:
+  call COPYSCRN                  ; HIRES.S:127
+  tail_call auxmem                ; HIRES.S:128
 }
 
 fn copyscrnMA {
   *$c002@0xc002 = a            ; HIRES.S:135
   *$c005@0xc005 = a            ; HIRES.S:136
   goto ]copyscrn                ; HIRES.S:137
+]copyscrn:
+  call COPYSCRN                  ; HIRES.S:127
+  tail_call auxmem                ; HIRES.S:128
 }
 
 fn copyscrnAM {
   *$c003@0xc003 = a            ; HIRES.S:140
   *$c004@0xc004 = a            ; HIRES.S:141
   goto ]copyscrn                ; HIRES.S:142
+]copyscrn:
+  call COPYSCRN                  ; HIRES.S:127
+  tail_call auxmem                ; HIRES.S:128
 }
 
 fn mainmem {
@@ -654,6 +663,8 @@ fn LayMask {
   goto :nextline                ; HIRES.S:996
 :done:
   tail_call DONE                ; HIRES.S:998
+]done:
+  tail_call DONE                ; HIRES.S:831
 }
 
 fn LayXOR {
@@ -1446,6 +1457,13 @@ FASTBLACK:
   cmp x, #0xff              ; HIRES.S:2045
   if ne goto :outloop       ; HIRES.S:2046
   return                           ; HIRES.S:2048
+]setfast:
+  patch *]ramrd1+1 = a            ; HIRES.S:1983
+  patch *]ramrd2+1 = a            ; HIRES.S:1984
+  patch *]ramrd3+1 = a            ; HIRES.S:1985
+  patch *]ramrd4+1 = a            ; HIRES.S:1986
+  patch *]ramrd5+1 = a            ; HIRES.S:1987
+  return                           ; HIRES.S:1988
 }
 
 fn FASTBLACK {
