@@ -8,13 +8,13 @@ from pop_lifter.pass0_parse import parse_files
 
 # Reasons we expect a Pass 0 diagnostic on a given source location. The
 # location-counter equates (`*`-relative / label-difference table sizes)
-# that used to land here now resolve via PC tracking; what remains is one
-# genuinely-undefined symbol and two conditional `put` includes that are
-# not present in this build configuration.
+# that used to land here now resolve via PC tracking. The two conditional
+# `put ryellow1` / `put purple` includes that used to fail here are inside
+# disabled `do ThreeFive ... else` blocks (ThreeFive=1), so conditional
+# assembly now excludes them before any resolution is attempted — what
+# remains is one genuinely-undefined symbol.
 _EXPECTED_DIAGNOSTICS = {
-    ("GAMEBG.S", 0, "could not resolve `put ryellow1`"),
     ("MISC.S", 150, "equate eval failed: undefined symbol: MOVEMEM"),
-    ("UNPACK.S", 0, "could not resolve `put purple`"),
 }
 
 

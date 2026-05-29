@@ -72,8 +72,8 @@ impl Cpu {
 
 #[allow(non_upper_case_globals)]
 mod sym {
-    pub const lookup: usize = 0x02f2;
-    pub const savex: usize = 0x02f1;
+    pub const lookup: usize = 0x02f1;
+    pub const savex: usize = 0x02f0;
     pub const soundon: usize = 0x0203;
     pub const soundtable: usize = 0xb6c0;
     pub const spkr: usize = 0xc030;

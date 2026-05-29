@@ -7,14 +7,14 @@ fn ZEROSOUND  (aka lookup, endlook) {
 }
 
 fn ADDSOUND {
-  *savex@0x02f1 = x            ; SOUND.S:80
+  *savex@0x02f0 = x            ; SOUND.S:80
   x = *soundtable@0xb6c0        ; SOUND.S:82
   if x >= #maxsfx goto :rts  ; SOUND.S:84
   x += 1                         ; SOUND.S:86
   *(soundtable@0xb6c0 + x) = a   ; SOUND.S:87
   *soundtable@0xb6c0 = x            ; SOUND.S:88
 :rts:
-  x = *savex@0x02f1        ; SOUND.S:90
+  x = *savex@0x02f0        ; SOUND.S:90
   return                           ; SOUND.S:91
 }
 
@@ -25,9 +25,9 @@ fn PLAYBACK {
   if x == #0x00 goto :rts  ; SOUND.S:105
 :loop:
   a = *(soundtable@0xb6c0 + x)   ; SOUND.S:107
-  *savex@0x02f1 = x            ; SOUND.S:109
+  *savex@0x02f0 = x            ; SOUND.S:109
   call makesound                  ; SOUND.S:111
-  x = *savex@0x02f1        ; SOUND.S:113
+  x = *savex@0x02f0        ; SOUND.S:113
   x -= 1                         ; SOUND.S:115
   if x != #0x00 goto :loop  ; SOUND.S:116
 :rts:
@@ -38,9 +38,9 @@ fn makesound {
   a = a << 1                       ; SOUND.S:128
   if a >= #maxaddr goto :rts  ; SOUND.S:130
   x = a                            ; SOUND.S:132
-  a = *(lookup@0x02f2 + x)   ; SOUND.S:133
+  a = *(lookup@0x02f1 + x)   ; SOUND.S:133
   patch *:sm+1 = a            ; SOUND.S:134
-  a = *(lookup+1@0x02f3 + x)   ; SOUND.S:135
+  a = *(lookup+1@0x02f2 + x)   ; SOUND.S:135
   patch *:sm+2 = a            ; SOUND.S:136
 :sm:
   tail_call $ffff                ; SOUND.S:138

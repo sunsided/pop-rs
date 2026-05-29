@@ -666,7 +666,7 @@ fn animexit {
 :2:
   a = *state@0x00f0        ; MOVER.S:815
   c = 1                            ; MOVER.S:816
-  a = a - *(gatevel@0x0272 + x) - (1 - c)   ; MOVER.S:817
+  a = a - *(gatevel@0x0271 + x) - (1 - c)   ; MOVER.S:817
   *state@0x00f0 = a            ; MOVER.S:818
   if eq goto :cont       ; MOVER.S:819
   if cs goto :cont       ; MOVER.S:820
@@ -687,7 +687,7 @@ fn animgate {
   cmp a, #0xff              ; MOVER.S:845
   if a == #0xff goto :stop  ; MOVER.S:846
   c = 0                            ; MOVER.S:847
-  a = a + *(gateinc@0x0273 + x) + c   ; MOVER.S:848
+  a = a + *(gateinc@0x0272 + x) + c   ; MOVER.S:848
   *state@0x00f0 = a            ; MOVER.S:849
   cmp x, #0x00              ; MOVER.S:851
   if x == #0x00 goto :goingdown  ; MOVER.S:852
@@ -731,7 +731,7 @@ fn animgate {
 :2:
   a = *state@0x00f0        ; MOVER.S:907
   c = 1                            ; MOVER.S:908
-  a = a - *(gatevel@0x0272 + x) - (1 - c)   ; MOVER.S:909
+  a = a - *(gatevel@0x0271 + x) - (1 - c)   ; MOVER.S:909
   *state@0x00f0 = a            ; MOVER.S:910
   if eq goto :cont       ; MOVER.S:911
   if cs goto :cont       ; MOVER.S:912
@@ -1389,8 +1389,6 @@ fn knockloose {
 fn makespace {
   a = #space                  ; MOVER.S:1789
   *(BlueType@0x0024)[y] = a   ; MOVER.S:1790
-  a = #0x01                  ; MOVER.S:1793
-  return                           ; MOVER.S:1794
   a = #0x00                  ; MOVER.S:1797
   x = *BGset1@0x0303        ; MOVER.S:1798
   if x != #0x01 goto ]rts  ; MOVER.S:1800

@@ -1053,7 +1053,7 @@ pub fn FADEIN(cpu: &mut Cpu) {
     cpu.mem[0xc029] = cpu.reg.a;
     // 65816 (IIgs-only, not modeled): rep $20  ; UNPACK.S:722
     cpu.set_x(0x00);  // aux mem
-    cpu.set_y(0xca);
+    cpu.set_y(0xc8);
     cpu.set_a(0x1f);
     // 65816 (IIgs-only, not modeled): phb  ; UNPACK.S:729
     // 65816 (IIgs-only, not modeled): mvn 0,1  ; UNPACK.S:730

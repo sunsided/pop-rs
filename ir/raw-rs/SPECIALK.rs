@@ -76,28 +76,23 @@ impl Cpu {
 
 #[allow(non_upper_case_globals)]
 mod sym {
-    pub const AMtimer: usize = 0x00c7;
     pub const BBundID: usize = 0x03f5;
     pub const BOTCUT: usize = 0x0013;
     pub const BlockBot: usize = 0x1279;
     pub const BlueSpec: usize = 0x0026;
     pub const BlueType: usize = 0x0024;
-    pub const ChgKidStr: usize = 0x00cf;
     pub const ChgOppStr: usize = 0x00d2;
     pub const FrameCount: usize = 0x0306;
     pub const JSTKX: usize = 0x0018;
     pub const JSTKY: usize = 0x0019;
-    pub const KidBlockY: usize = 0x0055;
     pub const KidLife: usize = 0x005f;
-    pub const KidY: usize = 0x0052;
-    pub const ManCtrl: usize = 0x00de;
+    pub const MaxKidStr: usize = 0x00d0;
     pub const MinLeft: usize = 0x0300;
     pub const NextLevel: usize = 0x031c;
     pub const NextTimeMsg: usize = 0x0301;
     pub const OFFSET: usize = 0x0003;
-    pub const PAGE: usize = 0x0000;
+    pub const OppStrength: usize = 0x00cc;
     pub const SINGSTEP: usize = 0x0021;
-    pub const SPEED: usize = 0x030c;
     pub const SavLevel: usize = 0xb6f0;
     pub const SecLeft: usize = 0x0302;
     pub const SongCount: usize = 0x0308;
@@ -105,7 +100,6 @@ mod sym {
     pub const VisScrn: usize = 0x00cb;
     pub const XCO: usize = 0x0001;
     pub const YCO: usize = 0x0002;
-    pub const blackflag: usize = 0x0022;
     pub const btn: usize = 0x003d;
     pub const clrB: usize = 0x00d5;
     pub const clrD: usize = 0x00d7;
@@ -116,7 +110,9 @@ mod sym {
     pub const clrbtn: usize = 0x00d8;
     pub const develment: usize = 0x020e;
     pub const fredbuf: usize = 0x5e78;
-    pub const guardprog: usize = 0x00dd;
+    pub const jhoriz: usize = 0x020b;
+    pub const joyon: usize = 0x020d;
+    pub const jvert: usize = 0x020a;
     pub const kbdX: usize = 0x0039;
     pub const kbdY: usize = 0x003a;
     pub const keybuf: usize = 0x03ac;
@@ -125,15 +121,17 @@ mod sym {
     pub const keypress: usize = 0x020f;
     pub const level: usize = 0x03f4;
     pub const msgtimer: usize = 0x00db;
-    pub const redrawflg: usize = 0x0097;
+    pub const musicon: usize = 0x031a;
+    pub const origstrength: usize = 0x00e1;
+    pub const soundon: usize = 0x0203;
     pub const soundtable: usize = 0xb6c0;
     pub const timerequest: usize = 0x031f;
-    pub const timetable: usize = 0x0332;
-    pub const torchclip: usize = 0x032d;
-    pub const torchcount: usize = 0x032e;
-    pub const torchstate: usize = 0x032c;
-    pub const torchx: usize = 0x032a;
-    pub const torchy: usize = 0x032b;
+    pub const timetable: usize = 0x0331;
+    pub const torchclip: usize = 0x032c;
+    pub const torchcount: usize = 0x032d;
+    pub const torchstate: usize = 0x032b;
+    pub const torchx: usize = 0x0329;
+    pub const torchy: usize = 0x032a;
 }
 
 impl Cpu {
@@ -204,73 +202,13 @@ impl Cpu {
         if (self.reg.a as i8) >= 0 {
             return;
         }
-        'b13: {
-            self.set_x(self.mem[sym::develment]);
-            if self.reg.x != 0x00 {
-                let _o: u8 = 0x30;
-                self.flags.c = self.reg.a >= _o;
-                self.flags.z = self.reg.a == _o;
-                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                if self.reg.a >= 0x30 {
-                    let _o: u8 = 0x3a;
-                    self.flags.c = self.reg.a >= _o;
-                    self.flags.z = self.reg.a == _o;
-                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                    if self.reg.a < 0x3a {
-                        self.set_a(0x1a);
-                        self.set_x(0x03);
-                        self.checkcode();
-                        if !self.flags.z {
-                            self.set_a(0x1b);
-                            self.set_x(0x03);
-                            self.checkcode();
-                            if !self.flags.z {
-                                break 'b13;
-                            } else {
-                                self.set_a(0x0a);
-                                if self.reg.a == 0x00 {
-                                    break 'b13;
-                                }
-                            }
-                        } else {
-                            self.set_a(0x00);  // 1st digit
-                        }
-                        self.flags.c = false;
-                        let _r = (self.reg.a as u16) + self.mem[sym::keypress] as u16 + (self.flags.c as u16);
-                        self.flags.c = (_r >> 8) != 0;
-                        self.set_a(_r as u8);
-                        self.flags.c = true;
-                        let _r = (self.reg.a as u16) + (!0x30_u8) as u16 + (self.flags.c as u16);
-                        self.flags.c = (_r >> 8) != 0;
-                        self.set_a(_r as u8);
-                        let _o: u8 = 0x04;
-                        self.flags.c = self.reg.a >= _o;
-                        self.flags.z = self.reg.a == _o;
-                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                        if self.reg.a < 0x04 {
-                            return;
-                        }
-                        let _o: u8 = 0x0d;
-                        self.flags.c = self.reg.a >= _o;
-                        self.flags.z = self.reg.a == _o;
-                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                        if self.reg.a >= 0x0d {
-                            return;
-                        }
-                        self.mem[sym::NextLevel] = self.reg.a;
-                        self.shortentime();
-                        return;
-                    }
-                }
-            }
-        }
         self.set_a(self.mem[sym::keypress]);
         self.addkey();
-        self.set_a(0x19);
+        self.set_a(0x18);
         self.set_x(0x03);
         self.checkcode();
         if !self.flags.z {
-            self.set_a(0x18);
+            self.set_a(0x17);
             self.set_x(0x03);
             self.checkcode();
             if self.flags.z {
@@ -279,10 +217,6 @@ impl Cpu {
                 if self.reg.x != 0x00 {
                     self.set_a(0x0b);  // or level 12 in cheat mode
                 }
-                let _o: u8 = self.mem[sym::level];
-                self.flags.c = self.reg.a >= _o;
-                self.flags.z = self.reg.a == _o;
-                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if self.reg.a >= self.mem[sym::level] {
                     let _v = self.mem[sym::NextLevel].wrapping_add(1);
                     self.mem[sym::NextLevel] = _v;
@@ -309,73 +243,13 @@ impl Cpu {
         if (self.reg.a as i8) >= 0 {
             return;
         }
-        'b12: {
-            self.set_x(self.mem[sym::develment]);
-            if self.reg.x != 0x00 {
-                let _o: u8 = 0x30;
-                self.flags.c = self.reg.a >= _o;
-                self.flags.z = self.reg.a == _o;
-                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                if self.reg.a >= 0x30 {
-                    let _o: u8 = 0x3a;
-                    self.flags.c = self.reg.a >= _o;
-                    self.flags.z = self.reg.a == _o;
-                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                    if self.reg.a < 0x3a {
-                        self.set_a(0x1a);
-                        self.set_x(0x03);
-                        self.checkcode();
-                        if !self.flags.z {
-                            self.set_a(0x1b);
-                            self.set_x(0x03);
-                            self.checkcode();
-                            if !self.flags.z {
-                                break 'b12;
-                            } else {
-                                self.set_a(0x0a);
-                                if self.reg.a == 0x00 {
-                                    break 'b12;
-                                }
-                            }
-                        } else {
-                            self.set_a(0x00);  // 1st digit
-                        }
-                        self.flags.c = false;
-                        let _r = (self.reg.a as u16) + self.mem[sym::keypress] as u16 + (self.flags.c as u16);
-                        self.flags.c = (_r >> 8) != 0;
-                        self.set_a(_r as u8);
-                        self.flags.c = true;
-                        let _r = (self.reg.a as u16) + (!0x30_u8) as u16 + (self.flags.c as u16);
-                        self.flags.c = (_r >> 8) != 0;
-                        self.set_a(_r as u8);
-                        let _o: u8 = 0x04;
-                        self.flags.c = self.reg.a >= _o;
-                        self.flags.z = self.reg.a == _o;
-                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                        if self.reg.a < 0x04 {
-                            return;
-                        }
-                        let _o: u8 = 0x0d;
-                        self.flags.c = self.reg.a >= _o;
-                        self.flags.z = self.reg.a == _o;
-                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                        if self.reg.a >= 0x0d {
-                            return;
-                        }
-                        self.mem[sym::NextLevel] = self.reg.a;
-                        self.shortentime();
-                        return;
-                    }
-                }
-            }
-        }
         self.set_a(self.mem[sym::keypress]);
         self.addkey();
-        self.set_a(0x19);
+        self.set_a(0x18);
         self.set_x(0x03);
         self.checkcode();
         if !self.flags.z {
-            self.set_a(0x18);
+            self.set_a(0x17);
             self.set_x(0x03);
             self.checkcode();
             if self.flags.z {
@@ -384,10 +258,6 @@ impl Cpu {
                 if self.reg.x != 0x00 {
                     self.set_a(0x0b);  // or level 12 in cheat mode
                 }
-                let _o: u8 = self.mem[sym::level];
-                self.flags.c = self.reg.a >= _o;
-                self.flags.z = self.reg.a == _o;
-                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if self.reg.a >= self.mem[sym::level] {
                     let _v = self.mem[sym::NextLevel].wrapping_add(1);
                     self.mem[sym::NextLevel] = _v;
@@ -423,7 +293,107 @@ impl Cpu {
                 self.flags.z = self.reg.a == _o;
                 self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
                 if self.reg.a != 0x01 {
-                    self._3a1b();
+                    let _o: u8 = 0x0b;
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if self.reg.a != 0x0b {
+                        let _o: u8 = 0x0a;
+                        self.flags.c = self.reg.a >= _o;
+                        self.flags.z = self.reg.a == _o;
+                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                        if self.reg.a != 0x0a {
+                            let _o: u8 = 0x18;
+                            self.flags.c = self.reg.a >= _o;
+                            self.flags.z = self.reg.a == _o;
+                            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                            if self.reg.a == 0x18 {
+                                self.set_a(self.mem[sym::jhoriz]);
+                                self.set_a(self.reg.a ^ 0x01);
+                                self.mem[sym::jhoriz] = self.reg.a;
+                                if !self.flags.n {
+                                    self.gtone();
+                                    return;
+                                }
+                            }
+                            let _o: u8 = 0x19;
+                            self.flags.c = self.reg.a >= _o;
+                            self.flags.z = self.reg.a == _o;
+                            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                            if self.reg.a == 0x19 {
+                                self.set_a(self.mem[sym::jvert]);
+                                self.set_a(self.reg.a ^ 0x01);
+                                self.mem[sym::jvert] = self.reg.a;
+                                if !self.flags.n {
+                                    self.gtone();
+                                    return;
+                                }
+                            }
+                            let _o: u8 = 0x13;
+                            self.flags.c = self.reg.a >= _o;
+                            self.flags.z = self.reg.a == _o;
+                            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                            if self.reg.a != 0x13 {
+                                let _o: u8 = 0x0e;
+                                self.flags.c = self.reg.a >= _o;
+                                self.flags.z = self.reg.a == _o;
+                                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                                if self.reg.a != 0x0e {
+                                    let _o: u8 = 0x16;
+                                    self.flags.c = self.reg.a >= _o;
+                                    self.flags.z = self.reg.a == _o;
+                                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                                    if self.reg.a != 0x16 {
+                                        let _o: u8 = 0x07;
+                                        self.flags.c = self.reg.a >= _o;
+                                        self.flags.z = self.reg.a == _o;
+                                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                                        if self.reg.a != 0x07 {
+                                            let _o: u8 = 0x20;
+                                            self.flags.c = self.reg.a >= _o;
+                                            self.flags.z = self.reg.a == _o;
+                                            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                                            if self.reg.a != 0x20 {
+                                                return;
+                                            }
+                                            self.set_a(0x03);
+                                            self.mem[sym::timerequest] = self.reg.a;
+                                            return;
+                                        }
+                                        self.set_a(self.mem[sym::level]);
+                                        self.mem[sym::SavLevel] = self.reg.a;
+                                        self.DoSaveGame();
+                                        return;
+                                    }
+                                    self.dispversion();
+                                    return;
+                                }
+                                self.set_a(self.mem[sym::musicon]);
+                                self.set_a(self.reg.a ^ 0x01);
+                                self.mem[sym::musicon] = self.reg.a;
+                                if !self.flags.z {
+                                    self.gtone();
+                                    return;
+                                }
+                                return;
+                            }
+                            self.zerosound();
+                            self.set_a(self.mem[sym::soundon]);
+                            self.set_a(self.reg.a ^ 0x01);
+                            self.mem[sym::soundon] = self.reg.a;
+                            if !self.flags.z {
+                                self.gtone();
+                                return;
+                            }
+                            return;
+                        }
+                        self.setcenter();
+                        self.gtone();
+                        return;
+                    }
+                    self.set_a(0x00);
+                    self.mem[sym::joyon] = self.reg.a;
+                    self.gtone();
                     return;
                 }
                 self.restart();
@@ -1196,256 +1166,59 @@ impl Cpu {
     }
 
     fn TempDevel(&mut self) {
-        self.set_a(self.mem[sym::develment]);
-        if self.reg.a == 0x00 {
-            return;
-        }
-        self.set_a(self.mem[sym::keypress]);
-        let _o: u8 = 0x06;
-        self.flags.c = self.reg.a >= _o;
-        self.flags.z = self.reg.a == _o;
-        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-        if self.reg.a != 0x06 {
-            let _o: u8 = 0x42;
-            self.flags.c = self.reg.a >= _o;
-            self.flags.z = self.reg.a == _o;
-            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-            if self.reg.a != 0x42 {
-                let _o: u8 = 0x11;
-                self.flags.c = self.reg.a >= _o;
-                self.flags.z = self.reg.a == _o;
-                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                if self.reg.a != 0x11 {
-                    let _o: u8 = 0x53;
-                    self.flags.c = self.reg.a >= _o;
-                    self.flags.z = self.reg.a == _o;
-                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                    if self.reg.a != 0x53 {
-                        let _o: u8 = 0x46;
-                        self.flags.c = self.reg.a >= _o;
-                        self.flags.z = self.reg.a == _o;
-                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                        if self.reg.a != 0x46 {
-                            let _o: u8 = 0x29;
-                            self.flags.c = self.reg.a >= _o;
-                            self.flags.z = self.reg.a == _o;
-                            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                            if self.reg.a != 0x29 {
-                                let _o: u8 = 0x2b;
-                                self.flags.c = self.reg.a >= _o;
-                                self.flags.z = self.reg.a == _o;
-                                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                if self.reg.a != 0x2b {
-                                    self.set_a(self.mem[sym::keypress]);
-                                    let _o: u8 = 0x30;
-                                    self.flags.c = self.reg.a >= _o;
-                                    self.flags.z = self.reg.a == _o;
-                                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                    if self.reg.a >= 0x30 {
-                                        let _o: u8 = 0x3a;
-                                        self.flags.c = self.reg.a >= _o;
-                                        self.flags.z = self.reg.a == _o;
-                                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                        if self.reg.a < 0x3a {
-                                            self.flags.c = true;
-                                            let _r = (self.reg.a as u16) + (!0x30_u8) as u16 + (self.flags.c as u16);
-                                            self.flags.c = (_r >> 8) != 0;
-                                            self.set_a(_r as u8);
-                                            self.mem[sym::guardprog] = self.reg.a;
-                                            self.gtone();
-                                            return;
-                                        }
-                                    }
-                                    let _o: u8 = 0x03;
-                                    self.flags.c = self.reg.a >= _o;
-                                    self.flags.z = self.reg.a == _o;
-                                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                    if self.reg.a != 0x03 {
-                                        let _o: u8 = 0x5d;
-                                        self.flags.c = self.reg.a >= _o;
-                                        self.flags.z = self.reg.a == _o;
-                                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                        if self.reg.a != 0x5d {
-                                            let _o: u8 = 0x5b;
-                                            self.flags.c = self.reg.a >= _o;
-                                            self.flags.z = self.reg.a == _o;
-                                            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                            if self.reg.a != 0x5b {
-                                                let _o: u8 = 0x40;
-                                                self.flags.c = self.reg.a >= _o;
-                                                self.flags.z = self.reg.a == _o;
-                                                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                                if self.reg.a != 0x40 {
-                                                    let _o: u8 = 0x05;
-                                                    self.flags.c = self.reg.a >= _o;
-                                                    self.flags.z = self.reg.a == _o;
-                                                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                                    if self.reg.a != 0x05 {
-                                                        let _o: u8 = 0x44;
-                                                        self.flags.c = self.reg.a >= _o;
-                                                        self.flags.z = self.reg.a == _o;
-                                                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                                        if self.reg.a != 0x44 {
-                                                            let _o: u8 = 0x41;
-                                                            self.flags.c = self.reg.a >= _o;
-                                                            self.flags.z = self.reg.a == _o;
-                                                            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                                            if self.reg.a != 0x41 {
-                                                                let _o: u8 = 0x10;
-                                                                self.flags.c = self.reg.a >= _o;
-                                                                self.flags.z = self.reg.a == _o;
-                                                                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                                                if self.reg.a != 0x10 {
-                                                                    'b42: {
-                                                                        let _o: u8 = 0x3c;
-                                                                        self.flags.c = self.reg.a >= _o;
-                                                                        self.flags.z = self.reg.a == _o;
-                                                                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                                                        if self.reg.a != 0x3c {
-                                                                            let _o: u8 = 0x3e;
-                                                                            self.flags.c = self.reg.a >= _o;
-                                                                            self.flags.z = self.reg.a == _o;
-                                                                            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                                                            if self.reg.a == 0x3e {
-                                                                                self.set_a(0x02);
-                                                                                if self.reg.a != 0x00 {
-                                                                                    break 'b42;
-                                                                                }
-                                                                            }
-                                                                            let _o: u8 = 0x2a;
-                                                                            self.flags.c = self.reg.a >= _o;
-                                                                            self.flags.z = self.reg.a == _o;
-                                                                            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                                                            if self.reg.a != 0x2a {
-                                                                                let _o: u8 = 0x4d;
-                                                                                self.flags.c = self.reg.a >= _o;
-                                                                                self.flags.z = self.reg.a == _o;
-                                                                                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                                                                if self.reg.a != 0x4d {
-                                                                                    return;
-                                                                                }
-                                                                                self.set_a(0xff);
-                                                                                self.mem[sym::FrameCount + 1] = self.reg.a;
-                                                                                return;
-                                                                            }
-                                                                            self.set_a(0xff);
-                                                                            self.mem[sym::SavLevel] = self.reg.a;
-                                                                            self.DoSaveGame();
-                                                                            return;
-                                                                        }
-                                                                        self.set_a(0xfe);
-                                                                    }
-                                                                    self.flags.c = false;
-                                                                    let _r = (self.reg.a as u16) + self.mem[sym::FrameCount + 1] as u16 + (self.flags.c as u16);
-                                                                    self.flags.c = (_r >> 8) != 0;
-                                                                    self.set_a(_r as u8);
-                                                                    self.mem[sym::FrameCount + 1] = self.reg.a;
-                                                                    return;
-                                                                }
-                                                                self.mem[sym::level] = 0x01;
-                                                                self.set_a(0x02);
-                                                                self.mem[sym::NextLevel] = self.reg.a;
-                                                                return;
-                                                            }
-                                                            self.set_a(self.mem[sym::ManCtrl]);
-                                                            self.set_a(self.reg.a ^ 0xff);
-                                                            self.mem[sym::ManCtrl] = self.reg.a;
-                                                            return;
-                                                        }
-                                                        let _v = self.mem[sym::ChgKidStr].wrapping_sub(1);
-                                                        self.mem[sym::ChgKidStr] = _v;
-                                                        self.set_nz(_v);
-                                                        return;
-                                                    }
-                                                    self.set_a(self.mem[sym::KidY]);
-                                                    self.flags.c = true;
-                                                    let _r = (self.reg.a as u16) + (!0x3f_u8) as u16 + (self.flags.c as u16);
-                                                    self.flags.c = (_r >> 8) != 0;
-                                                    self.set_a(_r as u8);
-                                                    self.mem[sym::KidY] = self.reg.a;
-                                                    let _v = self.mem[sym::KidBlockY].wrapping_sub(1);
-                                                    self.mem[sym::KidBlockY] = _v;
-                                                    self.set_nz(_v);
-                                                    return;
-                                                }
-                                                self.set_a(self.mem[sym::PAGE]);
-                                                self.screendump();
-                                                return;
-                                            }
-                                            self.gtone();
-                                            self.set_a(self.mem[sym::SPEED]);
-                                            self.flags.c = false;
-                                            let _r = (self.reg.a as u16) + (0x04) as u16 + (self.flags.c as u16);
-                                            self.flags.c = (_r >> 8) != 0;
-                                            self.set_a(_r as u8);
-                                            self.mem[sym::SPEED] = self.reg.a;
-                                            return;
-                                        }
-                                        self.set_a(self.mem[sym::SPEED]);
-                                        let _o: u8 = 0x05;
-                                        self.flags.c = self.reg.a >= _o;
-                                        self.flags.z = self.reg.a == _o;
-                                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                        if self.reg.a < 0x05 {
-                                            self.set_a(0x01);  // fastest
-                                            self.mem[sym::SPEED] = self.reg.a;
-                                            return;
-                                        }
-                                        self.flags.c = true;
-                                        let _r = (self.reg.a as u16) + (!0x04_u8) as u16 + (self.flags.c as u16);
-                                        self.flags.c = (_r >> 8) != 0;
-                                        self.set_a(_r as u8);
-                                        self.mem[sym::SPEED] = self.reg.a;
-                                        self.gtone();
-                                        return;
-                                    }
-                                    self.preload();
-                                    self.set_a(0x02);
-                                    self.mem[sym::redrawflg] = self.reg.a;
-                                    self.reload();
-                                    self.postload();
-                                    return;
-                                }
-                                self.set_a(self.mem[sym::level]);
-                                self.flags.c = false;
-                                let _r = (self.reg.a as u16) + (0x05) as u16 + (self.flags.c as u16);
-                                self.flags.c = (_r >> 8) != 0;
-                                self.set_a(_r as u8);
-                                self.mem[sym::NextLevel] = self.reg.a;
-                                return;
-                            }
-                            let _v = self.mem[sym::NextLevel].wrapping_add(1);
-                            self.mem[sym::NextLevel] = _v;
-                            self.set_nz(_v);
-                            return;
-                        }
-                        self.boostmeter();
-                        return;
-                    }
-                    let _v = self.mem[sym::ChgKidStr].wrapping_add(1);
-                    self.mem[sym::ChgKidStr] = _v;
-                    self.set_nz(_v);
-                    let _v = self.mem[sym::ChgOppStr].wrapping_add(1);
-                    self.mem[sym::ChgOppStr] = _v;
-                    self.set_nz(_v);
-                    return;
-                }
-                self.set_a(0x0a);
-                self.mem[sym::AMtimer] = self.reg.a;
-                return;
-            }
-            self.set_a(self.mem[sym::blackflag]);
-            self.set_a(self.reg.a ^ 0xff);
-            self.mem[sym::blackflag] = self.reg.a;
-            return;
-        }
-        self.mem[sym::redrawflg] = 0x02;
-        self.set_a(0x00);
-        self.mem[sym::blackflag] = self.reg.a;
         return;
     }
 
     fn checkcodes(&mut self) {
+        self.set_a(0x1c);
+        self.set_x(0x03);
+        self.checkcode();
+        if !self.flags.z {
+            self.set_a(0x1d);
+            self.set_x(0x03);
+            self.checkcode();
+            if !self.flags.z {
+                self.set_a(0x1b);
+                self.set_x(0x03);
+                self.checkcode();
+                if !self.flags.z {
+                    self.set_a(0x1e);
+                    self.set_x(0x03);
+                    self.checkcode();
+                    if !self.flags.z {
+                        self.set_a(0x1f);
+                        self.set_x(0x03);
+                        self.checkcode();
+                        if self.flags.n {
+                            return;
+                        }
+                        self.set_a(0x0e);
+                        self.mem[sym::NextLevel] = self.reg.a;
+                        self.shortentime();
+                        return;
+                    }
+                    self.set_a(0x01);
+                    self.flags.c = true;
+                    let _r = (self.reg.a as u16) + (!self.mem[sym::OppStrength]) as u16 + (self.flags.c as u16);
+                    self.flags.c = (_r >> 8) != 0;
+                    self.set_a(_r as u8);
+                    self.mem[sym::ChgOppStr] = self.reg.a;
+                    return;
+                }
+                self.set_a(0x00);
+                self.flags.c = true;
+                let _r = (self.reg.a as u16) + (!self.mem[sym::OppStrength]) as u16 + (self.flags.c as u16);
+                self.flags.c = (_r >> 8) != 0;
+                self.set_a(_r as u8);
+                self.mem[sym::ChgOppStr] = self.reg.a;
+                return;
+            }
+            self.rechargemeter();
+            return;
+        }
+        self.boostmeter();
+        self.set_a(self.mem[sym::MaxKidStr]);
+        self.mem[sym::origstrength] = self.reg.a;
         return;
     }
 

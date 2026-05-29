@@ -104,6 +104,11 @@ from .pass0_parse import FileAST, eval_expr
 # upstream source mostly uses `jmp`.
 _TERMINATORS = frozenset({"rts", "rti", "jmp", "bra"})
 
+# Conditional-assembly directives. They emit no bytes, so a label sitting
+# on one floats to the next assembled instruction (e.g. `:stripe do
+# EditorDisk` with EditorDisk=0 — `:stripe` names the code after `fin`).
+_COND_DIRECTIVES = frozenset({"do", "else", "fin"})
+
 # Lines that are not "real" instructions for routine-walking purposes.
 # We skip them silently — they belong either to the equate header of the
 # file (already consumed by pass 0) or to the data sections that pass 1
@@ -752,6 +757,8 @@ def lift_file(
 
     # Pre-index the lines so we can walk forward cheaply from any label.
     lines = file_ast.lines
+    # Lines a false `do`/`else`/`fin` condition excludes from this build.
+    inactive = file_ast.inactive_lines
 
     # Map label -> index in `lines` of the line whose *next* code
     # instruction the label refers to. Bare-label lines just attach
@@ -759,15 +766,17 @@ def lift_file(
     label_to_instr_index: dict[str, int] = {}
     pending_labels: list[str] = []
     for i, line in enumerate(lines):
-        if line.is_blank:
+        if line.is_blank or i in inactive:
             continue
         if line.label and (line.mnemonic is None or line.mnemonic in _NON_CODE_DIRECTIVES):
             # Bare-label line, or a label on a non-code directive. The
             # bare-label case is the one we care about for the pilot
             # (`DoBlock\n DoUp lda #-1`); the directive case can also
             # carry a label (e.g. equates) and we just ignore that
-            # because pass 0 already absorbed it.
-            if line.mnemonic is None:
+            # because pass 0 already absorbed it. A label on a
+            # conditional-assembly directive (`:stripe do ...`) floats to
+            # the next assembled instruction, the same as a bare label.
+            if line.mnemonic is None or line.mnemonic in _COND_DIRECTIVES:
                 pending_labels.append(line.label)
             continue
         if line.mnemonic is None:
@@ -810,7 +819,7 @@ def lift_file(
         scan = before_idx - 1
         while scan >= 0:
             ln = lines[scan]
-            if not ln.is_blank and ln.label == target:
+            if scan not in inactive and not ln.is_blank and ln.label == target:
                 def_idx = scan
                 break
             scan -= 1
@@ -822,7 +831,7 @@ def lift_file(
         i = def_idx
         while i < len(lines):
             ln = lines[i]
-            if ln.is_blank:
+            if ln.is_blank or i in inactive:
                 i += 1
                 continue
             ref = SourceRef(
@@ -868,7 +877,7 @@ def lift_file(
         first = True
         while idx < len(lines):
             line = lines[idx]
-            if line.is_blank:
+            if line.is_blank or idx in inactive:
                 idx += 1
                 continue
 
@@ -893,8 +902,11 @@ def lift_file(
                 # bare label that the lifter will pick up via the
                 # pending-labels mechanism on the next code line. We
                 # don't add it to the body directly; it'll show up
-                # attached to the next instruction's pre-labels.
-                if not first and line.label and line.mnemonic is None:
+                # attached to the next instruction's pre-labels. A label on
+                # a conditional-assembly directive floats the same way.
+                if (not first and line.label
+                        and (line.mnemonic is None
+                             or line.mnemonic in _COND_DIRECTIVES)):
                     routine.body.append(
                         Label(
                             name=line.label,
@@ -949,7 +961,7 @@ def lift_file(
                 lookahead = idx + 1
                 while lookahead < len(lines):
                     nxt = lines[lookahead]
-                    if nxt.is_blank or (
+                    if nxt.is_blank or lookahead in inactive or (
                         nxt.mnemonic is None and nxt.label is None
                     ):
                         lookahead += 1
@@ -1054,7 +1066,7 @@ def lift_file(
         scan = idx - 1
         while scan >= 0:
             ln = lines[scan]
-            if ln.is_blank:
+            if ln.is_blank or scan in inactive:
                 scan -= 1
                 continue
             if ln.label and ln.mnemonic is None:

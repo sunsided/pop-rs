@@ -50,10 +50,6 @@ fn MouseProg {
   if a < #0xc8 goto ]rts  ; AUTO.S:213
   tail_call VanishChar                ; AUTO.S:214
 ShadowProg:
-SkelProg:
-VizierProg:
-  ??? brk             ; AUTO.S:223
-ShadowProg:
   a = *level@0x03f4        ; AUTO.S:227
   if a != #0x04 goto :0  ; AUTO.S:229
   tail_call ShadLevel4                ; AUTO.S:230

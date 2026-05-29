@@ -2076,7 +2076,12 @@ pub fn knockloose(cpu: &mut Cpu) {
 
 pub fn makespace(cpu: &mut Cpu) {
     cpu.mem[((cpu.mem[sym::BlueType] as usize | (cpu.mem[sym::BlueType + 1] as usize) << 8) + cpu.reg.y as usize) & 0xffff] = 0x00;
-    cpu.set_a(0x01);
+    cpu.set_a(0x00);
+    cpu.set_x(cpu.mem[sym::BGset1]);
+    if cpu.reg.x != 0x01 {
+        return;
+    }
+    cpu.set_a(0x01);  // stripe
     return;
 }
 

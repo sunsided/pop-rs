@@ -88,14 +88,14 @@ mod sym {
     pub const RAMWRTmain: usize = 0xc004;
     pub const RWBANK1: usize = 0xc08b;
     pub const RWBANK2: usize = 0xc083;
-    pub const bg1trk: usize = 0x022b;
-    pub const bg2trk: usize = 0x022c;
+    pub const bg1trk: usize = 0x022a;
+    pub const bg2trk: usize = 0x022b;
     pub const bluepREG: usize = 0x03f1;
     pub const bluepTRK: usize = 0x03f0;
-    pub const ch4off: usize = 0x022e;
-    pub const ch4trk: usize = 0x022d;
-    pub const demolevel: usize = 0x021a;
-    pub const firstlevel: usize = 0x021b;
+    pub const ch4off: usize = 0x022d;
+    pub const ch4trk: usize = 0x022c;
+    pub const demolevel: usize = 0x0219;
+    pub const firstlevel: usize = 0x021a;
     pub const invert: usize = 0x009f;
     pub const keypress: usize = 0x020f;
     pub const musicon: usize = 0x031a;
@@ -815,23 +815,24 @@ impl Cpu {
         if self.reg.a < 0x80 {
             return;
         }
-        if self.reg.a == 0x04 {
-            self.Demo();
+        if self.reg.a != 0x12 {
+            self.blackout();
+            self.LoadStage3();
+            self.set1stlevel();
+            self.rdbluep();
+            self.driveoff();
+            self.mem[sym::musicon] = 0x01;
+            self.set_a(self.mem[sym::keypress]);
+            if self.reg.a != 0x0c {
+                self.set_a(0x01);
+                self.start();
+                return;
+            }
+            self.set_a(0x04);  // arbitrary
+            self.startresume();
             return;
         }
-        self.LoadStage3();
-        self.set1stlevel();
-        self.rdbluep();
-        self.driveoff();
-        self.mem[sym::musicon] = 0x01;
-        self.set_a(self.mem[sym::keypress]);
-        if self.reg.a != 0x0c {
-            self.set_a(0x01);
-            self.start();
-            return;
-        }
-        self.set_a(0x04);  // arbitrary
-        self.startresume();
+        self.ATTRACTMODE();
         return;
     }
 

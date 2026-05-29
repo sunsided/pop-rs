@@ -172,7 +172,6 @@ pub fn ADDPEEL(cpu: &mut Cpu) {
     if cpu.reg.a != 0x00 {
         cpu.set_x(cpu.mem[sym::purpleflag]);
         cpu.set_a(cpu.mem[(sym::dummy + cpu.reg.x as usize) & 0xffff]);
-        cpu.set_a(0x2e);
     }
     cpu.smc.sm = cpu.reg.a;
     cpu.set_x(cpu.reg.a);
@@ -1994,7 +1993,7 @@ pub fn InitVBLANK(cpu: &mut Cpu) {
         return;
     }
     cpu.mem[sym::RAMWRTaux] = cpu.reg.a;
-    cpu.mem[sym::VBLvect + 1] = 0xfd;
+    cpu.mem[sym::VBLvect + 1] = 0xfc;
     cpu.set_a(0x01);
     cpu.mem[sym::VBLvect + 2] = cpu.reg.a;
     cpu.flags.i = true;

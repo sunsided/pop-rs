@@ -47,37 +47,6 @@ KEYS2:
   call KREAD                  ; SPECIALK.S:168
   a = *keypress@0x020f        ; SPECIALK.S:170
   if a >=0 goto ]rts  ; SPECIALK.S:171
-  x = *develment@0x020e        ; SPECIALK.S:175
-  if x == #0x00 goto :nogo  ; SPECIALK.S:176
-  cmp a, #"0"              ; SPECIALK.S:177
-  if a < #"0" goto :nogo  ; SPECIALK.S:178
-  cmp a, #"9"+1              ; SPECIALK.S:179
-  if a >= #"9"+1 goto :nogo  ; SPECIALK.S:180
-  a = #C_go0                  ; SPECIALK.S:185
-  x = #>C_go0                  ; SPECIALK.S:186
-  call checkcode                  ; SPECIALK.S:187
-  if ne goto :nogo0       ; SPECIALK.S:188
-  a = #0x00                  ; SPECIALK.S:189
-:golevel:
-  c = 0                            ; SPECIALK.S:190
-  a = a + *keypress@0x020f + c    ; SPECIALK.S:191
-  c = 1                            ; SPECIALK.S:192
-  a = a - #"0" - (1 - c)        ; SPECIALK.S:193
-  cmp a, #0x04              ; SPECIALK.S:195
-  if a < #0x04 goto ]rts  ; SPECIALK.S:196
-  cmp a, #0x0d              ; SPECIALK.S:197
-  if a >= #0x0d goto ]rts  ; SPECIALK.S:198
-  *NextLevel@0x031c = a            ; SPECIALK.S:199
-  call shortentime                  ; SPECIALK.S:200
-]rts:
-  return                           ; SPECIALK.S:201
-:nogo0:
-  a = #C_go1                  ; SPECIALK.S:203
-  x = #>C_go1                  ; SPECIALK.S:204
-  call checkcode                  ; SPECIALK.S:205
-  if ne goto :nogo       ; SPECIALK.S:206
-  a = #0x0a                  ; SPECIALK.S:207
-  if a != #0x00 goto :golevel  ; SPECIALK.S:208
 :nogo:
   a = *keypress@0x020f        ; SPECIALK.S:214
   call addkey                  ; SPECIALK.S:215
@@ -98,7 +67,6 @@ KEYS2:
   if x == #0x00 goto :limit  ; SPECIALK.S:240
   a = #0x0b                  ; SPECIALK.S:241
 :limit:
-  cmp a, *level@0x03f4    ; SPECIALK.S:242
   if a < *level@0x03f4 goto :2  ; SPECIALK.S:243
   *NextLevel@0x031c += 1                         ; SPECIALK.S:244
   call shortentime                  ; SPECIALK.S:246
@@ -117,37 +85,6 @@ fn KEYS2 {
   call KREAD                  ; SPECIALK.S:168
   a = *keypress@0x020f        ; SPECIALK.S:170
   if a >=0 goto ]rts  ; SPECIALK.S:171
-  x = *develment@0x020e        ; SPECIALK.S:175
-  if x == #0x00 goto :nogo  ; SPECIALK.S:176
-  cmp a, #"0"              ; SPECIALK.S:177
-  if a < #"0" goto :nogo  ; SPECIALK.S:178
-  cmp a, #"9"+1              ; SPECIALK.S:179
-  if a >= #"9"+1 goto :nogo  ; SPECIALK.S:180
-  a = #C_go0                  ; SPECIALK.S:185
-  x = #>C_go0                  ; SPECIALK.S:186
-  call checkcode                  ; SPECIALK.S:187
-  if ne goto :nogo0       ; SPECIALK.S:188
-  a = #0x00                  ; SPECIALK.S:189
-:golevel:
-  c = 0                            ; SPECIALK.S:190
-  a = a + *keypress@0x020f + c    ; SPECIALK.S:191
-  c = 1                            ; SPECIALK.S:192
-  a = a - #"0" - (1 - c)        ; SPECIALK.S:193
-  cmp a, #0x04              ; SPECIALK.S:195
-  if a < #0x04 goto ]rts  ; SPECIALK.S:196
-  cmp a, #0x0d              ; SPECIALK.S:197
-  if a >= #0x0d goto ]rts  ; SPECIALK.S:198
-  *NextLevel@0x031c = a            ; SPECIALK.S:199
-  call shortentime                  ; SPECIALK.S:200
-]rts:
-  return                           ; SPECIALK.S:201
-:nogo0:
-  a = #C_go1                  ; SPECIALK.S:203
-  x = #>C_go1                  ; SPECIALK.S:204
-  call checkcode                  ; SPECIALK.S:205
-  if ne goto :nogo       ; SPECIALK.S:206
-  a = #0x0a                  ; SPECIALK.S:207
-  if a != #0x00 goto :golevel  ; SPECIALK.S:208
 :nogo:
   a = *keypress@0x020f        ; SPECIALK.S:214
   call addkey                  ; SPECIALK.S:215
@@ -168,7 +105,6 @@ fn KEYS2 {
   if x == #0x00 goto :limit  ; SPECIALK.S:240
   a = #0x0b                  ; SPECIALK.S:241
 :limit:
-  cmp a, *level@0x03f4    ; SPECIALK.S:242
   if a < *level@0x03f4 goto :2  ; SPECIALK.S:243
   *NextLevel@0x031c += 1                         ; SPECIALK.S:244
   call shortentime                  ; SPECIALK.S:246
@@ -193,9 +129,7 @@ fn LegitKeys {
   cmp a, #kabort              ; SPECIALK.S:275
   if a != #kabort goto :1b  ; SPECIALK.S:276
   tail_call restart                ; SPECIALK.S:277
-  cmp a, #kreturn              ; SPECIALK.S:280
-  if a != #kreturn goto :2  ; SPECIALK.S:281
-  tail_call gobuild                ; SPECIALK.S:282
+:1b:
 :2:
   cmp a, #ksetkbd              ; SPECIALK.S:287
   if a != #ksetkbd goto :30  ; SPECIALK.S:288
@@ -593,8 +527,8 @@ fn LISTTORCHES {
   x = *]numtorches@0x00f0        ; SPECIALK.S:1070
 :max:
   a = #0xff                  ; SPECIALK.S:1071
-  *(torchx@0x032a + x) = a   ; SPECIALK.S:1072
-  *torchcount@0x032e = a            ; SPECIALK.S:1073
+  *(torchx@0x0329 + x) = a   ; SPECIALK.S:1072
+  *torchcount@0x032d = a            ; SPECIALK.S:1073
 ]rts:
   return                           ; SPECIALK.S:1074
 :sub:
@@ -614,9 +548,9 @@ fn LISTTORCHES {
   a = *(BlockBot+1@0x127a + y)   ; SPECIALK.S:1091
   c = 1                            ; SPECIALK.S:1092
   a = a - #0x03 - (1 - c)        ; SPECIALK.S:1093
-  *(torchy@0x032b + x) = a   ; SPECIALK.S:1094
+  *(torchy@0x032a + x) = a   ; SPECIALK.S:1094
   a = *BOTCUT@0x0013        ; SPECIALK.S:1095
-  *(torchclip@0x032d + x) = a   ; SPECIALK.S:1096
+  *(torchclip@0x032c + x) = a   ; SPECIALK.S:1096
   a = pop                          ; SPECIALK.S:1097
   c = 0                            ; SPECIALK.S:1098
   a = a + #0x01 + c              ; SPECIALK.S:1099
@@ -624,35 +558,35 @@ fn LISTTORCHES {
   if a >= #0x0a goto ]rts  ; SPECIALK.S:1101
   a = a << 1                       ; SPECIALK.S:1102
   a = a << 1                       ; SPECIALK.S:1103
-  *(torchx@0x032a + x) = a   ; SPECIALK.S:1104
+  *(torchx@0x0329 + x) = a   ; SPECIALK.S:1104
   a = pop                          ; SPECIALK.S:1106
   y = a                            ; SPECIALK.S:1107
   a = *(BlueSpec@0x0026)[y]   ; SPECIALK.S:1108
-  *(torchstate@0x032c + x) = a   ; SPECIALK.S:1109
+  *(torchstate@0x032b + x) = a   ; SPECIALK.S:1109
   *]numtorches@0x00f0 += 1                         ; SPECIALK.S:1111
 ]rts:
   return                           ; SPECIALK.S:1112
 }
 
 fn BURN {
-  a = *torchx@0x032a        ; SPECIALK.S:1126
+  a = *torchx@0x0329        ; SPECIALK.S:1126
   if a <0 goto ]rts  ; SPECIALK.S:1127
-  x = *torchcount@0x032e        ; SPECIALK.S:1129
+  x = *torchcount@0x032d        ; SPECIALK.S:1129
   x += 1                         ; SPECIALK.S:1130
-  a = *(torchx@0x032a + x)   ; SPECIALK.S:1131
+  a = *(torchx@0x0329 + x)   ; SPECIALK.S:1131
   if a >=0 goto :ok  ; SPECIALK.S:1132
   x = #0x00                  ; SPECIALK.S:1133
 :ok:
-  *torchcount@0x032e = x            ; SPECIALK.S:1134
-  a = *(torchx@0x032a + x)   ; SPECIALK.S:1135
+  *torchcount@0x032d = x            ; SPECIALK.S:1134
+  a = *(torchx@0x0329 + x)   ; SPECIALK.S:1135
   *XCO@0x0001 = a            ; SPECIALK.S:1136
-  a = *(torchy@0x032b + x)   ; SPECIALK.S:1137
+  a = *(torchy@0x032a + x)   ; SPECIALK.S:1137
   *YCO@0x0002 = a            ; SPECIALK.S:1138
-  a = *(torchclip@0x032d + x)   ; SPECIALK.S:1139
+  a = *(torchclip@0x032c + x)   ; SPECIALK.S:1139
   *BOTCUT@0x0013 = a            ; SPECIALK.S:1140
-  a = *(torchstate@0x032c + x)   ; SPECIALK.S:1141
+  a = *(torchstate@0x032b + x)   ; SPECIALK.S:1141
   call getflameframe                  ; SPECIALK.S:1142
-  *(torchstate@0x032c + x) = a   ; SPECIALK.S:1143
+  *(torchstate@0x032b + x) = a   ; SPECIALK.S:1143
   x = a                            ; SPECIALK.S:1144
   call setupflame                  ; SPECIALK.S:1145
   a = *BOTCUT@0x0013        ; SPECIALK.S:1146
@@ -744,11 +678,11 @@ fn KEEPTIME {
   y = *NextTimeMsg@0x0301        ; SPECIALK.S:1282
   if y >= #nummsg goto ]rts  ; SPECIALK.S:1284
   a = *FrameCount+1@0x0307        ; SPECIALK.S:1285
-  cmp a, *(timetable+1@0x0333 + y)   ; SPECIALK.S:1286
-  if a < *(timetable+1@0x0333 + y) goto ]rts  ; SPECIALK.S:1287
+  cmp a, *(timetable+1@0x0332 + y)   ; SPECIALK.S:1286
+  if a < *(timetable+1@0x0332 + y) goto ]rts  ; SPECIALK.S:1287
   a = *FrameCount@0x0306        ; SPECIALK.S:1288
-  cmp a, *(timetable@0x0332 + y)   ; SPECIALK.S:1289
-  if a < *(timetable@0x0332 + y) goto ]rts  ; SPECIALK.S:1290
+  cmp a, *(timetable@0x0331 + y)   ; SPECIALK.S:1289
+  if a < *(timetable@0x0331 + y) goto ]rts  ; SPECIALK.S:1290
   a = *msgtimer@0x00db        ; SPECIALK.S:1294
   if a != #0x00 goto ]rts  ; SPECIALK.S:1295
   *NextTimeMsg@0x0301 += 1                         ; SPECIALK.S:1299
@@ -764,9 +698,9 @@ fn SHORTENTIME {
   if y >= #0x14 goto ]rts  ; SPECIALK.S:1315
   y = #0x12                  ; SPECIALK.S:1316
   *NextTimeMsg@0x0301 = y            ; SPECIALK.S:1317
-  a = *(timetable@0x0332 + y)   ; SPECIALK.S:1318
+  a = *(timetable@0x0331 + y)   ; SPECIALK.S:1318
   *FrameCount@0x0306 = a            ; SPECIALK.S:1319
-  a = *(timetable+1@0x0333 + y)   ; SPECIALK.S:1320
+  a = *(timetable+1@0x0332 + y)   ; SPECIALK.S:1320
   *FrameCount+1@0x0307 = a            ; SPECIALK.S:1321
 ]rts:
   return                           ; SPECIALK.S:1322
@@ -787,164 +721,10 @@ fn DLOOP  (aka STROBE) {
 }
 
 fn TempDevel {
-  a = *develment@0x020e        ; SPECIALK.S:382
-  if a == #0x00 goto ]rts  ; SPECIALK.S:383
-  a = *keypress@0x020f        ; SPECIALK.S:385
-  cmp a, #kforceredraw              ; SPECIALK.S:386
-  if a != #kforceredraw goto :10  ; SPECIALK.S:387
-  a = #0x02                  ; SPECIALK.S:388
-  *redrawflg@0x0097 = a            ; SPECIALK.S:389
-  a = #0x00                  ; SPECIALK.S:390
-  *blackflag@0x0022 = a            ; SPECIALK.S:391
-  return                           ; SPECIALK.S:392
-:10:
-  cmp a, #kblackout              ; SPECIALK.S:394
-  if a != #kblackout goto :9  ; SPECIALK.S:395
-  a = *blackflag@0x0022        ; SPECIALK.S:396
-  a = a ^ #0xff              ; SPECIALK.S:397
-  *blackflag@0x0022 = a            ; SPECIALK.S:398
-]rts:
-  return                           ; SPECIALK.S:399
-:9:
-  cmp a, #kantimatter              ; SPECIALK.S:401
-  if a != #kantimatter goto :17  ; SPECIALK.S:402
-  a = #initAMtimer                  ; SPECIALK.S:403
-  *AMtimer@0x00c7 = a            ; SPECIALK.S:404
-  return                           ; SPECIALK.S:405
-:17:
-  cmp a, #kincstr              ; SPECIALK.S:407
-  if a != #kincstr goto :20  ; SPECIALK.S:408
-  *ChgKidStr@0x00cf += 1                         ; SPECIALK.S:409
-  *ChgOppStr@0x00d2 += 1                         ; SPECIALK.S:410
-  return                           ; SPECIALK.S:411
-:20:
-  cmp a, #kincmax              ; SPECIALK.S:413
-  if a != #kincmax goto :36  ; SPECIALK.S:414
-  tail_call boostmeter                ; SPECIALK.S:415
-:36:
-  cmp a, #knextlevel              ; SPECIALK.S:417
-  if a != #knextlevel goto :28  ; SPECIALK.S:418
-  *NextLevel@0x031c += 1                         ; SPECIALK.S:419
-  return                           ; SPECIALK.S:420
-:28:
-  cmp a, #kskip5              ; SPECIALK.S:422
-  if a != #kskip5 goto :30  ; SPECIALK.S:423
-  a = *level@0x03f4        ; SPECIALK.S:424
-  c = 0                            ; SPECIALK.S:425
-  a = a + #0x05 + c              ; SPECIALK.S:426
-  *NextLevel@0x031c = a            ; SPECIALK.S:427
-  return                           ; SPECIALK.S:428
-:30:
-  a = *keypress@0x020f        ; SPECIALK.S:433
-  cmp a, #"0"              ; SPECIALK.S:434
-  if a < #"0" goto :non  ; SPECIALK.S:435
-  cmp a, #"9"+1              ; SPECIALK.S:436
-  if a >= #"9"+1 goto :non  ; SPECIALK.S:437
-  c = 1                            ; SPECIALK.S:438
-  a = a - #"0" - (1 - c)        ; SPECIALK.S:439
-  *guardprog@0x00dd = a            ; SPECIALK.S:440
-]sk1:
-  tail_call gtone                ; SPECIALK.S:441
-:non:
-  cmp a, #kreload              ; SPECIALK.S:445
-  if a != #kreload goto :8  ; SPECIALK.S:446
-  call preload                  ; SPECIALK.S:447
-  a = #0x02                  ; SPECIALK.S:448
-  *redrawflg@0x0097 = a            ; SPECIALK.S:449
-  call reload                  ; SPECIALK.S:450
-  tail_call postload                ; SPECIALK.S:451
-:8:
-  cmp a, #kspeedup              ; SPECIALK.S:455
-  if a != #kspeedup goto :13  ; SPECIALK.S:456
-  a = *SPEED@0x030c        ; SPECIALK.S:457
-  cmp a, #0x05              ; SPECIALK.S:458
-  if a < #0x05 goto :12  ; SPECIALK.S:459
-  c = 1                            ; SPECIALK.S:460
-  a = a - #0x04 - (1 - c)        ; SPECIALK.S:461
-  *SPEED@0x030c = a            ; SPECIALK.S:462
-  goto ]sk1                ; SPECIALK.S:463
-:12:
-  a = #0x01                  ; SPECIALK.S:464
-  *SPEED@0x030c = a            ; SPECIALK.S:465
-]rts:
-  return                           ; SPECIALK.S:466
-:13:
-  cmp a, #kslowdown              ; SPECIALK.S:468
-  if a != #kslowdown goto :14  ; SPECIALK.S:469
-  call gtone                  ; SPECIALK.S:470
-  a = *SPEED@0x030c        ; SPECIALK.S:471
-  c = 0                            ; SPECIALK.S:472
-  a = a + #0x04 + c              ; SPECIALK.S:473
-  *SPEED@0x030c = a            ; SPECIALK.S:474
-  return                           ; SPECIALK.S:475
-:14:
-  cmp a, #kscreendump              ; SPECIALK.S:479
-  if a != #kscreendump goto :15  ; SPECIALK.S:480
-  a = *PAGE@0x0000        ; SPECIALK.S:481
-  tail_call screendump                ; SPECIALK.S:482
-:15:
-  cmp a, #kupone              ; SPECIALK.S:484
-  if a != #kupone goto :19  ; SPECIALK.S:485
-  a = *KidY@0x0052        ; SPECIALK.S:486
-  c = 1                            ; SPECIALK.S:487
-  a = a - #0x3f - (1 - c)        ; SPECIALK.S:488
-  *KidY@0x0052 = a            ; SPECIALK.S:489
-  *KidBlockY@0x0055 -= 1                         ; SPECIALK.S:490
-  return                           ; SPECIALK.S:491
-:19:
-  cmp a, #kdecstr              ; SPECIALK.S:493
-  if a != #kdecstr goto :21  ; SPECIALK.S:494
-  *ChgKidStr@0x00cf -= 1                         ; SPECIALK.S:495
-]rts:
-  return                           ; SPECIALK.S:496
-:21:
-  cmp a, #kautoman              ; SPECIALK.S:498
-  if a != #kautoman goto :23  ; SPECIALK.S:499
-  a = *ManCtrl@0x00de        ; SPECIALK.S:500
-  a = a ^ #0xff              ; SPECIALK.S:501
-  *ManCtrl@0x00de = a            ; SPECIALK.S:502
-  return                           ; SPECIALK.S:503
-:23:
-  cmp a, #kplayback              ; SPECIALK.S:508
-  if a != #kplayback goto :24  ; SPECIALK.S:509
-  a = #0x01                  ; SPECIALK.S:510
-  *level@0x03f4 = a            ; SPECIALK.S:511
-  a = #0x02                  ; SPECIALK.S:512
-  *NextLevel@0x031c = a            ; SPECIALK.S:513
-  return                           ; SPECIALK.S:514
-:24:
-  cmp a, #ktimeback              ; SPECIALK.S:516
-  if a != #ktimeback goto :31  ; SPECIALK.S:517
-  a = #0xfe                  ; SPECIALK.S:518
-:chgtime:
-  c = 0                            ; SPECIALK.S:519
-  a = a + *FrameCount+1@0x0307 + c    ; SPECIALK.S:520
-  *FrameCount+1@0x0307 = a            ; SPECIALK.S:521
-  return                           ; SPECIALK.S:522
-:31:
-  cmp a, #ktimefwd              ; SPECIALK.S:524
-  if a != #ktimefwd goto :32  ; SPECIALK.S:525
-  a = #0x02                  ; SPECIALK.S:526
-  if a != #0x00 goto :chgtime  ; SPECIALK.S:527
-:32:
-  cmp a, #kerasegame              ; SPECIALK.S:529
-  if a != #kerasegame goto :33  ; SPECIALK.S:530
-  a = #0xff                  ; SPECIALK.S:531
-  *SavLevel@0xb6f0 = a            ; SPECIALK.S:532
-  tail_call DoSaveGame                ; SPECIALK.S:533
-:33:
-  cmp a, #ktimeup              ; SPECIALK.S:535
-  if a != #ktimeup goto :34  ; SPECIALK.S:536
-  a = #0xff                  ; SPECIALK.S:537
-  *FrameCount+1@0x0307 = a            ; SPECIALK.S:538
-  return                           ; SPECIALK.S:539
-:34:
-]rts:
   return                           ; SPECIALK.S:543
 }
 
 fn checkcodes {
-  return                           ; SPECIALK.S:587
   a = #C_boost                  ; SPECIALK.S:590
   x = #>C_boost                  ; SPECIALK.S:591
   call checkcode                  ; SPECIALK.S:592

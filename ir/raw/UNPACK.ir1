@@ -441,12 +441,12 @@ PROMPT:
   if eq goto :1       ; UNPACK.S:586
   a = #"B"                  ; UNPACK.S:587
 :1:
-  *msg2@0x03c0 = a            ; UNPACK.S:588
+  *msg2@0x03be = a            ; UNPACK.S:588
   call blackout                  ; UNPACK.S:590
   *RAMWRTmain@0xc004 = a            ; UNPACK.S:592
   x = #0x00                  ; UNPACK.S:594
 :loop:
-  a = *(msg1@0x03bf + x)   ; UNPACK.S:595
+  a = *(msg1@0x03bd + x)   ; UNPACK.S:595
   cmp a, #"@"              ; UNPACK.S:596
   if eq goto :done       ; UNPACK.S:597
   *($528+2@0x052a + x) = a   ; UNPACK.S:598
@@ -471,12 +471,12 @@ fn PROMPT {
   if eq goto :1       ; UNPACK.S:586
   a = #"B"                  ; UNPACK.S:587
 :1:
-  *msg2@0x03c0 = a            ; UNPACK.S:588
+  *msg2@0x03be = a            ; UNPACK.S:588
   call blackout                  ; UNPACK.S:590
   *RAMWRTmain@0xc004 = a            ; UNPACK.S:592
   x = #0x00                  ; UNPACK.S:594
 :loop:
-  a = *(msg1@0x03bf + x)   ; UNPACK.S:595
+  a = *(msg1@0x03bd + x)   ; UNPACK.S:595
   cmp a, #"@"              ; UNPACK.S:596
   if eq goto :done       ; UNPACK.S:597
   *($528+2@0x052a + x) = a   ; UNPACK.S:598
