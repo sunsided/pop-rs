@@ -72,6 +72,7 @@ impl Cpu {
 
 #[allow(non_upper_case_globals)]
 mod sym {
+    pub const BGset1: usize = 0x0303;
     pub const BlockAy: usize = 0x1283;
     pub const BlockBot: usize = 0x1279;
     pub const BlueSpec: usize = 0x0026;
@@ -91,8 +92,8 @@ mod sym {
     pub const VisScrn: usize = 0x00cb;
     pub const alertguard: usize = 0x00e4;
     pub const exitopen: usize = 0x0086;
-    pub const gateinc: usize = 0x0273;
-    pub const gatevel: usize = 0x0272;
+    pub const gateinc: usize = 0x0272;
+    pub const gatevel: usize = 0x0271;
     pub const height: usize = 0x0004;
     pub const level: usize = 0x03f4;
     pub const linkindex: usize = 0x00f3;
@@ -2187,7 +2188,12 @@ impl Cpu {
 
     fn makespace(&mut self) {
         self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff] = 0x00;
-        self.set_a(0x01);
+        self.set_a(0x00);
+        self.set_x(self.mem[sym::BGset1]);
+        if self.reg.x != 0x01 {
+            return;
+        }
+        self.set_a(0x01);  // stripe
         return;
     }
 

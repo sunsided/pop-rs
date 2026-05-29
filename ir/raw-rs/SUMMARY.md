@@ -11,19 +11,19 @@ Lowered / Deferred count *top-level* statements that became real Rust vs. those 
 | `COLL.S` | 27 | 214 | 0 | 100.0% |
 | `CTRL.S` | 51 | 321 | 0 | 100.0% |
 | `CTRLSUBS.S` | 86 | 578 | 0 | 100.0% |
-| `FRAMEADV.S` | 67 | 538 | 0 | 100.0% |
+| `FRAMEADV.S` | 66 | 531 | 0 | 100.0% |
 | `GAMEBG.S` | 41 | 332 | 0 | 100.0% |
 | `GRAFIX.S` | 98 | 591 | 7 | 98.8% |
 | `HIRES.S` | 42 | 153 | 0 | 100.0% |
-| `MASTER.S` | 60 | 380 | 0 | 100.0% |
+| `MASTER.S` | 60 | 372 | 0 | 100.0% |
 | `MISC.S` | 27 | 236 | 0 | 100.0% |
-| `MOVER.S` | 72 | 516 | 0 | 100.0% |
+| `MOVER.S` | 72 | 519 | 0 | 100.0% |
 | `SOUND.S` | 22 | 75 | 0 | 100.0% |
-| `SPECIALK.S` | 31 | 208 | 0 | 100.0% |
-| `SUBS.S` | 68 | 617 | 0 | 100.0% |
-| `TOPCTRL.S` | 52 | 425 | 0 | 100.0% |
+| `SPECIALK.S` | 31 | 205 | 0 | 100.0% |
+| `SUBS.S` | 68 | 608 | 0 | 100.0% |
+| `TOPCTRL.S` | 51 | 443 | 0 | 100.0% |
 | `UNPACK.S` | 21 | 108 | 11 | 90.8% |
-| **total** | **828** | **5743** | **18** | **99.7%** |
+| **total** | **826** | **5737** | **18** | **99.7%** |
 
 ## Skipped (no liftable entry points)
 

@@ -717,23 +717,24 @@ pub fn StartGame_3f(cpu: &mut Cpu) {
     if cpu.reg.a < 0x80 {
         return;
     }
-    if cpu.reg.a == 0x04 {
-        Demo(cpu);
+    if cpu.reg.a != 0x12 {
+        crate::unpack::BLACKOUT(cpu);
+        LoadStage3(cpu);
+        set1stlevel(cpu);
+        rdbluep(cpu);
+        driveoff(cpu);
+        cpu.mem[sym::musicon] = 0x01;
+        cpu.set_a(cpu.mem[sym::keypress]);
+        if cpu.reg.a != 0x0c {
+            cpu.set_a(0x01);
+            crate::topctrl::START(cpu);
+            return;
+        }
+        cpu.set_a(0x04);  // arbitrary
+        crate::topctrl::STARTRESUME(cpu);
         return;
     }
-    LoadStage3(cpu);
-    set1stlevel(cpu);
-    rdbluep(cpu);
-    driveoff(cpu);
-    cpu.mem[sym::musicon] = 0x01;
-    cpu.set_a(cpu.mem[sym::keypress]);
-    if cpu.reg.a != 0x0c {
-        cpu.set_a(0x01);
-        crate::topctrl::START(cpu);
-        return;
-    }
-    cpu.set_a(0x04);  // arbitrary
-    crate::topctrl::STARTRESUME(cpu);
+    ATTRACTMODE(cpu);
     return;
 }
 

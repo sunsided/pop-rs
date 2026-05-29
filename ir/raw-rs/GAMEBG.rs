@@ -91,16 +91,16 @@ mod sym {
     pub const KidAction: usize = 0x0056;
     pub const KidBlockX: usize = 0x0054;
     pub const KidBlockY: usize = 0x0055;
-    pub const KidStrOFF: usize = 0x015e;
-    pub const KidStrX: usize = 0x015d;
+    pub const KidStrOFF: usize = 0x015d;
+    pub const KidStrX: usize = 0x015c;
     pub const KidStrength: usize = 0x00ce;
     pub const LEFTCUT: usize = 0x0010;
     pub const MaxKidStr: usize = 0x00d0;
     pub const MinLeft: usize = 0x0300;
     pub const OFFSET: usize = 0x0003;
     pub const OPACITY: usize = 0x0006;
-    pub const OppStrOFF: usize = 0x0160;
-    pub const OppStrX: usize = 0x015f;
+    pub const OppStrOFF: usize = 0x015f;
+    pub const OppStrX: usize = 0x015e;
     pub const OppStrength: usize = 0x00cc;
     pub const PAGE: usize = 0x0000;
     pub const RIGHTCUT: usize = 0x0011;
@@ -112,12 +112,12 @@ mod sym {
     pub const YCO: usize = 0x0002;
     pub const addr: usize = 0x00e9;
     pub const backtolife: usize = 0x00a2;
-    pub const bline: usize = 0x0161;
-    pub const bubble: usize = 0x016c;
-    pub const digit1: usize = 0x0173;
-    pub const digit2: usize = 0x0174;
-    pub const flowimg: usize = 0x0166;
-    pub const glassimg: usize = 0x0164;
+    pub const bline: usize = 0x0160;
+    pub const bubble: usize = 0x016b;
+    pub const digit1: usize = 0x0172;
+    pub const digit2: usize = 0x0173;
+    pub const flowimg: usize = 0x0165;
+    pub const glassimg: usize = 0x0163;
     pub const inbuilder: usize = 0x0201;
     pub const level: usize = 0x03f4;
     pub const locals: usize = 0x00f0;
@@ -135,20 +135,20 @@ mod sym {
     pub const objX: usize = 0xb493;
     pub const objY: usize = 0xb4bb;
     pub const objbuf: usize = 0x5ef0;
-    pub const pmaskdx: usize = 0x0167;
-    pub const pmaskdy: usize = 0x0168;
-    pub const pmaski: usize = 0x0169;
-    pub const ptorchflame: usize = 0x016b;
+    pub const pmaskdx: usize = 0x0166;
+    pub const pmaskdy: usize = 0x0167;
+    pub const pmaski: usize = 0x0168;
+    pub const ptorchflame: usize = 0x016a;
     pub const redkidmeter: usize = 0x031b;
     pub const redoppmeter: usize = 0x031e;
-    pub const sandht: usize = 0x0165;
-    pub const stari: usize = 0x0163;
-    pub const stary: usize = 0x0162;
+    pub const sandht: usize = 0x0164;
+    pub const stari: usize = 0x0162;
+    pub const stary: usize = 0x0161;
     pub const temp: usize = 0x00eb;
     pub const tempblockx: usize = 0x0091;
     pub const tempblocky: usize = 0x0092;
-    pub const tempsave: usize = 0x015c;
-    pub const torchflame: usize = 0x016a;
+    pub const tempsave: usize = 0x015b;
+    pub const torchflame: usize = 0x0169;
     pub const xsave: usize = 0x00e8;
     pub const yellowflag: usize = 0x007c;
 }
@@ -161,7 +161,7 @@ impl Cpu {
     }
 
     fn TIMELEFTMSG(&mut self) {
-        self.set_a(0x71);
+        self.set_a(0x70);
         self.set_x(0x01);
         self.setupimage();
         self.set_a(self.mem[sym::MinLeft]);
@@ -226,7 +226,7 @@ impl Cpu {
         }
         self.set_a(self.mem[sym::YCO]);
         let tmp0 = self.reg.a;
-        self.set_a(0x72);
+        self.set_a(0x71);
         self.set_x(0x01);
         self.setupimage();
         self.reg.a = tmp0;
@@ -238,10 +238,10 @@ impl Cpu {
     }
 
     fn PRINTLEVEL(&mut self) {
-        self.set_a(0x6e);
+        self.set_a(0x6d);
         self.set_x(0x01);
         self.superimage();
-        self.set_a(0x6f);
+        self.set_a(0x6e);
         self.set_x(0x01);
         self.setupimage();
         self.getlevelno();
@@ -289,7 +289,7 @@ impl Cpu {
     }
 
     fn CONTINUEMSG(&mut self) {
-        self.set_a(0x6d);
+        self.set_a(0x6c);
         self.set_x(0x01);
         self.setupimage();
         self.set_a(self.mem[sym::KidBlockX]);
@@ -304,7 +304,7 @@ impl Cpu {
     }
 
     fn FLIPDISKMSG(&mut self) {
-        self.set_a(0x70);
+        self.set_a(0x6f);
         self.set_x(0x01);
         self.superimage();
         return;

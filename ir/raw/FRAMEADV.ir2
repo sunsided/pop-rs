@@ -211,11 +211,7 @@ fn FAST {
   a = #0xff                  ; FRAMEADV.S:330
   *yindex@0x00eb = a            ; FRAMEADV.S:331
   call drawobjs                  ; FRAMEADV.S:332
-  a = *inbuilder@0x0201        ; FRAMEADV.S:335
-  if a != #0x00 goto ]rts  ; FRAMEADV.S:336
   tail_call updatemeters                ; FRAMEADV.S:339
-]rts:
-  return                           ; FRAMEADV.S:179
 }
 
 fn RedBlockSure {
@@ -559,8 +555,6 @@ fn drawfrnt {
   a = a + *(frontx@0x0059 + x) + c   ; FRAMEADV.S:787
   *XCO@0x0001 = a            ; FRAMEADV.S:788
   if x >= #archtop2 goto :sta  ; FRAMEADV.S:791
-  a = #EditorDisk                  ; FRAMEADV.S:794
-  if a == #0x02 goto :ndunj  ; FRAMEADV.S:796
   a = *BGset1@0x0303        ; FRAMEADV.S:799
   if a == #0x01 goto :ndunj  ; FRAMEADV.S:801
   if x == #posts goto :sta  ; FRAMEADV.S:804
@@ -728,9 +722,7 @@ fn drawb {
   cmp a, #panelb0              ; FRAMEADV.S:1011
   if a == #panelb0 goto :panel  ; FRAMEADV.S:1012
   call :cont1                  ; FRAMEADV.S:1016
-  a = #EditorDisk                  ; FRAMEADV.S:1021
-  cmp a, #0x02              ; FRAMEADV.S:1022
-  if a == #0x02 goto :stripe  ; FRAMEADV.S:1023
+:stripe:
   a = *BGset1@0x0303        ; FRAMEADV.S:1026
   cmp a, #0x01              ; FRAMEADV.S:1027
   if a != #0x01 goto ]rts  ; FRAMEADV.S:1028
@@ -1576,8 +1568,6 @@ fn getobjid {
   a = *SCRNUM@0x0023        ; FRAMEADV.S:2042
   if a == #0x00 goto GOnull  ; FRAMEADV.S:2043
 getobjid1:
-  a = *inbuilder@0x0201        ; FRAMEADV.S:2049
-  if a != #0x00 goto getobjbldr  ; FRAMEADV.S:2050
   a = *(BlueSpec@0x0026)[y]   ; FRAMEADV.S:2053
   *state@0x00f0 = a            ; FRAMEADV.S:2054
   a = *(BlueType@0x0024)[y]   ; FRAMEADV.S:2056
@@ -1609,45 +1599,6 @@ getobjid1:
 :up1:
   a = #upressplate                  ; FRAMEADV.S:2097
   return                           ; FRAMEADV.S:2098
-}
-
-fn getobjbldr {
-  a = *(BlueType@0x0024)[y]   ; FRAMEADV.S:2118
-  a = a & #idmask              ; FRAMEADV.S:2119
-  push a                           ; FRAMEADV.S:2120
-  call getinitobj1                  ; FRAMEADV.S:2121
-  if cs goto :ok       ; FRAMEADV.S:2122
-  a = *(BlueSpec@0x0026)[y]   ; FRAMEADV.S:2123
-:ok:
-  *state@0x00f0 = a            ; FRAMEADV.S:2124
-  a = pop                          ; FRAMEADV.S:2125
-  return                           ; FRAMEADV.S:2126
-sortlist:
-:newpass:
-  a = #0x00                  ; FRAMEADV.S:2138
-  *switches@0x00f4 = a            ; FRAMEADV.S:2139
-  x = *sortX@0x03c0        ; FRAMEADV.S:2141
-:loop:
-  cmp x, #0x01              ; FRAMEADV.S:2143
-  if x == #0x01 goto :attop  ; FRAMEADV.S:2144
-  *xsave@0x00e8 = x            ; FRAMEADV.S:2146
-  call compare                  ; FRAMEADV.S:2148
-  x = *xsave@0x00e8        ; FRAMEADV.S:2150
-  if cc goto :ok       ; FRAMEADV.S:2152
-  a = *(sortX@0x03c0 + x)   ; FRAMEADV.S:2154
-  push a                           ; FRAMEADV.S:2155
-  a = *(sortX-1@0x03bf + x)   ; FRAMEADV.S:2156
-  *(sortX@0x03c0 + x) = a   ; FRAMEADV.S:2157
-  a = pop                          ; FRAMEADV.S:2158
-  *(sortX-1@0x03bf + x) = a   ; FRAMEADV.S:2159
-:ok:
-  x -= 1                         ; FRAMEADV.S:2161
-  if x != #0x00 goto :loop  ; FRAMEADV.S:2162
-:attop:
-  a = *switches@0x00f4        ; FRAMEADV.S:2167
-  if a != #0x00 goto :newpass  ; FRAMEADV.S:2168
-:rts:
-  return                           ; FRAMEADV.S:2172
 }
 
 fn sortlist  (aka :newpass) {
@@ -1800,8 +1751,6 @@ fn mbsub {
 }
 
 fn getobjid1 {
-  a = *inbuilder@0x0201        ; FRAMEADV.S:2049
-  if a != #0x00 goto getobjbldr  ; FRAMEADV.S:2050
   a = *(BlueSpec@0x0026)[y]   ; FRAMEADV.S:2053
   *state@0x00f0 = a            ; FRAMEADV.S:2054
   a = *(BlueType@0x0024)[y]   ; FRAMEADV.S:2056
@@ -1836,8 +1785,6 @@ fn getobjid1 {
 }
 
 fn drawtorchb {
-  a = *inbuilder@0x0201        ; FRAMEADV.S:1495
-  if a != #0x00 goto ]rts  ; FRAMEADV.S:1496
   a = *blockxco@0x00f3        ; FRAMEADV.S:1499
   if a == #0x00 goto ]rts  ; FRAMEADV.S:1500
   *XCO@0x0001 = a            ; FRAMEADV.S:1501
@@ -1906,8 +1853,6 @@ drawa:
 }
 
 fn drawflaska {
-  a = *inbuilder@0x0201        ; FRAMEADV.S:1514
-  if a != #0x00 goto ]rts  ; FRAMEADV.S:1515
   a = *blockxco@0x00f3        ; FRAMEADV.S:1518
   *XCO@0x0001 = a            ; FRAMEADV.S:1519
   a = *Ay@0x00ee        ; FRAMEADV.S:1520
@@ -1916,8 +1861,6 @@ fn drawflaska {
   call setupflask                  ; FRAMEADV.S:1523
   a = #UseLay                  ; FRAMEADV.S:1524
   tail_call addmidezo                ; FRAMEADV.S:1525
-]rts:
-  return                           ; FRAMEADV.S:1507
 }
 
 fn :sub {
@@ -1937,11 +1880,6 @@ fn :sub {
 }
 
 fn getloosey {
-  y = *inbuilder@0x0201        ; FRAMEADV.S:1435
-  if y == #0x00 goto :1  ; FRAMEADV.S:1436
-  y = #0x01                  ; FRAMEADV.S:1437
-  return                           ; FRAMEADV.S:1438
-:1:
   y = a                            ; FRAMEADV.S:1441
   if y >=0 goto ]rts  ; FRAMEADV.S:1442
   a = a & #0x7f              ; FRAMEADV.S:1443

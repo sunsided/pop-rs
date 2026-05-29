@@ -14,7 +14,7 @@ pub fn YELLOW(cpu: &mut Cpu) {
 
 #[doc(alias = "timeleftmsg")]
 pub fn TIMELEFTMSG(cpu: &mut Cpu) {
-    cpu.set_a(0x71);
+    cpu.set_a(0x70);
     cpu.set_x(0x01);
     setupimage(cpu);
     cpu.set_a(cpu.mem[sym::MinLeft]);
@@ -79,7 +79,7 @@ pub fn TIMELEFTMSG(cpu: &mut Cpu) {
     }
     cpu.set_a(cpu.mem[sym::YCO]);
     let tmp0 = cpu.reg.a;
-    cpu.set_a(0x72);
+    cpu.set_a(0x71);
     cpu.set_x(0x01);
     setupimage(cpu);
     cpu.reg.a = tmp0;
@@ -92,10 +92,10 @@ pub fn TIMELEFTMSG(cpu: &mut Cpu) {
 
 #[doc(alias = "printlevel")]
 pub fn PRINTLEVEL(cpu: &mut Cpu) {
-    cpu.set_a(0x6e);
+    cpu.set_a(0x6d);
     cpu.set_x(0x01);
     superimage(cpu);
-    cpu.set_a(0x6f);
+    cpu.set_a(0x6e);
     cpu.set_x(0x01);
     setupimage(cpu);
     getlevelno(cpu);
@@ -144,7 +144,7 @@ pub fn getlevelno(cpu: &mut Cpu) {
 
 #[doc(alias = "continuemsg")]
 pub fn CONTINUEMSG(cpu: &mut Cpu) {
-    cpu.set_a(0x6d);
+    cpu.set_a(0x6c);
     cpu.set_x(0x01);
     setupimage(cpu);
     cpu.set_a(cpu.mem[sym::KidBlockX]);
@@ -160,7 +160,7 @@ pub fn CONTINUEMSG(cpu: &mut Cpu) {
 
 #[doc(alias = "flipdiskmsg")]
 pub fn FLIPDISKMSG(cpu: &mut Cpu) {
-    cpu.set_a(0x70);
+    cpu.set_a(0x6f);
     cpu.set_x(0x01);
     superimage(cpu);
     return;

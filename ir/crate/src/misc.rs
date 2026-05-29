@@ -795,14 +795,6 @@ pub fn CHECKALERT(cpu: &mut Cpu) {
                 cpu.flags.c = (_r >> 8) != 0;
                 cpu.set_a(_r as u8);
                 cpu.mem[0x00f1] = cpu.reg.a;
-                cpu.set_a(cpu.mem[0x00f0]);
-                crate::ctrlsubs::GETBLOCKXP(cpu);
-                cpu.set_x(0x01);
-                crate::ext::showpage(cpu);
-                cpu.set_a(cpu.mem[0x00f1]);
-                crate::ctrlsubs::GETBLOCKXP(cpu);
-                cpu.set_x(0x02);
-                crate::ext::showpage(cpu);
                 cpu.set_a(cpu.mem[0x00f1]);
                 let _o: u8 = cpu.mem[0x00f0];
                 cpu.flags.c = cpu.reg.a >= _o;

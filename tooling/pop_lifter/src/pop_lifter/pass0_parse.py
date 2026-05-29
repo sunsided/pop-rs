@@ -59,6 +59,12 @@ class DumBlock:
 class FileAST:
     path: str
     lines: list[Line] = field(default_factory=list)
+    # Indices into `lines` that Merlin's conditional assembly (`do`/`else`/
+    # `fin`) excludes from this build — the block bodies under a false
+    # condition. Pass 0 skips them for PC accounting / label collection and
+    # pass 1 skips them when lifting, so dead build-flag code (e.g. the
+    # `do EditorDisk` editor paths, EditorDisk=0) isn't lifted as if live.
+    inactive_lines: set[int] = field(default_factory=set)
 
 
 @dataclass
@@ -595,11 +601,60 @@ class Parser:
 
         dum: _DumState | None = None
 
-        for line in lines:
+        # Merlin conditional-assembly stack. Each open `do` pushes a frame
+        # `(emit, cond, parent_active)`: `emit` is whether the current
+        # sub-region (the `do` branch, or the `else` branch after an
+        # `else`) assembles, given the enclosing state. The whole chain is
+        # active only when every frame emits.
+        cond_stack: list[dict] = []
+
+        def _cond_active() -> bool:
+            return all(f["emit"] for f in cond_stack)
+
+        for idx, line in enumerate(lines):
             if line.is_blank:
                 continue
 
             mnemonic = line.mnemonic
+
+            # ---- conditional assembly (`do` / `else` / `fin`) ----
+            if mnemonic == "do":
+                parent_active = _cond_active()
+                cond = False
+                if parent_active:
+                    try:
+                        cond = eval_expr(line.operand or "0", self.ast.equates) != 0
+                    except ValueError:
+                        # Unresolved condition: assemble the block rather
+                        # than silently dropping code (matches pre-feature
+                        # behaviour) and flag it.
+                        self._warn(line, f"do condition eval failed: {line.operand!r}")
+                        cond = True
+                cond_stack.append(
+                    {"emit": parent_active and cond,
+                     "cond": cond, "parent_active": parent_active}
+                )
+                continue
+            if mnemonic == "else":
+                # A stray `else`/`fin` with no open `do` is tolerated by
+                # Merlin (POP's SPECIALK.S carries a stray `fin`, GRAFIX.S
+                # an unclosed `do` at EOF) — ignore it silently rather than
+                # emitting a diagnostic for normal source.
+                if cond_stack:
+                    f = cond_stack[-1]
+                    f["emit"] = f["parent_active"] and not f["cond"]
+                continue
+            if mnemonic == "fin":
+                if cond_stack:
+                    cond_stack.pop()
+                continue
+
+            # Inside an inactive conditional region the line is excluded
+            # from this build: record it so pass 1 skips it, and don't let
+            # it advance the PC or define labels.
+            if not _cond_active():
+                file_ast.inactive_lines.add(idx)
+                continue
 
             # Record the PC at every global label before the line emits
             # any bytes, so a later `LABEL = *-thislabel` equate resolves.
@@ -819,7 +874,9 @@ def _collect_labels(ast: ProgramAST) -> None:
     downstream passes care about anyway."""
     counter = 0
     for file_ast in ast.files:
-        for line in file_ast.lines:
+        for i, line in enumerate(file_ast.lines):
+            if i in file_ast.inactive_lines:
+                continue
             label = line.label
             if not label:
                 continue

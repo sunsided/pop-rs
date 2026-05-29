@@ -110,7 +110,7 @@ mod sym {
     pub const RWBANK2: usize = 0xc083;
     pub const TABLE: usize = 0x0007;
     pub const TOPCUT: usize = 0x000f;
-    pub const VBLvect: usize = 0x019a;
+    pub const VBLvect: usize = 0x0199;
     pub const XCO: usize = 0x0001;
     pub const YCO: usize = 0x0002;
     pub const bgIMG: usize = 0xad91;
@@ -119,9 +119,9 @@ mod sym {
     pub const bgY: usize = 0xacc9;
     pub const blackflag: usize = 0x0022;
     pub const btn: usize = 0x003d;
-    pub const chtabbank: usize = 0x019b;
-    pub const chtablist: usize = 0x019c;
-    pub const dummy: usize = 0x019d;
+    pub const chtabbank: usize = 0x019a;
+    pub const chtablist: usize = 0x019b;
+    pub const dummy: usize = 0x019c;
     pub const fgIMG: usize = 0xafe9;
     pub const fgOP: usize = 0xb04d;
     pub const fgX: usize = 0xaf21;
@@ -175,7 +175,7 @@ mod sym {
     pub const scrncolor: usize = 0x031d;
     pub const soundon: usize = 0x0203;
     pub const topbuf: usize = 0x5f2c;
-    pub const vblflag: usize = 0x01fb;
+    pub const vblflag: usize = 0x01fa;
     pub const width: usize = 0x0005;
     pub const wipeCOL: usize = 0xb101;
     pub const wipeH: usize = 0xb0d9;
@@ -345,7 +345,6 @@ impl Cpu {
         if self.reg.a != 0x00 {
             self.set_x(self.mem[sym::purpleflag]);
             self.set_a(self.mem[(sym::dummy + self.reg.x as usize) & 0xffff]);
-            self.set_a(0x2e);
         }
         self.smc.sm = self.reg.a;
         self.set_x(self.reg.a);
@@ -2111,7 +2110,7 @@ impl Cpu {
             return;
         }
         self.mem[sym::RAMWRTaux] = self.reg.a;
-        self.mem[sym::VBLvect + 1] = 0xfd;
+        self.mem[sym::VBLvect + 1] = 0xfc;
         self.set_a(0x01);
         self.mem[sym::VBLvect + 2] = self.reg.a;
         self.flags.i = true;

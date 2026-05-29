@@ -105,8 +105,8 @@ mod sym {
     pub const YHI: usize = 0xe0c0;
     pub const YLO: usize = 0xe000;
     pub const YScrPos: usize = 0x00f3;
-    pub const msg1: usize = 0x03bf;
-    pub const msg2: usize = 0x03c0;
+    pub const msg1: usize = 0x03bd;
+    pub const msg2: usize = 0x03be;
     pub const track: usize = 0x00fe;
 }
 
@@ -1147,7 +1147,7 @@ impl Cpu {
         self.mem[0xc029] = self.reg.a;
         // 65816 (IIgs-only, not modeled): rep $20  ; UNPACK.S:722
         self.set_x(0x00);  // aux mem
-        self.set_y(0xca);
+        self.set_y(0xc8);
         self.set_a(0x1f);
         // 65816 (IIgs-only, not modeled): phb  ; UNPACK.S:729
         // 65816 (IIgs-only, not modeled): mvn 0,1  ; UNPACK.S:730

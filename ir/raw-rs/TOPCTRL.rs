@@ -76,7 +76,6 @@ mod sym {
     pub const ALTZPon: usize = 0xc009;
     pub const AMtimer: usize = 0x00c7;
     pub const BBundID: usize = 0x03f5;
-    pub const BGset1: usize = 0x0303;
     pub const BTN0: usize = 0x001a;
     pub const BTN1: usize = 0x001b;
     pub const BlockYlast: usize = 0x039b;
@@ -97,6 +96,7 @@ mod sym {
     pub const KidPosn: usize = 0x0050;
     pub const KidScrn: usize = 0x005b;
     pub const KidStrength: usize = 0x00ce;
+    pub const KidY: usize = 0x0052;
     pub const ManCtrl: usize = 0x00de;
     pub const MaxKidStr: usize = 0x00d0;
     pub const MaxOppStr: usize = 0x00dc;
@@ -116,15 +116,19 @@ mod sym {
     pub const SNlastframe: usize = 0x0370;
     pub const SNthisframe: usize = 0x0360;
     pub const SPEED: usize = 0x030c;
+    pub const SavLevel: usize = 0xb6f0;
+    pub const SavNextMsg: usize = 0xb6f6;
+    pub const SavStrength: usize = 0xb6f1;
+    pub const SavTimer: usize = 0xb6f3;
     pub const SecLeft: usize = 0x0302;
     pub const ShadFace: usize = 0x0063;
     pub const ShadID: usize = 0x006d;
     pub const ShadPosn: usize = 0x0060;
     pub const ShadScrn: usize = 0x006b;
+    pub const SongCount: usize = 0x0308;
     pub const SongCue: usize = 0x0319;
     pub const TEXTon: usize = 0xc051;
     pub const VisScrn: usize = 0x00cb;
-    pub const backtolife: usize = 0x00a2;
     pub const blackflag: usize = 0x0022;
     pub const clrB: usize = 0x00d5;
     pub const clrD: usize = 0x00d7;
@@ -136,14 +140,12 @@ mod sym {
     pub const cutscrn: usize = 0x00a6;
     pub const develment: usize = 0x020e;
     pub const exitopen: usize = 0x0086;
-    pub const genCLS: usize = 0xac00;
     pub const gotsword: usize = 0x030a;
     pub const heroic: usize = 0x00d3;
     pub const inbuilder: usize = 0x0201;
     pub const inmenu: usize = 0x0200;
     pub const invert: usize = 0x009f;
     pub const jarabove: usize = 0x00cd;
-    pub const keypress: usize = 0x020f;
     pub const level: usize = 0x03f4;
     pub const lightcolor: usize = 0x0089;
     pub const lightning: usize = 0x0088;
@@ -161,8 +163,10 @@ mod sym {
     pub const soundon: usize = 0x0203;
     pub const stunned: usize = 0x00e6;
     pub const timerequest: usize = 0x031f;
+    pub const trobcount: usize = 0xb6e0;
     pub const vibes: usize = 0x0318;
     pub const weightless: usize = 0x00c5;
+    pub const yellowflag: usize = 0x007c;
 }
 
 impl Cpu {
@@ -238,7 +242,6 @@ impl Cpu {
     fn RESTART(&mut self) {
         self.mem[sym::ALTZPon] = self.reg.a;
         self.mem[0xc010] = self.reg.a;
-        self.reloadblue();
         self.set_a(0x20);
         self.lrcls();
         self.vblank();
@@ -355,6 +358,126 @@ impl Cpu {
         }
         self.mem[sym::origstrength] = self.mem[sym::MaxKidStr];
         self.mem[sym::milestone] = 0x00;
+        self.set_a(self.mem[sym::NextLevel]);
+        let _o: u8 = 0x0f;
+        self.flags.c = self.reg.a >= _o;
+        self.flags.z = self.reg.a == _o;
+        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+        if self.reg.a < 0x0f {
+            let _o: u8 = 0x01;
+            self.flags.c = self.reg.a >= _o;
+            self.flags.z = self.reg.a == _o;
+            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+            if self.reg.a >= 0x01 {
+                self.set_x(0xad);
+                let _o: u8 = 0x03;
+                self.flags.c = self.reg.a >= _o;
+                self.flags.z = self.reg.a == _o;
+                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                if self.reg.a < 0x03 {
+                    self.set_x(0xa9);
+                }
+                self.addsfx();
+                self.chgmeters();
+                self.cutcheck();
+                self.PrepCut();
+                self.cutguard();
+                self.set_a(self.mem[sym::level]);
+                if self.reg.a != 0x00 {
+                    self.set_a(self.mem[sym::level]);
+                    let _o: u8 = 0x06;
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if self.reg.a != 0x06 {
+                        let _o: u8 = 0x0c;
+                        self.flags.c = self.reg.a >= _o;
+                        self.flags.z = self.reg.a == _o;
+                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                        if self.reg.a == 0x0c {
+                            self.set_a(self.mem[sym::KidScrn]);
+                            let _o: u8 = 0x17;
+                            self.flags.c = self.reg.a >= _o;
+                            self.flags.z = self.reg.a == _o;
+                            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                            if self.reg.a == 0x17 {
+                                let _v = self.mem[sym::NextLevel].wrapping_add(1);
+                                self.mem[sym::NextLevel] = _v;
+                                self.set_nz(_v);
+                                self.mem[sym::skipmessage] = 0x01;
+                                self.LoadNext1();
+                                return;
+                            }
+                        }
+                    } else {
+                        self.set_a(self.mem[sym::KidScrn]);
+                        let _o: u8 = 0x01;
+                        self.flags.c = self.reg.a >= _o;
+                        self.flags.z = self.reg.a == _o;
+                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                        if self.reg.a == 0x01 {
+                            self.set_a(self.mem[sym::KidY]);
+                            let _o: u8 = 0x14;
+                            self.flags.c = self.reg.a >= _o;
+                            self.flags.z = self.reg.a == _o;
+                            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                            if self.reg.a < 0x14 {
+                                self.set_a(0xff);
+                                self.mem[sym::KidY] = self.reg.a;
+                                let _v = self.mem[sym::NextLevel].wrapping_add(1);
+                                self.mem[sym::NextLevel] = _v;
+                                self.set_nz(_v);
+                            }
+                        }
+                    }
+                } else {
+                    self.set_a(self.mem[sym::KidScrn]);
+                    let _o: u8 = 0x18;
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if self.reg.a == 0x18 {
+                        self.GOATTRACT();
+                        return;
+                    }
+                }
+                'b40: {
+                    self.set_a(self.mem[sym::level]);
+                    let _o: u8 = 0x0e;
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if self.reg.a < 0x0e {
+                        let _o: u8 = 0x0d;
+                        self.flags.c = self.reg.a >= _o;
+                        self.flags.z = self.reg.a == _o;
+                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                        if self.reg.a >= 0x0d {
+                            self.set_a(self.mem[sym::exitopen]);
+                            if self.reg.a != 0x00 {
+                                break 'b40;
+                            }
+                        }
+                        self.keeptime();
+                    }
+                }
+                self.showtime();
+                self.set_a(self.mem[sym::level]);
+                let _o: u8 = 0x0d;
+                self.flags.c = self.reg.a >= _o;
+                self.flags.z = self.reg.a == _o;
+                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                if self.reg.a < 0x0d {
+                    self.set_a(self.mem[sym::MinLeft]);
+                    self.set_a(self.reg.a | self.mem[sym::SecLeft]);
+                    if self.reg.a == 0x00 {
+                        self.YouLose();
+                        return;
+                    }
+                }
+                return;
+            }
+        }
         self.set_a(self.mem[sym::level]);
         self.mem[sym::NextLevel] = self.reg.a;
         self.RESTART();
@@ -364,6 +487,126 @@ impl Cpu {
     fn LoadNext1(&mut self) {
         self.mem[sym::origstrength] = self.mem[sym::MaxKidStr];
         self.mem[sym::milestone] = 0x00;
+        self.set_a(self.mem[sym::NextLevel]);
+        let _o: u8 = 0x0f;
+        self.flags.c = self.reg.a >= _o;
+        self.flags.z = self.reg.a == _o;
+        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+        if self.reg.a < 0x0f {
+            let _o: u8 = 0x01;
+            self.flags.c = self.reg.a >= _o;
+            self.flags.z = self.reg.a == _o;
+            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+            if self.reg.a >= 0x01 {
+                self.set_x(0xad);
+                let _o: u8 = 0x03;
+                self.flags.c = self.reg.a >= _o;
+                self.flags.z = self.reg.a == _o;
+                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                if self.reg.a < 0x03 {
+                    self.set_x(0xa9);
+                }
+                self.addsfx();
+                self.chgmeters();
+                self.cutcheck();
+                self.PrepCut();
+                self.cutguard();
+                self.set_a(self.mem[sym::level]);
+                if self.reg.a != 0x00 {
+                    self.set_a(self.mem[sym::level]);
+                    let _o: u8 = 0x06;
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if self.reg.a != 0x06 {
+                        let _o: u8 = 0x0c;
+                        self.flags.c = self.reg.a >= _o;
+                        self.flags.z = self.reg.a == _o;
+                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                        if self.reg.a == 0x0c {
+                            self.set_a(self.mem[sym::KidScrn]);
+                            let _o: u8 = 0x17;
+                            self.flags.c = self.reg.a >= _o;
+                            self.flags.z = self.reg.a == _o;
+                            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                            if self.reg.a == 0x17 {
+                                let _v = self.mem[sym::NextLevel].wrapping_add(1);
+                                self.mem[sym::NextLevel] = _v;
+                                self.set_nz(_v);
+                                self.mem[sym::skipmessage] = 0x01;
+                                self.LoadNext1();
+                                return;
+                            }
+                        }
+                    } else {
+                        self.set_a(self.mem[sym::KidScrn]);
+                        let _o: u8 = 0x01;
+                        self.flags.c = self.reg.a >= _o;
+                        self.flags.z = self.reg.a == _o;
+                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                        if self.reg.a == 0x01 {
+                            self.set_a(self.mem[sym::KidY]);
+                            let _o: u8 = 0x14;
+                            self.flags.c = self.reg.a >= _o;
+                            self.flags.z = self.reg.a == _o;
+                            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                            if self.reg.a < 0x14 {
+                                self.set_a(0xff);
+                                self.mem[sym::KidY] = self.reg.a;
+                                let _v = self.mem[sym::NextLevel].wrapping_add(1);
+                                self.mem[sym::NextLevel] = _v;
+                                self.set_nz(_v);
+                            }
+                        }
+                    }
+                } else {
+                    self.set_a(self.mem[sym::KidScrn]);
+                    let _o: u8 = 0x18;
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if self.reg.a == 0x18 {
+                        self.GOATTRACT();
+                        return;
+                    }
+                }
+                'b38: {
+                    self.set_a(self.mem[sym::level]);
+                    let _o: u8 = 0x0e;
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if self.reg.a < 0x0e {
+                        let _o: u8 = 0x0d;
+                        self.flags.c = self.reg.a >= _o;
+                        self.flags.z = self.reg.a == _o;
+                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                        if self.reg.a >= 0x0d {
+                            self.set_a(self.mem[sym::exitopen]);
+                            if self.reg.a != 0x00 {
+                                break 'b38;
+                            }
+                        }
+                        self.keeptime();
+                    }
+                }
+                self.showtime();
+                self.set_a(self.mem[sym::level]);
+                let _o: u8 = 0x0d;
+                self.flags.c = self.reg.a >= _o;
+                self.flags.z = self.reg.a == _o;
+                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                if self.reg.a < 0x0d {
+                    self.set_a(self.mem[sym::MinLeft]);
+                    self.set_a(self.reg.a | self.mem[sym::SecLeft]);
+                    if self.reg.a == 0x00 {
+                        self.YouLose();
+                        return;
+                    }
+                }
+                return;
+            }
+        }
         self.set_a(self.mem[sym::level]);
         self.mem[sym::NextLevel] = self.reg.a;
         self.RESTART();
@@ -384,6 +627,63 @@ impl Cpu {
         self.cutcheck();
         self.PrepCut();
         self.cutguard();
+        self.set_a(self.mem[sym::level]);
+        if self.reg.a != 0x00 {
+            self.set_a(self.mem[sym::level]);
+            if self.reg.a != 0x06 {
+                if self.reg.a == 0x0c {
+                    self.set_a(self.mem[sym::KidScrn]);
+                    if self.reg.a == 0x17 {
+                        let _v = self.mem[sym::NextLevel].wrapping_add(1);
+                        self.mem[sym::NextLevel] = _v;
+                        self.set_nz(_v);
+                        self.mem[sym::skipmessage] = 0x01;
+                        self.LoadNext1();
+                        return;
+                    }
+                }
+            } else {
+                self.set_a(self.mem[sym::KidScrn]);
+                if self.reg.a == 0x01 {
+                    self.set_a(self.mem[sym::KidY]);
+                    if self.reg.a < 0x14 {
+                        self.set_a(0xff);
+                        self.mem[sym::KidY] = self.reg.a;
+                        let _v = self.mem[sym::NextLevel].wrapping_add(1);
+                        self.mem[sym::NextLevel] = _v;
+                        self.set_nz(_v);
+                    }
+                }
+            }
+        } else {
+            self.set_a(self.mem[sym::KidScrn]);
+            if self.reg.a == 0x18 {
+                self.GOATTRACT();
+                return;
+            }
+        }
+        'b15: {
+            self.set_a(self.mem[sym::level]);
+            if self.reg.a < 0x0e {
+                if self.reg.a >= 0x0d {
+                    self.set_a(self.mem[sym::exitopen]);
+                    if self.reg.a != 0x00 {
+                        break 'b15;
+                    }
+                }
+                self.keeptime();
+            }
+        }
+        self.showtime();
+        self.set_a(self.mem[sym::level]);
+        if self.reg.a < 0x0d {
+            self.set_a(self.mem[sym::MinLeft]);
+            self.set_a(self.reg.a | self.mem[sym::SecLeft]);
+            if self.reg.a == 0x00 {
+                self.YouLose();
+                return;
+            }
+        }
         return;
     }
 
@@ -548,18 +848,6 @@ impl Cpu {
         self.set_a(_r as u8);
         self.mem[sym::FCharCL] = self.reg.a;
         self.addshadobj();
-        return;
-    }
-
-    fn DoQuickCut(&mut self) {
-        self.fastspeed();
-        self.mem[sym::PAGE] = 0x00;
-        self.drawbg();
-        self.PageFlip();
-        self.copyscrn();
-        self.DoFast();
-        self.PageFlip();
-        self.normspeed();
         return;
     }
 
@@ -730,7 +1018,7 @@ impl Cpu {
         if self.reg.a >= 0x04 {
             self.set_a(self.mem[sym::level]);
             if self.reg.a == 0x00 {
-                self.RESTART();
+                self.GOATTRACT();
                 return;
             }
             self.set_a(self.mem[sym::SongCue]);
@@ -749,24 +1037,8 @@ impl Cpu {
                         self.mem[sym::msgtimer] = self.reg.a;
                     }
                     if self.reg.a == 0x01 {
-                        self.RESTART();
+                        self.GOATTRACT();
                         return;
-                    }
-                    self.set_a(self.mem[sym::develment]);
-                    if self.reg.a != 0x00 {
-                        self.set_a(self.mem[sym::keypress]);
-                        if self.reg.a == 0x52 {
-                            self.mem[sym::msgtimer] = 0x00;
-                            self.mem[sym::SongCue] = 0x00;
-                            self.set_a(0x14);
-                            self.mem[sym::backtolife] = self.reg.a;
-                            self.LoadKid();
-                            self.mem[sym::ChgKidStr] = self.mem[sym::MaxKidStr];
-                            self.set_a(0x02);
-                            self.jumpseq();
-                            self.startkid1();
-                            return;
-                        }
                     }
                     self.set_a(self.mem[sym::BTN0]);
                     self.set_a(self.reg.a | self.mem[sym::BTN1]);
@@ -1137,10 +1409,547 @@ impl Cpu {
     }
 
     fn ResumeGame(&mut self) {
+        self.flipdisk();
+        self.set_a(0xad);
+        self.mem[sym::BBundID] = self.reg.a;
+        self.loadgame();
+        self.set_a(self.mem[sym::SavLevel]);
+        if (self.reg.a as i8) >= 0 {
+            self.mem[sym::origstrength] = self.mem[sym::SavStrength];
+            self.mem[sym::FrameCount + 1] = self.mem[sym::SavTimer + 1];
+            self.mem[sym::FrameCount] = self.mem[sym::SavTimer];
+            self.mem[sym::NextTimeMsg] = self.mem[sym::SavNextMsg];
+            self.mem[sym::timerequest] = 0x01;
+            self.mem[sym::yellowflag] = 0x80;
+            self.set_a(self.mem[sym::SavLevel]);
+            self.mem[sym::level] = self.reg.a;
+            self.mem[sym::NextLevel] = self.reg.a;
+            self.RESTART();
+            return;
+        }
+        self.flipdisk();
+        self.mem[sym::BBundID] = 0xa9;
+        self.set_a(0x01);
+        self.mem[sym::level] = self.reg.a;
+        self.mem[sym::NextLevel] = self.reg.a;
+        self.RESTART();
         return;
     }
 
     fn songcues(&mut self) {
+        self.set_x(self.mem[sym::SongCue]);
+        if self.reg.x == 0x00 {
+            return;
+        }
+        self.set_a(self.mem[sym::level]);
+        if self.reg.a == 0x00 {
+            return;
+        }
+        self.set_a(self.mem[sym::SongCount]);
+        if self.reg.a != 0x00 {
+            let _v = self.mem[sym::SongCount].wrapping_sub(1);
+            self.mem[sym::SongCount] = _v;
+            self.set_nz(_v);
+            self.set_a(self.mem[sym::KidPosn]);
+            if self.reg.a != 0x00 {
+                self.set_a(self.mem[sym::KidPosn]);
+                self.static_3f();
+                if !self.flags.z {
+                    return;
+                }
+                self.set_a(self.mem[sym::ShadFace]);
+                let _o: u8 = 0x56;
+                self.flags.c = self.reg.a >= _o;
+                self.flags.z = self.reg.a == _o;
+                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                if self.reg.a == 0x56 {
+                    self.set_a(self.mem[sym::trobcount]);
+                    if self.reg.a != 0x00 {
+                        return;
+                    }
+                    self.set_a(self.mem[sym::nummob]);
+                    if self.reg.a != 0x00 {
+                        return;
+                    }
+                    self.set_a(self.mem[sym::lightning]);
+                    if self.reg.a != 0x00 {
+                        return;
+                    }
+                    self.set_a(self.mem[sym::mergetimer]);
+                    if (self.reg.a as i8) < 0 {
+                        self.set_a(self.mem[sym::PAGE]);
+                        self.set_a(self.reg.a ^ 0x20);
+                        self.mem[sym::PAGE] = self.reg.a;
+                        self.listtorches();
+                        self.set_a(self.mem[sym::SongCue]);
+                        self.minit();
+                        self.mem[0xc010] = self.reg.a;
+                        loop {
+                            self.burn();
+                            self.musickeys();
+                            self.mplay();
+                            let _o: u8 = 0x00;
+                            self.flags.c = self.reg.a >= _o;
+                            self.flags.z = self.reg.a == _o;
+                            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                            if !(self.reg.a != 0x00) {
+                                break;
+                            }
+                        }
+                        self.mem[sym::SongCue] = 0x00;
+                        self.set_a(self.mem[sym::PAGE]);
+                        self.set_a(self.reg.a ^ 0x20);
+                        self.mem[sym::PAGE] = self.reg.a;
+                        self.clearjoy();
+                        return;
+                    }
+                    if !self.flags.z {
+                        return;
+                    }
+                    self.set_a(self.mem[sym::ChgKidStr]);
+                    self.set_a(self.reg.a | self.mem[sym::ChgOppStr]);
+                    if self.reg.a != 0x00 {
+                        return;
+                    }
+                    self.set_a(self.mem[sym::PAGE]);
+                    self.set_a(self.reg.a ^ 0x20);
+                    self.mem[sym::PAGE] = self.reg.a;
+                    self.listtorches();
+                    self.set_a(self.mem[sym::SongCue]);
+                    self.minit();
+                    self.mem[0xc010] = self.reg.a;
+                    loop {
+                        self.burn();
+                        self.musickeys();
+                        self.mplay();
+                        let _o: u8 = 0x00;
+                        self.flags.c = self.reg.a >= _o;
+                        self.flags.z = self.reg.a == _o;
+                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                        if !(self.reg.a != 0x00) {
+                            break;
+                        }
+                    }
+                    self.mem[sym::SongCue] = 0x00;
+                    self.set_a(self.mem[sym::PAGE]);
+                    self.set_a(self.reg.a ^ 0x20);
+                    self.mem[sym::PAGE] = self.reg.a;
+                    self.clearjoy();
+                    return;
+                }
+                self.set_a(self.mem[sym::ShadScrn]);
+                let _o: u8 = self.mem[sym::VisScrn];
+                self.flags.c = self.reg.a >= _o;
+                self.flags.z = self.reg.a == _o;
+                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                if self.reg.a != self.mem[sym::VisScrn] {
+                    self.set_a(self.mem[sym::trobcount]);
+                    if self.reg.a != 0x00 {
+                        return;
+                    }
+                    self.set_a(self.mem[sym::nummob]);
+                    if self.reg.a != 0x00 {
+                        return;
+                    }
+                    self.set_a(self.mem[sym::lightning]);
+                    if self.reg.a != 0x00 {
+                        return;
+                    }
+                    self.set_a(self.mem[sym::mergetimer]);
+                    if (self.reg.a as i8) < 0 {
+                        self.set_a(self.mem[sym::PAGE]);
+                        self.set_a(self.reg.a ^ 0x20);
+                        self.mem[sym::PAGE] = self.reg.a;
+                        self.listtorches();
+                        self.set_a(self.mem[sym::SongCue]);
+                        self.minit();
+                        self.mem[0xc010] = self.reg.a;
+                        loop {
+                            self.burn();
+                            self.musickeys();
+                            self.mplay();
+                            let _o: u8 = 0x00;
+                            self.flags.c = self.reg.a >= _o;
+                            self.flags.z = self.reg.a == _o;
+                            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                            if !(self.reg.a != 0x00) {
+                                break;
+                            }
+                        }
+                        self.mem[sym::SongCue] = 0x00;
+                        self.set_a(self.mem[sym::PAGE]);
+                        self.set_a(self.reg.a ^ 0x20);
+                        self.mem[sym::PAGE] = self.reg.a;
+                        self.clearjoy();
+                        return;
+                    }
+                    if !self.flags.z {
+                        return;
+                    }
+                    self.set_a(self.mem[sym::ChgKidStr]);
+                    self.set_a(self.reg.a | self.mem[sym::ChgOppStr]);
+                    if self.reg.a != 0x00 {
+                        return;
+                    }
+                    self.set_a(self.mem[sym::PAGE]);
+                    self.set_a(self.reg.a ^ 0x20);
+                    self.mem[sym::PAGE] = self.reg.a;
+                    self.listtorches();
+                    self.set_a(self.mem[sym::SongCue]);
+                    self.minit();
+                    self.mem[0xc010] = self.reg.a;
+                    loop {
+                        self.burn();
+                        self.musickeys();
+                        self.mplay();
+                        let _o: u8 = 0x00;
+                        self.flags.c = self.reg.a >= _o;
+                        self.flags.z = self.reg.a == _o;
+                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                        if !(self.reg.a != 0x00) {
+                            break;
+                        }
+                    }
+                    self.mem[sym::SongCue] = 0x00;
+                    self.set_a(self.mem[sym::PAGE]);
+                    self.set_a(self.reg.a ^ 0x20);
+                    self.mem[sym::PAGE] = self.reg.a;
+                    self.clearjoy();
+                    return;
+                }
+                self.set_a(self.mem[sym::ShadPosn]);
+                self.static_3f();
+                if !self.flags.z {
+                    return;
+                }
+                self.set_a(self.mem[sym::trobcount]);
+                if self.reg.a != 0x00 {
+                    return;
+                }
+                self.set_a(self.mem[sym::nummob]);
+                if self.reg.a != 0x00 {
+                    return;
+                }
+                self.set_a(self.mem[sym::lightning]);
+                if self.reg.a != 0x00 {
+                    return;
+                }
+                self.set_a(self.mem[sym::mergetimer]);
+                if (self.reg.a as i8) < 0 {
+                    self.set_a(self.mem[sym::PAGE]);
+                    self.set_a(self.reg.a ^ 0x20);
+                    self.mem[sym::PAGE] = self.reg.a;
+                    self.listtorches();
+                    self.set_a(self.mem[sym::SongCue]);
+                    self.minit();
+                    self.mem[0xc010] = self.reg.a;
+                    loop {
+                        self.burn();
+                        self.musickeys();
+                        self.mplay();
+                        let _o: u8 = 0x00;
+                        self.flags.c = self.reg.a >= _o;
+                        self.flags.z = self.reg.a == _o;
+                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                        if !(self.reg.a != 0x00) {
+                            break;
+                        }
+                    }
+                    self.mem[sym::SongCue] = 0x00;
+                    self.set_a(self.mem[sym::PAGE]);
+                    self.set_a(self.reg.a ^ 0x20);
+                    self.mem[sym::PAGE] = self.reg.a;
+                    self.clearjoy();
+                    return;
+                }
+                if !self.flags.z {
+                    return;
+                }
+                self.set_a(self.mem[sym::ChgKidStr]);
+                self.set_a(self.reg.a | self.mem[sym::ChgOppStr]);
+                if self.reg.a != 0x00 {
+                    return;
+                }
+                self.set_a(self.mem[sym::PAGE]);
+                self.set_a(self.reg.a ^ 0x20);
+                self.mem[sym::PAGE] = self.reg.a;
+                self.listtorches();
+                self.set_a(self.mem[sym::SongCue]);
+                self.minit();
+                self.mem[0xc010] = self.reg.a;
+                loop {
+                    self.burn();
+                    self.musickeys();
+                    self.mplay();
+                    let _o: u8 = 0x00;
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if !(self.reg.a != 0x00) {
+                        break;
+                    }
+                }
+                self.mem[sym::SongCue] = 0x00;
+                self.set_a(self.mem[sym::PAGE]);
+                self.set_a(self.reg.a ^ 0x20);
+                self.mem[sym::PAGE] = self.reg.a;
+                self.clearjoy();
+                return;
+            }
+            self.set_a(self.mem[sym::NextLevel]);
+            let _o: u8 = self.mem[sym::level];
+            self.flags.c = self.reg.a >= _o;
+            self.flags.z = self.reg.a == _o;
+            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+            if self.reg.a == self.mem[sym::level] {
+                return;
+            }
+            self.set_a(self.mem[sym::KidPosn]);
+            self.static_3f();
+            if !self.flags.z {
+                return;
+            }
+            self.set_a(self.mem[sym::ShadFace]);
+            let _o: u8 = 0x56;
+            self.flags.c = self.reg.a >= _o;
+            self.flags.z = self.reg.a == _o;
+            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+            if self.reg.a == 0x56 {
+                self.set_a(self.mem[sym::trobcount]);
+                if self.reg.a != 0x00 {
+                    return;
+                }
+                self.set_a(self.mem[sym::nummob]);
+                if self.reg.a != 0x00 {
+                    return;
+                }
+                self.set_a(self.mem[sym::lightning]);
+                if self.reg.a != 0x00 {
+                    return;
+                }
+                self.set_a(self.mem[sym::mergetimer]);
+                if (self.reg.a as i8) < 0 {
+                    self.set_a(self.mem[sym::PAGE]);
+                    self.set_a(self.reg.a ^ 0x20);
+                    self.mem[sym::PAGE] = self.reg.a;
+                    self.listtorches();
+                    self.set_a(self.mem[sym::SongCue]);
+                    self.minit();
+                    self.mem[0xc010] = self.reg.a;
+                    loop {
+                        self.burn();
+                        self.musickeys();
+                        self.mplay();
+                        let _o: u8 = 0x00;
+                        self.flags.c = self.reg.a >= _o;
+                        self.flags.z = self.reg.a == _o;
+                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                        if !(self.reg.a != 0x00) {
+                            break;
+                        }
+                    }
+                    self.mem[sym::SongCue] = 0x00;
+                    self.set_a(self.mem[sym::PAGE]);
+                    self.set_a(self.reg.a ^ 0x20);
+                    self.mem[sym::PAGE] = self.reg.a;
+                    self.clearjoy();
+                    return;
+                }
+                if !self.flags.z {
+                    return;
+                }
+                self.set_a(self.mem[sym::ChgKidStr]);
+                self.set_a(self.reg.a | self.mem[sym::ChgOppStr]);
+                if self.reg.a != 0x00 {
+                    return;
+                }
+                self.set_a(self.mem[sym::PAGE]);
+                self.set_a(self.reg.a ^ 0x20);
+                self.mem[sym::PAGE] = self.reg.a;
+                self.listtorches();
+                self.set_a(self.mem[sym::SongCue]);
+                self.minit();
+                self.mem[0xc010] = self.reg.a;
+                loop {
+                    self.burn();
+                    self.musickeys();
+                    self.mplay();
+                    let _o: u8 = 0x00;
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if !(self.reg.a != 0x00) {
+                        break;
+                    }
+                }
+                self.mem[sym::SongCue] = 0x00;
+                self.set_a(self.mem[sym::PAGE]);
+                self.set_a(self.reg.a ^ 0x20);
+                self.mem[sym::PAGE] = self.reg.a;
+                self.clearjoy();
+                return;
+            }
+            self.set_a(self.mem[sym::ShadScrn]);
+            let _o: u8 = self.mem[sym::VisScrn];
+            self.flags.c = self.reg.a >= _o;
+            self.flags.z = self.reg.a == _o;
+            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+            if self.reg.a != self.mem[sym::VisScrn] {
+                self.set_a(self.mem[sym::trobcount]);
+                if self.reg.a != 0x00 {
+                    return;
+                }
+                self.set_a(self.mem[sym::nummob]);
+                if self.reg.a != 0x00 {
+                    return;
+                }
+                self.set_a(self.mem[sym::lightning]);
+                if self.reg.a != 0x00 {
+                    return;
+                }
+                self.set_a(self.mem[sym::mergetimer]);
+                if (self.reg.a as i8) < 0 {
+                    self.set_a(self.mem[sym::PAGE]);
+                    self.set_a(self.reg.a ^ 0x20);
+                    self.mem[sym::PAGE] = self.reg.a;
+                    self.listtorches();
+                    self.set_a(self.mem[sym::SongCue]);
+                    self.minit();
+                    self.mem[0xc010] = self.reg.a;
+                    loop {
+                        self.burn();
+                        self.musickeys();
+                        self.mplay();
+                        let _o: u8 = 0x00;
+                        self.flags.c = self.reg.a >= _o;
+                        self.flags.z = self.reg.a == _o;
+                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                        if !(self.reg.a != 0x00) {
+                            break;
+                        }
+                    }
+                    self.mem[sym::SongCue] = 0x00;
+                    self.set_a(self.mem[sym::PAGE]);
+                    self.set_a(self.reg.a ^ 0x20);
+                    self.mem[sym::PAGE] = self.reg.a;
+                    self.clearjoy();
+                    return;
+                }
+                if !self.flags.z {
+                    return;
+                }
+                self.set_a(self.mem[sym::ChgKidStr]);
+                self.set_a(self.reg.a | self.mem[sym::ChgOppStr]);
+                if self.reg.a != 0x00 {
+                    return;
+                }
+                self.set_a(self.mem[sym::PAGE]);
+                self.set_a(self.reg.a ^ 0x20);
+                self.mem[sym::PAGE] = self.reg.a;
+                self.listtorches();
+                self.set_a(self.mem[sym::SongCue]);
+                self.minit();
+                self.mem[0xc010] = self.reg.a;
+                loop {
+                    self.burn();
+                    self.musickeys();
+                    self.mplay();
+                    let _o: u8 = 0x00;
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if !(self.reg.a != 0x00) {
+                        break;
+                    }
+                }
+                self.mem[sym::SongCue] = 0x00;
+                self.set_a(self.mem[sym::PAGE]);
+                self.set_a(self.reg.a ^ 0x20);
+                self.mem[sym::PAGE] = self.reg.a;
+                self.clearjoy();
+                return;
+            }
+            self.set_a(self.mem[sym::ShadPosn]);
+            self.static_3f();
+            if !self.flags.z {
+                return;
+            }
+            self.set_a(self.mem[sym::trobcount]);
+            if self.reg.a != 0x00 {
+                return;
+            }
+            self.set_a(self.mem[sym::nummob]);
+            if self.reg.a != 0x00 {
+                return;
+            }
+            self.set_a(self.mem[sym::lightning]);
+            if self.reg.a != 0x00 {
+                return;
+            }
+            self.set_a(self.mem[sym::mergetimer]);
+            if (self.reg.a as i8) < 0 {
+                self.set_a(self.mem[sym::PAGE]);
+                self.set_a(self.reg.a ^ 0x20);
+                self.mem[sym::PAGE] = self.reg.a;
+                self.listtorches();
+                self.set_a(self.mem[sym::SongCue]);
+                self.minit();
+                self.mem[0xc010] = self.reg.a;
+                loop {
+                    self.burn();
+                    self.musickeys();
+                    self.mplay();
+                    let _o: u8 = 0x00;
+                    self.flags.c = self.reg.a >= _o;
+                    self.flags.z = self.reg.a == _o;
+                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                    if !(self.reg.a != 0x00) {
+                        break;
+                    }
+                }
+                self.mem[sym::SongCue] = 0x00;
+                self.set_a(self.mem[sym::PAGE]);
+                self.set_a(self.reg.a ^ 0x20);
+                self.mem[sym::PAGE] = self.reg.a;
+                self.clearjoy();
+                return;
+            }
+            if !self.flags.z {
+                return;
+            }
+            self.set_a(self.mem[sym::ChgKidStr]);
+            self.set_a(self.reg.a | self.mem[sym::ChgOppStr]);
+            if self.reg.a != 0x00 {
+                return;
+            }
+            self.set_a(self.mem[sym::PAGE]);
+            self.set_a(self.reg.a ^ 0x20);
+            self.mem[sym::PAGE] = self.reg.a;
+            self.listtorches();
+            self.set_a(self.mem[sym::SongCue]);
+            self.minit();
+            self.mem[0xc010] = self.reg.a;
+            loop {
+                self.burn();
+                self.musickeys();
+                self.mplay();
+                let _o: u8 = 0x00;
+                self.flags.c = self.reg.a >= _o;
+                self.flags.z = self.reg.a == _o;
+                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                if !(self.reg.a != 0x00) {
+                    break;
+                }
+            }
+            self.mem[sym::SongCue] = 0x00;
+            self.set_a(self.mem[sym::PAGE]);
+            self.set_a(self.reg.a ^ 0x20);
+            self.mem[sym::PAGE] = self.reg.a;
+            self.clearjoy();
+            return;
+        }
+        self.set_a(0x00);
+        self.mem[sym::SongCue] = self.reg.a;
         return;
     }
 
@@ -1155,11 +1964,6 @@ impl Cpu {
         if self.reg.a == 0xa9 {
             self.attractmode();
             return;
-        }
-        self.set_a(self.mem[sym::BGset1]);
-        if (self.reg.a as i8) < 0 {
-            self.set_x(0x04);
-            self.LoadLevelX();
         }
         self.flipdisk();
         self.set_a(0xa9);
@@ -1213,11 +2017,6 @@ impl Cpu {
     }
 
     fn develpatch(&mut self) {
-        self.set_a(self.mem[sym::blackflag]);
-        if self.reg.a != 0x00 {
-            self.set_a(0x01);
-            self.mem[sym::genCLS] = self.reg.a;
-        }
         self.set_a(self.mem[sym::redrawflg]);
         if self.reg.a == 0x00 {
             return;

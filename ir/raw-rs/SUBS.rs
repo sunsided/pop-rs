@@ -73,6 +73,8 @@ impl Cpu {
 
 #[allow(non_upper_case_globals)]
 mod sym {
+    pub const AddrH: usize = 0x034c;
+    pub const AddrL: usize = 0x034b;
     pub const BlueSpec: usize = 0x0026;
     pub const BlueType: usize = 0x0024;
     pub const CharAction: usize = 0x0046;
@@ -110,7 +112,7 @@ mod sym {
     pub const PreRecPtr: usize = 0x0309;
     pub const SCRNUM: usize = 0x0023;
     pub const SPEED: usize = 0x030c;
-    pub const SceneCount: usize = 0x0338;
+    pub const SceneCount: usize = 0x0337;
     pub const SecLeft: usize = 0x0302;
     pub const ShadPosn: usize = 0x0060;
     pub const VisScrn: usize = 0x00cb;
@@ -133,13 +135,13 @@ mod sym {
     pub const musicon: usize = 0x031a;
     pub const offguard: usize = 0x008a;
     pub const origstrength: usize = 0x00e1;
-    pub const psandcount: usize = 0x0346;
-    pub const pstarcount: usize = 0x0347;
-    pub const ptorchcount: usize = 0x0345;
-    pub const ptorchoff: usize = 0x0342;
-    pub const ptorchstate: usize = 0x0344;
-    pub const ptorchx: usize = 0x0341;
-    pub const ptorchy: usize = 0x0343;
+    pub const psandcount: usize = 0x0345;
+    pub const pstarcount: usize = 0x0346;
+    pub const ptorchcount: usize = 0x0344;
+    pub const ptorchoff: usize = 0x0341;
+    pub const ptorchstate: usize = 0x0343;
+    pub const ptorchx: usize = 0x0340;
+    pub const ptorchy: usize = 0x0342;
     pub const purpleflag: usize = 0x00da;
     pub const redrawglass: usize = 0x0214;
     pub const scrnAbove: usize = 0x0033;
@@ -572,7 +574,13 @@ impl Cpu {
         self.initit();
         self.reg.a = tmp0;
         self.set_x(self.reg.a);
-        self.PlayCut4();
+        self.set_a(self.mem[(sym::AddrL + self.reg.x as usize) & 0xffff]);
+        self.local.insert((":sm", 1), self.reg.a);
+        self.set_a(self.mem[(sym::AddrH + self.reg.x as usize) & 0xffff]);
+        self.local.insert((":sm", 2), self.reg.a);
+        self._24FFFF();
+        self.set_a(0x01);
+        self.mem[sym::SPEED] = self.reg.a;
         return;
     }
 
@@ -1380,7 +1388,7 @@ impl Cpu {
     }
 
     fn DEMO(&mut self) {
-        self.set_a(0x79);
+        self.set_a(0x78);
         self.set_x(0x03);
         self.AutoPlayback();
         return;
@@ -1693,41 +1701,65 @@ impl Cpu {
         }
         self.mem[sym::MaxKidStr] = self.reg.a;
         self.mem[sym::KidStrength] = self.reg.a;
-        self.set_a(0x05);
-        self.jumpseq();
-        self.set_x(self.mem[sym::CharBlockY]);
-        self.mem[sym::CharY] = self.mem[(sym::FloorY + 1 + self.reg.x as usize) & 0xffff];
-        self.mem[sym::CharLife] = 0xff;
-        self.mem[sym::CharID] = 0x00;
-        self.set_a(0x00);
-        self.mem[sym::CharXVel] = self.reg.a;
-        self.mem[sym::CharYVel] = self.reg.a;
-        self.mem[sym::waitingtojump] = self.reg.a;
-        self.mem[sym::weightless] = self.reg.a;
-        self.mem[sym::invert] = self.reg.a;
-        self.mem[sym::jarabove] = self.reg.a;
-        self.mem[sym::droppedout] = self.reg.a;
-        self.mem[sym::CharSword] = self.reg.a;
-        self.mem[sym::offguard] = self.reg.a;
-        self.animchar();
         self.set_a(self.mem[sym::level]);
-        if self.reg.a != 0x07 {
-            self.SaveKid();
-            return;
+        if self.reg.a != 0x01 {
+            let _o: u8 = 0x0d;
+            self.flags.c = self.reg.a >= _o;
+            self.flags.z = self.reg.a == _o;
+            self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+            if self.reg.a == 0x0d {
+                self.set_a(0x54);
+                self.jumpseq();
+                self.STARTKID1();
+                return;
+            }
+            if !self.flags.z {
+                self.set_a(0x05);
+                self.jumpseq();
+                self.set_x(self.mem[sym::CharBlockY]);
+                self.mem[sym::CharY] = self.mem[(sym::FloorY + 1 + self.reg.x as usize) & 0xffff];
+                self.mem[sym::CharLife] = 0xff;
+                self.mem[sym::CharID] = 0x00;
+                self.set_a(0x00);
+                self.mem[sym::CharXVel] = self.reg.a;
+                self.mem[sym::CharYVel] = self.reg.a;
+                self.mem[sym::waitingtojump] = self.reg.a;
+                self.mem[sym::weightless] = self.reg.a;
+                self.mem[sym::invert] = self.reg.a;
+                self.mem[sym::jarabove] = self.reg.a;
+                self.mem[sym::droppedout] = self.reg.a;
+                self.mem[sym::CharSword] = self.reg.a;
+                self.mem[sym::offguard] = self.reg.a;
+                self.animchar();
+                self.set_a(self.mem[sym::level]);
+                if self.reg.a != 0x07 {
+                    self.SaveKid();
+                    return;
+                }
+                self.set_a(self.mem[sym::yellowflag]);
+                if (self.reg.a as i8) >= 0 {
+                    self.set_a(0x40);
+                    self.mem[sym::timebomb] = self.reg.a;
+                }
+                self.set_a(self.mem[sym::CharScrn]);
+                if self.reg.a != 0x11 {
+                    self.SaveKid();
+                    return;
+                }
+                self.set_a(0x03);  // down
+                self.cut();
+                self.SaveKid();
+                return;
+            }
         }
-        self.set_a(self.mem[sym::yellowflag]);
-        if (self.reg.a as i8) >= 0 {
-            self.set_a(0x40);
-            self.mem[sym::timebomb] = self.reg.a;
-        }
-        self.set_a(self.mem[sym::CharScrn]);
-        if self.reg.a != 0x11 {
-            self.SaveKid();
-            return;
-        }
-        self.set_a(0x03);  // down
-        self.cut();
-        self.SaveKid();
+        self.set_a(0x05);  // scrn
+        self.set_x(0x02);  // blockx
+        self.set_y(0x00);  // blocky
+        self.rdblock();
+        self.pushpp();
+        self.set_a(0x07);
+        self.jumpseq();
+        self.STARTKID1();
         return;
     }
 

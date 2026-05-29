@@ -57,10 +57,6 @@ fn MouseProg {
   if cc goto ]rts       ; AUTO.S:213
   tail_call VanishChar                ; AUTO.S:214
 ShadowProg:
-SkelProg:
-VizierProg:
-  ??? brk             ; AUTO.S:223
-ShadowProg:
   a = *level@0x03f4        ; AUTO.S:227
   cmp a, #0x04              ; AUTO.S:228
   if ne goto :0       ; AUTO.S:229

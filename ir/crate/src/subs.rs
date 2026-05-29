@@ -425,7 +425,13 @@ pub fn PLAYCUT(cpu: &mut Cpu) {
     initit(cpu);
     cpu.reg.a = tmp0;
     cpu.set_x(cpu.reg.a);
-    PlayCut4(cpu);
+    cpu.set_a(cpu.mem[(sym::AddrL + cpu.reg.x as usize) & 0xffff]);
+    cpu.local.insert((":sm", 1), cpu.reg.a);
+    cpu.set_a(cpu.mem[(sym::AddrH + cpu.reg.x as usize) & 0xffff]);
+    cpu.local.insert((":sm", 2), cpu.reg.a);
+    crate::ext::_24FFFF(cpu);
+    cpu.set_a(0x01);
+    cpu.mem[sym::SPEED] = cpu.reg.a;
     return;
 }
 
@@ -1235,7 +1241,7 @@ pub fn startK7(cpu: &mut Cpu) {
 
 #[doc(alias = "demo")]
 pub fn DEMO(cpu: &mut Cpu) {
-    cpu.set_a(0x79);
+    cpu.set_a(0x78);
     cpu.set_x(0x03);
     crate::auto::AUTOPLAYBACK(cpu);
     return;
@@ -1553,41 +1559,65 @@ pub fn STARTKID(cpu: &mut Cpu) {
     }
     cpu.mem[sym::MaxKidStr] = cpu.reg.a;
     cpu.mem[sym::KidStrength] = cpu.reg.a;
-    cpu.set_a(0x05);
-    crate::ctrlsubs::JUMPSEQ(cpu);
-    cpu.set_x(cpu.mem[sym::CharBlockY]);
-    cpu.mem[sym::CharY] = cpu.mem[(sym::FloorY + 1 + cpu.reg.x as usize) & 0xffff];
-    cpu.mem[sym::CharLife] = 0xff;
-    cpu.mem[sym::CharID] = 0x00;
-    cpu.set_a(0x00);
-    cpu.mem[sym::CharXVel] = cpu.reg.a;
-    cpu.mem[sym::CharYVel] = cpu.reg.a;
-    cpu.mem[sym::waitingtojump] = cpu.reg.a;
-    cpu.mem[sym::weightless] = cpu.reg.a;
-    cpu.mem[sym::invert] = cpu.reg.a;
-    cpu.mem[sym::jarabove] = cpu.reg.a;
-    cpu.mem[sym::droppedout] = cpu.reg.a;
-    cpu.mem[sym::CharSword] = cpu.reg.a;
-    cpu.mem[sym::offguard] = cpu.reg.a;
-    crate::coll::ANIMCHAR(cpu);
     cpu.set_a(cpu.mem[sym::level]);
-    if cpu.reg.a != 0x07 {
-        crate::ctrlsubs::SAVEKID(cpu);
-        return;
+    if cpu.reg.a != 0x01 {
+        let _o: u8 = 0x0d;
+        cpu.flags.c = cpu.reg.a >= _o;
+        cpu.flags.z = cpu.reg.a == _o;
+        cpu.flags.n = (cpu.reg.a.wrapping_sub(_o) >> 7) != 0;
+        if cpu.reg.a == 0x0d {
+            cpu.set_a(0x54);
+            crate::ctrlsubs::JUMPSEQ(cpu);
+            STARTKID1(cpu);
+            return;
+        }
+        if !cpu.flags.z {
+            cpu.set_a(0x05);
+            crate::ctrlsubs::JUMPSEQ(cpu);
+            cpu.set_x(cpu.mem[sym::CharBlockY]);
+            cpu.mem[sym::CharY] = cpu.mem[(sym::FloorY + 1 + cpu.reg.x as usize) & 0xffff];
+            cpu.mem[sym::CharLife] = 0xff;
+            cpu.mem[sym::CharID] = 0x00;
+            cpu.set_a(0x00);
+            cpu.mem[sym::CharXVel] = cpu.reg.a;
+            cpu.mem[sym::CharYVel] = cpu.reg.a;
+            cpu.mem[sym::waitingtojump] = cpu.reg.a;
+            cpu.mem[sym::weightless] = cpu.reg.a;
+            cpu.mem[sym::invert] = cpu.reg.a;
+            cpu.mem[sym::jarabove] = cpu.reg.a;
+            cpu.mem[sym::droppedout] = cpu.reg.a;
+            cpu.mem[sym::CharSword] = cpu.reg.a;
+            cpu.mem[sym::offguard] = cpu.reg.a;
+            crate::coll::ANIMCHAR(cpu);
+            cpu.set_a(cpu.mem[sym::level]);
+            if cpu.reg.a != 0x07 {
+                crate::ctrlsubs::SAVEKID(cpu);
+                return;
+            }
+            cpu.set_a(cpu.mem[sym::yellowflag]);
+            if (cpu.reg.a as i8) >= 0 {
+                cpu.set_a(0x40);
+                cpu.mem[sym::timebomb] = cpu.reg.a;
+            }
+            cpu.set_a(cpu.mem[sym::CharScrn]);
+            if cpu.reg.a != 0x11 {
+                crate::ctrlsubs::SAVEKID(cpu);
+                return;
+            }
+            cpu.set_a(0x03);  // down
+            crate::auto::CUT(cpu);
+            crate::ctrlsubs::SAVEKID(cpu);
+            return;
+        }
     }
-    cpu.set_a(cpu.mem[sym::yellowflag]);
-    if (cpu.reg.a as i8) >= 0 {
-        cpu.set_a(0x40);
-        cpu.mem[sym::timebomb] = cpu.reg.a;
-    }
-    cpu.set_a(cpu.mem[sym::CharScrn]);
-    if cpu.reg.a != 0x11 {
-        crate::ctrlsubs::SAVEKID(cpu);
-        return;
-    }
-    cpu.set_a(0x03);  // down
-    crate::auto::CUT(cpu);
-    crate::ctrlsubs::SAVEKID(cpu);
+    cpu.set_a(0x05);  // scrn
+    cpu.set_x(0x02);  // blockx
+    cpu.set_y(0x00);  // blocky
+    crate::ctrlsubs::RDBLOCK(cpu);
+    crate::mover::PUSHPP(cpu);
+    cpu.set_a(0x07);
+    crate::ctrlsubs::JUMPSEQ(cpu);
+    STARTKID1(cpu);
     return;
 }
 

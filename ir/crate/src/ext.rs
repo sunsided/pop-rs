@@ -18,11 +18,10 @@ pub fn Tmovemem(cpu: &mut Cpu) {}
 pub fn _24005c(cpu: &mut Cpu) {}
 pub fn _24180(cpu: &mut Cpu) {}
 pub fn _24900(cpu: &mut Cpu) {}
+pub fn _24FFFF(cpu: &mut Cpu) {}
 pub fn _24c00(cpu: &mut Cpu) {}
 pub fn _24ee00(cpu: &mut Cpu) {}
 pub fn _24ffff(cpu: &mut Cpu) {}
-pub fn _3a1b(cpu: &mut Cpu) {}
-pub fn _3astripe(cpu: &mut Cpu) {}
 pub fn _dostartgame(cpu: &mut Cpu) {}
 pub fn _minit(cpu: &mut Cpu) {}
 pub fn _mplay(cpu: &mut Cpu) {}
@@ -34,6 +33,7 @@ pub fn checkalert(cpu: &mut Cpu) {}
 pub fn cout(cpu: &mut Cpu) {}
 pub fn cutcheck(cpu: &mut Cpu) {}
 pub fn decstr(cpu: &mut Cpu) {}
+pub fn dispversion(cpu: &mut Cpu) {}
 pub fn fadeout(cpu: &mut Cpu) {}
 pub fn firstguard(cpu: &mut Cpu) {}
 pub fn home(cpu: &mut Cpu) {}

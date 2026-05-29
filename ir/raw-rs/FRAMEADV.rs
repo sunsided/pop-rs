@@ -126,7 +126,6 @@ mod sym {
     pub const genCLS: usize = 0xac00;
     pub const halfbuf: usize = 0x5e3c;
     pub const height: usize = 0x0004;
-    pub const inbuilder: usize = 0x0201;
     pub const initsettings: usize = 0x0115;
     pub const level: usize = 0x03f4;
     pub const loosea: usize = 0x0064;
@@ -529,18 +528,7 @@ impl Cpu {
                     self.set_a(0xff);
                     self.mem[sym::yindex] = self.reg.a;
                     self.drawobjs();
-                    self.set_a(self.mem[sym::inbuilder]);
-                    if self.reg.a != 0x00 {
-                        pc = 11;
-                    } else {
-                        pc = 10;
-                    }
-                }
-                10 => {
                     self.updatemeters();
-                    return;
-                }
-                11 => {
                     return;
                 }
                 _ => unreachable!(),
@@ -1057,7 +1045,7 @@ impl Cpu {
                     return;
                 }
             }
-            'b18: {
+            'b17: {
                 self.mem[sym::IMAGE] = self.reg.a;
                 self.set_a(self.mem[sym::Ay]);
                 self.flags.c = false;
@@ -1072,13 +1060,10 @@ impl Cpu {
                 self.set_a(_r as u8);
                 self.mem[sym::XCO] = self.reg.a;
                 if self.reg.x < 0x1b {
-                    self.set_a(0x00);
-                    if self.reg.a != 0x02 {
-                        self.set_a(self.mem[sym::BGset1]);
-                        if self.reg.a != 0x01 {
-                            if self.reg.x == 0x03 {
-                                break 'b18;
-                            }
+                    self.set_a(self.mem[sym::BGset1]);
+                    if self.reg.a != 0x01 {
+                        if self.reg.x == 0x03 {
+                            break 'b17;
                         }
                     }
                     if self.reg.x == 0x14 {
@@ -1320,56 +1305,49 @@ impl Cpu {
                         self.flags.z = self.reg.x == _o;
                         self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
                         if self.reg.x != 0x01 {
-                            let _o: u8 = 0x14;
-                            self.flags.c = self.reg.x >= _o;
-                            self.flags.z = self.reg.x == _o;
-                            self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
-                            if self.reg.x == 0x14 {
-                                self.set_y(self.mem[sym::spreced]);
-                                let _o: u8 = 0x02;
-                                self.flags.c = self.reg.y >= _o;
-                                self.flags.z = self.reg.y == _o;
-                                self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
-                                if self.reg.y >= 0x02 {
-                                    self.set_y(0x00);
-                                }
-                                self.set_a(self.mem[(sym::blockb + self.reg.y as usize) & 0xffff]);
-                                if self.reg.a == 0x00 {
-                                    break 'b16;
-                                }
-                            } else {
-                                self.set_a(self.mem[(sym::pieceb + self.reg.x as usize) & 0xffff]);
-                                if self.reg.a == 0x00 {
-                                    self._3astripe();
-                                    return;
-                                }
-                                let _o: u8 = 0x9e;
-                                self.flags.c = self.reg.a >= _o;
-                                self.flags.z = self.reg.a == _o;
-                                self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                if self.reg.a == 0x9e {
+                            'b23: {
+                                let _o: u8 = 0x14;
+                                self.flags.c = self.reg.x >= _o;
+                                self.flags.z = self.reg.x == _o;
+                                self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
+                                if self.reg.x == 0x14 {
                                     self.set_y(self.mem[sym::spreced]);
-                                    let _o: u8 = 0x03;
+                                    let _o: u8 = 0x02;
                                     self.flags.c = self.reg.y >= _o;
                                     self.flags.z = self.reg.y == _o;
                                     self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
-                                    if self.reg.y >= 0x03 {
-                                        return;
+                                    if self.reg.y >= 0x02 {
+                                        self.set_y(0x00);
                                     }
-                                    self.set_a(self.mem[(sym::panelb + self.reg.y as usize) & 0xffff]);
+                                    self.set_a(self.mem[(sym::blockb + self.reg.y as usize) & 0xffff]);
                                     if self.reg.a == 0x00 {
-                                        return;
+                                        break 'b16;
                                     }
                                 } else {
-                                    self._3acont1();
-                                    self.set_a(0x00);
-                                    let _o: u8 = 0x02;
-                                    self.flags.c = self.reg.a >= _o;
-                                    self.flags.z = self.reg.a == _o;
-                                    self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
-                                    if self.reg.a == 0x02 {
-                                        self._3astripe();
-                                        return;
+                                    self.set_a(self.mem[(sym::pieceb + self.reg.x as usize) & 0xffff]);
+                                    if self.reg.a != 0x00 {
+                                        let _o: u8 = 0x9e;
+                                        self.flags.c = self.reg.a >= _o;
+                                        self.flags.z = self.reg.a == _o;
+                                        self.flags.n = (self.reg.a.wrapping_sub(_o) >> 7) != 0;
+                                        if self.reg.a == 0x9e {
+                                            self.set_y(self.mem[sym::spreced]);
+                                            let _o: u8 = 0x03;
+                                            self.flags.c = self.reg.y >= _o;
+                                            self.flags.z = self.reg.y == _o;
+                                            self.flags.n = (self.reg.y.wrapping_sub(_o) >> 7) != 0;
+                                            if self.reg.y >= 0x03 {
+                                                return;
+                                            }
+                                            self.set_a(self.mem[(sym::panelb + self.reg.y as usize) & 0xffff]);
+                                            if self.reg.a != 0x00 {
+                                                break 'b23;
+                                            } else {
+                                                return;
+                                            }
+                                        } else {
+                                            self._3acont1();
+                                        }
                                     }
                                     self.set_a(self.mem[sym::BGset1]);
                                     let _o: u8 = 0x01;
@@ -2446,11 +2424,6 @@ impl Cpu {
             self.GOnull();
             return;
         }
-        self.set_a(self.mem[sym::inbuilder]);
-        if self.reg.a != 0x00 {
-            self.getobjbldr();
-            return;
-        }
         self.mem[sym::state] = self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff];
         self.set_a(self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
         self.set_a(self.reg.a & 0x1f);
@@ -2483,95 +2456,6 @@ impl Cpu {
             _ => {}
         }
         return;
-    }
-
-    fn getobjbldr(&mut self) {
-        let mut pc: u32 = 0;
-        loop {
-            match pc {
-                0 => {
-                    self.set_a(self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
-                    self.set_a(self.reg.a & 0x1f);
-                    self.stack.push(self.reg.a);
-                    self.getinitobj1();
-                    if self.flags.c {
-                        pc = 8;
-                    } else {
-                        pc = 1;
-                    }
-                }
-                1 => {
-                    self.set_a(self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
-                    pc = 8;
-                }
-                2 => {
-                    self.mem[sym::state] = self.reg.a;
-                    let _v = self.stack.pop().expect("pla on empty stack");
-                    self.set_a(_v);
-                    return;
-                }
-                3 => {
-                    pc = 4;
-                }
-                4 => {
-                    self.set_a(0x00);
-                    self.mem[sym::switches] = self.reg.a;
-                    self.set_x(self.mem[sym::sortX]);
-                    pc = 5;
-                }
-                5 => {
-                    let _o: u8 = 0x01;
-                    self.flags.c = self.reg.x >= _o;
-                    self.flags.z = self.reg.x == _o;
-                    self.flags.n = (self.reg.x.wrapping_sub(_o) >> 7) != 0;
-                    if self.reg.x == 0x01 {
-                        pc = 9;
-                    } else {
-                        pc = 6;
-                    }
-                }
-                6 => {
-                    self.mem[sym::xsave] = self.reg.x;
-                    self.compare();
-                    self.set_x(self.mem[sym::xsave]);
-                    if !self.flags.c {
-                        pc = 8;
-                    } else {
-                        pc = 7;
-                    }
-                }
-                7 => {
-                    self.set_a(self.mem[(sym::sortX + self.reg.x as usize) & 0xffff]);
-                    self.stack.push(self.reg.a);
-                    self.set_a(self.mem[(sym::sortX - 1 + self.reg.x as usize) & 0xffff]);
-                    self.mem[(sym::sortX + self.reg.x as usize) & 0xffff] = self.reg.a;
-                    let _v = self.stack.pop().expect("pla on empty stack");
-                    self.set_a(_v);
-                    self.mem[(sym::sortX - 1 + self.reg.x as usize) & 0xffff] = self.reg.a;
-                    pc = 8;
-                }
-                8 => {
-                    self.set_x(self.reg.x.wrapping_sub(1));
-                    if self.reg.x != 0x00 {
-                        pc = 5;
-                    } else {
-                        pc = 9;
-                    }
-                }
-                9 => {
-                    self.set_a(self.mem[sym::switches]);
-                    if self.reg.a != 0x00 {
-                        pc = 4;
-                    } else {
-                        pc = 10;
-                    }
-                }
-                10 => {
-                    return;
-                }
-                _ => unreachable!(),
-            }
-        }
     }
 
     // aliases: :newpass
@@ -2775,11 +2659,6 @@ impl Cpu {
     }
 
     fn getobjid1(&mut self) {
-        self.set_a(self.mem[sym::inbuilder]);
-        if self.reg.a != 0x00 {
-            self.getobjbldr();
-            return;
-        }
         self.mem[sym::state] = self.mem[((self.mem[sym::BlueSpec] as usize | (self.mem[sym::BlueSpec + 1] as usize) << 8) + self.reg.y as usize) & 0xffff];
         self.set_a(self.mem[((self.mem[sym::BlueType] as usize | (self.mem[sym::BlueType + 1] as usize) << 8) + self.reg.y as usize) & 0xffff]);
         self.set_a(self.reg.a & 0x1f);
@@ -2815,10 +2694,6 @@ impl Cpu {
     }
 
     fn drawtorchb(&mut self) {
-        self.set_a(self.mem[sym::inbuilder]);
-        if self.reg.a != 0x00 {
-            return;
-        }
         self.set_a(self.mem[sym::blockxco]);
         if self.reg.a == 0x00 {
             return;
@@ -2843,10 +2718,6 @@ impl Cpu {
     }
 
     fn drawflaska(&mut self) {
-        self.set_a(self.mem[sym::inbuilder]);
-        if self.reg.a != 0x00 {
-            return;
-        }
         self.mem[sym::XCO] = self.mem[sym::blockxco];
         self.set_a(self.mem[sym::Ay]);
         self.mem[sym::YCO] = self.reg.a;
@@ -2874,20 +2745,15 @@ impl Cpu {
     }
 
     fn getloosey(&mut self) {
-        self.set_y(self.mem[sym::inbuilder]);
-        if self.reg.y == 0x00 {
-            self.set_y(self.reg.a);
-            if (self.reg.y as i8) >= 0 {
-                return;
-            }
-            self.set_a(self.reg.a & 0x7f);
-            if self.reg.a >= 0x0b {
-                self.set_a(0x01);
-            }
-            self.set_y(self.reg.a);
+        self.set_y(self.reg.a);
+        if (self.reg.y as i8) >= 0 {
             return;
         }
-        self.set_y(0x01);
+        self.set_a(self.reg.a & 0x7f);
+        if self.reg.a >= 0x0b {
+            self.set_a(0x01);
+        }
+        self.set_y(self.reg.a);
         return;
     }
 }

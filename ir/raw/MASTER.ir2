@@ -92,8 +92,8 @@ fn driveoff {
 }
 
 fn set1stlevel {
-  a = *firstlevel@0x021b        ; MASTER.S:351
-  x = *firstlevel+1@0x021c        ; MASTER.S:352
+  a = *firstlevel@0x021a        ; MASTER.S:351
+  x = *firstlevel+1@0x021b        ; MASTER.S:352
 SetLevel:
   *params@0x03f0 = a            ; MASTER.S:353
   *params+1@0x03f1 = x            ; MASTER.S:354
@@ -109,8 +109,8 @@ fn SetLevel {
 }
 
 fn setdemolevel {
-  a = *demolevel@0x021a        ; MASTER.S:358
-  x = *demolevel+1@0x021b        ; MASTER.S:359
+  a = *demolevel@0x0219        ; MASTER.S:358
+  x = *demolevel+1@0x021a        ; MASTER.S:359
   tail_call SetLevel                ; MASTER.S:360
 }
 
@@ -223,7 +223,7 @@ fn rdbg1 {
   x = *newBGset1@0x00f6        ; MASTER.S:530
   if x == *BGset1@0x0303 goto :rts  ; MASTER.S:532
   *BGset1@0x0303 = x            ; MASTER.S:533
-  a = *(bg1trk@0x022b + x)   ; MASTER.S:534
+  a = *(bg1trk@0x022a + x)   ; MASTER.S:534
   *track@0x00fe = a            ; MASTER.S:535
   call rw18                  ; MASTER.S:536
   call rw18                  ; MASTER.S:538
@@ -236,7 +236,7 @@ fn rdbg2 {
   x = *newBGset2@0x00f7        ; MASTER.S:543
   if x == *BGset2@0x0304 goto ]rts  ; MASTER.S:545
   *BGset2@0x0304 = x            ; MASTER.S:546
-  a = *(bg2trk@0x022c + x)   ; MASTER.S:547
+  a = *(bg2trk@0x022b + x)   ; MASTER.S:547
   *track@0x00fe = a            ; MASTER.S:548
   call rw18                  ; MASTER.S:549
   return                           ; MASTER.S:551
@@ -249,9 +249,9 @@ fn rdch4 {
   x = *newCHset@0x00f8        ; MASTER.S:553
   if x == *CHset@0x0305 goto ]rts  ; MASTER.S:555
   *CHset@0x0305 = x            ; MASTER.S:556
-  a = *(ch4trk@0x022d + x)   ; MASTER.S:557
+  a = *(ch4trk@0x022c + x)   ; MASTER.S:557
   *track@0x00fe = a            ; MASTER.S:558
-  a = *(ch4off@0x022e + x)   ; MASTER.S:559
+  a = *(ch4off@0x022d + x)   ; MASTER.S:559
   if a == #0x00 goto :off0  ; MASTER.S:560
   if a == #0x06 goto :off6  ; MASTER.S:562
   if a == #0x0c goto :off12  ; MASTER.S:564
@@ -560,11 +560,6 @@ fn pauseNI  (aka :loop) {
 fn StartGame? {
   call musickeys                  ; MASTER.S:997
   if a < #0x80 goto ]rts  ; MASTER.S:999
-  if a != #kdemo goto :1  ; MASTER.S:1004
-  tail_call Demo                ; MASTER.S:1005
-:1:
-  if a != #kprincess goto :2  ; MASTER.S:1007
-  goto ]princess                ; MASTER.S:1008
 :2:
   if a != #krestart goto :3  ; MASTER.S:1012
   tail_call AttractLoop                ; MASTER.S:1013
@@ -587,12 +582,6 @@ DOSTARTGAME:
   tail_call start                ; MASTER.S:1060
 ]rts:
   return                           ; MASTER.S:989
-]princess:
-  call PrincessScene                  ; MASTER.S:701
-  call SetupDHires                  ; MASTER.S:703
-  call Prolog2                  ; MASTER.S:705
-  call SilentTitle                  ; MASTER.S:707
-  tail_call Demo                ; MASTER.S:709
 }
 
 fn :3  (aka DOSTARTGAME) {
