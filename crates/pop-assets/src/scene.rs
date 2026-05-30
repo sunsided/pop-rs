@@ -92,6 +92,13 @@ pub struct BiomeTables {
     pub table1: ImageTable,
     /// Second image table (sprite IDs `0x81..=0xFE`).
     pub table2: ImageTable,
+    /// Optional fallback biome. When a sprite in this biome resolves to
+    /// a truncated 3.5"-rebuild placeholder (see [`is_placeholder`]),
+    /// [`Self::resolve`] substitutes the same sprite from this fallback
+    /// — the editor attaches a complete dungeon set so red-biome rooms
+    /// render correctly despite the #112 truncation. `None` keeps the
+    /// faithful (truncated) behaviour. See `docs/copy-protection.md`.
+    fallback: Option<Box<BiomeTables>>,
 }
 
 impl BiomeTables {
@@ -115,13 +122,33 @@ impl BiomeTables {
             biome,
             table1,
             table2,
+            fallback: None,
         })
     }
 
+    /// Attach a `fallback` biome whose sprites are substituted for any
+    /// truncated placeholder in this biome (see the `fallback` field).
+    /// Chainable; replaces any existing fallback.
+    #[must_use]
+    pub fn with_fallback(mut self, fallback: BiomeTables) -> Self {
+        self.fallback = Some(Box::new(fallback));
+        self
+    }
+
     fn resolve(&self, piece_id: u8) -> Option<&Image> {
-        match PieceRef::resolve(piece_id)? {
+        let img = match PieceRef::resolve(piece_id)? {
             PieceRef::Table1(i) => self.table1.images.get(usize::from(i)),
             PieceRef::Table2(i) => self.table2.images.get(usize::from(i)),
+        };
+        match img {
+            // Truncated 3.5"-rebuild placeholder → substitute the same
+            // sprite from the fallback biome if one is attached.
+            Some(im) if is_placeholder(im) => self
+                .fallback
+                .as_deref()
+                .and_then(|fb| fb.resolve(piece_id))
+                .or(Some(im)),
+            other => other,
         }
     }
 
@@ -1564,6 +1591,35 @@ mod tests {
         assert!(
             count_above_strip(&slicer) > count_above_strip(&empty),
             "slicer mechanism should add pixels above the floor strip"
+        );
+    }
+
+    #[test]
+    fn red_biome_fallback_fills_truncated_sprites() {
+        // Red biome's looseb (0x1b) etc. are truncated 1x1 placeholders
+        // (#112). Attaching a dungeon fallback should substitute the
+        // complete sprite, filling the floor edges that were gaps.
+        // LV9 R5 has loose + up-pressplate tiles that spill 0x1b.
+        let level = load_level(9);
+        let plain = BiomeTables::load(&vendor_root(), Biome::Red).unwrap();
+        let with_fb = BiomeTables::load(&vendor_root(), Biome::Red)
+            .unwrap()
+            .with_fallback(BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap());
+        let a = render_room(&level, 5, &plain, RenderMode::Monochrome).unwrap();
+        let b = render_room(&level, 5, &with_fb, RenderMode::Monochrome).unwrap();
+        assert_ne!(
+            a.pixels, b.pixels,
+            "fallback should change the truncated-sprite render"
+        );
+        let lit = |f: &Frame| {
+            f.pixels
+                .chunks_exact(4)
+                .filter(|p| p[0..3] != [0, 0, 0])
+                .count()
+        };
+        assert!(
+            lit(&b) > lit(&a),
+            "fallback should fill truncated floor edges with more lit pixels"
         );
     }
 

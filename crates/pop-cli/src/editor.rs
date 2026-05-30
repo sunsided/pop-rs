@@ -473,6 +473,9 @@ impl EditorApp {
         if full {
             self.room_textures.clear();
             self.render_status.clear();
+            // Recomputed below for the level's own biome — otherwise a
+            // red-biome warning lingers after switching to a clean level.
+            self.asset_warnings.clear();
         }
         let Some(level) = &self.state.loaded_level else {
             return;
@@ -508,17 +511,18 @@ impl EditorApp {
             Some(t) => t,
             None => match BiomeTables::load(&root, biome) {
                 Ok(t) => {
-                    // Heuristic check for the truncated 3.5"-rebuild
-                    // asset fingerprint (see docs/copy-protection.md).
-                    // Surface non-fatal warnings; dedupe so loading
-                    // multiple levels of the same biome doesn't stack
-                    // duplicates.
-                    for issue in t.load_diagnostics() {
-                        let msg = format!("{issue}");
-                        if !self.asset_warnings.contains(&msg) {
-                            self.asset_warnings.push(msg);
+                    // Red biome's BGTAB is the truncated 3.5" rebuild
+                    // (#112). Attach a complete dungeon set as a fallback
+                    // so placeholder sprites (e.g. looseb 0x1b) render
+                    // with the real dungeon sprite instead of a gap.
+                    let t = if biome == Biome::Red {
+                        match BiomeTables::load(&root, Biome::Dungeon) {
+                            Ok(fb) => t.with_fallback(fb),
+                            Err(_) => t,
                         }
-                    }
+                    } else {
+                        t
+                    };
                     self.biome_cache.insert(biome, t);
                     self.biome_cache.get(&biome).expect("just inserted")
                 }
@@ -529,6 +533,21 @@ impl EditorApp {
                 }
             },
         };
+        // Surface this biome's truncation diagnostics. Recomputed each
+        // full refresh (asset_warnings was cleared above) so the banner
+        // tracks the current level rather than accumulating across every
+        // biome visited. `load_diagnostics` still reports red's truncated
+        // sprites even with the dungeon fallback attached — the banner
+        // notes the assets are incomplete; the fallback just keeps them
+        // from rendering as gaps.
+        if full {
+            for issue in tables.load_diagnostics() {
+                let msg = format!("{issue}");
+                if !self.asset_warnings.contains(&msg) {
+                    self.asset_warnings.push(msg);
+                }
+            }
+        }
         let mode = if self.ntsc_mode {
             RenderMode::NtscColor
         } else {
