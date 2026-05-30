@@ -44,14 +44,17 @@
 // (max ~240×72 tiles).
 #![allow(clippy::cast_precision_loss)]
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 
 use clap::Args as ClapArgs;
-use eframe::egui::{self, Color32, Pos2, Rect, Sense, Stroke, Vec2};
+use eframe::egui::{self, Color32, ColorImage, Pos2, Rect, Sense, Stroke, TextureHandle, Vec2};
 use pop_assets::{
+    bgdata::Biome,
     discovery,
+    hires::RenderMode,
     level::{Level, Tile, TileKind, ROOMS_PER_LEVEL, ROOM_HEIGHT, ROOM_WIDTH},
+    scene::{self, BiomeTables},
 };
 
 const _: () = assert!(ROOMS_PER_LEVEL <= u8::MAX as usize);
@@ -114,6 +117,17 @@ fn pick_dir() -> Option<PathBuf> {
     rfd::FileDialog::new()
         .set_title("Choose a POP data root (containing Levels/)")
         .pick_folder()
+}
+
+/// Extract the level number from a `…/LEVEL{n}` path, e.g.
+/// `Levels/LEVEL4` → `Some(4)`. Used to look up the per-level
+/// biome via [`Biome::for_level`] — the file's numeric suffix is the
+/// stable identifier, not the row's position in [`EditorState::level_paths`],
+/// which is a filtered list that skips any missing files.
+fn level_number_from_path(path: &std::path::Path) -> Option<usize> {
+    let name = path.file_name()?.to_str()?;
+    let digits = name.strip_prefix("LEVEL")?;
+    digits.parse().ok()
 }
 
 // ---------------------------------------------------------------------------
@@ -313,6 +327,7 @@ impl EditorState {
 
 /// egui application wrapping [`EditorState`] plus the
 /// canvas-specific pan / zoom state.
+#[allow(clippy::struct_excessive_bools)] // independent UI toggles
 struct EditorApp {
     state: EditorState,
     /// Canvas pan in screen pixels — the origin of the world (tile
@@ -325,18 +340,36 @@ struct EditorApp {
     show_labels: bool,
     /// Toggle for the per-room ID badge overlay.
     show_room_ids: bool,
+    /// Toggle for the real-sprite render. Falls back to schematic
+    /// colored rects when off, or when sprite loading failed.
+    show_sprites: bool,
+    /// Toggle between Apple II monochrome and NTSC artifact-colour
+    /// modes when rendering sprites.
+    ntsc_mode: bool,
     /// `Some((room, col, row))` when the mouse is hovering over a
     /// tile; surfaces in the status bar.
     hover: Option<(u8, u8, u8)>,
     /// Set on level load so the next frame can fit-to-view.
     pending_fit: bool,
+    /// Per-biome BGTAB cache. Loaded lazily on level-load; one entry
+    /// per biome encountered (max 3) and reused across levels.
+    biome_cache: HashMap<Biome, BiomeTables>,
+    /// Per-room rendered sprite textures for [`EditorState::loaded_level`].
+    /// Indexed `0..ROOMS_PER_LEVEL` = POP room `1..24`. Cleared on
+    /// every level load.
+    room_textures: Vec<Option<TextureHandle>>,
+    /// Diagnostic from the last sprite-load attempt, shown next to the
+    /// `Real sprites` checkbox when it's empty.
+    render_status: String,
 }
 
-/// Pixels per tile at zoom == 1.0.
-const BASE_TILE_W: f32 = 26.0;
-const BASE_TILE_H: f32 = 18.0;
+/// Pixels per tile at zoom == 1.0. Matches the real BGTAB cell shape:
+/// each cell is 4 hires bytes × 64 scan-lines → 28 mono pixels wide
+/// × 64 pixels tall.
+const BASE_TILE_W: f32 = 28.0;
+const BASE_TILE_H: f32 = 64.0;
 /// Min / max zoom — guards against accidental zoom-to-infinity.
-const MIN_ZOOM: f32 = 0.3;
+const MIN_ZOOM: f32 = 0.15;
 const MAX_ZOOM: f32 = 8.0;
 
 impl EditorApp {
@@ -345,11 +378,104 @@ impl EditorApp {
             state,
             pan: Vec2::ZERO,
             zoom: 1.0,
-            show_labels: true,
+            show_labels: false,
             show_room_ids: true,
+            show_sprites: true,
+            ntsc_mode: true,
             hover: None,
             pending_fit: true,
+            biome_cache: HashMap::new(),
+            room_textures: Vec::new(),
+            render_status: String::new(),
         }
+    }
+
+    /// Render every placed room of the loaded level into an egui
+    /// texture. Called on level load and when the render mode changes.
+    fn refresh_room_textures(&mut self, ctx: &egui::Context) {
+        self.room_textures.clear();
+        self.render_status.clear();
+        let Some(level) = &self.state.loaded_level else {
+            return;
+        };
+        let Some(layout) = &self.state.layout else {
+            return;
+        };
+        let Some(level_idx) = self.state.loaded_level_idx else {
+            return;
+        };
+        let Some(root) = self.state.root.clone() else {
+            self.render_status = "no data root".into();
+            return;
+        };
+        // `level_idx` is a position in the filtered `level_paths`
+        // vector, not the LEVEL{n} number. With an incomplete data
+        // root (e.g. only `LEVEL4` present) those numbers diverge, so
+        // we recover the real level number from the file name before
+        // looking up its biome.
+        let Some(level_path) = self.state.level_paths.get(level_idx) else {
+            self.render_status = format!("level index {level_idx} out of range");
+            return;
+        };
+        let Some(level_number) = level_number_from_path(level_path) else {
+            self.render_status = format!(
+                "can't parse level number from {}",
+                level_path.display()
+            );
+            return;
+        };
+        let Some(biome) = Biome::for_level(level_number) else {
+            self.render_status =
+                format!("LEVEL{level_number} has no biome mapping");
+            return;
+        };
+        let tables = match self.biome_cache.get(&biome) {
+            Some(t) => t,
+            None => match BiomeTables::load(&root, biome) {
+                Ok(t) => {
+                    self.biome_cache.insert(biome, t);
+                    self.biome_cache.get(&biome).expect("just inserted")
+                }
+                Err(e) => {
+                    self.render_status =
+                        format!("failed to load {} sprites: {e}", biome.short_name());
+                    return;
+                }
+            },
+        };
+        let mode = if self.ntsc_mode {
+            RenderMode::NtscColor
+        } else {
+            RenderMode::Monochrome
+        };
+        self.room_textures.resize(ROOMS_PER_LEVEL, None);
+        for (idx, slot) in layout.positions.iter().enumerate() {
+            if slot.is_none() {
+                continue;
+            }
+            let Ok(room_id) = u8::try_from(idx + 1) else {
+                continue;
+            };
+            let Some(frame) = scene::render_room(level, room_id, tables, mode) else {
+                continue;
+            };
+            let size = [
+                usize::try_from(frame.width).unwrap_or(0),
+                usize::try_from(frame.height).unwrap_or(0),
+            ];
+            let image = ColorImage::from_rgba_unmultiplied(size, &frame.pixels);
+            let tex = ctx.load_texture(
+                format!("pop-room-{room_id}"),
+                image,
+                egui::TextureOptions::NEAREST,
+            );
+            self.room_textures[idx] = Some(tex);
+        }
+        self.render_status = format!(
+            "{} sprites ready ({} rooms)",
+            biome.short_name(),
+            self.room_textures.iter().filter(|t| t.is_some()).count()
+        );
     }
 
     fn tile_w(&self) -> f32 {
@@ -432,25 +558,49 @@ impl EditorApp {
 
 impl eframe::App for EditorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::TopBottomPanel::top("toolbar").show(ctx, |ui| self.toolbar(ui));
+        let mut toolbar_request = ToolbarAction::None;
+        egui::TopBottomPanel::top("toolbar").show(ctx, |ui| toolbar_request = self.toolbar(ui));
         egui::SidePanel::left("levels")
             .resizable(true)
             .default_width(220.0)
-            .show(ctx, |ui| self.side_panel(ui));
+            .show(ctx, |ui| self.side_panel(ui, ctx));
         egui::TopBottomPanel::bottom("status").show(ctx, |ui| self.status_bar(ui));
         egui::CentralPanel::default().show(ctx, |ui| self.canvas(ui));
+        match toolbar_request {
+            ToolbarAction::RefreshTextures => self.refresh_room_textures(ctx),
+            ToolbarAction::None => {}
+        }
     }
 }
 
+#[derive(Clone, Copy)]
+enum ToolbarAction {
+    None,
+    /// Sprite mode or palette toggled — re-render textures.
+    RefreshTextures,
+}
+
 impl EditorApp {
-    fn toolbar(&mut self, ui: &mut egui::Ui) {
+    fn toolbar(&mut self, ui: &mut egui::Ui) -> ToolbarAction {
+        let mut action = ToolbarAction::None;
         ui.horizontal_wrapped(|ui| {
             if ui.button("Open data root…").clicked() {
                 if let Some(p) = pick_dir() {
                     self.state.set_root(p);
+                    self.biome_cache.clear();
+                    self.room_textures.clear();
                 }
             }
             ui.separator();
+            if ui
+                .checkbox(&mut self.show_sprites, "real sprites")
+                .changed()
+            {
+                action = ToolbarAction::RefreshTextures;
+            }
+            if ui.checkbox(&mut self.ntsc_mode, "NTSC color").changed() {
+                action = ToolbarAction::RefreshTextures;
+            }
             ui.checkbox(&mut self.show_labels, "tile labels");
             ui.checkbox(&mut self.show_room_ids, "room IDs");
             ui.separator();
@@ -465,10 +615,15 @@ impl EditorApp {
             } else {
                 ui.label("no data root");
             }
+            if !self.render_status.is_empty() {
+                ui.separator();
+                ui.label(&self.render_status);
+            }
         });
+        action
     }
 
-    fn side_panel(&mut self, ui: &mut egui::Ui) {
+    fn side_panel(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.heading("Levels");
         ui.add_space(4.0);
         if self.state.level_paths.is_empty() {
@@ -491,6 +646,7 @@ impl EditorApp {
         if let Some(i) = to_load {
             self.state.load_level(i);
             self.pending_fit = true;
+            self.refresh_room_textures(ctx);
         }
     }
 
@@ -544,13 +700,51 @@ impl EditorApp {
     ) -> Option<(u8, u8, u8)> {
         let tile_w = self.tile_w();
         let tile_h = self.tile_h();
-        let prince = snapshot.prince;
         let mut hover = None;
-
         for (room_idx, slot) in snapshot.layout.positions.iter().enumerate() {
             let Some((rx, ry)) = *slot else { continue };
             let room_id = u8::try_from(room_idx + 1).unwrap_or(0);
-            let tiles = snapshot.rooms[room_idx];
+            self.draw_one_room(painter, panel_rect, snapshot, room_idx, room_id, rx, ry);
+            if let Some(cl) = cursor_local {
+                hover = hover.or_else(|| hit_test(cl, self.pan, tile_w, tile_h, rx, ry, room_id));
+            }
+        }
+
+        self.draw_room_outlines(painter, panel_rect, snapshot);
+        hover
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn draw_one_room(
+        &self,
+        painter: &egui::Painter,
+        panel_rect: Rect,
+        snapshot: &LevelSnapshot,
+        room_idx: usize,
+        room_id: u8,
+        rx: i32,
+        ry: i32,
+    ) {
+        let tile_w = self.tile_w();
+        let tile_h = self.tile_h();
+        let tiles = snapshot.rooms[room_idx];
+        let texture = if self.show_sprites {
+            self.room_textures.get(room_idx).and_then(Option::as_ref)
+        } else {
+            None
+        };
+        if let Some(tex) = texture {
+            let room_rect = Rect::from_min_size(
+                panel_rect.min + self.pan + Vec2::new(rx as f32 * tile_w, ry as f32 * tile_h),
+                Vec2::new(tile_w * ROOM_WIDTH as f32, tile_h * ROOM_HEIGHT as f32),
+            );
+            painter.image(
+                tex.id(),
+                room_rect,
+                Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                Color32::WHITE,
+            );
+        } else {
             draw_room(
                 painter,
                 panel_rect.min,
@@ -562,34 +756,33 @@ impl EditorApp {
                 tiles,
                 self.show_labels,
             );
-            if self.show_room_ids {
-                let badge_pos = panel_rect.min
-                    + self.pan
-                    + Vec2::new(rx as f32 * tile_w + 4.0, ry as f32 * tile_h + 2.0);
-                painter.text(
-                    badge_pos,
-                    egui::Align2::LEFT_TOP,
-                    format!("R{room_id}"),
-                    egui::FontId::monospace((12.0 * self.zoom).clamp(8.0, 16.0)),
-                    Color32::from_rgb(255, 230, 120),
-                );
-            }
-            if prince.screen == room_id {
-                if let Some((col, row)) = prince.col_row() {
-                    draw_marker(
-                        painter,
-                        panel_rect.min,
-                        self.pan,
-                        tile_w,
-                        tile_h,
-                        rx + i32::from(col),
-                        ry + i32::from(row),
-                        "P",
-                        Color32::from_rgb(230, 70, 70),
-                    );
-                }
-            }
-            if let Some((col, row)) = snapshot.guard_positions[room_idx] {
+        }
+        if self.show_labels && texture.is_some() {
+            draw_tile_labels(
+                painter,
+                panel_rect.min,
+                self.pan,
+                tile_w,
+                tile_h,
+                rx,
+                ry,
+                tiles,
+            );
+        }
+        if self.show_room_ids {
+            let badge_pos = panel_rect.min
+                + self.pan
+                + Vec2::new(rx as f32 * tile_w + 4.0, ry as f32 * tile_h + 2.0);
+            painter.text(
+                badge_pos,
+                egui::Align2::LEFT_TOP,
+                format!("R{room_id}"),
+                egui::FontId::monospace((12.0 * self.zoom).clamp(8.0, 16.0)),
+                Color32::from_rgb(255, 230, 120),
+            );
+        }
+        if snapshot.prince.screen == room_id {
+            if let Some((col, row)) = snapshot.prince.col_row() {
                 draw_marker(
                     painter,
                     panel_rect.min,
@@ -598,33 +791,34 @@ impl EditorApp {
                     tile_h,
                     rx + i32::from(col),
                     ry + i32::from(row),
-                    "G",
-                    Color32::from_rgb(240, 160, 50),
+                    "P",
+                    Color32::from_rgb(230, 70, 70),
                 );
             }
-
-            if let Some(cl) = cursor_local {
-                let room_x = self.pan.x + rx as f32 * tile_w;
-                let room_y = self.pan.y + ry as f32 * tile_h;
-                let dx = cl.x - room_x;
-                let dy = cl.y - room_y;
-                if dx >= 0.0
-                    && dy >= 0.0
-                    && dx < tile_w * ROOM_WIDTH as f32
-                    && dy < tile_h * ROOM_HEIGHT as f32
-                {
-                    // Bounds-checked above; results lie in
-                    // 0..ROOM_WIDTH / 0..ROOM_HEIGHT.
-                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                    let col = (dx / tile_w) as u8;
-                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                    let row = (dy / tile_h) as u8;
-                    hover = Some((room_id, col, row));
-                }
-            }
         }
+        if let Some((col, row)) = snapshot.guard_positions[room_idx] {
+            draw_marker(
+                painter,
+                panel_rect.min,
+                self.pan,
+                tile_w,
+                tile_h,
+                rx + i32::from(col),
+                ry + i32::from(row),
+                "G",
+                Color32::from_rgb(240, 160, 50),
+            );
+        }
+    }
 
-        // Outline placed rooms.
+    fn draw_room_outlines(
+        &self,
+        painter: &egui::Painter,
+        panel_rect: Rect,
+        snapshot: &LevelSnapshot,
+    ) {
+        let tile_w = self.tile_w();
+        let tile_h = self.tile_h();
         for slot in &snapshot.layout.positions {
             let Some((rx, ry)) = *slot else { continue };
             let room_rect = Rect::from_min_size(
@@ -637,8 +831,35 @@ impl EditorApp {
                 Stroke::new(1.5, Color32::from_rgb(70, 70, 100)),
             );
         }
-        hover
     }
+}
+
+/// Tile-hit-test for the hover read-out. Returns
+/// `Some((room_id, col, row))` if the cursor lies within the rendered
+/// 10×3 grid of the room placed at `(rx, ry)` tiles.
+fn hit_test(
+    cursor_local: Vec2,
+    pan: Vec2,
+    tile_w: f32,
+    tile_h: f32,
+    rx: i32,
+    ry: i32,
+    room_id: u8,
+) -> Option<(u8, u8, u8)> {
+    let room_x = pan.x + rx as f32 * tile_w;
+    let room_y = pan.y + ry as f32 * tile_h;
+    let dx = cursor_local.x - room_x;
+    let dy = cursor_local.y - room_y;
+    if dx < 0.0 || dy < 0.0 || dx >= tile_w * ROOM_WIDTH as f32 || dy >= tile_h * ROOM_HEIGHT as f32
+    {
+        return None;
+    }
+    // Bounds-checked above; results lie in 0..ROOM_WIDTH / 0..ROOM_HEIGHT.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let col = (dx / tile_w) as u8;
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let row = (dy / tile_h) as u8;
+    Some((room_id, col, row))
 }
 
 /// Owned snapshot of the loaded level + layout, captured so the
@@ -711,6 +932,47 @@ fn draw_room(
     }
 }
 
+/// Overlay just the tile-name labels on top of a textured-room render.
+#[allow(clippy::too_many_arguments, clippy::cast_precision_loss)]
+fn draw_tile_labels(
+    painter: &egui::Painter,
+    panel_origin: Pos2,
+    pan: Vec2,
+    tile_w: f32,
+    tile_h: f32,
+    room_x_tiles: i32,
+    room_top_tiles: i32,
+    tiles: [Tile; ROOM_WIDTH * ROOM_HEIGHT],
+) {
+    if tile_w < 18.0 {
+        return;
+    }
+    let font_px = (tile_h * 0.18).clamp(8.0, 14.0);
+    for row in 0..ROOM_HEIGHT {
+        for col in 0..ROOM_WIDTH {
+            let tile = tiles[row * ROOM_WIDTH + col];
+            let x = panel_origin.x + pan.x + (room_x_tiles as f32 + col as f32) * tile_w + 2.0;
+            let y = panel_origin.y + pan.y + (room_top_tiles as f32 + row as f32) * tile_h + 1.0;
+            // Darken the badge area so labels stay readable over
+            // bright sprites.
+            let pad = Vec2::new(4.0, 2.0);
+            let text_size = Vec2::new(
+                font_px * tile.kind.short_name().len() as f32 * 0.6,
+                font_px + 2.0,
+            );
+            let bg_rect = Rect::from_min_size(Pos2::new(x - 1.0, y - 1.0), text_size + pad);
+            painter.rect_filled(bg_rect, 1.0, Color32::from_black_alpha(160));
+            painter.text(
+                Pos2::new(x, y),
+                egui::Align2::LEFT_TOP,
+                tile.kind.short_name(),
+                egui::FontId::monospace(font_px),
+                Color32::from_rgb(240, 240, 250),
+            );
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments, clippy::cast_precision_loss)]
 fn draw_marker(
     painter: &egui::Painter,
@@ -774,6 +1036,52 @@ mod tests {
 
     fn vendor_root() -> PathBuf {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vendor/pop-apple2/04 Support")
+    }
+
+    #[test]
+    fn level_number_from_path_handles_filenames() {
+        use std::path::Path;
+        assert_eq!(
+            level_number_from_path(Path::new("/tmp/Levels/LEVEL0")),
+            Some(0)
+        );
+        assert_eq!(
+            level_number_from_path(Path::new("Levels/LEVEL14")),
+            Some(14)
+        );
+        // Stable against full-paths with spaces (POP data roots often
+        // ship inside directories with spaces in the name).
+        assert_eq!(
+            level_number_from_path(Path::new("/data/04 Support/Levels/LEVEL7")),
+            Some(7)
+        );
+        // Bad inputs return None — the caller surfaces the error
+        // rather than picking the wrong biome.
+        assert_eq!(level_number_from_path(Path::new("/tmp/Levels")), None);
+        assert_eq!(
+            level_number_from_path(Path::new("/tmp/Levels/INFO")),
+            None
+        );
+        assert_eq!(
+            level_number_from_path(Path::new("/tmp/Levels/LEVELx")),
+            None
+        );
+    }
+
+    #[test]
+    fn biome_lookup_uses_filename_not_vector_index() {
+        // Regression: pre-fix the editor took the row index in
+        // `level_paths` and passed it straight to `Biome::for_level`,
+        // which gave the wrong biome on incomplete data roots (e.g.
+        // a root that only ships `LEVEL4` would render it with
+        // `Dungeon` sprites instead of `Palace`). Spot-check the
+        // helper that drives the new code path.
+        use pop_assets::bgdata::Biome;
+        for n in 0usize..=14 {
+            let path = PathBuf::from(format!("/tmp/Levels/LEVEL{n}"));
+            let parsed = level_number_from_path(&path).expect("parses");
+            assert_eq!(Biome::for_level(parsed), Biome::for_level(n));
+        }
     }
 
     fn level_n(n: u8) -> Level {
