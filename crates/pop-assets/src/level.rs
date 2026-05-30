@@ -345,6 +345,15 @@ impl Room {
             None
         }
     }
+
+    /// True if every tile in the room is [`TileKind::Empty`] — useful
+    /// for filtering out unused / dead-code rooms (POP levels often
+    /// ship rooms that are part of the link graph but contain no
+    /// playable geometry).
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.tiles.iter().all(|t| t.kind == TileKind::Empty)
+    }
 }
 
 /// One room's four neighbours, in the order `GETLEFT/RIGHT/UP/DOWN`
@@ -815,6 +824,23 @@ mod tests {
                 lv.screen_count_plus_one() >= 2,
                 "LEVEL{n} INFO[0] = {}",
                 lv.screen_count_plus_one()
+            );
+        }
+    }
+
+    #[test]
+    fn room_is_empty_distinguishes_default_from_populated() {
+        // A fresh `Room::default()` is all-Empty tiles.
+        assert!(Room::default().is_empty());
+        // LEVEL1 room 1 (prince start) has plenty of non-Empty tiles.
+        let lv = level(1);
+        assert!(!lv.rooms[0].is_empty(), "LEVEL1 room 1 should not be empty");
+        // Every bundled level has at least one non-empty room.
+        for n in 0u8..=14 {
+            let lv = level(n);
+            assert!(
+                lv.rooms.iter().any(|r| !r.is_empty()),
+                "LEVEL{n} has no non-empty rooms",
             );
         }
     }
