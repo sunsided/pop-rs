@@ -160,6 +160,27 @@ def _is_local_label(name: str) -> bool:
     return name.startswith(":") or name.startswith("]")
 
 
+def _parse_hex_jsl(line: Line) -> str | None:
+    """Return the 24-bit target of an IIgs `jsl` hand-assembled as
+    `hex 22,lo,mid,hi`, or `None` if `line` isn't that pattern. POP
+    embeds the control-panel toolbox calls this way (`hex 22,00,00,E1`
+    = `jsl $E10000`) because the assembler builds the 6502 only —
+    surfacing them as `Unsupported(jsl)` keeps them visible in dumps."""
+    if line.mnemonic != "hex" or not line.operand:
+        return None
+    parts = [p.strip() for p in line.operand.split(",")]
+    if len(parts) != 4:
+        return None
+    try:
+        bytes_ = [int(p, 16) for p in parts]
+    except ValueError:
+        return None
+    if bytes_[0] != 0x22 or any(b < 0 or b > 0xff for b in bytes_):
+        return None
+    lo, mid, hi = bytes_[1], bytes_[2], bytes_[3]
+    return f"${(hi << 16) | (mid << 8) | lo:06x}"
+
+
 def _parse_immediate(operand: str, equates: dict[str, int]) -> Imm | None:
     """Parse a `#expr` immediate operand. Returns `None` if `operand`
     isn't a `#`-prefixed immediate (the caller decides what to do).
@@ -898,6 +919,28 @@ def lift_file(
                 )
 
             if line.mnemonic is None or line.mnemonic in _NON_CODE_DIRECTIVES:
+                # IIgs toolbox `jsl` hand-assembled as `hex 22,lo,mid,hi`
+                # (the 65816 jsl opcode + 24-bit target). Merlin emits four
+                # raw bytes via `hex`, so the call is otherwise invisible
+                # in the lift; surface it as an `Unsupported(jsl)` atom
+                # tagged 65816, alongside the rest of the IIgs ops.
+                jsl_target = _parse_hex_jsl(line)
+                if jsl_target is not None:
+                    instr = Unsupported(
+                        mnemonic="jsl",
+                        operand=jsl_target,
+                        src=SourceRef(
+                            file=str(line.file),
+                            line=line.lineno,
+                            raw=line.raw.rstrip("\n"),
+                            comment=line.comment,
+                        ),
+                    )
+                    routine.body.append(instr)
+                    all_unsupported.append(instr)
+                    first = False
+                    idx += 1
+                    continue
                 # Non-code line in the middle of a routine — typically a
                 # bare label that the lifter will pick up via the
                 # pending-labels mechanism on the next code line. We

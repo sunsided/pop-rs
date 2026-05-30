@@ -1141,6 +1141,17 @@ impl Cpu {
         self.set_a(0xff);
         // 65816 (IIgs-only, not modeled): phb  ; UNPACK.S:713
         // 65816 (IIgs-only, not modeled): mvn $E1,1  ; UNPACK.S:714
+        // mvn block move (IIgs Super Hires): copy A+1 bytes from (src_bank, X) to (dst_bank, Y); 16-bit A/X/Y under `rep $30` and bank addressing are not modeled.
+        {
+            let count = (self.reg.a as usize).wrapping_add(1);
+            for _ in 0..count {
+                let b = self.mem[self.reg.x as usize];
+                self.mem[self.reg.y as usize] = b;
+                self.reg.x = self.reg.x.wrapping_add(1);
+                self.reg.y = self.reg.y.wrapping_add(1);
+                self.reg.a = self.reg.a.wrapping_sub(1);
+            }
+        }
         // 65816 (IIgs-only, not modeled): plb  ; UNPACK.S:715
         // 65816 (IIgs-only, not modeled): sep $20  ; UNPACK.S:719
         self.set_a(0xc1);
@@ -1151,6 +1162,17 @@ impl Cpu {
         self.set_a(0x1f);
         // 65816 (IIgs-only, not modeled): phb  ; UNPACK.S:729
         // 65816 (IIgs-only, not modeled): mvn 0,1  ; UNPACK.S:730
+        // mvn block move (IIgs Super Hires): copy A+1 bytes from (src_bank, X) to (dst_bank, Y); 16-bit A/X/Y under `rep $30` and bank addressing are not modeled.
+        {
+            let count = (self.reg.a as usize).wrapping_add(1);
+            for _ in 0..count {
+                let b = self.mem[self.reg.x as usize];
+                self.mem[self.reg.y as usize] = b;
+                self.reg.x = self.reg.x.wrapping_add(1);
+                self.reg.y = self.reg.y.wrapping_add(1);
+                self.reg.a = self.reg.a.wrapping_sub(1);
+            }
+        }
         // 65816 (IIgs-only, not modeled): plb  ; UNPACK.S:731
         self.PalFade();
         return;

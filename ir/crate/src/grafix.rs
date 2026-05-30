@@ -2042,6 +2042,7 @@ pub fn getparam(cpu: &mut Cpu) {
     cpu.stack.push(cpu.reg.a);
     cpu.stack.push(cpu.reg.y);
     cpu.set_x(0x03);
+    // 65816 (IIgs-only, not modeled): jsl $e10000  ; GRAFIX.S:2098
     let _v = cpu.stack.pop().expect("pla on empty stack");
     cpu.set_a(_v);
     cpu.flags.c = true;
@@ -2058,6 +2059,7 @@ pub fn setparam(cpu: &mut Cpu) {
     cpu.stack.push(cpu.reg.a);
     cpu.stack.push(cpu.reg.y);
     cpu.set_x(0x03);
+    // 65816 (IIgs-only, not modeled): jsl $e10000  ; GRAFIX.S:2120
     cpu.flags.c = true;
     // 65816 (IIgs-only, not modeled): xce  ; GRAFIX.S:2122
     return;

@@ -1047,6 +1047,17 @@ pub fn FADEIN(cpu: &mut Cpu) {
     cpu.set_a(0xff);
     // 65816 (IIgs-only, not modeled): phb  ; UNPACK.S:713
     // 65816 (IIgs-only, not modeled): mvn $E1,1  ; UNPACK.S:714
+    // mvn block move (IIgs Super Hires): copy A+1 bytes from (src_bank, X) to (dst_bank, Y); 16-bit A/X/Y under `rep $30` and bank addressing are not modeled.
+    {
+        let count = (cpu.reg.a as usize).wrapping_add(1);
+        for _ in 0..count {
+            let b = cpu.mem[cpu.reg.x as usize];
+            cpu.mem[cpu.reg.y as usize] = b;
+            cpu.reg.x = cpu.reg.x.wrapping_add(1);
+            cpu.reg.y = cpu.reg.y.wrapping_add(1);
+            cpu.reg.a = cpu.reg.a.wrapping_sub(1);
+        }
+    }
     // 65816 (IIgs-only, not modeled): plb  ; UNPACK.S:715
     // 65816 (IIgs-only, not modeled): sep $20  ; UNPACK.S:719
     cpu.set_a(0xc1);
@@ -1057,6 +1068,17 @@ pub fn FADEIN(cpu: &mut Cpu) {
     cpu.set_a(0x1f);
     // 65816 (IIgs-only, not modeled): phb  ; UNPACK.S:729
     // 65816 (IIgs-only, not modeled): mvn 0,1  ; UNPACK.S:730
+    // mvn block move (IIgs Super Hires): copy A+1 bytes from (src_bank, X) to (dst_bank, Y); 16-bit A/X/Y under `rep $30` and bank addressing are not modeled.
+    {
+        let count = (cpu.reg.a as usize).wrapping_add(1);
+        for _ in 0..count {
+            let b = cpu.mem[cpu.reg.x as usize];
+            cpu.mem[cpu.reg.y as usize] = b;
+            cpu.reg.x = cpu.reg.x.wrapping_add(1);
+            cpu.reg.y = cpu.reg.y.wrapping_add(1);
+            cpu.reg.a = cpu.reg.a.wrapping_sub(1);
+        }
+    }
     // 65816 (IIgs-only, not modeled): plb  ; UNPACK.S:731
     crate::ext::PalFade(cpu);
     return;

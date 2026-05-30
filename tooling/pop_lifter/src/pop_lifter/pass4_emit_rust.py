@@ -916,6 +916,50 @@ def _block_diverges(block) -> bool:
     return any(_diverges(s) for s in block.stmts)
 
 
+def _emit_iigs_unsupported(item, pad: str) -> list[str]:
+    """Render a 65816/IIgs `Unsupported` atom. Most ops just become a
+    documenting comment (the routines they appear in are IIgs-gated and
+    inert on the stock-Apple-II target), but `mvn` (Super Hires block
+    move, the one piece of real computation in UNPACK's `FADEIN`) lowers
+    to a small Rust copy loop on the 8-bit register alias.
+
+    The loop is *symbolic*: a real `mvn` runs after `rep $30`, with A/X/Y
+    in 16-bit mode and bank-aware addressing — we don't model either, so
+    the lowered loop uses the current 8-bit A/X/Y and ignores the bank
+    operands. That's fine in practice: every caller is gated behind
+    `lda IIGS / beq` and never reached on the stock target, so the loop
+    documents the intent without affecting observed behavior."""
+    op = f" {item.operand}" if item.operand else ""
+    header = (
+        f"{pad}// 65816 (IIgs-only, not modeled): "
+        f"{item.mnemonic}{op}  ; {item.src.short()}"
+    )
+    if item.mnemonic == "mvn":
+        # `mvn` — Merlin syntax is `mvn dst_bank, src_bank` (the order
+        # matches the 65816 byte encoding, opposite of WDC's `src, dst`
+        # assembly convention). Symbolic 8-bit loop; banks ignored. Uses
+        # `self.` accessors — `emit_crate` rewrites them to `cpu.` for
+        # the assembled-crate form. Direct register writes (not
+        # `set_*`): `mvn` doesn't affect status flags.
+        return [
+            header,
+            f"{pad}// mvn block move (IIgs Super Hires): copy A+1 bytes from "
+            f"(src_bank, X) to (dst_bank, Y); 16-bit A/X/Y under `rep $30` "
+            f"and bank addressing are not modeled.",
+            f"{pad}{{",
+            f"{pad}    let count = (self.reg.a as usize).wrapping_add(1);",
+            f"{pad}    for _ in 0..count {{",
+            f"{pad}        let b = self.mem[self.reg.x as usize];",
+            f"{pad}        self.mem[self.reg.y as usize] = b;",
+            f"{pad}        self.reg.x = self.reg.x.wrapping_add(1);",
+            f"{pad}        self.reg.y = self.reg.y.wrapping_add(1);",
+            f"{pad}        self.reg.a = self.reg.a.wrapping_sub(1);",
+            f"{pad}    }}",
+            f"{pad}}}",
+        ]
+    return [header]
+
+
 def _emit_block_lines(stmts, indent, syms, names, call_render=None) -> tuple[list[str], bool]:
     """Emit a block's statements, stopping after the first that diverges
     (`_diverges`) — statements past it are unreachable and would trip
@@ -1100,11 +1144,7 @@ def _emit_stmt(
             return [f"{pad}{line}" for line in lowered]
         from .ir1 import Unsupported, format_item, is_65816
         if isinstance(stmt.item, Unsupported) and is_65816(stmt.item.mnemonic):
-            op = f" {stmt.item.operand}" if stmt.item.operand else ""
-            return [
-                f"{pad}// 65816 (IIgs-only, not modeled): "
-                f"{stmt.item.mnemonic}{op}  ; {stmt.item.src.short()}"
-            ]
+            return _emit_iigs_unsupported(stmt.item, pad)
         return [f"{pad}// raw: {format_item(stmt.item).strip()}"]
 
     return [f"{pad}// TODO(pass4): lower {type(stmt).__name__}"]
