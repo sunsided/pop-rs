@@ -138,8 +138,9 @@ _NON_CODE_DIRECTIVES = frozenset(
         # we'd lose entirely if we silently skipped it. Let it fall
         # through to `Unsupported(mnemonic="usr", …)` so the IR dump and
         # pass-4 Rust emission can render it as a documenting comment
-        # (`format_item` and `_emit_iigs_unsupported` recognise the
-        # mnemonic and emit a clear "build-time RW18 disk write" line).
+        # (`ir1.format_item` and `pass4_emit_rust._emit_stmt`'s
+        # `Unsupported` dispatch both recognise the mnemonic and emit a
+        # clear "build-time RW18 disk write" line).
         # All POP `usr` calls are unlabeled and sit after `rts`, so
         # `Unsupported` here doesn't reintroduce the data-label-as-entry
         # discovery bug.
