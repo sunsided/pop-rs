@@ -1094,9 +1094,11 @@ fn draw_tile_labels(
     }
 }
 
-/// Overlay each cell's `(col,row)` coordinate in its bottom-right
-/// corner. Pairs with the `R{id}` room badge and the selected level
-/// name so a glitch can be pinned to an exact level + room + cell.
+/// Overlay a red cell grid plus each cell's `(col,row)` coordinate in
+/// its bottom-right corner. The grid mirrors the one used in the
+/// debug screenshots; together with the `R{id}` room badge and the
+/// selected level name a glitch can be pinned to an exact
+/// level + room + cell.
 #[allow(clippy::too_many_arguments, clippy::cast_precision_loss)]
 fn draw_cell_coords(
     painter: &egui::Painter,
@@ -1107,7 +1109,25 @@ fn draw_cell_coords(
     room_x_tiles: i32,
     room_top_tiles: i32,
 ) {
-    // Coordinates are unreadable on tiny tiles — skip when zoomed out.
+    // Red cell grid — drawn at every zoom (the coordinate text below is
+    // gated on readability, but the grid stays useful when zoomed out).
+    let origin = panel_origin + pan;
+    let left = origin.x + room_x_tiles as f32 * tile_w;
+    let top = origin.y + room_top_tiles as f32 * tile_h;
+    let right = left + ROOM_WIDTH as f32 * tile_w;
+    let bottom = top + ROOM_HEIGHT as f32 * tile_h;
+    let grid = Stroke::new(1.0, Color32::from_rgba_unmultiplied(220, 40, 40, 150));
+    for c in 0..=ROOM_WIDTH {
+        let x = left + c as f32 * tile_w;
+        painter.line_segment([Pos2::new(x, top), Pos2::new(x, bottom)], grid);
+    }
+    for r in 0..=ROOM_HEIGHT {
+        let y = top + r as f32 * tile_h;
+        painter.line_segment([Pos2::new(left, y), Pos2::new(right, y)], grid);
+    }
+
+    // Coordinates are unreadable on tiny tiles — skip the text (but not
+    // the grid) when zoomed out.
     if tile_w < 22.0 {
         return;
     }
