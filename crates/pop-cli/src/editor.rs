@@ -228,6 +228,48 @@ fn compute_bounds(
     Some((min, max))
 }
 
+/// Bounding box of placed rooms whose tile content isn't entirely
+/// [`TileKind::Empty`]. Returns `None` when every placed room is
+/// empty (or there are no placed rooms) — callers fall back to
+/// [`RoomLayout::bounds`].
+///
+/// POP levels routinely ship dead-code rooms that are wired into the
+/// link graph but contain no playable geometry; fitting around them
+/// just wastes screen real estate.
+fn nonempty_bounds(layout: &RoomLayout, level: &Level) -> Option<((i32, i32), (i32, i32))> {
+    let room_w = i32::try_from(ROOM_WIDTH).unwrap_or(10);
+    let room_h = i32::try_from(ROOM_HEIGHT).unwrap_or(3);
+    let mut bounds: Option<((i32, i32), (i32, i32))> = None;
+    for (idx, slot) in layout.positions.iter().enumerate() {
+        let Some((x, y)) = *slot else { continue };
+        let Some(room) = level.rooms.get(idx) else {
+            continue;
+        };
+        if room.is_empty() {
+            continue;
+        }
+        let cell_max = (x + room_w, y + room_h);
+        match &mut bounds {
+            None => bounds = Some(((x, y), cell_max)),
+            Some(((min_x, min_y), (max_x, max_y))) => {
+                if x < *min_x {
+                    *min_x = x;
+                }
+                if y < *min_y {
+                    *min_y = y;
+                }
+                if cell_max.0 > *max_x {
+                    *max_x = cell_max.0;
+                }
+                if cell_max.1 > *max_y {
+                    *max_y = cell_max.1;
+                }
+            }
+        }
+    }
+    bounds
+}
+
 /// Editor data model. Holds the discovered POP data root and the
 /// currently-loaded level, layout, and inspection state.
 #[derive(Debug)]
@@ -351,6 +393,12 @@ struct EditorApp {
     hover: Option<(u8, u8, u8)>,
     /// Set on level load so the next frame can fit-to-view.
     pending_fit: bool,
+    /// Set on startup and after each data-root change so the next
+    /// `update()` auto-loads the first available level. Texture
+    /// upload needs the egui [`egui::Context`], which we only have
+    /// inside `update()` — hence the deferred flag rather than
+    /// loading from `EditorApp::new`.
+    pending_initial_load: bool,
     /// Per-biome BGTAB cache. Loaded lazily on level-load; one entry
     /// per biome encountered (max 3) and reused across levels.
     biome_cache: HashMap<Biome, BiomeTables>,
@@ -384,6 +432,7 @@ impl EditorApp {
             ntsc_mode: true,
             hover: None,
             pending_fit: true,
+            pending_initial_load: true,
             biome_cache: HashMap::new(),
             room_textures: Vec::new(),
             render_status: String::new(),
@@ -418,15 +467,11 @@ impl EditorApp {
             return;
         };
         let Some(level_number) = level_number_from_path(level_path) else {
-            self.render_status = format!(
-                "can't parse level number from {}",
-                level_path.display()
-            );
+            self.render_status = format!("can't parse level number from {}", level_path.display());
             return;
         };
         let Some(biome) = Biome::for_level(level_number) else {
-            self.render_status =
-                format!("LEVEL{level_number} has no biome mapping");
+            self.render_status = format!("LEVEL{level_number} has no biome mapping");
             return;
         };
         let tables = match self.biome_cache.get(&biome) {
@@ -528,11 +573,23 @@ impl EditorApp {
 
     /// Reset pan + zoom so the entire layout fits inside `viewport`
     /// with a small margin.
+    ///
+    /// Empty rooms (every tile is `TileKind::Empty`) are excluded
+    /// from the bounding box when there's at least one non-empty
+    /// room placed — POP levels often ship dead-code rooms wired
+    /// into the link graph but containing no playable geometry, and
+    /// fitting around them just wastes screen real estate. If every
+    /// placed room is empty we fall back to the full layout bounds
+    /// so the viewport still snaps to something.
     fn fit_to_view(&mut self, viewport: Rect) {
         let Some(layout) = &self.state.layout else {
             return;
         };
-        let Some((bb_min, bb_max)) = layout.bounds else {
+        let Some(level) = &self.state.loaded_level else {
+            return;
+        };
+        let bounds = nonempty_bounds(layout, level).or(layout.bounds);
+        let Some((bb_min, bb_max)) = bounds else {
             return;
         };
         let world_w = (bb_max.0 - bb_min.0).max(1) as f32;
@@ -558,6 +615,20 @@ impl EditorApp {
 
 impl eframe::App for EditorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Auto-load the first level (LEVEL0 if present, else the
+        // first that scanned) on startup and after each data-root
+        // change. We can't do this in `EditorApp::new` because
+        // texture upload needs the egui `Context`, which only
+        // exists from inside `update()`.
+        if self.pending_initial_load
+            && self.state.loaded_level.is_none()
+            && !self.state.level_paths.is_empty()
+        {
+            self.state.load_level(0);
+            self.refresh_room_textures(ctx);
+            self.pending_fit = true;
+            self.pending_initial_load = false;
+        }
         let mut toolbar_request = ToolbarAction::None;
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| toolbar_request = self.toolbar(ui));
         egui::SidePanel::left("levels")
@@ -589,6 +660,7 @@ impl EditorApp {
                     self.state.set_root(p);
                     self.biome_cache.clear();
                     self.room_textures.clear();
+                    self.pending_initial_load = true;
                 }
             }
             ui.separator();
@@ -1058,10 +1130,7 @@ mod tests {
         // Bad inputs return None — the caller surfaces the error
         // rather than picking the wrong biome.
         assert_eq!(level_number_from_path(Path::new("/tmp/Levels")), None);
-        assert_eq!(
-            level_number_from_path(Path::new("/tmp/Levels/INFO")),
-            None
-        );
+        assert_eq!(level_number_from_path(Path::new("/tmp/Levels/INFO")), None);
         assert_eq!(
             level_number_from_path(Path::new("/tmp/Levels/LEVELx")),
             None
@@ -1082,6 +1151,38 @@ mod tests {
             let parsed = level_number_from_path(&path).expect("parses");
             assert_eq!(Biome::for_level(parsed), Biome::for_level(n));
         }
+    }
+
+    #[test]
+    fn nonempty_bounds_excludes_dead_code_rooms() {
+        // Synth a layout with two placed rooms — one populated, one
+        // empty — and check the nonempty-bounds calculation excludes
+        // the empty one. Falls back to full bounds when every placed
+        // room is empty.
+        use pop_assets::level::Tile;
+        let mut level = level_n(0);
+        // Make rooms 1 and 2 distinct: room 1 keeps its content,
+        // room 2 becomes fully empty.
+        level.rooms[1] = pop_assets::level::Room::default();
+        let mut layout = RoomLayout {
+            positions: [None; ROOMS_PER_LEVEL],
+            bounds: None,
+        };
+        let room_h = i32::try_from(ROOM_HEIGHT).unwrap();
+        layout.positions[0] = Some((0, 0));
+        layout.positions[1] = Some((0, room_h));
+        // With one non-empty + one empty, bounds should clip to the
+        // non-empty room only.
+        let ne = nonempty_bounds(&layout, &level).expect("non-empty exists");
+        assert_eq!(ne.0, (0, 0));
+        assert_eq!(ne.1 .1, room_h, "should not extend into the empty room");
+
+        // Fallback: when every placed room is empty, the helper
+        // returns None and the caller is expected to fall back to
+        // the full layout bounds.
+        let _ = Tile::default();
+        level.rooms[0] = pop_assets::level::Room::default();
+        assert!(nonempty_bounds(&layout, &level).is_none());
     }
 
     fn level_n(n: u8) -> Level {

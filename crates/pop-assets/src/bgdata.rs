@@ -212,6 +212,23 @@ pub const GATE_8C: [u8; 8] = [0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36];
 pub const GATE_8B: [u8; 8] = [0x3e, 0x3d, 0x3c, 0x3b, 0x3a, 0x39, 0x38, 0x37];
 
 // ---------------------------------------------------------------------------
+// Exit door pieces (`BGDATA.S:107-110`).
+// ---------------------------------------------------------------------------
+
+/// Staircase sprite drawn under an exit door — skipped on the prince's
+/// start room (treated as the entrance, no stairs leaving).
+pub const STAIRS: u8 = 0x6b;
+/// One vertical slice of the closed exit door; `drawexitb` stacks
+/// these from `Ay − 14` downward in 4-pixel steps.
+pub const DOOR: u8 = 0x6c;
+/// Mask AND'd into the canvas immediately before each [`DOOR`] piece.
+pub const DOOR_MASK: u8 = 0x6d;
+/// "Top repair" sprite drawn above the door stack so the wall edge
+/// reads cleanly. Lives in the cell's C-section by Y coord but is
+/// emitted from `drawexitb`'s tail (`FRAMEADV.S:1680`).
+pub const TOP_REPAIR: u8 = 0x6e;
+
+// ---------------------------------------------------------------------------
 // Per-row layout constants (TABLES.S:33-42).
 // ---------------------------------------------------------------------------
 
