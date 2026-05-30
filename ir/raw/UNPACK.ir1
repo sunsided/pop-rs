@@ -639,5 +639,5 @@ fn loadscrn {
   if cc goto :loop       ; UNPACK.S:876
 ]rts:
   return                           ; UNPACK.S:877
-  ??? usr $a9,2,$a00,*-org            ; UNPACK.S:882
+  usr $a9,2,$a00,*-org            ; build-time RW18 disk write (no bytes emitted) — UNPACK.S:882
 }

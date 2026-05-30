@@ -1589,7 +1589,7 @@ fn setparam {
   c = 1                            ; GRAFIX.S:2121
   xce             ; 65816/IIgs op (not modeled) — GRAFIX.S:2122
   return                           ; GRAFIX.S:2123
-  ??? usr $a9,4,$0000,*-org            ; GRAFIX.S:2130
+  usr $a9,4,$0000,*-org            ; build-time RW18 disk write (no bytes emitted) — GRAFIX.S:2130
 }
 
 fn :setaddl {

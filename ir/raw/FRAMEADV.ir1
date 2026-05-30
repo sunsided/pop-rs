@@ -1794,7 +1794,7 @@ mbsub:
   a = a | *(fredbuf@0x5e78 + y)              ; FRAMEADV.S:2259
   a = a | *(wipebuf@0x5eb4 + y)              ; FRAMEADV.S:2260
   return                           ; FRAMEADV.S:2261
-  ??? usr $a9,3,$490,*-org            ; FRAMEADV.S:2266
+  usr $a9,3,$490,*-org            ; build-time RW18 disk write (no bytes emitted) — FRAMEADV.S:2266
 }
 
 fn metbufs2 {
@@ -1807,7 +1807,7 @@ mbsub:
   a = a | *(fredbuf@0x5e78 + y)              ; FRAMEADV.S:2259
   a = a | *(wipebuf@0x5eb4 + y)              ; FRAMEADV.S:2260
   return                           ; FRAMEADV.S:2261
-  ??? usr $a9,3,$490,*-org            ; FRAMEADV.S:2266
+  usr $a9,3,$490,*-org            ; build-time RW18 disk write (no bytes emitted) — FRAMEADV.S:2266
 }
 
 fn mbsub {
@@ -1817,7 +1817,7 @@ fn mbsub {
   a = a | *(fredbuf@0x5e78 + y)              ; FRAMEADV.S:2259
   a = a | *(wipebuf@0x5eb4 + y)              ; FRAMEADV.S:2260
   return                           ; FRAMEADV.S:2261
-  ??? usr $a9,3,$490,*-org            ; FRAMEADV.S:2266
+  usr $a9,3,$490,*-org            ; build-time RW18 disk write (no bytes emitted) — FRAMEADV.S:2266
 }
 
 fn getobjid1 {

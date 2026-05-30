@@ -1222,6 +1222,18 @@ def format_item(item: Item) -> str:
                 f"  {item.mnemonic} {op}            "
                 f"; 65816/IIgs op (not modeled) — {item.src.short()}"
             )
+        if item.mnemonic == "usr":
+            # POP's wiring of Merlin's user-hook to RW18 (see
+            # `vendor/pop-apple2/04 Support/MakeDisk/USR18.S`):
+            # `usr <BbundID>,<track>,<offset>,<length>` is a pass-2 disk
+            # write of the just-assembled module, no bytes emitted into
+            # the binary. The line stays in the dump so the build-time
+            # intent at each site is visible.
+            return (
+                f"  {item.mnemonic} {op}            "
+                f"; build-time RW18 disk write (no bytes emitted) — "
+                f"{item.src.short()}"
+            )
         return f"  ??? {item.mnemonic} {op}            ; {item.src.short()}"
     raise TypeError(f"unknown IR1 item: {type(item)}")
 

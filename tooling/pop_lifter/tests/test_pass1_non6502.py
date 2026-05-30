@@ -33,15 +33,55 @@ def test_rev_lifts_to_none():
 
 
 def test_usr_and_da_lift_correctly():
-    """`da` is inert data → None. `usr` is a code/data *generator*
-    (`usr $a9,N,addr,*-org`), not literal data — it stays visible as
-    `Unsupported` so the IR flags that an unexpanded generated block
-    lives here, rather than silently dropping it like `rev`/`da`."""
+    """`da` is inert data → None. `usr` is POP's wiring of Merlin's
+    user-defined hook to RW18's disk writer (see
+    `vendor/pop-apple2/04 Support/MakeDisk/USR18.S`): at pass 2 it
+    copies the just-assembled module to a disk track and emits *zero*
+    bytes into the binary. We keep it as `Unsupported` rather than
+    dropping it like `da`, so the IR dump and the lifted Rust can
+    render the directive as a documenting comment — readers can see
+    the build-time intent at each site even though no executable code
+    corresponds to it."""
     from pop_lifter.ir1 import Unsupported
     assert _lift_instr(_line("da", "label"), {}, set()) is None
     usr = _lift_instr(_line("usr", "$a9,16,$b00,*-org"), {}, set())
     assert isinstance(usr, Unsupported)
     assert usr.mnemonic == "usr"
+    assert usr.operand == "$a9,16,$b00,*-org"
+
+
+def test_usr_renders_buildhook_comment_in_ir_dump():
+    """The IR1 dump should show the build-time RW18 intent for `usr`,
+    not the generic `???` marker the lifter uses for unknown opcodes."""
+    from pop_lifter.ir1 import SourceRef, Unsupported, format_item
+    item = Unsupported(
+        mnemonic="usr",
+        operand="$a9,21,$b00,*-org",
+        src=SourceRef(file="MISC.S", line=1021, raw=""),
+    )
+    out = format_item(item)
+    assert "build-time RW18 disk write" in out
+    assert "no bytes emitted" in out
+    assert "MISC.S:1021" in out
+    assert "???" not in out
+
+
+def test_usr_renders_buildhook_comment_in_rust_emission():
+    """Pass 4 should surface `usr` as a `// build-time RW18 disk write …`
+    comment so the directive is visible in the lifted Rust output."""
+    from pop_lifter.ir1 import SourceRef, Unsupported
+    from pop_lifter.ir3 import RawStmt
+    from pop_lifter.pass4_emit_rust import _emit_stmt
+    item = Unsupported(
+        mnemonic="usr",
+        operand="$a9,21,$b00,*-org",
+        src=SourceRef(file="MISC.S", line=1021, raw=""),
+    )
+    out = _emit_stmt(RawStmt(item=item), 0)
+    assert out == [
+        "// build-time RW18 disk write (no bytes emitted): "
+        "usr $a9,21,$b00,*-org  ; MISC.S:1021"
+    ]
 
 
 def test_cheatcode_data_labels_not_discovered_as_entries(tmp_path):

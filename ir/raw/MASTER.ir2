@@ -908,7 +908,7 @@ fn error {
   call driveoff                  ; MASTER.S:1437
   call prompt                  ; MASTER.S:1439
   tail_call driveon                ; MASTER.S:1441
-  ??? usr $a9,1,$a80,*-org            ; MASTER.S:1446
+  usr $a9,1,$a80,*-org            ; build-time RW18 disk write (no bytes emitted) — MASTER.S:1446
 }
 
 fn ]lsub {

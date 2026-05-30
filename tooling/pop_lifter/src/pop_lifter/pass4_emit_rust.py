@@ -1143,8 +1143,24 @@ def _emit_stmt(
         if lowered is not None:
             return [f"{pad}{line}" for line in lowered]
         from .ir1 import Unsupported, format_item, is_65816
-        if isinstance(stmt.item, Unsupported) and is_65816(stmt.item.mnemonic):
-            return _emit_iigs_unsupported(stmt.item, pad)
+        if isinstance(stmt.item, Unsupported):
+            if is_65816(stmt.item.mnemonic):
+                return _emit_iigs_unsupported(stmt.item, pad)
+            if stmt.item.mnemonic == "usr":
+                # POP wires Merlin's user-defined hook to RW18's disk
+                # writer (see
+                # `vendor/pop-apple2/04 Support/MakeDisk/USR18.S`):
+                #   `usr <BbundID>,<track>,<offset>,<length>`
+                # writes the just-assembled module to a floppy track at
+                # pass 2 and emits zero bytes into the binary. Surface
+                # the directive as a documenting comment so the build-
+                # time intent at each site stays visible in the lifted
+                # Rust, even though no executable code corresponds to it.
+                op = f" {stmt.item.operand}" if stmt.item.operand else ""
+                return [
+                    f"{pad}// build-time RW18 disk write (no bytes emitted): "
+                    f"usr{op}  ; {stmt.item.src.short()}"
+                ]
         return [f"{pad}// raw: {format_item(stmt.item).strip()}"]
 
     return [f"{pad}// TODO(pass4): lower {type(stmt).__name__}"]

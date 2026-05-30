@@ -1102,7 +1102,7 @@ pub fn DISPVERSION(cpu: &mut Cpu) {
                 return;
             }
             8 => {
-                // raw: ??? usr $a9,21,$b00,*-org            ; MISC.S:1021
+                // build-time RW18 disk write (no bytes emitted): usr $a9,21,$b00,*-org  ; MISC.S:1021
                 return;
             }
             _ => unreachable!(),

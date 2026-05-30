@@ -337,7 +337,7 @@ impl Cpu {
                     return;
                 }
                 7 => {
-                    // raw: ??? usr $a9,20,$e00,*-org            ; SOUND.S:359
+                    // build-time RW18 disk write (no bytes emitted): usr $a9,20,$e00,*-org  ; SOUND.S:359
                     return;
                 }
                 _ => unreachable!(),

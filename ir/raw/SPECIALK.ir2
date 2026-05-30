@@ -717,7 +717,7 @@ fn DLOOP  (aka STROBE) {
   call controller                  ; SPECIALK.S:1344
 ]rts:
   return                           ; SPECIALK.S:1345
-  ??? usr $a9,19,$b00,*-org            ; SPECIALK.S:1351
+  usr $a9,19,$b00,*-org            ; build-time RW18 disk write (no bytes emitted) — SPECIALK.S:1351
 }
 
 fn TempDevel {
