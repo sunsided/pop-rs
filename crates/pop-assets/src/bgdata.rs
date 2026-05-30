@@ -178,6 +178,40 @@ pub const LOOSE_D: [u8; 11] = [
 pub const LOOSE_B: u8 = 0x1b;
 
 // ---------------------------------------------------------------------------
+// Torch flame frames (`GAMEBG.S:147`).
+// ---------------------------------------------------------------------------
+
+/// Per-frame sprite ID for the torch flame, drawn by `SETUPFLAME` in
+/// the cell **to the right** of a torch tile, offset by
+/// `(+1 hires byte, -43 px)` from `Ay`. Frame 0 is the at-rest flame.
+pub const TORCH_FLAME: [u8; 12] = [
+    0x52, 0x53, 0x54, 0x55, 0x56, 0x61, 0x62, 0x63, 0x64, 0x52, 0x54, 0x56,
+];
+
+// ---------------------------------------------------------------------------
+// Gate pieces (`BGDATA.S:89-95`).
+// ---------------------------------------------------------------------------
+
+/// Gate bottom piece, drawn with `sta` opacity when the bottom sits
+/// above the floor line.
+pub const GATE_BOT_STA: u8 = 0x43;
+/// Gate bottom piece, drawn with `ora` opacity when the bottom sits
+/// at / below the floor line and needs to overlay the background.
+pub const GATE_BOT_ORA: u8 = 0x44;
+/// Gate middle "grill" piece (8 pixels tall). Stacked vertically by
+/// `drawgateb` to fill the gate's full height.
+pub const GATE_B1: u8 = 0x37;
+/// Mask AND'd into the cell above-right when the cell below-left
+/// holds a gate (`drawgatec`).
+pub const GATE_C_MASK: u8 = 0x0d;
+/// Eight C-section sprites of varying heights — `drawgatec`
+/// indexes by `(state/4) mod 8`.
+pub const GATE_8C: [u8; 8] = [0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36];
+/// Eight B-section top-of-grill sprites (1-8 pixels tall), used as
+/// the very top piece of `drawgateb`.
+pub const GATE_8B: [u8; 8] = [0x3e, 0x3d, 0x3c, 0x3b, 0x3a, 0x39, 0x38, 0x37];
+
+// ---------------------------------------------------------------------------
 // Per-row layout constants (TABLES.S:33-42).
 // ---------------------------------------------------------------------------
 
