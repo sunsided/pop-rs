@@ -141,9 +141,9 @@ impl BiomeTables {
             PieceRef::Table2(i) => self.table2.images.get(usize::from(i)),
         };
         match img {
-            // Truncated 3.5"-rebuild placeholder → substitute the same
-            // sprite from the fallback biome if one is attached.
-            Some(im) if is_placeholder(im) => self
+            // Truncated 3.5"-rebuild sprite → substitute the same sprite
+            // from the fallback biome if one is attached.
+            Some(im) if is_truncated(im) => self
                 .fallback
                 .as_deref()
                 .and_then(|fb| fb.resolve(piece_id))
@@ -247,6 +247,19 @@ const PROBED_SPRITES: &[(u8, &str)] = &[(
 /// sprite — both stay clear of this predicate.
 fn is_placeholder(img: &Image) -> bool {
     img.width_bytes == 1 && img.height == 1 && img.bitmap.first() == Some(&0x80)
+}
+
+/// Broader truncation test used to trigger the [`BiomeTables`] fallback.
+///
+/// The 3.5" rebuild collapsed stripped sprites to degenerate sizes —
+/// `looseb` (`0x1b`) and the variant-1 block wall (`0x6f`) are both
+/// `1 byte × 1 px` in `IMG.BGTAB.RED1`, but they don't all share the
+/// `0x80` fill byte that [`is_placeholder`] keys on. Any real BGTAB
+/// sprite is at least a few pixels tall (the shortest, the floor
+/// D-strip, is 3 px), so a height of `<= 1` (or zero width) is a
+/// reliable "this slot was stripped" signal for substitution.
+fn is_truncated(img: &Image) -> bool {
+    img.width_bytes == 0 || img.height <= 1
 }
 
 /// Which of a biome's two BGTAB image tables a diagnostic refers to.
