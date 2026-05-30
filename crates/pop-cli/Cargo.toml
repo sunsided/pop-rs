@@ -1,0 +1,25 @@
+# The `pop` binary: a clap-based subcommand tree for working with
+# Prince of Persia (Apple II) assets and (eventually) running the game.
+# Phase 1 of the umbrella plan (#79) lands the asset-inspection
+# subcommands here; the egui editor (#90) and the runtime entry will
+# arrive behind their own Cargo features.
+[package]
+name = "pop-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Command-line tools for Prince of Persia (Apple II) assets."
+
+[[bin]]
+name = "pop"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+pop-assets = { path = "../pop-assets" }
