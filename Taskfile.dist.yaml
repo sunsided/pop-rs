@@ -77,6 +77,15 @@ tasks:
       - task: run
         vars: {CLI_ARGS: 'draz sprites "{{.CHTAB}}" --out-dir "{{.OUT}}" --mode {{.MODE}}'}
 
+  editor:
+    desc: "Launch the egui level browser (gated on the `editor` feature). Pass args after --, e.g. task editor -- --pick or task editor -- <data-root>."
+    deps: [submodules]
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found - install Rust from https://rustup.rs/"
+    cmds:
+      - cargo run {{.PROFILE_FLAG}} -p pop-cli --bin pop --features editor -- editor {{.CLI_ARGS}}
+
   test:
     desc: "Run the workspace test suite. Pass args after --, e.g. task test -- reader."
     preconditions:
