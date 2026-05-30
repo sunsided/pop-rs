@@ -46,6 +46,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 use clap::Args as ClapArgs;
 use eframe::egui::{self, Color32, ColorImage, Pos2, Rect, Sense, Stroke, TextureHandle, Vec2};
@@ -54,7 +55,7 @@ use pop_assets::{
     discovery,
     hires::RenderMode,
     level::{Level, Tile, TileKind, ROOMS_PER_LEVEL, ROOM_HEIGHT, ROOM_WIDTH},
-    scene::{self, BiomeTables},
+    scene::{self, Anim, BiomeTables},
 };
 
 const _: () = assert!(ROOMS_PER_LEVEL <= u8::MAX as usize);
@@ -382,12 +383,26 @@ struct EditorApp {
     show_labels: bool,
     /// Toggle for the per-room ID badge overlay.
     show_room_ids: bool,
+    /// Toggle for the per-cell `(col,row)` coordinate overlay.
+    show_coords: bool,
     /// Toggle for the real-sprite render. Falls back to schematic
     /// colored rects when off, or when sprite loading failed.
     show_sprites: bool,
     /// Toggle between Apple II monochrome and NTSC artifact-colour
     /// modes when rendering sprites.
     ntsc_mode: bool,
+    /// Animate time-varying tiles (torch flames + a non-physical
+    /// slicer/spike trap preview). Drives a throttled per-tick re-render
+    /// of the rooms in [`Self::animated_rooms`].
+    animate: bool,
+    /// Monotonic animation step, fed to [`Anim::tick`].
+    anim_tick: u32,
+    /// Wall-clock of the last animation step, for frame-rate throttling.
+    last_anim_step: Option<Instant>,
+    /// Room indices (0-based) whose tiles include an animated kind —
+    /// recomputed on each full texture refresh so the per-tick update
+    /// only re-renders rooms that actually change.
+    animated_rooms: Vec<usize>,
     /// `Some((room, col, row))` when the mouse is hovering over a
     /// tile; surfaces in the status bar.
     hover: Option<(u8, u8, u8)>,
@@ -409,6 +424,12 @@ struct EditorApp {
     /// Diagnostic from the last sprite-load attempt, shown next to the
     /// `Real sprites` checkbox when it's empty.
     render_status: String,
+    /// Cumulative non-fatal asset-completeness warnings from
+    /// [`BiomeTables::load_diagnostics`] — surfaced as a one-line
+    /// banner in the toolbar so users wondering why their red-biome
+    /// floors have gaps find the writeup in one hop. See
+    /// `docs/copy-protection.md`.
+    asset_warnings: Vec<String>,
 }
 
 /// Pixels per tile at zoom == 1.0. Matches the real BGTAB cell shape:
@@ -428,22 +449,34 @@ impl EditorApp {
             zoom: 1.0,
             show_labels: false,
             show_room_ids: true,
+            show_coords: false,
             show_sprites: true,
             ntsc_mode: true,
+            animate: false,
+            anim_tick: 0,
+            last_anim_step: None,
+            animated_rooms: Vec::new(),
             hover: None,
             pending_fit: true,
             pending_initial_load: true,
             biome_cache: HashMap::new(),
             room_textures: Vec::new(),
             render_status: String::new(),
+            asset_warnings: Vec::new(),
         }
     }
 
     /// Render every placed room of the loaded level into an egui
     /// texture. Called on level load and when the render mode changes.
-    fn refresh_room_textures(&mut self, ctx: &egui::Context) {
-        self.room_textures.clear();
-        self.render_status.clear();
+    fn refresh_room_textures(&mut self, ctx: &egui::Context, anim: Anim, only: Option<&[usize]>) {
+        let full = only.is_none();
+        if full {
+            self.room_textures.clear();
+            self.render_status.clear();
+            // Recomputed below for the level's own biome — otherwise a
+            // red-biome warning lingers after switching to a clean level.
+            self.asset_warnings.clear();
+        }
         let Some(level) = &self.state.loaded_level else {
             return;
         };
@@ -478,6 +511,18 @@ impl EditorApp {
             Some(t) => t,
             None => match BiomeTables::load(&root, biome) {
                 Ok(t) => {
+                    // Red biome's BGTAB is the truncated 3.5" rebuild
+                    // (#112). Attach a complete dungeon set as a fallback
+                    // so placeholder sprites (e.g. looseb 0x1b) render
+                    // with the real dungeon sprite instead of a gap.
+                    let t = if biome == Biome::Red {
+                        match BiomeTables::load(&root, Biome::Dungeon) {
+                            Ok(fb) => t.with_fallback(fb),
+                            Err(_) => t,
+                        }
+                    } else {
+                        t
+                    };
                     self.biome_cache.insert(biome, t);
                     self.biome_cache.get(&biome).expect("just inserted")
                 }
@@ -488,6 +533,21 @@ impl EditorApp {
                 }
             },
         };
+        // Surface this biome's truncation diagnostics. Recomputed each
+        // full refresh (asset_warnings was cleared above) so the banner
+        // tracks the current level rather than accumulating across every
+        // biome visited. `load_diagnostics` still reports red's truncated
+        // sprites even with the dungeon fallback attached — the banner
+        // notes the assets are incomplete; the fallback just keeps them
+        // from rendering as gaps.
+        if full {
+            for issue in tables.load_diagnostics() {
+                let msg = format!("{issue}");
+                if !self.asset_warnings.contains(&msg) {
+                    self.asset_warnings.push(msg);
+                }
+            }
+        }
         let mode = if self.ntsc_mode {
             RenderMode::NtscColor
         } else {
@@ -498,10 +558,16 @@ impl EditorApp {
             if slot.is_none() {
                 continue;
             }
+            // Partial refresh (animation tick): only re-render the
+            // rooms the caller asked for.
+            if only.is_some_and(|list| !list.contains(&idx)) {
+                continue;
+            }
             let Ok(room_id) = u8::try_from(idx + 1) else {
                 continue;
             };
-            let Some(frame) = scene::render_room(level, room_id, tables, mode) else {
+            let Some(frame) = scene::render_room_animated(level, room_id, tables, mode, anim)
+            else {
                 continue;
             };
             let size = [
@@ -516,11 +582,60 @@ impl EditorApp {
             );
             self.room_textures[idx] = Some(tex);
         }
-        self.render_status = format!(
-            "{} sprites ready ({} rooms)",
-            biome.short_name(),
-            self.room_textures.iter().filter(|t| t.is_some()).count()
-        );
+        if full {
+            // Cache which placed rooms contain an animated tile, so the
+            // per-tick refresh can skip the rest.
+            self.animated_rooms = layout
+                .positions
+                .iter()
+                .enumerate()
+                .filter(|(idx, slot)| {
+                    slot.is_some()
+                        && level.rooms[*idx]
+                            .tiles
+                            .iter()
+                            .any(|t| scene::is_animated_kind(t.kind))
+                })
+                .map(|(idx, _)| idx)
+                .collect();
+            self.render_status = format!(
+                "{} sprites ready ({} rooms)",
+                biome.short_name(),
+                self.room_textures.iter().filter(|t| t.is_some()).count()
+            );
+        }
+    }
+
+    /// The animation phase implied by the current toggle state.
+    fn current_anim(&self) -> Anim {
+        if self.animate {
+            Anim {
+                tick: self.anim_tick,
+                traps: true,
+            }
+        } else {
+            Anim::REST
+        }
+    }
+
+    /// Advance the animation a step if enough wall-clock has elapsed,
+    /// re-rendering only the animated rooms, and keep egui repainting.
+    fn step_animation(&mut self, ctx: &egui::Context) {
+        if !self.animate || self.animated_rooms.is_empty() {
+            return;
+        }
+        const STEP: Duration = Duration::from_millis(80);
+        let now = Instant::now();
+        if self.last_anim_step.is_some_and(|t| now.duration_since(t) < STEP) {
+            ctx.request_repaint_after(STEP);
+            return;
+        }
+        self.last_anim_step = Some(now);
+        self.anim_tick = self.anim_tick.wrapping_add(1);
+        let anim = self.current_anim();
+        let rooms = self.animated_rooms.clone();
+        self.refresh_room_textures(ctx, anim, Some(&rooms));
+        ctx.request_repaint_after(STEP);
     }
 
     fn tile_w(&self) -> f32 {
@@ -625,7 +740,8 @@ impl eframe::App for EditorApp {
             && !self.state.level_paths.is_empty()
         {
             self.state.load_level(0);
-            self.refresh_room_textures(ctx);
+            let anim = self.current_anim();
+            self.refresh_room_textures(ctx, anim, None);
             self.pending_fit = true;
             self.pending_initial_load = false;
         }
@@ -638,9 +754,13 @@ impl eframe::App for EditorApp {
         egui::TopBottomPanel::bottom("status").show(ctx, |ui| self.status_bar(ui));
         egui::CentralPanel::default().show(ctx, |ui| self.canvas(ui));
         match toolbar_request {
-            ToolbarAction::RefreshTextures => self.refresh_room_textures(ctx),
+            ToolbarAction::RefreshTextures => {
+                let anim = self.current_anim();
+                self.refresh_room_textures(ctx, anim, None);
+            }
             ToolbarAction::None => {}
         }
+        self.step_animation(ctx);
     }
 }
 
@@ -660,6 +780,7 @@ impl EditorApp {
                     self.state.set_root(p);
                     self.biome_cache.clear();
                     self.room_textures.clear();
+                    self.asset_warnings.clear();
                     self.pending_initial_load = true;
                 }
             }
@@ -673,8 +794,21 @@ impl EditorApp {
             if ui.checkbox(&mut self.ntsc_mode, "NTSC color").changed() {
                 action = ToolbarAction::RefreshTextures;
             }
+            if ui
+                .checkbox(&mut self.animate, "animate")
+                .on_hover_text("Torch flames + slicer/spike trap preview")
+                .changed()
+            {
+                // Reset the clock so toggling on starts from frame 0,
+                // and a full refresh re-renders every room at the new
+                // phase (clearing the preview when toggled off).
+                self.anim_tick = 0;
+                self.last_anim_step = None;
+                action = ToolbarAction::RefreshTextures;
+            }
             ui.checkbox(&mut self.show_labels, "tile labels");
             ui.checkbox(&mut self.show_room_ids, "room IDs");
+            ui.checkbox(&mut self.show_coords, "cell coords");
             ui.separator();
             if ui.button("Fit view").clicked() {
                 self.pending_fit = true;
@@ -690,6 +824,26 @@ impl EditorApp {
             if !self.render_status.is_empty() {
                 ui.separator();
                 ui.label(&self.render_status);
+            }
+            if !self.asset_warnings.is_empty() {
+                ui.separator();
+                // Banner in warning yellow with a tooltip carrying the
+                // full message + a pointer at the writeup.
+                let count = self.asset_warnings.len();
+                let summary = if count == 1 {
+                    "asset warning".to_string()
+                } else {
+                    format!("{count} asset warnings")
+                };
+                let label = egui::RichText::new(format!("⚠ {summary}"))
+                    .color(Color32::from_rgb(240, 200, 80));
+                ui.label(label).on_hover_ui(|ui| {
+                    for w in &self.asset_warnings {
+                        ui.label(w);
+                    }
+                    ui.add_space(4.0);
+                    ui.label("See docs/copy-protection.md for the workaround.");
+                });
             }
         });
         action
@@ -718,7 +872,8 @@ impl EditorApp {
         if let Some(i) = to_load {
             self.state.load_level(i);
             self.pending_fit = true;
-            self.refresh_room_textures(ctx);
+            let anim = self.current_anim();
+            self.refresh_room_textures(ctx, anim, None);
         }
     }
 
@@ -727,7 +882,10 @@ impl EditorApp {
             ui.label(format!("status: {}", self.state.status));
             ui.separator();
             if let Some((room, col, row)) = self.hover {
-                ui.label(format!("hover: room {room} tile ({col}, {row})"));
+                let block = u16::from(row) * ROOM_WIDTH as u16 + u16::from(col);
+                ui.label(format!(
+                    "hover: room {room} tile ({col}, {row}) block {block}"
+                ));
             } else {
                 ui.label("hover: —");
             }
@@ -852,6 +1010,9 @@ impl EditorApp {
                 egui::FontId::monospace((12.0 * self.zoom).clamp(8.0, 16.0)),
                 Color32::from_rgb(255, 230, 120),
             );
+        }
+        if self.show_coords {
+            draw_cell_coords(painter, panel_rect.min, self.pan, tile_w, tile_h, rx, ry);
         }
         if snapshot.prince.screen == room_id {
             if let Some((col, row)) = snapshot.prince.col_row() {
@@ -1040,6 +1201,69 @@ fn draw_tile_labels(
                 tile.kind.short_name(),
                 egui::FontId::monospace(font_px),
                 Color32::from_rgb(240, 240, 250),
+            );
+        }
+    }
+}
+
+/// Overlay a red cell grid plus each cell's `(col,row)` coordinate in
+/// its bottom-right corner. The grid mirrors the one used in the
+/// debug screenshots; together with the `R{id}` room badge and the
+/// selected level name a glitch can be pinned to an exact
+/// level + room + cell.
+#[allow(clippy::too_many_arguments, clippy::cast_precision_loss)]
+fn draw_cell_coords(
+    painter: &egui::Painter,
+    panel_origin: Pos2,
+    pan: Vec2,
+    tile_w: f32,
+    tile_h: f32,
+    room_x_tiles: i32,
+    room_top_tiles: i32,
+) {
+    // Red cell grid — drawn at every zoom (the coordinate text below is
+    // gated on readability, but the grid stays useful when zoomed out).
+    let origin = panel_origin + pan;
+    let left = origin.x + room_x_tiles as f32 * tile_w;
+    let top = origin.y + room_top_tiles as f32 * tile_h;
+    let right = left + ROOM_WIDTH as f32 * tile_w;
+    let bottom = top + ROOM_HEIGHT as f32 * tile_h;
+    let grid = Stroke::new(1.0, Color32::from_rgba_unmultiplied(220, 40, 40, 150));
+    for c in 0..=ROOM_WIDTH {
+        let x = left + c as f32 * tile_w;
+        painter.line_segment([Pos2::new(x, top), Pos2::new(x, bottom)], grid);
+    }
+    for r in 0..=ROOM_HEIGHT {
+        let y = top + r as f32 * tile_h;
+        painter.line_segment([Pos2::new(left, y), Pos2::new(right, y)], grid);
+    }
+
+    // Coordinates are unreadable on tiny tiles — skip the text (but not
+    // the grid) when zoomed out.
+    if tile_w < 22.0 {
+        return;
+    }
+    let font_px = (tile_h * 0.16).clamp(7.0, 12.0);
+    for row in 0..ROOM_HEIGHT {
+        for col in 0..ROOM_WIDTH {
+            // Anchor at the cell's bottom-right so the badge never
+            // collides with the top-left tile-name label.
+            let x = panel_origin.x + pan.x + (room_x_tiles as f32 + col as f32 + 1.0) * tile_w - 2.0;
+            let y =
+                panel_origin.y + pan.y + (room_top_tiles as f32 + row as f32 + 1.0) * tile_h - 1.0;
+            let text = format!("{col},{row}");
+            let text_size = Vec2::new(font_px * text.len() as f32 * 0.6, font_px + 2.0);
+            let bg_rect =
+                Rect::from_min_size(Pos2::new(x - text_size.x - 2.0, y - text_size.y - 1.0), {
+                    text_size + Vec2::new(4.0, 2.0)
+                });
+            painter.rect_filled(bg_rect, 1.0, Color32::from_black_alpha(150));
+            painter.text(
+                Pos2::new(x, y),
+                egui::Align2::RIGHT_BOTTOM,
+                text,
+                egui::FontId::monospace(font_px),
+                Color32::from_rgb(120, 220, 240),
             );
         }
     }

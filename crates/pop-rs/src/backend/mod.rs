@@ -24,6 +24,10 @@ pub struct SpriteId(pub u16);
 #[derive(Copy, Clone, Debug)]
 pub struct SoundId(pub u16);
 
+// Directional + modifier flags are independent and can be held
+// simultaneously, so a flat set of bools is the right shape here — a
+// state machine / enum would misrepresent the domain.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Copy, Clone, Debug, Default)]
 pub struct InputState {
     pub left: bool,

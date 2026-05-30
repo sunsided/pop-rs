@@ -28,9 +28,11 @@
 //! * At-rest "movable" pieces: torch flame (`drawtorchb`), loose-floor
 //!   B-edge (`drawlooseb`), closed-gate vertical bars (`drawgateb`),
 //!   gate top piece into the cell above (`drawgatec` via `draw_mc`),
-//!   and the exit-door stack + stairs + top-repair (`drawexitb`). The
-//!   stairs piece is suppressed in the prince's start room, matching
-//!   the `cmp KidStartScrn beq :nostairs` branch in `FRAMEADV.S:1635`.
+//!   the exit-door stack + stairs + top-repair (`drawexitb`), and the
+//!   slicer's retracted mechanism + front face (`drawslicera` /
+//!   `drawslicerf` via `draw_ma` / `draw_front`). The stairs piece is
+//!   suppressed in the prince's start room, matching the
+//!   `cmp KidStartScrn beq :nostairs` branch in `FRAMEADV.S:1635`.
 //! * Loose-floor visual fix: `LOOSE_A[0]` + `LOOSE_D[0]` substituted
 //!   for the empty `PIECE_A` / `PIECE_D` so the editor doesn't show
 //!   blank cells where breakable tiles live.
@@ -40,11 +42,17 @@
 //! All animated / state-sensitive specials punted to a follow-up PR:
 //!
 //! * Loose floor mid-fall animation frames (`LOOSE_A[1..]`).
-//! * Spike / slicer animation frames (`drawma` / `drawspikea` /
-//!   `drawslicera`) — uses the BGDATA `PIECE_A[k]` at-rest value.
+//! * Spike / slicer *mid-animation* frames. The at-rest (retracted)
+//!   pose is now drawn (`draw_ma` ports `drawma → drawspikea /
+//!   drawslicera` at state 0); cycling through the extend/retract
+//!   sequence is still a follow-up.
+//! * Spike B-edge spillover into the right neighbour (`drawspikeb`) —
+//!   empty at rest, so a no-op today.
 //! * Gate bars at partial heights — gates always render fully closed.
 //! * Depressed press-plate state — uses the up-state piece.
-//! * Flask bubbles / sword gleam — uses the BGDATA piece.
+//! * Flask bubbles (`drawflaska`) — builder-skipped in the original;
+//!   we draw only the static flask base from `PIECE_A`. (The sword is
+//!   now drawn via `drawsworda` in `draw_ma`.)
 //! * Half-piece climbup rendering — N/A for static scene browsing.
 //!
 //! Static rooms render correctly; dynamic objects look "frozen".
@@ -59,12 +67,13 @@
 )]
 
 use crate::bgdata::{
-    Biome, PieceRef, BLOCK_B, BLOCK_BOT_ROW, BLOCK_C, BLOCK_D, BLOCK_FR, B_STRIPE,
+    Biome, PieceRef, ARCHPANEL, BLOCK_B, BLOCK_BOT_ROW, BLOCK_C, BLOCK_D, BLOCK_FR, B_STRIPE,
     CELL_WIDTH_BYTES, DOOR, DOOR_MASK, D_HEIGHT, FLOOR_B, FLOOR_B_Y, FRONT_I, FRONT_X, FRONT_Y,
     GATE_8B, GATE_8C, GATE_B1, GATE_BOT_ORA, GATE_C_MASK, LOOSE_A, LOOSE_B, LOOSE_B_Y, LOOSE_D,
     MASK_A, MASK_B, PANEL_B, PANEL_B0_SENTINEL, PANEL_C, PANEL_C0_SENTINEL, PIECE_A, PIECE_A_Y,
-    PIECE_B, PIECE_B_Y, PIECE_C, PIECE_D, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES, SPACE_B, SPACE_B_Y,
-    STAIRS, TOP_REPAIR, TORCH_FLAME,
+    PIECE_B, PIECE_B_Y, PIECE_C, PIECE_D, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES, SLICER_BOT,
+    SLICER_BOT2, SLICER_FRNT, SLICER_GAP, SLICER_RET, SLICER_SEQ, SLICER_TOP, SPACE_B, SPACE_B_Y,
+    SPIKE_A, SPIKE_EXT, STAIRS, SWORDGLEAM0, SWORDGLEAM1, TOP_REPAIR, TORCH_FLAME,
 };
 use crate::draz::image_table::{self, Image, ImageTable};
 use crate::hires::{self, Frame, RenderMode};
@@ -83,6 +92,13 @@ pub struct BiomeTables {
     pub table1: ImageTable,
     /// Second image table (sprite IDs `0x81..=0xFE`).
     pub table2: ImageTable,
+    /// Optional fallback biome. When a sprite in this biome resolves to
+    /// a truncated 3.5"-rebuild placeholder (see [`is_placeholder`]),
+    /// [`Self::resolve`] substitutes the same sprite from this fallback
+    /// — the editor attaches a complete dungeon set so red-biome rooms
+    /// render correctly despite the #112 truncation. `None` keeps the
+    /// faithful (truncated) behaviour. See `docs/copy-protection.md`.
+    fallback: Option<Box<BiomeTables>>,
 }
 
 impl BiomeTables {
@@ -106,13 +122,205 @@ impl BiomeTables {
             biome,
             table1,
             table2,
+            fallback: None,
         })
     }
 
+    /// Attach a `fallback` biome whose sprites are substituted for any
+    /// truncated placeholder in this biome (see the `fallback` field).
+    /// Chainable; replaces any existing fallback.
+    #[must_use]
+    pub fn with_fallback(mut self, fallback: BiomeTables) -> Self {
+        self.fallback = Some(Box::new(fallback));
+        self
+    }
+
     fn resolve(&self, piece_id: u8) -> Option<&Image> {
-        match PieceRef::resolve(piece_id)? {
+        let img = match PieceRef::resolve(piece_id)? {
             PieceRef::Table1(i) => self.table1.images.get(usize::from(i)),
             PieceRef::Table2(i) => self.table2.images.get(usize::from(i)),
+        };
+        match img {
+            // Truncated 3.5"-rebuild sprite → substitute the same sprite
+            // from the fallback biome if one is attached.
+            Some(im) if is_truncated(im) => self
+                .fallback
+                .as_deref()
+                .and_then(|fb| fb.resolve(piece_id))
+                .or(Some(im)),
+            other => other,
+        }
+    }
+
+    /// Heuristic diagnostics for the loaded BGTAB pair.
+    ///
+    /// The vendored `vendor/pop-apple2/` tree is the 3.5"-only recovered
+    /// source (`widemeadows/Prince-of-Persia-Apple-II`), and per Peter
+    /// Ferrie's [POP protection writeup][ferrie] the rebuilt-from-source
+    /// asset binaries shipped with truncated graphics. The truncation
+    /// is visible in red-biome rooms — sprite ID `0x1b` (`looseb` from
+    /// `BGDATA.S:143`, drawn by `FRAMEADV.S:1388 drawlooseb` into every
+    /// cell right of a `LooseFloor`) collapses to a 1×1 placeholder in
+    /// `IMG.BGTAB.RED1` where the palace / dungeon equivalents carry a
+    /// 28×13 floor-edge sprite. The renderer faithfully reproduces the
+    /// engine's algorithm against whatever bytes the table holds, so
+    /// the visible gap is a real-asset issue, not a renderer bug.
+    ///
+    /// This method walks the loaded tables and returns one
+    /// [`BiomeTablesIssue`] per pattern it recognises. Non-fatal —
+    /// callers (the editor especially) can surface them as a banner so
+    /// users wondering "why does my LV13 floor have gaps" find an
+    /// answer.
+    ///
+    /// See `docs/copy-protection.md` for the full story and the
+    /// retail-image extraction workaround.
+    ///
+    /// [ferrie]: https://pferrie.epizy.com/misc/lowlevel14.htm
+    #[must_use]
+    pub fn load_diagnostics(&self) -> Vec<BiomeTablesIssue> {
+        // The truncated assets in the vendored 3.5" rebuild are
+        // distinguishable by a very specific fingerprint — sprites
+        // that became `1×1 = 0x80` (the canonical CLS-fill byte)
+        // **placeholders**. Real BGTAB sprites are never that small
+        // in the 1989 build, even when narrower than a cell: DUN1's
+        // `looseb` is 21×12 (3 hires bytes wide, a deliberate
+        // sub-cell width) but very much a real sprite.
+        //
+        // We therefore probe known-used sprite ids and flag only
+        // genuine 1×1 placeholders whose single byte is `0x80`. The
+        // byte check matters: a custom or hand-repaired BGTAB might
+        // legitimately have a 1×1 non-`0x80` sprite somewhere, and
+        // we shouldn't false-positive against that.
+        //
+        // The set is intentionally narrow — if more cases surface,
+        // add them here with a citation to the engine reference.
+        let mut issues = Vec::new();
+        for (sprite_id, role) in PROBED_SPRITES {
+            // Use `PieceRef::resolve` so the probe list can carry
+            // raw BGDATA sprite ids — bit 7 selects table 2 per
+            // `GRAFIX.S:828`. Today's only entry (`looseb = 0x1b`)
+            // resolves to table 1, but `front` / `archtop` etc.
+            // pieces with high IDs (`0xa7..=0xad`) live in table 2;
+            // resolve-via-ref keeps the door open without a future
+            // off-by-one rewrite.
+            let Some(piece_ref) = PieceRef::resolve(*sprite_id) else {
+                continue;
+            };
+            let (table, img) = match piece_ref {
+                PieceRef::Table1(i) => (BgTable::One, self.table1.images.get(usize::from(i))),
+                PieceRef::Table2(i) => (BgTable::Two, self.table2.images.get(usize::from(i))),
+            };
+            let Some(img) = img else { continue };
+            if is_placeholder(img) {
+                issues.push(BiomeTablesIssue::TruncatedSprite {
+                    biome: self.biome,
+                    table,
+                    sprite_id: *sprite_id,
+                    width_bytes: img.width_bytes,
+                    height: img.height,
+                    role,
+                });
+            }
+        }
+        issues
+    }
+}
+
+/// Sprite IDs whose absence has visible renderer consequences and
+/// which the truncated 3.5" rebuild is known to have stripped. Each
+/// row is `(sprite_id, short role description with engine ref)`.
+///
+/// Keep the list small — false positives on legitimate sub-cell-width
+/// sprites (DUN1's 21×12 `looseb`, palace decorative pieces, etc.)
+/// would just train users to ignore the diagnostic.
+const PROBED_SPRITES: &[(u8, &str)] = &[(
+    LOOSE_B,
+    "`looseb` — `drawlooseb` spillover (FRAMEADV.S:1388)",
+)];
+
+/// A BGTAB sprite is a "placeholder" iff it's a single byte AND that
+/// byte is `0x80` — the canonical `CLS` fill byte
+/// (`HIRES.S:213 lda #$80 ;black2`) that the truncated 3.5" rebuild
+/// stamped into stripped-sprite slots. Real game sprites have
+/// meaningful width × height even when narrower than a cell, and a
+/// hand-repaired BGTAB might legitimately carry a 1×1 non-`0x80`
+/// sprite — both stay clear of this predicate.
+fn is_placeholder(img: &Image) -> bool {
+    img.width_bytes == 1 && img.height == 1 && img.bitmap.first() == Some(&0x80)
+}
+
+/// Broader truncation test used to trigger the [`BiomeTables`] fallback.
+///
+/// The 3.5" rebuild collapsed stripped sprites to degenerate sizes —
+/// `looseb` (`0x1b`) and the variant-1 block wall (`0x6f`) are both
+/// `1 byte × 1 px` in `IMG.BGTAB.RED1`, but they don't all share the
+/// `0x80` fill byte that [`is_placeholder`] keys on. Any real BGTAB
+/// sprite is at least a few pixels tall (the shortest, the floor
+/// D-strip, is 3 px), so a height of `<= 1` (or zero width) is a
+/// reliable "this slot was stripped" signal for substitution.
+fn is_truncated(img: &Image) -> bool {
+    img.width_bytes == 0 || img.height <= 1
+}
+
+/// Which of a biome's two BGTAB image tables a diagnostic refers to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BgTable {
+    /// `IMG.BGTAB.{biome}1`.
+    One,
+    /// `IMG.BGTAB.{biome}2`.
+    Two,
+}
+
+/// A non-fatal data-completeness finding from
+/// [`BiomeTables::load_diagnostics`].
+///
+/// See `docs/copy-protection.md` (the "Data-completeness caveat"
+/// section) for context: the vendored upstream is the 3.5" rebuild
+/// Peter Ferrie flagged as carrying truncated graphics data.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BiomeTablesIssue {
+    /// A specific sprite resolves to a 1×1 placeholder — the
+    /// fingerprint of the 3.5"-rebuild truncation.
+    TruncatedSprite {
+        /// Biome whose tables were loaded.
+        biome: Biome,
+        /// Which of the two BGTAB tables (1 or 2) the sprite came from.
+        table: BgTable,
+        /// Sprite id (raw byte, bit 7 = table-2 select).
+        sprite_id: u8,
+        /// Sprite width as recorded in the file header.
+        width_bytes: u8,
+        /// Sprite height as recorded in the file header.
+        height: u8,
+        /// Short human-readable description of what this sprite is
+        /// used for in the engine.
+        role: &'static str,
+    },
+}
+
+impl std::fmt::Display for BiomeTablesIssue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TruncatedSprite {
+                biome,
+                table,
+                sprite_id,
+                width_bytes,
+                height,
+                role,
+            } => {
+                let table_n = match table {
+                    BgTable::One => 1,
+                    BgTable::Two => 2,
+                };
+                write!(
+                    f,
+                    "IMG.BGTAB.{biome}{table_n} sprite 0x{sprite_id:02x} ({role}) \
+                     is a {width_bytes}×{height} placeholder — likely the truncated 3.5\" \
+                     rebuild; see docs/copy-protection.md",
+                    biome = biome.short_name(),
+                )
+            }
         }
     }
 }
@@ -133,6 +341,69 @@ pub fn render_room(
     bg: &BiomeTables,
     mode: RenderMode,
 ) -> Option<Frame> {
+    render_room_animated(level, room_id, bg, mode, Anim::REST)
+}
+
+/// Animation phase for time-varying tiles.
+///
+/// `tick` is a monotonic counter the caller advances each animation
+/// step. [`Anim::REST`] (tick 0, traps off) reproduces the at-rest pose
+/// exactly, so the plain [`render_room`] path renders identically to
+/// before. `traps` cycles the gameplay-*triggered* traps (slicer,
+/// spikes) through their sequences — a non-physical "preview" for the
+/// editor; torch flames always cycle with `tick` since they are ambient
+/// in the real game.
+#[derive(Clone, Copy, Default)]
+pub struct Anim {
+    /// Monotonic animation step counter.
+    pub tick: u32,
+    /// Cycle the triggered traps (slicer / spikes) for preview.
+    pub traps: bool,
+}
+
+impl Anim {
+    /// The static at-rest phase — identical output to the original
+    /// non-animated renderer.
+    pub const REST: Self = Self {
+        tick: 0,
+        traps: false,
+    };
+
+    /// Torch-flame frame (always cycles; frame 0 at `tick == 0`).
+    fn torch_frame(self) -> usize {
+        (self.tick as usize / 4) % TORCH_FLAME.len()
+    }
+
+    /// Effective slicer state byte: the cycled preview state when
+    /// `traps`, else the tile's stored state.
+    fn slicer_state(self, stored: u8) -> u8 {
+        if self.traps {
+            (self.tick / 4 % (SLICER_RET as u32 + 1)) as u8
+        } else {
+            stored
+        }
+    }
+
+    /// Effective spike state byte (see [`Self::slicer_state`]).
+    fn spike_state(self, stored: u8) -> u8 {
+        if self.traps {
+            (self.tick / 3 % SPIKE_A.len() as u32) as u8
+        } else {
+            stored
+        }
+    }
+}
+
+/// Render one room at animation phase `anim`. [`render_room`] is the
+/// `Anim::REST` (static) special case.
+#[must_use]
+pub fn render_room_animated(
+    level: &Level,
+    room_id: u8,
+    bg: &BiomeTables,
+    mode: RenderMode,
+    anim: Anim,
+) -> Option<Frame> {
     let room_idx = usize::from(room_id).checked_sub(1)?;
     if room_idx >= level.rooms.len() {
         return None;
@@ -141,8 +412,15 @@ pub fn render_room(
     // `drawexitb` skips stairs when the current room is the prince's
     // entry point (`FRAMEADV.S:1635` `cmp KidStartScrn beq :nostairs`).
     let draw_stairs = room_id != level.prince_start().screen;
-    let canvas = Canvas::compose(&ctx, bg, draw_stairs);
+    let canvas = Canvas::compose(&ctx, bg, draw_stairs, anim);
     canvas.into_frame(mode)
+}
+
+/// Tile kinds whose appearance varies with [`Anim`] — used by callers
+/// (the editor) to decide which rooms need re-rendering each tick.
+#[must_use]
+pub fn is_animated_kind(kind: TileKind) -> bool {
+    matches!(kind, TileKind::Torch | TileKind::Slicer | TileKind::Spikes)
 }
 
 // ---------------------------------------------------------------------------
@@ -272,9 +550,7 @@ impl Canvas {
         // regions — visible as the "triangular gaps" in the floor
         // strip alongside columns / arches.
         Self {
-            bytes: Box::new(
-                [0x80; (ROOM_WIDTH_BYTES as usize) * (ROOM_HEIGHT_PX as usize)],
-            ),
+            bytes: Box::new([0x80; (ROOM_WIDTH_BYTES as usize) * (ROOM_HEIGHT_PX as usize)]),
         }
     }
 
@@ -312,7 +588,7 @@ impl Canvas {
     }
 
     /// Compose every cell of `ctx.room` onto a fresh canvas.
-    fn compose(ctx: &RoomContext, bg: &BiomeTables, draw_stairs: bool) -> Self {
+    fn compose(ctx: &RoomContext, bg: &BiomeTables, draw_stairs: bool, anim: Anim) -> Self {
         let mut canvas = Self::new();
         // Three on-screen rows, bottom → top — matches `FRAMEADV.S:62
         // SURE` (`ldy #2 :row sty rowno ... dey jmp :row`). Order
@@ -357,6 +633,7 @@ impl Canvas {
                     ay,
                     dy,
                     draw_stairs,
+                    anim,
                 );
             }
         }
@@ -389,6 +666,7 @@ impl Canvas {
                 blockxco,
                 ceil_above_y,
                 ceil_dy,
+                anim,
             );
         }
         canvas
@@ -500,15 +778,17 @@ fn draw_block(
     ay: i32,
     dy: i32,
     draw_stairs: bool,
+    anim: Anim,
 ) {
     draw_c(canvas, bg, me.kind, below_left, blockxco, dy, left.kind);
     draw_mc(canvas, bg, me.kind, below_left.kind, blockxco, dy, ay);
     draw_b(canvas, bg, left, below_left, blockxco, ay, dy, bg.biome);
-    draw_mb(canvas, bg, left.kind, blockxco, ay, dy, draw_stairs);
+    draw_mb(canvas, bg, left.kind, blockxco, ay, dy, draw_stairs, anim);
     draw_d(canvas, bg, me, blockxco, dy);
     draw_md(canvas, bg, me, blockxco, dy);
     draw_a(canvas, bg, me, left.kind, blockxco, ay);
-    draw_front(canvas, bg, me, blockxco, ay);
+    draw_ma(canvas, bg, me, blockxco, ay, anim);
+    draw_front(canvas, bg, me, blockxco, ay, anim);
 }
 
 /// Reduced per-cell draw used for the ceiling pass — C, B, D, Front
@@ -524,14 +804,28 @@ fn draw_d_only(
     blockxco: i32,
     ay: i32,
     dy: i32,
+    anim: Anim,
 ) {
     draw_c(canvas, bg, me.kind, below_left, blockxco, dy, left.kind);
     draw_b(canvas, bg, left, below_left, blockxco, ay, dy, bg.biome);
     draw_d(canvas, bg, me, blockxco, dy);
-    draw_front(canvas, bg, me, blockxco, ay);
+    draw_front(canvas, bg, me, blockxco, ay, anim);
 }
 
 fn draw_a(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, left: TileKind, blockxco: i32, ay: i32) {
+    // `drawa` special (`FRAMEADV.S:1136-1155`): when a panel-without-floor
+    // cell's left neighbour is an `archtop1`, the arch curve "ends to the
+    // left of a panel" and the engine draws the `archpanel` transition
+    // piece in place of the (empty) `PIECE_A[panelwof]`, with no A-mask.
+    // Without it the cell between an arch and a right-edge wall panel is
+    // blank — the gap seen left of LV4 R6's panelwof.
+    if left == TileKind::ArchTop1 && me.kind == TileKind::PanelWithoutFloor {
+        if let Some(piece) = bg.resolve(ARCHPANEL) {
+            let y = ay + i32::from(PIECE_A_Y[me.kind as usize]);
+            canvas.blit(piece, blockxco, y, Opacity::Or);
+        }
+        return;
+    }
     if left_intrudes(left) {
         if let Some(mask) = bg.resolve(MASK_A[me.kind as usize]) {
             canvas.blit(mask, blockxco, ay, Opacity::And);
@@ -708,6 +1002,7 @@ fn draw_d(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, dy: i3
 /// tile kinds that have a visible at-rest spillover:
 /// torch flame, loose-floor B-edge, closed-gate bar grill, and the
 /// exit-door stairs / door stack.
+#[allow(clippy::too_many_arguments)]
 fn draw_mb(
     canvas: &mut Canvas,
     bg: &BiomeTables,
@@ -716,16 +1011,18 @@ fn draw_mb(
     ay: i32,
     dy: i32,
     draw_stairs: bool,
+    anim: Anim,
 ) {
     match left {
         TileKind::Torch => {
             // SETUPFLAME (`GAMEBG.S:735`): no flame on the leftmost
             // torch (would draw off the room's left edge), advance
-            // X by 1 byte, drop Y by 43 px, frame 0 is at-rest.
+            // X by 1 byte, drop Y by 43 px. Frame cycles with `anim`
+            // (frame 0 at rest) — the flame is ambient in-game.
             if blockxco == 0 {
                 return;
             }
-            if let Some(piece) = bg.resolve(TORCH_FLAME[0]) {
+            if let Some(piece) = bg.resolve(TORCH_FLAME[anim.torch_frame()]) {
                 canvas.blit(piece, blockxco + 1, ay - 43, Opacity::Sta);
             }
         }
@@ -751,6 +1048,103 @@ fn draw_mb(
 /// so this is a no-op today; kept as a hook for the future animated
 /// loose-floor frames.
 fn draw_md(_canvas: &mut Canvas, _bg: &BiomeTables, _me: Tile, _blockxco: i32, _dy: i32) {}
+
+/// Movable A-piece — `drawma` from `FRAMEADV.S:1214`, called right
+/// after the generic `draw_a`. Dispatches the animated trap tiles
+/// whose moving parts are *not* in the generic `PIECE_A` table:
+/// spikes (`drawspikea`) and the slicer / chomper (`drawslicera`).
+///
+/// We render the at-rest pose (state byte 0). For spikes that frame is
+/// empty, so the cell reads as plain floor; for the slicer it's the
+/// retracted mechanism (top + bottom housing) that was previously
+/// missing — leaving slicer cells as bare floor with a visible gap.
+///
+/// `drawma`'s `flask` case is not ported: the flask's at-rest base
+/// comes from its non-empty `PIECE_A`, and the bubble overlay is
+/// builder-skipped in the original engine anyway. The `sword` case
+/// *is* ported — `PIECE_A[sword]` is empty, so the sword sprite must
+/// come from `drawsworda` or the cell is bare floor.
+fn draw_ma(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i32, anim: Anim) {
+    match me.kind {
+        TileKind::Spikes => draw_spike_a(canvas, bg, anim.spike_state(me.modifier), blockxco, ay),
+        TileKind::Slicer => {
+            draw_slicer_a(canvas, bg, anim.slicer_state(me.modifier), blockxco, ay);
+        }
+        TileKind::Sword => {
+            // drawsworda (`FRAMEADV.S:1530`): swordgleam1 when state==1,
+            // else swordgleam0, at (blockxco, Ay). The engine uses `sta`,
+            // but the sword sprite has a transparent (black) upper-left
+            // corner; a raw store would stamp that black over the floor
+            // edge (`FLOOR_B`) drawn underneath, leaving a gap. We `Or`
+            // instead so the sword composites onto the floor — same
+            // reasoning as the slicer front piece above.
+            let id = if me.modifier == 1 {
+                SWORDGLEAM1
+            } else {
+                SWORDGLEAM0
+            };
+            if let Some(piece) = bg.resolve(id) {
+                canvas.blit(piece, blockxco, ay, Opacity::Or);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// `drawspikea` (`FRAMEADV.S:1453`): `ldx state` → frame index (or
+/// [`SPIKE_EXT`] when bit 7 is set), then `spikea,x` OR'd at `Ay − 1`.
+/// Frame `0x00` entries draw nothing (retracted), so at rest this is a
+/// no-op over the generic floor base.
+fn draw_spike_a(canvas: &mut Canvas, bg: &BiomeTables, state: u8, blockxco: i32, ay: i32) {
+    let idx = if state & 0x80 != 0 {
+        SPIKE_EXT
+    } else {
+        usize::from(state & 0x7f)
+    };
+    let Some(&piece_id) = SPIKE_A.get(idx) else {
+        return;
+    };
+    if piece_id == 0 {
+        return;
+    }
+    if let Some(piece) = bg.resolve(piece_id) {
+        canvas.blit(piece, blockxco, ay - 1, Opacity::Or);
+    }
+}
+
+/// Resolve a slicer state byte to a 0-based index into the `SLICER_*`
+/// piece tables. Mirrors `drawslicera`'s `and #$7f` / clamp to
+/// [`SLICER_RET`] / `lda slicerseq,x` / `tax; dex`.
+fn slicer_seq_index(state: u8) -> usize {
+    let x = usize::from(state & 0x7f).min(SLICER_RET);
+    // `slicerseq` values are 1-based; the engine's `dex` makes them
+    // 0-based. All entries are >= 1, so the subtraction never wraps.
+    usize::from(SLICER_SEQ[x]).saturating_sub(1)
+}
+
+/// `drawslicera` (`FRAMEADV.S:1548`): bottom piece OR'd at `Ay`, then
+/// the top piece OR'd at `Ay − SLICER_GAP[i]`. The "smeared" bottom
+/// (state bit 7) falls back to the clean bottom when its entry is 0.
+fn draw_slicer_a(canvas: &mut Canvas, bg: &BiomeTables, state: u8, blockxco: i32, ay: i32) {
+    let idx = slicer_seq_index(state);
+    let bot_id = if state & 0x80 != 0 && SLICER_BOT2[idx] != 0 {
+        SLICER_BOT2[idx]
+    } else {
+        SLICER_BOT[idx]
+    };
+    if bot_id != 0 {
+        if let Some(piece) = bg.resolve(bot_id) {
+            canvas.blit(piece, blockxco, ay, Opacity::Or);
+        }
+    }
+    let top_id = SLICER_TOP[idx];
+    if top_id != 0 {
+        if let Some(piece) = bg.resolve(top_id) {
+            let y = ay - i32::from(SLICER_GAP[idx]);
+            canvas.blit(piece, blockxco, y, Opacity::Or);
+        }
+    }
+}
 
 /// Movable C-piece — fires only when CURRENT is a "see-through" kind
 /// (space / panelwof / pillartop) and the BELOW-LEFT neighbour is a
@@ -882,7 +1276,22 @@ fn draw_exit_door(
     }
 }
 
-fn draw_front(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i32) {
+fn draw_front(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i32, anim: Anim) {
+    // `drawfrnt` (`FRAMEADV.S:760`) jumps straight to `drawslicerf` for
+    // a slicer, bypassing the generic `FRONT_I` lookup. The front piece
+    // is `slicerfrnt[i]` at `Ay`. The engine draws it with `maddfore`
+    // (masked foreground add); we use `Or` rather than `Sta` so the
+    // front face composites onto the mechanism behind it without
+    // stamping a black bounding box.
+    if me.kind == TileKind::Slicer {
+        let id = SLICER_FRNT[slicer_seq_index(anim.slicer_state(me.modifier))];
+        if id != 0 {
+            if let Some(piece) = bg.resolve(id) {
+                canvas.blit(piece, blockxco, ay, Opacity::Or);
+            }
+        }
+        return;
+    }
     if me.kind == TileKind::Block {
         let v = block_variant(me.modifier);
         if let Some(piece) = bg.resolve(BLOCK_FR[v]) {
@@ -895,7 +1304,37 @@ fn draw_front(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay
     if let Some(piece) = bg.resolve(piece_id) {
         let y = ay + i32::from(FRONT_Y[me.kind as usize]);
         let x = blockxco + i32::from(FRONT_X[me.kind as usize]);
-        canvas.blit(piece, x, y, Opacity::Sta);
+        canvas.blit(piece, x, y, front_opacity(me.kind));
+    }
+}
+
+/// Opacity for a generic `FRONT_I` piece, mirroring `drawfrnt`'s
+/// `sta`-vs-`maddfore` split (`FRAMEADV.S:786-808`).
+///
+/// The engine stores (overwrites) only `archtop2..=archtop4`; every
+/// other front piece — `archbot`, `posts`, gate/panel/pillar/flask/
+/// mirror/rubble fronts — is drawn with `maddfore` (a masked add).
+///
+/// Note the game *does* `sta` dungeon/red `posts`, but that branch is
+/// explicitly skipped in the **level-editor build** (`do EditorDisk /
+/// cmp #2 / beq :ndunj`, `FRAMEADV.S:794`), which draws posts with
+/// `maddfore` in every biome. We're a viewer/editor, so we follow the
+/// editor path — and it's also what avoids the red-biome posts
+/// clobbering their floor edge.
+///
+/// Our flat blit has no masked mode, so `Or` is the faithful
+/// approximation: it composites onto whatever's behind without stamping
+/// the piece's transparent cells over the floor — the same fix used for
+/// the sword and slicer front. `block` and `slicer` use their own
+/// branches before this is reached.
+fn front_opacity(kind: TileKind) -> Opacity {
+    if matches!(
+        kind,
+        TileKind::ArchTop2 | TileKind::ArchTop3 | TileKind::ArchTop4
+    ) {
+        Opacity::Sta
+    } else {
+        Opacity::Or
     }
 }
 
@@ -925,6 +1364,86 @@ mod tests {
         // — a stricter pin would just track vendor-file fingerprints.
         assert!(tables.table1.images.len() >= 30);
         assert!(tables.table2.images.len() >= 10);
+    }
+
+    #[test]
+    fn dungeon_and_palace_load_diagnostics_are_clean() {
+        // The vendored DUN / PAL tables match the canonical 1989 build
+        // (per Peter Ferrie's writeup, only the red biome shipped
+        // truncated in the 3.5" rebuild). Diagnostics should be empty.
+        for biome in [Biome::Dungeon, Biome::Palace] {
+            let tables = BiomeTables::load(&vendor_root(), biome).expect("biome tables load");
+            let issues = tables.load_diagnostics();
+            assert!(
+                issues.is_empty(),
+                "{biome:?} should load without diagnostics; got: {issues:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn red_biome_surfaces_known_truncation() {
+        // Pin the fingerprint flagged in #109 / #110 / #112: in
+        // `IMG.BGTAB.RED1` sprite 0x1b (`looseb`) collapses to a 1×1
+        // placeholder where DUN1 carries 21×12 and PAL1 carries
+        // 28×13. The diagnostic exists so the editor can surface a
+        // clear explanation instead of silently rendering with the
+        // visible floor gaps.
+        let tables = BiomeTables::load(&vendor_root(), Biome::Red).expect("RED tables load");
+        let issues = tables.load_diagnostics();
+        assert_eq!(
+            issues,
+            vec![BiomeTablesIssue::TruncatedSprite {
+                biome: Biome::Red,
+                table: BgTable::One,
+                sprite_id: 0x1b,
+                width_bytes: 1,
+                height: 1,
+                role: "`looseb` — `drawlooseb` spillover (FRAMEADV.S:1388)",
+            }],
+        );
+    }
+
+    #[test]
+    fn is_placeholder_requires_dimensions_and_byte() {
+        // The fingerprint is 1×1 AND byte=0x80. A 1×1 sprite with a
+        // different byte is presumed legitimate (e.g. a custom or
+        // repaired table) and should NOT trip the diagnostic.
+        use crate::draz::image_table::Image;
+        let placeholder = Image {
+            width_bytes: 1,
+            height: 1,
+            bitmap: vec![0x80],
+        };
+        assert!(is_placeholder(&placeholder));
+        let non_placeholder = Image {
+            width_bytes: 1,
+            height: 1,
+            bitmap: vec![0x7f],
+        };
+        assert!(!is_placeholder(&non_placeholder));
+        let bigger = Image {
+            width_bytes: 3,
+            height: 12,
+            bitmap: vec![0; 36],
+        };
+        assert!(!is_placeholder(&bigger));
+    }
+
+    #[test]
+    fn truncated_sprite_diagnostic_message_mentions_workaround() {
+        // The Display impl must point at `docs/copy-protection.md` so
+        // the editor banner (and any future stderr-warning surface)
+        // gets users to the workaround in one hop.
+        let tables = BiomeTables::load(&vendor_root(), Biome::Red).unwrap();
+        let msg = tables
+            .load_diagnostics()
+            .iter()
+            .map(|i| format!("{i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(msg.contains("docs/copy-protection.md"), "got:\n{msg}");
+        assert!(msg.contains("IMG.BGTAB.RED1"), "got:\n{msg}");
     }
 
     #[test]
@@ -1038,6 +1557,224 @@ mod tests {
         assert!(
             has_non_black(&frame, 140, 50, 168, 62),
             "loose-floor A-section should be visible above the D-strip"
+        );
+    }
+
+    #[test]
+    fn slicer_renders_mechanism_at_rest() {
+        // Regression: pre-fix slicer cells rendered as bare floor
+        // (PIECE_A[slicer] = 0 and `drawslicera` was not ported), so the
+        // chomper mechanism was invisible — the "missing triangular
+        // segment" the level browser showed. `draw_ma` now draws the
+        // retracted bottom/top housing and `draw_front` the front face.
+        let idx = ROOM_WIDTH + 5; // middle row, col 5
+        let mut tiles = [Tile::default(); ROOM_WIDTH * ROOM_HEIGHT];
+        tiles[idx] = Tile {
+            kind: TileKind::Slicer,
+            variant: 0,
+            modifier: 0,
+        };
+        let level = synth_level_with(tiles);
+        let tables = BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap();
+        let slicer = render_room(&level, 1, &tables, RenderMode::Monochrome).unwrap();
+
+        // Baseline: an all-empty room. The slicer's cell column must
+        // gain pixels *above* the floor D-strip (y < 125), which is
+        // exactly the region that was black pre-fix.
+        let empty = render_room(
+            &synth_level_with([Tile::default(); ROOM_WIDTH * ROOM_HEIGHT]),
+            1,
+            &tables,
+            RenderMode::Monochrome,
+        )
+        .unwrap();
+
+        let count_above_strip = |f: &Frame| -> usize {
+            let mut n = 0;
+            for y in 60..124u32 {
+                for x in 140..168u32 {
+                    let i = ((y * f.width + x) * 4) as usize;
+                    if f.pixels[i..i + 3] != [0, 0, 0] {
+                        n += 1;
+                    }
+                }
+            }
+            n
+        };
+        assert!(
+            count_above_strip(&slicer) > count_above_strip(&empty),
+            "slicer mechanism should add pixels above the floor strip"
+        );
+    }
+
+    #[test]
+    fn red_biome_fallback_fills_truncated_sprites() {
+        // Red biome's looseb (0x1b) etc. are truncated 1x1 placeholders
+        // (#112). Attaching a dungeon fallback should substitute the
+        // complete sprite, filling the floor edges that were gaps.
+        // LV9 R5 has loose + up-pressplate tiles that spill 0x1b.
+        let level = load_level(9);
+        let plain = BiomeTables::load(&vendor_root(), Biome::Red).unwrap();
+        let with_fb = BiomeTables::load(&vendor_root(), Biome::Red)
+            .unwrap()
+            .with_fallback(BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap());
+        let a = render_room(&level, 5, &plain, RenderMode::Monochrome).unwrap();
+        let b = render_room(&level, 5, &with_fb, RenderMode::Monochrome).unwrap();
+        assert_ne!(
+            a.pixels, b.pixels,
+            "fallback should change the truncated-sprite render"
+        );
+        let lit = |f: &Frame| {
+            f.pixels
+                .chunks_exact(4)
+                .filter(|p| p[0..3] != [0, 0, 0])
+                .count()
+        };
+        assert!(
+            lit(&b) > lit(&a),
+            "fallback should fill truncated floor edges with more lit pixels"
+        );
+    }
+
+    #[test]
+    fn sword_renders_on_floor() {
+        // Regression: sword cells rendered as bare floor — PIECE_A[sword]
+        // is 0x00 and the sword sprite comes from `drawsworda`, which was
+        // initially not ported (the "triangular missing floor" in LV1
+        // R15). draw_ma now draws swordgleam0.
+        let idx = ROOM_WIDTH + 5; // middle row, col 5
+        let mut tiles = [Tile::default(); ROOM_WIDTH * ROOM_HEIGHT];
+        tiles[idx] = Tile {
+            kind: TileKind::Sword,
+            variant: 0,
+            modifier: 0,
+        };
+        let sword = render_room(
+            &synth_level_with(tiles),
+            1,
+            &BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap(),
+            RenderMode::Monochrome,
+        )
+        .unwrap();
+        let tables = BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap();
+        let empty = render_room(
+            &synth_level_with([Tile::default(); ROOM_WIDTH * ROOM_HEIGHT]),
+            1,
+            &tables,
+            RenderMode::Monochrome,
+        )
+        .unwrap();
+        let count = |f: &Frame| -> usize {
+            let mut n = 0;
+            for y in 80..124u32 {
+                for x in 140..168u32 {
+                    let i = ((y * f.width + x) * 4) as usize;
+                    if f.pixels[i..i + 3] != [0, 0, 0] {
+                        n += 1;
+                    }
+                }
+            }
+            n
+        };
+        assert!(
+            count(&sword) > count(&empty),
+            "sword sprite should add pixels over the bare floor cell"
+        );
+    }
+
+    #[test]
+    fn animation_phase_changes_output() {
+        // A torch + slicer room at a non-rest phase must differ from the
+        // at-rest render, and `Anim::REST` via the animated entry point
+        // must equal the static `render_room` output.
+        let mut tiles = [Tile::default(); ROOM_WIDTH * ROOM_HEIGHT];
+        tiles[ROOM_WIDTH + 3] = Tile {
+            kind: TileKind::Torch,
+            variant: 0,
+            modifier: 0,
+        };
+        tiles[ROOM_WIDTH + 6] = Tile {
+            kind: TileKind::Slicer,
+            variant: 0,
+            modifier: 0,
+        };
+        let level = synth_level_with(tiles);
+        let tables = BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap();
+        let rest = render_room(&level, 1, &tables, RenderMode::Monochrome).unwrap();
+        let moved = render_room_animated(
+            &level,
+            1,
+            &tables,
+            RenderMode::Monochrome,
+            Anim {
+                tick: 20,
+                traps: true,
+            },
+        )
+        .unwrap();
+        assert_ne!(
+            rest.pixels, moved.pixels,
+            "animated phase should differ from the rest pose"
+        );
+        let rest2 =
+            render_room_animated(&level, 1, &tables, RenderMode::Monochrome, Anim::REST).unwrap();
+        assert_eq!(
+            rest.pixels, rest2.pixels,
+            "Anim::REST must match the static render"
+        );
+    }
+
+    #[test]
+    fn archpanel_bridges_arch_to_panel() {
+        // Regression: a panelwof whose left neighbour is an archtop1
+        // must draw the `archpanel` transition piece (sprite 0xa1) in
+        // its A-section — PIECE_A[panelwof] is empty, so without the
+        // `drawa` special (FRAMEADV.S:1151) the cell between an arch and
+        // a wall panel was blank (the gap left of LV4 R6's panelwof).
+        let panel_at = 5usize; // row 0, col 5
+        let with_arch = {
+            let mut tiles = [Tile::default(); ROOM_WIDTH * ROOM_HEIGHT];
+            tiles[panel_at - 1] = Tile {
+                kind: TileKind::ArchTop1,
+                variant: 0,
+                modifier: 0,
+            };
+            tiles[panel_at] = Tile {
+                kind: TileKind::PanelWithoutFloor,
+                variant: 0,
+                modifier: 2,
+            };
+            synth_level_with(tiles)
+        };
+        let without_arch = {
+            // Left neighbour is Empty → no archpanel substitution.
+            let mut tiles = [Tile::default(); ROOM_WIDTH * ROOM_HEIGHT];
+            tiles[panel_at] = Tile {
+                kind: TileKind::PanelWithoutFloor,
+                variant: 0,
+                modifier: 2,
+            };
+            synth_level_with(tiles)
+        };
+        let tables = BiomeTables::load(&vendor_root(), Biome::Palace).unwrap();
+        let a = render_room(&with_arch, 1, &tables, RenderMode::Monochrome).unwrap();
+        let b = render_room(&without_arch, 1, &tables, RenderMode::Monochrome).unwrap();
+        // Panel cell A-section: x 140..168, above the top-row D-strip.
+        let count = |f: &Frame| -> usize {
+            let mut n = 0;
+            for y in 20..60u32 {
+                for x in 140..168u32 {
+                    let i = ((y * f.width + x) * 4) as usize;
+                    if f.pixels[i..i + 3] != [0, 0, 0] {
+                        n += 1;
+                    }
+                }
+            }
+            n
+        };
+        assert!(
+            count(&a) > count(&b),
+            "archpanel piece should fill the arch-to-panel cell"
         );
     }
 

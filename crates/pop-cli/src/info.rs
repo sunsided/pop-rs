@@ -118,7 +118,7 @@ fn print_level(path: &std::path::Path, level: &Level) {
         .filter_map(|i| TileKind::from_raw(i).map(|k| (k, hist[i as usize])))
         .filter(|(_, n)| *n > 0)
         .collect();
-    entries.sort_by(|a, b| b.1.cmp(&a.1));
+    entries.sort_by_key(|e| std::cmp::Reverse(e.1));
 
     println!("  tile-kind histogram (non-zero, by count):");
     for (kind, count) in entries {
