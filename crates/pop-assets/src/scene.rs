@@ -1264,7 +1264,37 @@ fn draw_front(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay
     if let Some(piece) = bg.resolve(piece_id) {
         let y = ay + i32::from(FRONT_Y[me.kind as usize]);
         let x = blockxco + i32::from(FRONT_X[me.kind as usize]);
-        canvas.blit(piece, x, y, Opacity::Sta);
+        canvas.blit(piece, x, y, front_opacity(me.kind));
+    }
+}
+
+/// Opacity for a generic `FRONT_I` piece, mirroring `drawfrnt`'s
+/// `sta`-vs-`maddfore` split (`FRAMEADV.S:786-808`).
+///
+/// The engine stores (overwrites) only `archtop2..=archtop4`; every
+/// other front piece — `archbot`, `posts`, gate/panel/pillar/flask/
+/// mirror/rubble fronts — is drawn with `maddfore` (a masked add).
+///
+/// Note the game *does* `sta` dungeon/red `posts`, but that branch is
+/// explicitly skipped in the **level-editor build** (`do EditorDisk /
+/// cmp #2 / beq :ndunj`, `FRAMEADV.S:794`), which draws posts with
+/// `maddfore` in every biome. We're a viewer/editor, so we follow the
+/// editor path — and it's also what avoids the red-biome posts
+/// clobbering their floor edge.
+///
+/// Our flat blit has no masked mode, so `Or` is the faithful
+/// approximation: it composites onto whatever's behind without stamping
+/// the piece's transparent cells over the floor — the same fix used for
+/// the sword and slicer front. `block` and `slicer` use their own
+/// branches before this is reached.
+fn front_opacity(kind: TileKind) -> Opacity {
+    if matches!(
+        kind,
+        TileKind::ArchTop2 | TileKind::ArchTop3 | TileKind::ArchTop4
+    ) {
+        Opacity::Sta
+    } else {
+        Opacity::Or
     }
 }
 
