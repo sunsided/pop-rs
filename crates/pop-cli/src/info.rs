@@ -56,9 +56,51 @@ fn print_level(path: &std::path::Path, level: &Level) {
     println!("{}", path.display());
     println!("  rooms:    {ROOMS_PER_LEVEL} ({ROOM_WIDTH}x{ROOM_HEIGHT} tiles each)");
     println!(
-        "  metadata: {} raw bytes (not yet decoded)",
-        level.raw_metadata().len()
+        "  screens used (INFO[0] - 1): {}",
+        level.screen_count_plus_one().saturating_sub(1),
     );
+
+    let prince = level.prince_start();
+    if let Some((col, row)) = prince.col_row() {
+        println!(
+            "  prince start: room {} tile {} ({}, {}) face=0x{:02x}",
+            prince.screen, prince.block, col, row, prince.face_raw,
+        );
+    } else {
+        println!(
+            "  prince start: room {} tile {} (out of range) face=0x{:02x}",
+            prince.screen, prince.block, prince.face_raw,
+        );
+    }
+
+    if let Some(sword) = level.sword_start() {
+        if let Some((col, row)) = sword.col_row() {
+            println!(
+                "  sword start:  room {} tile {} ({}, {})",
+                sword.screen, sword.block, col, row,
+            );
+        }
+    } else {
+        println!("  sword start:  none");
+    }
+
+    let guards = level.guard_spawns();
+    let guard_count = guards.iter().filter(|g| g.is_some()).count();
+    println!("  guards:   {guard_count}");
+    for (room_idx, guard) in guards.iter().enumerate() {
+        if let Some(g) = guard {
+            let (col, row) = g.col_row().unwrap_or((0, 0));
+            println!(
+                "    room {:>2}: tile {:>2} ({}, {}) prog=0x{:02x} face=0x{:02x}",
+                room_idx + 1,
+                g.block,
+                col,
+                row,
+                g.prog,
+                g.face_raw,
+            );
+        }
+    }
 
     let hist = level.tile_kind_histogram();
     let mut entries: Vec<(TileKind, u32)> = (0..TileKind::COUNT)

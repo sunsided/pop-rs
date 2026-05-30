@@ -186,13 +186,13 @@ impl ImageTable {
         let mut images = Vec::with_capacity(count);
         for i in 0..count {
             let ptr = read_u16_le(bytes, 1 + 2 * i);
-            let offset_in_table = ptr
-                .checked_sub(base_address)
-                .ok_or(ParseError::PointerBelowBase {
-                    image_index: i,
-                    pointer: ptr,
-                    base_address,
-                })?;
+            let offset_in_table =
+                ptr.checked_sub(base_address)
+                    .ok_or(ParseError::PointerBelowBase {
+                        image_index: i,
+                        pointer: ptr,
+                        base_address,
+                    })?;
             let start = usize::from(offset_in_table);
             if start + 2 > bytes.len() {
                 return Err(ParseError::ImageOutOfRange {
