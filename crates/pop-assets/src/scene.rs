@@ -1032,14 +1032,19 @@ fn draw_ma(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i
         }
         TileKind::Sword => {
             // drawsworda (`FRAMEADV.S:1530`): swordgleam1 when state==1,
-            // else swordgleam0, at (blockxco, Ay) with `sta`.
+            // else swordgleam0, at (blockxco, Ay). The engine uses `sta`,
+            // but the sword sprite has a transparent (black) upper-left
+            // corner; a raw store would stamp that black over the floor
+            // edge (`FLOOR_B`) drawn underneath, leaving a gap. We `Or`
+            // instead so the sword composites onto the floor — same
+            // reasoning as the slicer front piece above.
             let id = if me.modifier == 1 {
                 SWORDGLEAM1
             } else {
                 SWORDGLEAM0
             };
             if let Some(piece) = bg.resolve(id) {
-                canvas.blit(piece, blockxco, ay, Opacity::Sta);
+                canvas.blit(piece, blockxco, ay, Opacity::Or);
             }
         }
         _ => {}
