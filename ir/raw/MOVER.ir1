@@ -1757,7 +1757,7 @@ fn shakeit {
   a = #0x01                  ; MOVER.S:2165
   *trdirec@0xb640 = a            ; MOVER.S:2166
   tail_call addtrob                ; MOVER.S:2168
-  ??? usr $a9,21,$00,*-org            ; MOVER.S:2173
+  usr $a9,21,$00,*-org            ; build-time RW18 disk write (no bytes emitted) — MOVER.S:2173
 ]rts:
   return                           ; MOVER.S:2147
 }

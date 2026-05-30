@@ -1780,7 +1780,7 @@ fn PickItUp {
   call RemoveObj                  ; CTRL.S:2159
   a = #pickupsword                  ; CTRL.S:2161
   tail_call jumpseq                ; CTRL.S:2162
-  ??? usr $a9,16,$00,*-org            ; CTRL.S:2167
+  usr $a9,16,$00,*-org            ; build-time RW18 disk write (no bytes emitted) — CTRL.S:2167
 }
 
 fn :test {

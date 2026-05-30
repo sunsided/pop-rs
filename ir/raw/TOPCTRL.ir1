@@ -1464,7 +1464,7 @@ fn develpatch {
   *redrawflg@0x0097 -= 1                         ; TOPCTRL.S:1731
   call markmeters                  ; TOPCTRL.S:1733
   tail_call sure                ; TOPCTRL.S:1734
-  ??? usr $a9,4,$a00,*-org            ; TOPCTRL.S:1739
+  usr $a9,4,$a00,*-org            ; build-time RW18 disk write (no bytes emitted) — TOPCTRL.S:1739
 ]rts:
   return                           ; TOPCTRL.S:1700
 }

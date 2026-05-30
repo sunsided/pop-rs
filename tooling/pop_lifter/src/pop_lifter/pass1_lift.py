@@ -128,16 +128,20 @@ _NON_CODE_DIRECTIVES = frozenset(
         # mistaking a data label (e.g. `C_skip`) for a routine entry,
         # and keeps inline data from surfacing as `??? rev`.
         #
-        # NOTE: `usr` is deliberately NOT here. It's a Merlin user-
-        # function *generator* (`usr $a9,N,addr,*-org` — emits an
-        # unrolled fast-fill / address table, bracketed by `lst off`
-        # so its output stays out of the listing), not inert data.
-        # The lift can't expand it, but silently skipping it would
-        # hide that a generated block exists. Leaving it to fall
-        # through to `Unsupported` keeps a visible `??? usr ...`
-        # marker for a future codegen/data-extraction pass. All `usr`
-        # calls in POP are unlabeled and sit after `rts`, so this
-        # doesn't reintroduce the data-label-as-entry discovery bug.
+        # NOTE: `usr` is deliberately NOT here. It's POP's wiring of
+        # Merlin's user-defined hook to the RW18 fast disk routine
+        # (see `04 Support/MakeDisk/USR18.S`): at pass 2 the hook reads
+        # the just-assembled module out of `obj_buf` and writes it to a
+        # disk track. A pure build-time side effect — zero bytes emitted
+        # into the binary — but a *real* directive with real arguments
+        # we'd lose entirely if we silently skipped it. Let it fall
+        # through to `Unsupported(mnemonic="usr", …)` so the IR dump and
+        # pass-4 Rust emission can render it as a documenting comment
+        # (`format_item` and `_emit_iigs_unsupported` recognise the
+        # mnemonic and emit a clear "build-time RW18 disk write" line).
+        # All POP `usr` calls are unlabeled and sit after `rts`, so
+        # `Unsupported` here doesn't reintroduce the data-label-as-entry
+        # discovery bug.
         "rev", "da",
     }
 )

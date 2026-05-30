@@ -830,7 +830,7 @@ fn prchar {
   call lay                  ; GAMEBG.S:1183
   *XCO@0x0001 += 1                         ; GAMEBG.S:1185
   return                           ; GAMEBG.S:1186
-  ??? usr $a9,17,$00,*-org            ; GAMEBG.S:1191
+  usr $a9,17,$00,*-org            ; build-time RW18 disk write (no bytes emitted) — GAMEBG.S:1191
 }
 
 fn :draw {

@@ -1556,5 +1556,5 @@ fn INVERTY {
   if y < #0x60 goto :loop  ; HIRES.S:2123
 ]rts:
   return                           ; HIRES.S:2124
-  ??? usr $a9,1,$0000,*-org            ; HIRES.S:2129
+  usr $a9,1,$0000,*-org            ; build-time RW18 disk write (no bytes emitted) — HIRES.S:2129
 }
