@@ -82,6 +82,21 @@ pub enum ParseError {
         /// Byte offset where image data must begin (= `1 + 2(N+1)`).
         first_data_offset: usize,
     },
+    /// A directory entry pointed below the inferred base address —
+    /// directory pointers must be monotonically non-decreasing from
+    /// `base_address`. Catches non-monotone / corrupt directories
+    /// before they get silently mapped to byte 0 (the count byte).
+    #[error(
+        "image {image_index}: pointer 0x{pointer:04x} below inferred base 0x{base_address:04x}"
+    )]
+    PointerBelowBase {
+        /// 0-based index of the offending directory entry.
+        image_index: usize,
+        /// Raw absolute pointer from the directory.
+        pointer: u16,
+        /// Inferred load base (from the first pointer).
+        base_address: u16,
+    },
     /// An image's `(width, height)` header pointed past the end of the
     /// file. Carries the offending image index (0-based) and the
     /// computed end offset.
@@ -105,8 +120,12 @@ pub enum ParseError {
 ///
 /// Width is in bytes (each byte = 7 horizontal pixels in Apple II
 /// hi-res); height is in scan-lines. The bitmap is exactly
-/// `width_bytes * height` bytes, laid out row-major top-down. Hand to
-/// [`crate::hires::render_linear`] for an RGBA frame.
+/// `width_bytes * height` bytes, preserving POP's on-disk **bottom-up**
+/// row order — bytes `[0..width_bytes]` are the bottom scan-line of the
+/// displayed sprite, the last `width_bytes` bytes are the top
+/// scan-line (see the module-level docs and `HIRES.S:421`). Hand to
+/// [`crate::hires::render_linear`] for a top-down RGBA frame (it flips
+/// during read).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Image {
     /// Image width in hi-res bytes (= pixels / 7).
@@ -167,7 +186,14 @@ impl ImageTable {
         let mut images = Vec::with_capacity(count);
         for i in 0..count {
             let ptr = read_u16_le(bytes, 1 + 2 * i);
-            let start = usize::from(ptr.saturating_sub(base_address));
+            let offset_in_table = ptr
+                .checked_sub(base_address)
+                .ok_or(ParseError::PointerBelowBase {
+                    image_index: i,
+                    pointer: ptr,
+                    base_address,
+                })?;
+            let start = usize::from(offset_in_table);
             if start + 2 > bytes.len() {
                 return Err(ParseError::ImageOutOfRange {
                     image_index: i,
@@ -284,6 +310,36 @@ mod tests {
                 height: 1,
                 bitmap: vec![0xBB, 0xCC],
             }
+        );
+    }
+
+    #[test]
+    fn non_monotone_directory_rejected() {
+        // Two-image directory where the second pointer is below the
+        // base address derived from the first. Pre-fix, this was
+        // silently mapped to offset 0 and produced garbage sprites.
+        //  byte 0      : count = 2
+        //  bytes 1..7  : pointers
+        //    pointer 1 = $4007 (sets base = $4000), pointer 2 = $3FFF
+        //    (below base), fence = $400D
+        let mut buf = vec![2u8];
+        buf.extend_from_slice(&0x4007u16.to_le_bytes());
+        buf.extend_from_slice(&0x3FFFu16.to_le_bytes());
+        buf.extend_from_slice(&0x400Du16.to_le_bytes());
+        buf.extend_from_slice(&[1, 1, 0xAA]); // image 1 OK
+        buf.extend_from_slice(&[2, 1, 0xBB, 0xCC]);
+
+        let err = ImageTable::from_bytes(&buf).unwrap_err();
+        assert!(
+            matches!(
+                err,
+                ParseError::PointerBelowBase {
+                    image_index: 1,
+                    pointer: 0x3FFF,
+                    base_address: 0x4000,
+                }
+            ),
+            "unexpected: {err:?}"
         );
     }
 
