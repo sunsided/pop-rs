@@ -59,6 +59,24 @@ tasks:
     cmds:
       - cargo run {{.PROFILE_FLAG}} -p pop-difftest --bin diffrun -- {{.CLI_ARGS}}
 
+  draz:
+    desc: "Run `pop draz` (inspect | screen | sprites). Pass args after --."
+    deps: [submodules]
+    cmds:
+      - task: run
+        vars: {CLI_ARGS: 'draz {{.CLI_ARGS}}'}
+
+  draz:sprites:
+    desc: "Smoke test: dump the prince sprites (DRAZ IMG.CHTAB1) to PNGs. Vars: CHTAB, OUT, MODE."
+    deps: [submodules]
+    vars:
+      CHTAB: '{{.CHTAB | default "vendor/pop-apple2/04 Support/DRAZ/I/IMG.CHTAB1"}}'
+      OUT: '{{.OUT | default "/tmp/chtab1"}}'
+      MODE: '{{.MODE | default "ntsc"}}'
+    cmds:
+      - task: run
+        vars: {CLI_ARGS: 'draz sprites "{{.CHTAB}}" --out-dir "{{.OUT}}" --mode {{.MODE}}'}
+
   test:
     desc: "Run the workspace test suite. Pass args after --, e.g. task test -- reader."
     preconditions:
