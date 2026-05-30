@@ -1223,7 +1223,8 @@ def format_item(item: Item) -> str:
                 f"; 65816/IIgs op (not modeled) — {item.src.short()}"
             )
         if item.mnemonic == "usr":
-            # POP's wiring of Merlin's user-hook to RW18 (see USR18.S):
+            # POP's wiring of Merlin's user-hook to RW18 (see
+            # `vendor/pop-apple2/04 Support/MakeDisk/USR18.S`):
             # `usr <BbundID>,<track>,<offset>,<length>` is a pass-2 disk
             # write of the just-assembled module, no bytes emitted into
             # the binary. The line stays in the dump so the build-time

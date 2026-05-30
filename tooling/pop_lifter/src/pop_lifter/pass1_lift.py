@@ -130,7 +130,8 @@ _NON_CODE_DIRECTIVES = frozenset(
         #
         # NOTE: `usr` is deliberately NOT here. It's POP's wiring of
         # Merlin's user-defined hook to the RW18 fast disk routine
-        # (see `04 Support/MakeDisk/USR18.S`): at pass 2 the hook reads
+        # (see `vendor/pop-apple2/04 Support/MakeDisk/USR18.S`): at
+        # pass 2 the hook reads
         # the just-assembled module out of `obj_buf` and writes it to a
         # disk track. A pure build-time side effect — zero bytes emitted
         # into the binary — but a *real* directive with real arguments

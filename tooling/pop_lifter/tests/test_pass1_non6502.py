@@ -35,12 +35,13 @@ def test_rev_lifts_to_none():
 def test_usr_and_da_lift_correctly():
     """`da` is inert data → None. `usr` is POP's wiring of Merlin's
     user-defined hook to RW18's disk writer (see
-    `04 Support/MakeDisk/USR18.S`): at pass 2 it copies the just-
-    assembled module to a disk track and emits *zero* bytes into the
-    binary. We keep it as `Unsupported` rather than dropping it like
-    `da`, so the IR dump and the lifted Rust can render the directive
-    as a documenting comment — readers can see the build-time intent
-    at each site even though no executable code corresponds to it."""
+    `vendor/pop-apple2/04 Support/MakeDisk/USR18.S`): at pass 2 it
+    copies the just-assembled module to a disk track and emits *zero*
+    bytes into the binary. We keep it as `Unsupported` rather than
+    dropping it like `da`, so the IR dump and the lifted Rust can
+    render the directive as a documenting comment — readers can see
+    the build-time intent at each site even though no executable code
+    corresponds to it."""
     from pop_lifter.ir1 import Unsupported
     assert _lift_instr(_line("da", "label"), {}, set()) is None
     usr = _lift_instr(_line("usr", "$a9,16,$b00,*-org"), {}, set())

@@ -1148,7 +1148,8 @@ def _emit_stmt(
                 return _emit_iigs_unsupported(stmt.item, pad)
             if stmt.item.mnemonic == "usr":
                 # POP wires Merlin's user-defined hook to RW18's disk
-                # writer (see `04 Support/MakeDisk/USR18.S`):
+                # writer (see
+                # `vendor/pop-apple2/04 Support/MakeDisk/USR18.S`):
                 #   `usr <BbundID>,<track>,<offset>,<length>`
                 # writes the just-assembled module to a floppy track at
                 # pass 2 and emits zero bytes into the binary. Surface
