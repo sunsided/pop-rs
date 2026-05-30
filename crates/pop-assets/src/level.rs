@@ -327,7 +327,9 @@ impl Level {
                 };
             }
 
-            room.links.raw.copy_from_slice(&data[link_base..link_base + LINK_BYTES_PER_ROOM]);
+            room.links
+                .raw
+                .copy_from_slice(&data[link_base..link_base + LINK_BYTES_PER_ROOM]);
         }
 
         let metadata = data[LINK_SECTION_END..LEVEL_FILE_SIZE].to_vec();
@@ -375,8 +377,9 @@ mod tests {
     use super::*;
 
     fn bundled_level(n: u8) -> Vec<u8> {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join(format!("../../vendor/pop-apple2/04 Support/Levels/LEVEL{n}"));
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
+            "../../vendor/pop-apple2/04 Support/Levels/LEVEL{n}"
+        ));
         std::fs::read(&path).unwrap_or_else(|e| panic!("read {path:?}: {e}"))
     }
 
@@ -443,8 +446,14 @@ mod tests {
 
         let total: u32 = h.iter().sum();
         assert_eq!(total as usize, ROOMS_PER_LEVEL * TILES_PER_ROOM);
-        assert!(h[TileKind::Floor as usize] > 10, "level 1 has too few floor tiles");
-        assert!(h[TileKind::Block as usize] > 10, "level 1 has too few block tiles");
+        assert!(
+            h[TileKind::Floor as usize] > 10,
+            "level 1 has too few floor tiles"
+        );
+        assert!(
+            h[TileKind::Block as usize] > 10,
+            "level 1 has too few block tiles"
+        );
         assert!(h[TileKind::Empty as usize] > 0);
     }
 

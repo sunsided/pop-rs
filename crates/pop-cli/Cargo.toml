@@ -22,4 +22,5 @@ workspace = true
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+png = "0.17"
 pop-assets = { path = "../pop-assets" }

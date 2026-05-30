@@ -3,7 +3,10 @@
 use std::path::PathBuf;
 
 use clap::Args as ClapArgs;
-use pop_assets::{discovery, level::{Level, TileKind, ROOM_HEIGHT, ROOM_WIDTH, ROOMS_PER_LEVEL}};
+use pop_assets::{
+    discovery,
+    level::{Level, TileKind, ROOMS_PER_LEVEL, ROOM_HEIGHT, ROOM_WIDTH},
+};
 
 /// Arguments for the `info` subcommand.
 #[derive(Debug, ClapArgs)]
@@ -52,7 +55,10 @@ fn resolve_paths(args: &Args) -> anyhow::Result<Vec<PathBuf>> {
 fn print_level(path: &std::path::Path, level: &Level) {
     println!("{}", path.display());
     println!("  rooms:    {ROOMS_PER_LEVEL} ({ROOM_WIDTH}x{ROOM_HEIGHT} tiles each)");
-    println!("  metadata: {} raw bytes (not yet decoded)", level.raw_metadata().len());
+    println!(
+        "  metadata: {} raw bytes (not yet decoded)",
+        level.raw_metadata().len()
+    );
 
     let hist = level.tile_kind_histogram();
     let mut entries: Vec<(TileKind, u32)> = (0..TileKind::COUNT)

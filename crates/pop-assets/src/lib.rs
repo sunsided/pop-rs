@@ -12,5 +12,6 @@
 #![cfg_attr(not(test), warn(missing_docs))]
 
 pub mod discovery;
+pub mod draz;
 pub mod hires;
 pub mod level;
