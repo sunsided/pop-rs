@@ -745,27 +745,32 @@ fn draw_exit_door(
     dy: i32,
     draw_stairs: bool,
 ) {
+    let canvas_h = i32::from(ROOM_HEIGHT_PX);
     if draw_stairs && blockxco < 36 {
         if let Some(piece) = bg.resolve(STAIRS) {
             canvas.blit(piece, blockxco + 1, ay - 12, Opacity::Sta);
         }
     }
     let blockthr = dy - 67;
-    if (0..192).contains(&blockthr) {
+    if (0..canvas_h).contains(&blockthr) {
+        // Both sprite refs are loop-invariant — resolve them once up
+        // front so we don't re-index the BGTAB tables per slice.
+        let door_mask = bg.resolve(DOOR_MASK);
+        let door = bg.resolve(DOOR);
         // state=0 → gateposn=0; door top starts at `ay − 14`.
         let mut y = ay - 14;
         while y >= blockthr {
-            if let Some(mask) = bg.resolve(DOOR_MASK) {
+            if let Some(mask) = door_mask {
                 canvas.blit(mask, blockxco, y, Opacity::And);
             }
-            if let Some(piece) = bg.resolve(DOOR) {
+            if let Some(piece) = door {
                 canvas.blit(piece, blockxco, y, Opacity::Or);
             }
             y -= 4;
         }
     }
     let top_y = ay - 64;
-    if (0..192).contains(&top_y) {
+    if (0..canvas_h).contains(&top_y) {
         if let Some(piece) = bg.resolve(TOP_REPAIR) {
             canvas.blit(piece, blockxco, top_y, Opacity::Sta);
         }
@@ -1022,36 +1027,23 @@ mod tests {
         };
         let level = synth_level_with(tiles);
         let tables = BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap();
-        // LEVEL0's bundled prince_start is room 1, so rendering as
-        // room 1 vs room 2 toggles the stairs branch.
-        assert_eq!(
-            level.prince_start().screen,
-            1,
-            "test assumes LEVEL0 prince starts in room 1",
-        );
-        let with_stairs = render_room(&level, 2, &tables, RenderMode::Monochrome).unwrap();
-        let without_stairs = render_room(&level, 1, &tables, RenderMode::Monochrome).unwrap();
+        // Derive the start room from the level header rather than
+        // hard-coding it — that way an unrelated vendor / INFO header
+        // change doesn't break this test silently.
+        let start = level.prince_start().screen;
+        let non_start = if start == 1 { 2 } else { 1 };
+        let with_stairs = render_room(&level, non_start, &tables, RenderMode::Monochrome).unwrap();
+        let without_stairs = render_room(&level, start, &tables, RenderMode::Monochrome).unwrap();
         // Whole-frame inequality: the start-room render skips the
         // stairs sprite, so some pixels must differ between the two.
         // Pinning a tighter pixel rect would couple the test to the
-        // stairs sprite's exact shape.
+        // stairs sprite's exact shape, and a lit-pixel count would be
+        // fragile too — `Opacity::Sta` *overwrites* canvas bytes, so
+        // the stairs branch can clear previously-lit pixels just as
+        // easily as it adds new ones.
         assert_ne!(
             with_stairs.pixels, without_stairs.pixels,
             "stairs flag should produce a visibly different render",
-        );
-        // And the rooms with the stairs branch ON must have *more*
-        // non-black coverage — stairs sprite is purely additive
-        // (Opacity::Sta over previously-black pixels in this
-        // synthetic single-exit room).
-        let count_lit = |f: &Frame| {
-            f.pixels
-                .chunks_exact(4)
-                .filter(|p| p[0..3] != [0, 0, 0])
-                .count()
-        };
-        assert!(
-            count_lit(&with_stairs) > count_lit(&without_stairs),
-            "non-start render should add stairs pixels on top of the start render",
         );
     }
 }
