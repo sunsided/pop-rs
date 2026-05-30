@@ -1,0 +1,154 @@
+# Task runner for pop-rs. See https://taskfile.dev
+#
+# This repo has two halves:
+#   - the Rust workspace under crates/* (+ the generated ir/crate)
+#   - the Python lifter under tooling/pop_lifter (the current CI job)
+#
+# Canonical entry points (build/test/fmt/lint/check/ci) drive the Rust
+# side; the Python lifter lives under the `lifter:*` namespace.
+version: '3'
+
+vars:
+  # Build profile for `build`/`run`: debug (default) or release.
+  PROFILE: '{{ .PROFILE | default "debug" }}'
+  PROFILE_FLAG: '{{ if eq .PROFILE "release" }}--release{{ end }}'
+  LIFTER_DIR: tooling/pop_lifter
+
+tasks:
+  default:
+    cmds:
+      - task --list --sort=none
+    silent: true
+
+  # --- Rust workspace -----------------------------------------------------
+
+  build:
+    desc: Compile the whole workspace (all targets). PROFILE=release for optimized.
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found - install Rust from https://rustup.rs/"
+    cmds:
+      - cargo build --workspace --all-targets {{.PROFILE_FLAG}}
+
+  build:release:
+    desc: Compile the workspace with optimizations.
+    cmds:
+      - task: build
+        vars: {PROFILE: release}
+
+  run:
+    desc: "Run the `pop` CLI. Pass args after --, e.g. task run -- info <file>."
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found - install Rust from https://rustup.rs/"
+    cmds:
+      - cargo run {{.PROFILE_FLAG}} -p pop-cli --bin pop -- {{.CLI_ARGS}}
+
+  info:
+    desc: "Inspect level file(s); no args scans the bundled LEVEL set. task info -- <path>..."
+    cmds:
+      - task: run
+        vars: {CLI_ARGS: 'info {{.CLI_ARGS}}'}
+
+  diffrun:
+    desc: "Run the differential-test harness (diffrun). Pass args after --."
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found - install Rust from https://rustup.rs/"
+    cmds:
+      - cargo run {{.PROFILE_FLAG}} -p pop-difftest --bin diffrun -- {{.CLI_ARGS}}
+
+  test:
+    desc: "Run the workspace test suite. Pass args after --, e.g. task test -- reader."
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found - install Rust from https://rustup.rs/"
+    cmds:
+      - cargo test --workspace --all-targets {{.CLI_ARGS}}
+
+  fmt:
+    desc: Format all Rust code.
+    aliases: [format]
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found - install Rust from https://rustup.rs/"
+    cmds:
+      - cargo fmt --all
+
+  fmt:check:
+    desc: Check formatting without writing changes.
+    cmds:
+      - cargo fmt --all --check
+
+  lint:
+    desc: Lint the workspace with clippy (warnings as errors).
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found - install Rust from https://rustup.rs/"
+      - sh: cargo clippy --version
+        msg: "clippy not found - rustup component add clippy"
+    cmds:
+      - cargo clippy --workspace --all-targets -- -D warnings
+
+  lint:fix:
+    desc: Run clippy and auto-apply fixes where possible.
+    aliases: [fix]
+    cmds:
+      - cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged
+
+  check:
+    desc: Static checks - formatting + clippy. No tests.
+    cmds:
+      - task: fmt:check
+      - task: lint
+
+  ci:
+    desc: Full local CI - Rust checks + tests + the Python lifter suite.
+    cmds:
+      - task: check
+      - task: test
+      - task: lifter:test
+
+  docs:
+    desc: Build workspace API docs (no dependencies).
+    cmds:
+      - cargo doc --workspace --no-deps
+
+  docs:open:
+    desc: Build and open workspace API docs in a browser.
+    cmds:
+      - cargo doc --workspace --no-deps --open
+
+  clean:
+    desc: Remove Cargo build output.
+    status:
+      - test ! -d target
+    cmds:
+      - cargo clean
+
+  # --- Python lifter (tooling/pop_lifter) ---------------------------------
+
+  lifter:install:
+    desc: Install the pop-lifter package + pytest (editable) for local runs.
+    dir: '{{.LIFTER_DIR}}'
+    preconditions:
+      - sh: command -v pip
+        msg: "pip not found - install Python 3.11+ from https://python.org"
+    cmds:
+      - pip install -e . pytest
+
+  lifter:test:
+    desc: "Run the pop-lifter pytest suite (the CI job). Pass args after --."
+    dir: '{{.LIFTER_DIR}}'
+    preconditions:
+      - sh: command -v pytest
+        msg: "pytest not found - run: task lifter:install"
+    cmds:
+      - pytest -q {{.CLI_ARGS}}
+
+  # --- Repo setup ---------------------------------------------------------
+
+  submodules:
+    desc: Fetch the vendored POP source submodule (needed by lifter tests).
+    cmds:
+      - git submodule update --init --recursive
