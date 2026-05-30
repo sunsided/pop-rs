@@ -13,6 +13,15 @@
 //!   Byte 2-n:  image bytes (read left-right, top-bottom)
 //! ```
 //!
+//! The "top-bottom" wording is misleading: the actual blitter
+//! (`FASTLAY`, `HIRES.S:421`) walks screen Y *up* from `YCO` (the
+//! lowest visible scan-line) while advancing `IMAGE` *forward* through
+//! the bitmap. That means the **first row of bytes in memory
+//! corresponds to the bottom row of the displayed sprite** — i.e. the
+//! bitmap is stored bottom-up. The extracted [`Image::bitmap`] keeps
+//! this on-disk order verbatim; [`crate::hires::render_linear`] flips
+//! at render time so callers get a top-down RGBA frame.
+//!
 //! The file as a whole wraps `N` such blobs behind a count + pointer
 //! directory laid out at load address `$6000`:
 //!

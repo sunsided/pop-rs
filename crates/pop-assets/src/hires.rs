@@ -171,11 +171,25 @@ pub fn render(page: &[u8; HIRES_PAGE_BYTES], mode: RenderMode) -> Frame {
 /// Render a non-interleaved bitmap of `width_bytes × height` (POP's
 /// sprite / image-table format) to an RGBA [`Frame`].
 ///
-/// `bytes` must be exactly `width_bytes * height` long: each row is
-/// `width_bytes` consecutive bytes, rows stacked top-to-bottom. Within
-/// each byte, bit 0 is the leftmost pixel and bit 6 is the rightmost
-/// (bit 7 is the NTSC palette select). The resulting frame is
+/// `bytes` must be exactly `width_bytes * height` long. Within each
+/// byte, bit 0 is the leftmost pixel and bit 6 is the rightmost (bit 7
+/// is the NTSC palette select). The resulting frame is
 /// `width_bytes * 7` pixels wide.
+///
+/// # Row order
+///
+/// POP stores sprite bitmaps **bottom-up**: bytes `[0..width_bytes]`
+/// are the *bottom* row of the displayed sprite, and the last
+/// `width_bytes` bytes are the *top* row. This matches the `FASTLAY`
+/// blitter in `HIRES.S` (around line 421), which seeds `X` from `YCO`
+/// (the lowest visible scan-line of the sprite) and advances `IMAGE`
+/// forward in lockstep with `dex` — so the first byte of the bitmap
+/// corresponds to the lowest screen row. The "left-right, top-bottom"
+/// comment near `HIRES.S:186` describes the draw order on screen
+/// (which is bottom-up here), not in-memory order.
+///
+/// `render_linear` flips during read so callers always get a frame
+/// with row 0 = the visual top of the sprite.
 ///
 /// # Errors
 ///
@@ -190,7 +204,10 @@ pub fn render_linear(bytes: &[u8], width_bytes: u8, height: u8, mode: RenderMode
     let w_pixels = w_bytes * 7;
     let mut pixels = vec![0u8; w_pixels * h * 4];
     for y in 0..h {
-        let row = &bytes[y * w_bytes..(y + 1) * w_bytes];
+        // POP sprites are stored bottom-up; flip so row 0 of the output
+        // frame is the visual top of the sprite.
+        let src_y = h - 1 - y;
+        let row = &bytes[src_y * w_bytes..(src_y + 1) * w_bytes];
         let out_row = &mut pixels[y * w_pixels * 4..(y + 1) * w_pixels * 4];
         match mode {
             RenderMode::Monochrome => render_row_mono(row, out_row),
@@ -271,6 +288,38 @@ mod tests {
 
     const TEST_WHITE: [u8; 4] = [0xff, 0xff, 0xff, 0xff];
     const TEST_BLACK: [u8; 4] = [0x00, 0x00, 0x00, 0xff];
+
+    #[test]
+    fn render_linear_flips_rows_bottom_up_to_top_down() {
+        // POP sprite memory layout: bytes [0..width_bytes] = visual
+        // bottom row, last `width_bytes` = visual top row. After
+        // render_linear, the output frame must have row 0 = visual top.
+        //
+        // 1-byte-wide, 2-line sprite: lit bottom row, dark top row in
+        // memory. Output frame row 0 should be black, row 1 should be
+        // white (lit).
+        let bytes = [
+            0x7f, // memory row 0 = visual bottom: all 7 pixels lit
+            0x00, // memory row 1 = visual top:    all 7 pixels dark
+        ];
+        let frame = render_linear(&bytes, 1, 2, RenderMode::Monochrome).unwrap();
+        assert_eq!(frame.width, 7);
+        assert_eq!(frame.height, 2);
+        // Output row 0 = top of display = memory row 1 (dark).
+        for x in 0..7 {
+            assert_eq!(frame.pixel(x, 0).unwrap(), TEST_BLACK, "top row x={x}");
+        }
+        // Output row 1 = bottom of display = memory row 0 (lit).
+        for x in 0..7 {
+            assert_eq!(frame.pixel(x, 1).unwrap(), TEST_WHITE, "bottom row x={x}");
+        }
+    }
+
+    #[test]
+    fn render_linear_rejects_size_mismatch() {
+        // 2-byte-wide, 3-line sprite needs 6 bytes; pass 5.
+        assert!(render_linear(&[0u8; 5], 2, 3, RenderMode::Monochrome).is_none());
+    }
 
     #[test]
     fn row_interleave_is_bijective_over_192_rows() {
