@@ -382,6 +382,8 @@ struct EditorApp {
     show_labels: bool,
     /// Toggle for the per-room ID badge overlay.
     show_room_ids: bool,
+    /// Toggle for the per-cell `(col,row)` coordinate overlay.
+    show_coords: bool,
     /// Toggle for the real-sprite render. Falls back to schematic
     /// colored rects when off, or when sprite loading failed.
     show_sprites: bool,
@@ -434,6 +436,7 @@ impl EditorApp {
             zoom: 1.0,
             show_labels: false,
             show_room_ids: true,
+            show_coords: false,
             show_sprites: true,
             ntsc_mode: true,
             hover: None,
@@ -694,6 +697,7 @@ impl EditorApp {
             }
             ui.checkbox(&mut self.show_labels, "tile labels");
             ui.checkbox(&mut self.show_room_ids, "room IDs");
+            ui.checkbox(&mut self.show_coords, "cell coords");
             ui.separator();
             if ui.button("Fit view").clicked() {
                 self.pending_fit = true;
@@ -766,7 +770,10 @@ impl EditorApp {
             ui.label(format!("status: {}", self.state.status));
             ui.separator();
             if let Some((room, col, row)) = self.hover {
-                ui.label(format!("hover: room {room} tile ({col}, {row})"));
+                let block = u16::from(row) * ROOM_WIDTH as u16 + u16::from(col);
+                ui.label(format!(
+                    "hover: room {room} tile ({col}, {row}) block {block}"
+                ));
             } else {
                 ui.label("hover: —");
             }
@@ -891,6 +898,9 @@ impl EditorApp {
                 egui::FontId::monospace((12.0 * self.zoom).clamp(8.0, 16.0)),
                 Color32::from_rgb(255, 230, 120),
             );
+        }
+        if self.show_coords {
+            draw_cell_coords(painter, panel_rect.min, self.pan, tile_w, tile_h, rx, ry);
         }
         if snapshot.prince.screen == room_id {
             if let Some((col, row)) = snapshot.prince.col_row() {
@@ -1079,6 +1089,49 @@ fn draw_tile_labels(
                 tile.kind.short_name(),
                 egui::FontId::monospace(font_px),
                 Color32::from_rgb(240, 240, 250),
+            );
+        }
+    }
+}
+
+/// Overlay each cell's `(col,row)` coordinate in its bottom-right
+/// corner. Pairs with the `R{id}` room badge and the selected level
+/// name so a glitch can be pinned to an exact level + room + cell.
+#[allow(clippy::too_many_arguments, clippy::cast_precision_loss)]
+fn draw_cell_coords(
+    painter: &egui::Painter,
+    panel_origin: Pos2,
+    pan: Vec2,
+    tile_w: f32,
+    tile_h: f32,
+    room_x_tiles: i32,
+    room_top_tiles: i32,
+) {
+    // Coordinates are unreadable on tiny tiles — skip when zoomed out.
+    if tile_w < 22.0 {
+        return;
+    }
+    let font_px = (tile_h * 0.16).clamp(7.0, 12.0);
+    for row in 0..ROOM_HEIGHT {
+        for col in 0..ROOM_WIDTH {
+            // Anchor at the cell's bottom-right so the badge never
+            // collides with the top-left tile-name label.
+            let x = panel_origin.x + pan.x + (room_x_tiles as f32 + col as f32 + 1.0) * tile_w - 2.0;
+            let y =
+                panel_origin.y + pan.y + (room_top_tiles as f32 + row as f32 + 1.0) * tile_h - 1.0;
+            let text = format!("{col},{row}");
+            let text_size = Vec2::new(font_px * text.len() as f32 * 0.6, font_px + 2.0);
+            let bg_rect =
+                Rect::from_min_size(Pos2::new(x - text_size.x - 2.0, y - text_size.y - 1.0), {
+                    text_size + Vec2::new(4.0, 2.0)
+                });
+            painter.rect_filled(bg_rect, 1.0, Color32::from_black_alpha(150));
+            painter.text(
+                Pos2::new(x, y),
+                egui::Align2::RIGHT_BOTTOM,
+                text,
+                egui::FontId::monospace(font_px),
+                Color32::from_rgb(120, 220, 240),
             );
         }
     }
