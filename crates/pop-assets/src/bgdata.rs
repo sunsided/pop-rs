@@ -317,16 +317,20 @@ pub enum PieceRef {
 }
 
 impl PieceRef {
-    /// Decode a raw sprite-ID byte. Returns `None` for ID 0 (no piece).
+    /// Decode a raw sprite-ID byte. Returns `None` for IDs whose
+    /// 7-bit index is `0` — that's the "no piece" sentinel used
+    /// throughout `BGDATA.S`, in either table half (`0x00` and
+    /// `0x80`).
     #[must_use]
     pub const fn resolve(id: u8) -> Option<Self> {
-        if id == 0 {
+        let index = id & 0x7F;
+        if index == 0 {
             return None;
         }
         if id & 0x80 == 0 {
-            Some(Self::Table1(id - 1))
+            Some(Self::Table1(index - 1))
         } else {
-            Some(Self::Table2((id & 0x7F) - 1))
+            Some(Self::Table2(index - 1))
         }
     }
 }
@@ -361,6 +365,10 @@ mod tests {
         // Bit 7 set → table 2.
         assert_eq!(PieceRef::resolve(0x80 | 1), Some(PieceRef::Table2(0)));
         assert_eq!(PieceRef::resolve(0xa7), Some(PieceRef::Table2(0x26)));
+        // `0x80` is bit-7-set with a zero 7-bit index — treat as
+        // "no piece", same as raw `0`. Pre-fix this underflowed
+        // `(id & 0x7F) - 1` in debug builds.
+        assert_eq!(PieceRef::resolve(0x80), None);
     }
 
     #[test]

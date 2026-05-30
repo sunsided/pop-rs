@@ -119,6 +119,17 @@ fn pick_dir() -> Option<PathBuf> {
         .pick_folder()
 }
 
+/// Extract the level number from a `…/LEVEL{n}` path, e.g.
+/// `Levels/LEVEL4` → `Some(4)`. Used to look up the per-level
+/// biome via [`Biome::for_level`] — the file's numeric suffix is the
+/// stable identifier, not the row's position in [`EditorState::level_paths`],
+/// which is a filtered list that skips any missing files.
+fn level_number_from_path(path: &std::path::Path) -> Option<usize> {
+    let name = path.file_name()?.to_str()?;
+    let digits = name.strip_prefix("LEVEL")?;
+    digits.parse().ok()
+}
+
 // ---------------------------------------------------------------------------
 // State (no egui types — pure projection target for the UI).
 // ---------------------------------------------------------------------------
@@ -397,8 +408,25 @@ impl EditorApp {
             self.render_status = "no data root".into();
             return;
         };
-        let Some(biome) = Biome::for_level(level_idx) else {
-            self.render_status = format!("level index {level_idx} has no biome mapping");
+        // `level_idx` is a position in the filtered `level_paths`
+        // vector, not the LEVEL{n} number. With an incomplete data
+        // root (e.g. only `LEVEL4` present) those numbers diverge, so
+        // we recover the real level number from the file name before
+        // looking up its biome.
+        let Some(level_path) = self.state.level_paths.get(level_idx) else {
+            self.render_status = format!("level index {level_idx} out of range");
+            return;
+        };
+        let Some(level_number) = level_number_from_path(level_path) else {
+            self.render_status = format!(
+                "can't parse level number from {}",
+                level_path.display()
+            );
+            return;
+        };
+        let Some(biome) = Biome::for_level(level_number) else {
+            self.render_status =
+                format!("LEVEL{level_number} has no biome mapping");
             return;
         };
         let tables = match self.biome_cache.get(&biome) {
@@ -1008,6 +1036,52 @@ mod tests {
 
     fn vendor_root() -> PathBuf {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vendor/pop-apple2/04 Support")
+    }
+
+    #[test]
+    fn level_number_from_path_handles_filenames() {
+        use std::path::Path;
+        assert_eq!(
+            level_number_from_path(Path::new("/tmp/Levels/LEVEL0")),
+            Some(0)
+        );
+        assert_eq!(
+            level_number_from_path(Path::new("Levels/LEVEL14")),
+            Some(14)
+        );
+        // Stable against full-paths with spaces (POP data roots often
+        // ship inside directories with spaces in the name).
+        assert_eq!(
+            level_number_from_path(Path::new("/data/04 Support/Levels/LEVEL7")),
+            Some(7)
+        );
+        // Bad inputs return None — the caller surfaces the error
+        // rather than picking the wrong biome.
+        assert_eq!(level_number_from_path(Path::new("/tmp/Levels")), None);
+        assert_eq!(
+            level_number_from_path(Path::new("/tmp/Levels/INFO")),
+            None
+        );
+        assert_eq!(
+            level_number_from_path(Path::new("/tmp/Levels/LEVELx")),
+            None
+        );
+    }
+
+    #[test]
+    fn biome_lookup_uses_filename_not_vector_index() {
+        // Regression: pre-fix the editor took the row index in
+        // `level_paths` and passed it straight to `Biome::for_level`,
+        // which gave the wrong biome on incomplete data roots (e.g.
+        // a root that only ships `LEVEL4` would render it with
+        // `Dungeon` sprites instead of `Palace`). Spot-check the
+        // helper that drives the new code path.
+        use pop_assets::bgdata::Biome;
+        for n in 0usize..=14 {
+            let path = PathBuf::from(format!("/tmp/Levels/LEVEL{n}"));
+            let parsed = level_number_from_path(&path).expect("parses");
+            assert_eq!(Biome::for_level(parsed), Biome::for_level(n));
+        }
     }
 
     fn level_n(n: u8) -> Level {
