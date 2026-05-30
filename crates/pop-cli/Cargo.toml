@@ -19,8 +19,18 @@ path = "src/main.rs"
 [lints]
 workspace = true
 
+[features]
+# `pop editor` — egui level browser. Optional because the eframe / rfd
+# trees are large and pull in native windowing system libs that aren't
+# wanted for headless / CI builds. Requires a newer Rust than the
+# default-feature build (eframe's MSRV moves faster than ours).
+editor = ["dep:eframe", "dep:rfd"]
+
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 png = "0.17"
 pop-assets = { path = "../pop-assets" }
+
+eframe = { version = "0.29", optional = true, default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+rfd = { version = "0.15", optional = true }
