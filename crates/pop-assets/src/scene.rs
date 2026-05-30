@@ -61,10 +61,10 @@
 use crate::bgdata::{
     Biome, PieceRef, BLOCK_B, BLOCK_BOT_ROW, BLOCK_C, BLOCK_D, BLOCK_FR, B_STRIPE,
     CELL_WIDTH_BYTES, DOOR, DOOR_MASK, D_HEIGHT, FLOOR_B, FLOOR_B_Y, FRONT_I, FRONT_X, FRONT_Y,
-    GATE_8C, GATE_B1, GATE_BOT_ORA, GATE_C_MASK, LOOSE_A, LOOSE_B, LOOSE_B_Y, LOOSE_D, MASK_A,
-    MASK_B, PANEL_B, PANEL_B0_SENTINEL, PANEL_C, PANEL_C0_SENTINEL, PIECE_A, PIECE_A_Y, PIECE_B,
-    PIECE_B_Y, PIECE_C, PIECE_D, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES, SPACE_B, SPACE_B_Y, STAIRS,
-    TOP_REPAIR, TORCH_FLAME,
+    GATE_8B, GATE_8C, GATE_B1, GATE_BOT_ORA, GATE_C_MASK, LOOSE_A, LOOSE_B, LOOSE_B_Y, LOOSE_D,
+    MASK_A, MASK_B, PANEL_B, PANEL_B0_SENTINEL, PANEL_C, PANEL_C0_SENTINEL, PIECE_A, PIECE_A_Y,
+    PIECE_B, PIECE_B_Y, PIECE_C, PIECE_D, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES, SPACE_B, SPACE_B_Y,
+    STAIRS, TOP_REPAIR, TORCH_FLAME,
 };
 use crate::draz::image_table::{self, Image, ImageTable};
 use crate::hires::{self, Frame, RenderMode};
@@ -405,6 +405,53 @@ fn c_section_visible(me: TileKind) -> bool {
     )
 }
 
+/// Clamp a block-tile state byte to `0..2` (`numblox`). Matches the
+/// `cpy #numblox bcc :1 ldy #0` clamp branches in
+/// `FRAMEADV.S:1048` / `1118` / `:block` cases — out-of-range states
+/// fall back to variant 0, **not** wrap-around.
+fn block_variant(state: u8) -> usize {
+    if usize::from(state) < BLOCK_B.len() {
+        usize::from(state)
+    } else {
+        0
+    }
+}
+
+/// Resolve a panel-tile state byte to a 0..`numpans` index. Returns
+/// `None` for out-of-range — the original engine `bcs ]rts` in
+/// `FRAMEADV.S:1041` skips the panel branch entirely rather than
+/// clamping (so weird state bytes don't paint a stray default).
+fn panel_index(state: u8) -> Option<usize> {
+    let v = usize::from(state);
+    if v < PANEL_B.len() {
+        Some(v)
+    } else {
+        None
+    }
+}
+
+/// Resolve a `space`-back-wall state byte. Skips out-of-range per
+/// `FRAMEADV.S:1067 cpy #numbpans+1 bcs ]rts`.
+fn space_index(state: u8) -> Option<usize> {
+    let v = usize::from(state);
+    if v < SPACE_B.len() {
+        Some(v)
+    } else {
+        None
+    }
+}
+
+/// Resolve a `floor`-back-wall state byte. Clamps to 0 per
+/// `FRAMEADV.S:1056 cpy #numbpans+1 bcc :3 ldy #0`.
+fn floor_index(state: u8) -> usize {
+    let v = usize::from(state);
+    if v < FLOOR_B.len() {
+        v
+    } else {
+        0
+    }
+}
+
 /// Returns `true` if the left tile's B-section "intrudes" into this
 /// cell and we need to AND a mask before OR'ing the A-piece
 /// (FRAMEADV.S:1134-1153).
@@ -488,35 +535,40 @@ fn draw_b(
     canvas: &mut Canvas,
     bg: &BiomeTables,
     left: Tile,
-    below_left: Tile,
+    _below_left: Tile,
     blockxco: i32,
     ay: i32,
     dy: i32,
     biome: Biome,
 ) {
-    // Block solid hides B-section (FRAMEADV.S:998-1000).
+    // Block solid hides B-section (FRAMEADV.S:998-1000). State byte
+    // (BLUESPEC, exposed as `Tile::modifier`) selects between two
+    // block-B variants; FRAMEADV's `:block` branch clamps an
+    // out-of-range state to 0 rather than skipping (FRAMEADV.S:1048).
     if left.kind == TileKind::Block {
-        // Variant-aware B-piece for solid blocks.
-        let variant = usize::from(left.variant) % BLOCK_B.len();
-        if let Some(piece) = bg.resolve(BLOCK_B[variant]) {
+        let v = block_variant(left.modifier);
+        if let Some(piece) = bg.resolve(BLOCK_B[v]) {
             let y = ay + i32::from(PIECE_B_Y[TileKind::Block as usize]);
             canvas.blit(piece, blockxco, y, Opacity::Or);
         }
-        // No bstripe over solid blocks.
         return;
     }
     // Back-wall variants for space / floor (FRAMEADV.S:1055-1072).
+    // Both branches key off `spreced` — the LEFT-neighbour's state
+    // byte — not the cell-below-left's. Space SKIPS on out-of-range,
+    // floor CLAMPS to 0; we mirror both exactly.
     match left.kind {
         TileKind::Empty => {
-            let v = usize::from(below_left.variant) % SPACE_B.len();
-            if let Some(piece) = bg.resolve(SPACE_B[v]) {
-                let y = ay + i32::from(SPACE_B_Y[v]);
-                canvas.blit(piece, blockxco, y, Opacity::Or);
+            if let Some(v) = space_index(left.modifier) {
+                if let Some(piece) = bg.resolve(SPACE_B[v]) {
+                    let y = ay + i32::from(SPACE_B_Y[v]);
+                    canvas.blit(piece, blockxco, y, Opacity::Or);
+                }
             }
             return;
         }
         TileKind::Floor => {
-            let v = usize::from(below_left.variant) % FLOOR_B.len();
+            let v = floor_index(left.modifier);
             if let Some(piece) = bg.resolve(FLOOR_B[v]) {
                 let y = ay + i32::from(FLOOR_B_Y[v]);
                 canvas.blit(piece, blockxco, y, Opacity::Or);
@@ -527,10 +579,13 @@ fn draw_b(
     }
     let raw_b = PIECE_B[left.kind as usize];
     if raw_b == PANEL_B0_SENTINEL {
-        let v = usize::from(left.variant) % PANEL_B.len();
-        if let Some(piece) = bg.resolve(PANEL_B[v]) {
-            let y = ay + i32::from(PIECE_B_Y[left.kind as usize]);
-            canvas.blit(piece, blockxco, y, Opacity::Or);
+        // Panel branch SKIPS for out-of-range state (FRAMEADV.S:1041
+        // `cpy #numpans bcs ]rts`).
+        if let Some(v) = panel_index(left.modifier) {
+            if let Some(piece) = bg.resolve(PANEL_B[v]) {
+                let y = ay + i32::from(PIECE_B_Y[left.kind as usize]);
+                canvas.blit(piece, blockxco, y, Opacity::Or);
+            }
         }
     } else if let Some(piece) = bg.resolve(raw_b) {
         let y = ay + i32::from(PIECE_B_Y[left.kind as usize]);
@@ -549,11 +604,19 @@ fn draw_b(
     let _ = dy;
 }
 
-/// `drawc` from `FRAMEADV.S:906` — OR's the below-left's C-piece into
-/// the current cell (if `me` is "see-through"), then AND's the
-/// left-neighbour's `MASK_B` over the D-strip area. The mask runs
-/// here, BEFORE `draw_b` fires, so `pieceb` from `draw_b` cleanly
-/// fills the carved area.
+/// `drawc` from `FRAMEADV.S:906` — when `me` is "see-through" (the
+/// C-section behind it is visible), OR the below-left's C-piece into
+/// the current cell and AND the left-neighbour's `MASK_B` over the
+/// D-strip area to carve room for the left's `pieceb` overflow.
+///
+/// Both the C-piece draw AND the mask are gated on `c_section_visible`
+/// — the original engine returns at `bcc ]rts` (FRAMEADV.S:908) before
+/// `domaskb` runs when `checkc` says the C-section is hidden, because
+/// the current tile's own `pieced` (drawn later with `Sta` opacity)
+/// would otherwise overwrite the carved area, AND the mask is tall
+/// enough to bleed *above* the floor strip into the A-section where
+/// the overdraw never restores it — that bled-out area is what showed
+/// up as a black rectangle to the left of solid-floor neighbours.
 fn draw_c(
     canvas: &mut Canvas,
     bg: &BiomeTables,
@@ -563,10 +626,10 @@ fn draw_c(
     dy: i32,
     left: TileKind,
 ) {
-    if c_section_visible(me) {
-        draw_c_piece(canvas, bg, below_left, blockxco, dy);
+    if !c_section_visible(me) {
+        return;
     }
-    // domaskb (FRAMEADV.S:980) runs unconditionally at end of drawc.
+    draw_c_piece(canvas, bg, below_left, blockxco, dy);
     if let Some(mask) = bg.resolve(MASK_B[left as usize]) {
         canvas.blit(mask, blockxco, dy, Opacity::And);
     }
@@ -574,7 +637,7 @@ fn draw_c(
 
 fn draw_c_piece(canvas: &mut Canvas, bg: &BiomeTables, below_left: Tile, blockxco: i32, dy: i32) {
     if below_left.kind == TileKind::Block {
-        let v = usize::from(below_left.variant) % BLOCK_C.len();
+        let v = block_variant(below_left.modifier);
         if let Some(piece) = bg.resolve(BLOCK_C[v]) {
             canvas.blit(piece, blockxco, dy, Opacity::Or);
         }
@@ -582,9 +645,10 @@ fn draw_c_piece(canvas: &mut Canvas, bg: &BiomeTables, below_left: Tile, blockxc
     }
     let raw_c = PIECE_C[below_left.kind as usize];
     if raw_c == PANEL_C0_SENTINEL {
-        let v = usize::from(below_left.variant) % PANEL_C.len();
-        if let Some(piece) = bg.resolve(PANEL_C[v]) {
-            canvas.blit(piece, blockxco, dy, Opacity::Or);
+        if let Some(v) = panel_index(below_left.modifier) {
+            if let Some(piece) = bg.resolve(PANEL_C[v]) {
+                canvas.blit(piece, blockxco, dy, Opacity::Or);
+            }
         }
     } else if let Some(piece) = bg.resolve(raw_c) {
         canvas.blit(piece, blockxco, dy, Opacity::Or);
@@ -598,7 +662,7 @@ fn draw_d(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, dy: i3
         Opacity::Sta
     };
     if me.kind == TileKind::Block {
-        let v = usize::from(me.variant) % BLOCK_D.len();
+        let v = block_variant(me.modifier);
         if let Some(piece) = bg.resolve(BLOCK_D[v]) {
             canvas.blit(piece, blockxco, dy, opacity);
         }
@@ -704,7 +768,11 @@ fn draw_mc(
 /// Stacks `GATE_B1` 8-pixel grill pieces from `gatebot − 12`
 /// upward by 8 pixels each, stopping when the next piece's top
 /// would rise above `blockthr = Ay − 59`. With state=0 this fits
-/// five middle pieces between the bottom strip and the cell top.
+/// six middle pieces between the bottom strip and a variable-height
+/// `GATE_8B[height − 1]` top piece that fills the leftover space —
+/// matching the `:done` tail of `FRAMEADV.S:drawgateb` (without that
+/// top piece the rendered gate had a black horizontal gap at the top
+/// edge inside the bars).
 fn draw_gate_bars(canvas: &mut Canvas, bg: &BiomeTables, blockxco: i32, ay: i32) {
     let gate_bot = ay - 1;
     // Bottom strip: `gatebotORA` at gatebot − 2.
@@ -713,12 +781,27 @@ fn draw_gate_bars(canvas: &mut Canvas, bg: &BiomeTables, blockxco: i32, ay: i32)
     }
     // Middle grill pieces.
     let blockthr = ay - 59;
+    let middle = bg.resolve(GATE_B1);
     let mut y = gate_bot - 12;
     while y - 7 >= blockthr && y >= 0 {
-        if let Some(piece) = bg.resolve(GATE_B1) {
+        if let Some(piece) = middle {
             canvas.blit(piece, blockxco, y, Opacity::Sta);
         }
         y -= 8;
+    }
+    // Variable-height top piece (`FRAMEADV.S:1889-1907`):
+    //   desired_height = YCO − blockthr + 1, in 1..=8
+    //   sprite        = GATE_8B[desired_height − 1]
+    // `y` here is the YCO that *failed* the loop's `y-7 >= blockthr`
+    // test, so it's the right starting point for the top piece.
+    if y >= 0 {
+        let desired_height = y - blockthr + 1;
+        if (1..=8).contains(&desired_height) {
+            let idx = usize::try_from(desired_height - 1).unwrap_or(0);
+            if let Some(piece) = bg.resolve(GATE_8B[idx]) {
+                canvas.blit(piece, blockxco, y, Opacity::Sta);
+            }
+        }
     }
 }
 
@@ -779,7 +862,7 @@ fn draw_exit_door(
 
 fn draw_front(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i32) {
     if me.kind == TileKind::Block {
-        let v = usize::from(me.variant) % BLOCK_FR.len();
+        let v = block_variant(me.modifier);
         if let Some(piece) = bg.resolve(BLOCK_FR[v]) {
             // Block front: Y offset is 0 per BGDATA (FRONT_Y[block]=0).
             canvas.blit(piece, blockxco, ay, Opacity::Sta);
