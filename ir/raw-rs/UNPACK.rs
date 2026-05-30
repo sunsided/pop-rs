@@ -1131,7 +1131,7 @@ impl Cpu {
         loop {
             self.set_x(self.reg.x.wrapping_sub(1));
             self.set_x(self.reg.x.wrapping_sub(1));
-            // raw: ??? stlx $E1            ; UNPACK.S:705
+            // 65816 (IIgs-only, not modeled): stlx $E1  ; UNPACK.S:705
             if self.flags.z {
                 break;
             }

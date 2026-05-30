@@ -554,7 +554,7 @@ FADEIN:
 :scbclr:
   x -= 1                         ; UNPACK.S:703
   x -= 1                         ; UNPACK.S:704
-  ??? stlx $E1            ; UNPACK.S:705
+  stlx $E1            ; 65816/IIgs op (not modeled) — UNPACK.S:705
   if ne goto :scbclr       ; UNPACK.S:706
   x = #0x00                  ; UNPACK.S:710
   y = #0x00                  ; UNPACK.S:711
@@ -594,7 +594,7 @@ fn FADEIN {
 :scbclr:
   x -= 1                         ; UNPACK.S:703
   x -= 1                         ; UNPACK.S:704
-  ??? stlx $E1            ; UNPACK.S:705
+  stlx $E1            ; 65816/IIgs op (not modeled) — UNPACK.S:705
   if ne goto :scbclr       ; UNPACK.S:706
   x = #0x00                  ; UNPACK.S:710
   y = #0x00                  ; UNPACK.S:711

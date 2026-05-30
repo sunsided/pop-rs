@@ -1500,7 +1500,7 @@ fn VBLI {
   c = 1                            ; GRAFIX.S:1976
   *vblflag@0x01fa ror>= 1                 ; GRAFIX.S:1977
 :notvbl:
-  ??? rti             ; GRAFIX.S:1978
+  return                           ; GRAFIX.S:1978
 }
 
 fn InitVBLANK {
