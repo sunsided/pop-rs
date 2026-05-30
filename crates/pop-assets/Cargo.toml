@@ -1,0 +1,18 @@
+# Asset extraction for Prince of Persia (Apple II): file-format readers
+# for the bundled game data and any future on-disk resources. Pure
+# library — no UI, no host I/O beyond `std::fs`. Designed to be reused
+# by both runtime paths in the umbrella plan (#79).
+[package]
+name = "pop-assets"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "POP (Apple II) asset readers: level binaries, disk images, sprite data."
+
+[lints]
+workspace = true
+
+[dependencies]
+thiserror = "1"
