@@ -2,7 +2,7 @@
 //!
 //! Subcommand tree:
 //!
-//! - [`info`] — identify and dump a level file's structure.
+//! - `info` — identify and dump a level file's structure.
 //!
 //! Future subcommands (`editor`, `play`, …) land behind their own
 //! Cargo features so headless / CI builds stay light.

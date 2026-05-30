@@ -52,9 +52,21 @@ pub fn bundled_level_path(n: u8) -> Option<PathBuf> {
 
 /// All bundled level paths in numerical order, skipping any that don't
 /// exist on disk.
+///
+/// Resolves the bundled directory exactly once (rather than per index)
+/// — calling [`bundled_level_path`] in a loop would re-run the env-var
+/// lookup and `.is_dir()` probe for every level.
 #[must_use]
 pub fn bundled_level_paths() -> Vec<PathBuf> {
-    (0..BUNDLED_LEVEL_COUNT).filter_map(bundled_level_path).collect()
+    let Some(dir) = bundled_levels_dir() else {
+        return Vec::new();
+    };
+    (0..BUNDLED_LEVEL_COUNT)
+        .filter_map(|n| {
+            let p = dir.join(format!("LEVEL{n}"));
+            p.is_file().then_some(p)
+        })
+        .collect()
 }
 
 /// A `Levels` directory is considered valid when it exists and contains
