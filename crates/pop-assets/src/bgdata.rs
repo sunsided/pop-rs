@@ -178,6 +178,51 @@ pub const LOOSE_D: [u8; 11] = [
 pub const LOOSE_B: u8 = 0x1b;
 
 // ---------------------------------------------------------------------------
+// Spike animation frames (`BGDATA.S:118-122`).
+// ---------------------------------------------------------------------------
+
+/// Per-frame A-piece for the spike trap, drawn by `drawspikea`
+/// (`FRAMEADV.S:1453`) at `Ay − 1` with `ora` opacity. Frame 0 (and
+/// the wrap-around frame 9) are `0x00` — fully retracted, nothing
+/// protrudes — so an at-rest spike reads as plain floor.
+pub const SPIKE_A: [u8; 10] = [0x00, 0x22, 0x24, 0x26, 0x28, 0x2a, 0x28, 0x24, 0x22, 0x00];
+/// Per-frame B-piece (`drawspikeb`, `FRAMEADV.S:1473`), drawn into the
+/// cell to the right based on the left-neighbour's state.
+pub const SPIKE_B: [u8; 10] = [0x00, 0x23, 0x25, 0x27, 0x29, 0x2b, 0x29, 0x25, 0x23, 0x00];
+/// Frame index used when the state byte has bit 7 set ("extended").
+pub const SPIKE_EXT: usize = 5;
+/// Fully-retracted frame index (`must match MOVEDATA`).
+pub const SPIKE_RET: usize = 9;
+
+// ---------------------------------------------------------------------------
+// Slicer (chomper) animation frames (`BGDATA.S:128-137`).
+// ---------------------------------------------------------------------------
+
+/// Sequence table mapping a clamped state (`0..=slicerRet`) to a
+/// **1-based** frame number; `drawslicera` does `tax; dex` to turn it
+/// into a 0-based index into the `SLICER_*` piece tables. At rest
+/// (state 0 or `SLICER_RET`) the value is `0x04` → index 3.
+pub const SLICER_SEQ: [u8; 7] = [0x04, 0x03, 0x01, 0x02, 0x05, 0x04, 0x04];
+/// Frame index for the fully-extended (cutting) pose.
+pub const SLICER_EXT: usize = 2;
+/// State value clamped to when the slicer is fully retracted
+/// (`must match MOVEDATA`).
+pub const SLICER_RET: usize = 6;
+/// Top piece (above the floor line, at `Ay − SLICER_GAP[i]`); `0x00`
+/// means "no top piece this frame".
+pub const SLICER_TOP: [u8; 5] = [0x00, 0x58, 0x5a, 0x5c, 0x5e];
+/// Bottom piece, drawn at `Ay` with `ora`.
+pub const SLICER_BOT: [u8; 5] = [0x57, 0x59, 0x5b, 0x5d, 0x5f];
+/// "Smeared" bottom piece, used instead of [`SLICER_BOT`] when the
+/// state byte has bit 7 set (and the smeared entry is non-zero).
+pub const SLICER_BOT2: [u8; 5] = [0x8e, 0x8f, 0x90, 0x5d, 0x5f];
+/// Per-frame vertical gap (pixels) subtracted from `Ay` to position
+/// [`SLICER_TOP`].
+pub const SLICER_GAP: [u8; 5] = [0x00, 0x38, 0x46, 0x53, 0x55];
+/// Front-plane piece (`drawslicerf`, `FRAMEADV.S:1590`).
+pub const SLICER_FRNT: [u8; 5] = [0x65, 0x66, 0x67, 0x68, 0x69];
+
+// ---------------------------------------------------------------------------
 // Torch flame frames (`GAMEBG.S:147`).
 // ---------------------------------------------------------------------------
 

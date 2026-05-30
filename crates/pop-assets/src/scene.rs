@@ -28,9 +28,11 @@
 //! * At-rest "movable" pieces: torch flame (`drawtorchb`), loose-floor
 //!   B-edge (`drawlooseb`), closed-gate vertical bars (`drawgateb`),
 //!   gate top piece into the cell above (`drawgatec` via `draw_mc`),
-//!   and the exit-door stack + stairs + top-repair (`drawexitb`). The
-//!   stairs piece is suppressed in the prince's start room, matching
-//!   the `cmp KidStartScrn beq :nostairs` branch in `FRAMEADV.S:1635`.
+//!   the exit-door stack + stairs + top-repair (`drawexitb`), and the
+//!   slicer's retracted mechanism + front face (`drawslicera` /
+//!   `drawslicerf` via `draw_ma` / `draw_front`). The stairs piece is
+//!   suppressed in the prince's start room, matching the
+//!   `cmp KidStartScrn beq :nostairs` branch in `FRAMEADV.S:1635`.
 //! * Loose-floor visual fix: `LOOSE_A[0]` + `LOOSE_D[0]` substituted
 //!   for the empty `PIECE_A` / `PIECE_D` so the editor doesn't show
 //!   blank cells where breakable tiles live.
@@ -40,8 +42,12 @@
 //! All animated / state-sensitive specials punted to a follow-up PR:
 //!
 //! * Loose floor mid-fall animation frames (`LOOSE_A[1..]`).
-//! * Spike / slicer animation frames (`drawma` / `drawspikea` /
-//!   `drawslicera`) — uses the BGDATA `PIECE_A[k]` at-rest value.
+//! * Spike / slicer *mid-animation* frames. The at-rest (retracted)
+//!   pose is now drawn (`draw_ma` ports `drawma → drawspikea /
+//!   drawslicera` at state 0); cycling through the extend/retract
+//!   sequence is still a follow-up.
+//! * Spike B-edge spillover into the right neighbour (`drawspikeb`) —
+//!   empty at rest, so a no-op today.
 //! * Gate bars at partial heights — gates always render fully closed.
 //! * Depressed press-plate state — uses the up-state piece.
 //! * Flask bubbles / sword gleam — uses the BGDATA piece.
@@ -63,8 +69,9 @@ use crate::bgdata::{
     CELL_WIDTH_BYTES, DOOR, DOOR_MASK, D_HEIGHT, FLOOR_B, FLOOR_B_Y, FRONT_I, FRONT_X, FRONT_Y,
     GATE_8B, GATE_8C, GATE_B1, GATE_BOT_ORA, GATE_C_MASK, LOOSE_A, LOOSE_B, LOOSE_B_Y, LOOSE_D,
     MASK_A, MASK_B, PANEL_B, PANEL_B0_SENTINEL, PANEL_C, PANEL_C0_SENTINEL, PIECE_A, PIECE_A_Y,
-    PIECE_B, PIECE_B_Y, PIECE_C, PIECE_D, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES, SPACE_B, SPACE_B_Y,
-    STAIRS, TOP_REPAIR, TORCH_FLAME,
+    PIECE_B, PIECE_B_Y, PIECE_C, PIECE_D, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES, SLICER_BOT,
+    SLICER_BOT2, SLICER_FRNT, SLICER_GAP, SLICER_RET, SLICER_SEQ, SLICER_TOP, SPACE_B, SPACE_B_Y,
+    SPIKE_A, SPIKE_EXT, STAIRS, TOP_REPAIR, TORCH_FLAME,
 };
 use crate::draz::image_table::{self, Image, ImageTable};
 use crate::hires::{self, Frame, RenderMode};
@@ -197,12 +204,10 @@ impl BiomeTables {
 /// Keep the list small — false positives on legitimate sub-cell-width
 /// sprites (DUN1's 21×12 `looseb`, palace decorative pieces, etc.)
 /// would just train users to ignore the diagnostic.
-const PROBED_SPRITES: &[(u8, &str)] = &[
-    (
-        LOOSE_B,
-        "`looseb` — `drawlooseb` spillover (FRAMEADV.S:1388)",
-    ),
-];
+const PROBED_SPRITES: &[(u8, &str)] = &[(
+    LOOSE_B,
+    "`looseb` — `drawlooseb` spillover (FRAMEADV.S:1388)",
+)];
 
 /// A BGTAB sprite is a "placeholder" iff it's a single byte AND that
 /// byte is `0x80` — the canonical `CLS` fill byte
@@ -433,9 +438,7 @@ impl Canvas {
         // regions — visible as the "triangular gaps" in the floor
         // strip alongside columns / arches.
         Self {
-            bytes: Box::new(
-                [0x80; (ROOM_WIDTH_BYTES as usize) * (ROOM_HEIGHT_PX as usize)],
-            ),
+            bytes: Box::new([0x80; (ROOM_WIDTH_BYTES as usize) * (ROOM_HEIGHT_PX as usize)]),
         }
     }
 
@@ -669,6 +672,7 @@ fn draw_block(
     draw_d(canvas, bg, me, blockxco, dy);
     draw_md(canvas, bg, me, blockxco, dy);
     draw_a(canvas, bg, me, left.kind, blockxco, ay);
+    draw_ma(canvas, bg, me, blockxco, ay);
     draw_front(canvas, bg, me, blockxco, ay);
 }
 
@@ -913,6 +917,83 @@ fn draw_mb(
 /// loose-floor frames.
 fn draw_md(_canvas: &mut Canvas, _bg: &BiomeTables, _me: Tile, _blockxco: i32, _dy: i32) {}
 
+/// Movable A-piece — `drawma` from `FRAMEADV.S:1214`, called right
+/// after the generic `draw_a`. Dispatches the animated trap tiles
+/// whose moving parts are *not* in the generic `PIECE_A` table:
+/// spikes (`drawspikea`) and the slicer / chomper (`drawslicera`).
+///
+/// We render the at-rest pose (state byte 0). For spikes that frame is
+/// empty, so the cell reads as plain floor; for the slicer it's the
+/// retracted mechanism (top + bottom housing) that was previously
+/// missing — leaving slicer cells as bare floor with a visible gap.
+///
+/// `drawma`'s `flask` / `sword` cases are intentionally not ported:
+/// their at-rest visual already comes from the generic `PIECE_A` entry,
+/// matching the existing "uses the BGDATA piece" simplification.
+fn draw_ma(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i32) {
+    match me.kind {
+        TileKind::Spikes => draw_spike_a(canvas, bg, me, blockxco, ay),
+        TileKind::Slicer => draw_slicer_a(canvas, bg, me, blockxco, ay),
+        _ => {}
+    }
+}
+
+/// `drawspikea` (`FRAMEADV.S:1453`): `ldx state` → frame index (or
+/// [`SPIKE_EXT`] when bit 7 is set), then `spikea,x` OR'd at `Ay − 1`.
+/// Frame `0x00` entries draw nothing (retracted), so at rest this is a
+/// no-op over the generic floor base.
+fn draw_spike_a(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i32) {
+    let state = me.modifier;
+    let idx = if state & 0x80 != 0 {
+        SPIKE_EXT
+    } else {
+        usize::from(state & 0x7f)
+    };
+    let Some(&piece_id) = SPIKE_A.get(idx) else {
+        return;
+    };
+    if piece_id == 0 {
+        return;
+    }
+    if let Some(piece) = bg.resolve(piece_id) {
+        canvas.blit(piece, blockxco, ay - 1, Opacity::Or);
+    }
+}
+
+/// Resolve a slicer state byte to a 0-based index into the `SLICER_*`
+/// piece tables. Mirrors `drawslicera`'s `and #$7f` / clamp to
+/// [`SLICER_RET`] / `lda slicerseq,x` / `tax; dex`.
+fn slicer_seq_index(state: u8) -> usize {
+    let x = usize::from(state & 0x7f).min(SLICER_RET);
+    // `slicerseq` values are 1-based; the engine's `dex` makes them
+    // 0-based. All entries are >= 1, so the subtraction never wraps.
+    usize::from(SLICER_SEQ[x]).saturating_sub(1)
+}
+
+/// `drawslicera` (`FRAMEADV.S:1548`): bottom piece OR'd at `Ay`, then
+/// the top piece OR'd at `Ay − SLICER_GAP[i]`. The "smeared" bottom
+/// (state bit 7) falls back to the clean bottom when its entry is 0.
+fn draw_slicer_a(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i32) {
+    let idx = slicer_seq_index(me.modifier);
+    let bot_id = if me.modifier & 0x80 != 0 && SLICER_BOT2[idx] != 0 {
+        SLICER_BOT2[idx]
+    } else {
+        SLICER_BOT[idx]
+    };
+    if bot_id != 0 {
+        if let Some(piece) = bg.resolve(bot_id) {
+            canvas.blit(piece, blockxco, ay, Opacity::Or);
+        }
+    }
+    let top_id = SLICER_TOP[idx];
+    if top_id != 0 {
+        if let Some(piece) = bg.resolve(top_id) {
+            let y = ay - i32::from(SLICER_GAP[idx]);
+            canvas.blit(piece, blockxco, y, Opacity::Or);
+        }
+    }
+}
+
 /// Movable C-piece — fires only when CURRENT is a "see-through" kind
 /// (space / panelwof / pillartop) and the BELOW-LEFT neighbour is a
 /// gate. Mirrors `FRAMEADV.S:drawmc → drawgatec`: AND a fixed mask
@@ -1044,6 +1125,21 @@ fn draw_exit_door(
 }
 
 fn draw_front(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i32) {
+    // `drawfrnt` (`FRAMEADV.S:760`) jumps straight to `drawslicerf` for
+    // a slicer, bypassing the generic `FRONT_I` lookup. The front piece
+    // is `slicerfrnt[i]` at `Ay`. The engine draws it with `maddfore`
+    // (masked foreground add); we use `Or` rather than `Sta` so the
+    // front face composites onto the mechanism behind it without
+    // stamping a black bounding box.
+    if me.kind == TileKind::Slicer {
+        let id = SLICER_FRNT[slicer_seq_index(me.modifier)];
+        if id != 0 {
+            if let Some(piece) = bg.resolve(id) {
+                canvas.blit(piece, blockxco, ay, Opacity::Or);
+            }
+        }
+        return;
+    }
     if me.kind == TileKind::Block {
         let v = block_variant(me.modifier);
         if let Some(piece) = bg.resolve(BLOCK_FR[v]) {
@@ -1279,6 +1375,53 @@ mod tests {
         assert!(
             has_non_black(&frame, 140, 50, 168, 62),
             "loose-floor A-section should be visible above the D-strip"
+        );
+    }
+
+    #[test]
+    fn slicer_renders_mechanism_at_rest() {
+        // Regression: pre-fix slicer cells rendered as bare floor
+        // (PIECE_A[slicer] = 0 and `drawslicera` was not ported), so the
+        // chomper mechanism was invisible — the "missing triangular
+        // segment" the level browser showed. `draw_ma` now draws the
+        // retracted bottom/top housing and `draw_front` the front face.
+        let idx = ROOM_WIDTH + 5; // middle row, col 5
+        let mut tiles = [Tile::default(); ROOM_WIDTH * ROOM_HEIGHT];
+        tiles[idx] = Tile {
+            kind: TileKind::Slicer,
+            variant: 0,
+            modifier: 0,
+        };
+        let level = synth_level_with(tiles);
+        let tables = BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap();
+        let slicer = render_room(&level, 1, &tables, RenderMode::Monochrome).unwrap();
+
+        // Baseline: an all-empty room. The slicer's cell column must
+        // gain pixels *above* the floor D-strip (y < 125), which is
+        // exactly the region that was black pre-fix.
+        let empty = render_room(
+            &synth_level_with([Tile::default(); ROOM_WIDTH * ROOM_HEIGHT]),
+            1,
+            &tables,
+            RenderMode::Monochrome,
+        )
+        .unwrap();
+
+        let count_above_strip = |f: &Frame| -> usize {
+            let mut n = 0;
+            for y in 60..124u32 {
+                for x in 140..168u32 {
+                    let i = ((y * f.width + x) * 4) as usize;
+                    if f.pixels[i..i + 3] != [0, 0, 0] {
+                        n += 1;
+                    }
+                }
+            }
+            n
+        };
+        assert!(
+            count_above_strip(&slicer) > count_above_strip(&empty),
+            "slicer mechanism should add pixels above the floor strip"
         );
     }
 
