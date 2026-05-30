@@ -144,30 +144,46 @@ impl BiomeTables {
     pub fn load_diagnostics(&self) -> Vec<BiomeTablesIssue> {
         // The truncated assets in the vendored 3.5" rebuild are
         // distinguishable by a very specific fingerprint — sprites
-        // that became `1×1` (= 1 byte = `0x80`, the canonical
-        // CLS-fill byte) **placeholders**. Real BGTAB sprites are
-        // never that small in the 1989 build, even when narrower
-        // than a cell: DUN1's `looseb` is 21×12 (3 hires bytes wide,
-        // a deliberate sub-cell width) but very much a real sprite.
+        // that became `1×1 = 0x80` (the canonical CLS-fill byte)
+        // **placeholders**. Real BGTAB sprites are never that small
+        // in the 1989 build, even when narrower than a cell: DUN1's
+        // `looseb` is 21×12 (3 hires bytes wide, a deliberate
+        // sub-cell width) but very much a real sprite.
         //
         // We therefore probe known-used sprite ids and flag only
-        // genuine 1×1 placeholders. The set is intentionally narrow
-        // — if more cases surface, add them here with a citation to
-        // the engine reference.
+        // genuine 1×1 placeholders whose single byte is `0x80`. The
+        // byte check matters: a custom or hand-repaired BGTAB might
+        // legitimately have a 1×1 non-`0x80` sprite somewhere, and
+        // we shouldn't false-positive against that.
+        //
+        // The set is intentionally narrow — if more cases surface,
+        // add them here with a citation to the engine reference.
         let mut issues = Vec::new();
         for (sprite_id, role) in PROBED_SPRITES {
-            let idx = usize::from(*sprite_id - 1);
-            if let Some(img) = self.table1.images.get(idx) {
-                if is_placeholder(img) {
-                    issues.push(BiomeTablesIssue::TruncatedSprite {
-                        biome: self.biome,
-                        table: BgTable::One,
-                        sprite_id: *sprite_id,
-                        width_bytes: img.width_bytes,
-                        height: img.height,
-                        role,
-                    });
-                }
+            // Use `PieceRef::resolve` so the probe list can carry
+            // raw BGDATA sprite ids — bit 7 selects table 2 per
+            // `GRAFIX.S:828`. Today's only entry (`looseb = 0x1b`)
+            // resolves to table 1, but `front` / `archtop` etc.
+            // pieces with high IDs (`0xa7..=0xad`) live in table 2;
+            // resolve-via-ref keeps the door open without a future
+            // off-by-one rewrite.
+            let Some(piece_ref) = PieceRef::resolve(*sprite_id) else {
+                continue;
+            };
+            let (table, img) = match piece_ref {
+                PieceRef::Table1(i) => (BgTable::One, self.table1.images.get(usize::from(i))),
+                PieceRef::Table2(i) => (BgTable::Two, self.table2.images.get(usize::from(i))),
+            };
+            let Some(img) = img else { continue };
+            if is_placeholder(img) {
+                issues.push(BiomeTablesIssue::TruncatedSprite {
+                    biome: self.biome,
+                    table,
+                    sprite_id: *sprite_id,
+                    width_bytes: img.width_bytes,
+                    height: img.height,
+                    role,
+                });
             }
         }
         issues
@@ -188,11 +204,15 @@ const PROBED_SPRITES: &[(u8, &str)] = &[
     ),
 ];
 
-/// A BGTAB sprite is a "placeholder" iff it's a single byte. Real
-/// game sprites have meaningful width × height even when narrower
-/// than a cell.
+/// A BGTAB sprite is a "placeholder" iff it's a single byte AND that
+/// byte is `0x80` — the canonical `CLS` fill byte
+/// (`HIRES.S:213 lda #$80 ;black2`) that the truncated 3.5" rebuild
+/// stamped into stripped-sprite slots. Real game sprites have
+/// meaningful width × height even when narrower than a cell, and a
+/// hand-repaired BGTAB might legitimately carry a 1×1 non-`0x80`
+/// sprite — both stay clear of this predicate.
 fn is_placeholder(img: &Image) -> bool {
-    img.width_bytes == 1 && img.height == 1
+    img.width_bytes == 1 && img.height == 1 && img.bitmap.first() == Some(&0x80)
 }
 
 /// Which of a biome's two BGTAB image tables a diagnostic refers to.
@@ -1104,6 +1124,32 @@ mod tests {
                 role: "`looseb` — `drawlooseb` spillover (FRAMEADV.S:1388)",
             }],
         );
+    }
+
+    #[test]
+    fn is_placeholder_requires_dimensions_and_byte() {
+        // The fingerprint is 1×1 AND byte=0x80. A 1×1 sprite with a
+        // different byte is presumed legitimate (e.g. a custom or
+        // repaired table) and should NOT trip the diagnostic.
+        use crate::draz::image_table::Image;
+        let placeholder = Image {
+            width_bytes: 1,
+            height: 1,
+            bitmap: vec![0x80],
+        };
+        assert!(is_placeholder(&placeholder));
+        let non_placeholder = Image {
+            width_bytes: 1,
+            height: 1,
+            bitmap: vec![0x7f],
+        };
+        assert!(!is_placeholder(&non_placeholder));
+        let bigger = Image {
+            width_bytes: 3,
+            height: 12,
+            bitmap: vec![0; 36],
+        };
+        assert!(!is_placeholder(&bigger));
     }
 
     #[test]
