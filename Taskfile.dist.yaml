@@ -46,6 +46,7 @@ tasks:
 
   info:
     desc: "Inspect level file(s); no args scans the bundled LEVEL set. task info -- <path>..."
+    deps: [submodules]
     cmds:
       - task: run
         vars: {CLI_ARGS: 'info {{.CLI_ARGS}}'}
@@ -149,6 +150,8 @@ tasks:
   # --- Repo setup ---------------------------------------------------------
 
   submodules:
-    desc: Fetch the vendored POP source submodule (needed by lifter tests).
+    desc: Fetch the vendored POP source submodule (needed by lifter + level tasks).
+    status:
+      - test -f 'vendor/pop-apple2/04 Support/Levels/LEVEL0'
     cmds:
       - git submodule update --init --recursive
