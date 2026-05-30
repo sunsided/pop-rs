@@ -165,7 +165,14 @@ def test_emitted_routine_matches_interpreter_seeded(module, name, regs, diffrun_
 # ---- seeded sweep over every routine -----------------------------------
 
 _SWEEP_RNG_SEED = 0xC0FFEE
-_SWEEP_SEEDS_PER_ROUTINE = 2
+# Five seeds per routine widens the state-space exploration ~2.5x over
+# the original 2 — every routine that completes does so under more
+# distinct random register / RAM starts, so a state-dependent
+# interpreter / crate disagreement has more chances to surface. Cost is
+# proportional sweep runtime (~5 minutes for the seeded sweep alone).
+# A 5-seed run pinned at 0 divergences when this was raised, so the
+# wider coverage is sound.
+_SWEEP_SEEDS_PER_ROUTINE = 5
 _INTERP_TIMEOUT_S = 0.5  # skip routines that loop on a wild RAM seed
 
 
