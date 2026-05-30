@@ -46,6 +46,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 use clap::Args as ClapArgs;
 use eframe::egui::{self, Color32, ColorImage, Pos2, Rect, Sense, Stroke, TextureHandle, Vec2};
@@ -54,7 +55,7 @@ use pop_assets::{
     discovery,
     hires::RenderMode,
     level::{Level, Tile, TileKind, ROOMS_PER_LEVEL, ROOM_HEIGHT, ROOM_WIDTH},
-    scene::{self, BiomeTables},
+    scene::{self, Anim, BiomeTables},
 };
 
 const _: () = assert!(ROOMS_PER_LEVEL <= u8::MAX as usize);
@@ -390,6 +391,18 @@ struct EditorApp {
     /// Toggle between Apple II monochrome and NTSC artifact-colour
     /// modes when rendering sprites.
     ntsc_mode: bool,
+    /// Animate time-varying tiles (torch flames + a non-physical
+    /// slicer/spike trap preview). Drives a throttled per-tick re-render
+    /// of the rooms in [`Self::animated_rooms`].
+    animate: bool,
+    /// Monotonic animation step, fed to [`Anim::tick`].
+    anim_tick: u32,
+    /// Wall-clock of the last animation step, for frame-rate throttling.
+    last_anim_step: Option<Instant>,
+    /// Room indices (0-based) whose tiles include an animated kind —
+    /// recomputed on each full texture refresh so the per-tick update
+    /// only re-renders rooms that actually change.
+    animated_rooms: Vec<usize>,
     /// `Some((room, col, row))` when the mouse is hovering over a
     /// tile; surfaces in the status bar.
     hover: Option<(u8, u8, u8)>,
@@ -439,6 +452,10 @@ impl EditorApp {
             show_coords: false,
             show_sprites: true,
             ntsc_mode: true,
+            animate: false,
+            anim_tick: 0,
+            last_anim_step: None,
+            animated_rooms: Vec::new(),
             hover: None,
             pending_fit: true,
             pending_initial_load: true,
@@ -451,9 +468,12 @@ impl EditorApp {
 
     /// Render every placed room of the loaded level into an egui
     /// texture. Called on level load and when the render mode changes.
-    fn refresh_room_textures(&mut self, ctx: &egui::Context) {
-        self.room_textures.clear();
-        self.render_status.clear();
+    fn refresh_room_textures(&mut self, ctx: &egui::Context, anim: Anim, only: Option<&[usize]>) {
+        let full = only.is_none();
+        if full {
+            self.room_textures.clear();
+            self.render_status.clear();
+        }
         let Some(level) = &self.state.loaded_level else {
             return;
         };
@@ -519,10 +539,16 @@ impl EditorApp {
             if slot.is_none() {
                 continue;
             }
+            // Partial refresh (animation tick): only re-render the
+            // rooms the caller asked for.
+            if only.is_some_and(|list| !list.contains(&idx)) {
+                continue;
+            }
             let Ok(room_id) = u8::try_from(idx + 1) else {
                 continue;
             };
-            let Some(frame) = scene::render_room(level, room_id, tables, mode) else {
+            let Some(frame) = scene::render_room_animated(level, room_id, tables, mode, anim)
+            else {
                 continue;
             };
             let size = [
@@ -537,11 +563,60 @@ impl EditorApp {
             );
             self.room_textures[idx] = Some(tex);
         }
-        self.render_status = format!(
-            "{} sprites ready ({} rooms)",
-            biome.short_name(),
-            self.room_textures.iter().filter(|t| t.is_some()).count()
-        );
+        if full {
+            // Cache which placed rooms contain an animated tile, so the
+            // per-tick refresh can skip the rest.
+            self.animated_rooms = layout
+                .positions
+                .iter()
+                .enumerate()
+                .filter(|(idx, slot)| {
+                    slot.is_some()
+                        && level.rooms[*idx]
+                            .tiles
+                            .iter()
+                            .any(|t| scene::is_animated_kind(t.kind))
+                })
+                .map(|(idx, _)| idx)
+                .collect();
+            self.render_status = format!(
+                "{} sprites ready ({} rooms)",
+                biome.short_name(),
+                self.room_textures.iter().filter(|t| t.is_some()).count()
+            );
+        }
+    }
+
+    /// The animation phase implied by the current toggle state.
+    fn current_anim(&self) -> Anim {
+        if self.animate {
+            Anim {
+                tick: self.anim_tick,
+                traps: true,
+            }
+        } else {
+            Anim::REST
+        }
+    }
+
+    /// Advance the animation a step if enough wall-clock has elapsed,
+    /// re-rendering only the animated rooms, and keep egui repainting.
+    fn step_animation(&mut self, ctx: &egui::Context) {
+        if !self.animate || self.animated_rooms.is_empty() {
+            return;
+        }
+        const STEP: Duration = Duration::from_millis(80);
+        let now = Instant::now();
+        if self.last_anim_step.is_some_and(|t| now.duration_since(t) < STEP) {
+            ctx.request_repaint_after(STEP);
+            return;
+        }
+        self.last_anim_step = Some(now);
+        self.anim_tick = self.anim_tick.wrapping_add(1);
+        let anim = self.current_anim();
+        let rooms = self.animated_rooms.clone();
+        self.refresh_room_textures(ctx, anim, Some(&rooms));
+        ctx.request_repaint_after(STEP);
     }
 
     fn tile_w(&self) -> f32 {
@@ -646,7 +721,8 @@ impl eframe::App for EditorApp {
             && !self.state.level_paths.is_empty()
         {
             self.state.load_level(0);
-            self.refresh_room_textures(ctx);
+            let anim = self.current_anim();
+            self.refresh_room_textures(ctx, anim, None);
             self.pending_fit = true;
             self.pending_initial_load = false;
         }
@@ -659,9 +735,13 @@ impl eframe::App for EditorApp {
         egui::TopBottomPanel::bottom("status").show(ctx, |ui| self.status_bar(ui));
         egui::CentralPanel::default().show(ctx, |ui| self.canvas(ui));
         match toolbar_request {
-            ToolbarAction::RefreshTextures => self.refresh_room_textures(ctx),
+            ToolbarAction::RefreshTextures => {
+                let anim = self.current_anim();
+                self.refresh_room_textures(ctx, anim, None);
+            }
             ToolbarAction::None => {}
         }
+        self.step_animation(ctx);
     }
 }
 
@@ -693,6 +773,18 @@ impl EditorApp {
                 action = ToolbarAction::RefreshTextures;
             }
             if ui.checkbox(&mut self.ntsc_mode, "NTSC color").changed() {
+                action = ToolbarAction::RefreshTextures;
+            }
+            if ui
+                .checkbox(&mut self.animate, "animate")
+                .on_hover_text("Torch flames + slicer/spike trap preview")
+                .changed()
+            {
+                // Reset the clock so toggling on starts from frame 0,
+                // and a full refresh re-renders every room at the new
+                // phase (clearing the preview when toggled off).
+                self.anim_tick = 0;
+                self.last_anim_step = None;
                 action = ToolbarAction::RefreshTextures;
             }
             ui.checkbox(&mut self.show_labels, "tile labels");
@@ -761,7 +853,8 @@ impl EditorApp {
         if let Some(i) = to_load {
             self.state.load_level(i);
             self.pending_fit = true;
-            self.refresh_room_textures(ctx);
+            let anim = self.current_anim();
+            self.refresh_room_textures(ctx, anim, None);
         }
     }
 

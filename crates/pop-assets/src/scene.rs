@@ -299,6 +299,69 @@ pub fn render_room(
     bg: &BiomeTables,
     mode: RenderMode,
 ) -> Option<Frame> {
+    render_room_animated(level, room_id, bg, mode, Anim::REST)
+}
+
+/// Animation phase for time-varying tiles.
+///
+/// `tick` is a monotonic counter the caller advances each animation
+/// step. [`Anim::REST`] (tick 0, traps off) reproduces the at-rest pose
+/// exactly, so the plain [`render_room`] path renders identically to
+/// before. `traps` cycles the gameplay-*triggered* traps (slicer,
+/// spikes) through their sequences — a non-physical "preview" for the
+/// editor; torch flames always cycle with `tick` since they are ambient
+/// in the real game.
+#[derive(Clone, Copy, Default)]
+pub struct Anim {
+    /// Monotonic animation step counter.
+    pub tick: u32,
+    /// Cycle the triggered traps (slicer / spikes) for preview.
+    pub traps: bool,
+}
+
+impl Anim {
+    /// The static at-rest phase — identical output to the original
+    /// non-animated renderer.
+    pub const REST: Self = Self {
+        tick: 0,
+        traps: false,
+    };
+
+    /// Torch-flame frame (always cycles; frame 0 at `tick == 0`).
+    fn torch_frame(self) -> usize {
+        (self.tick as usize / 4) % TORCH_FLAME.len()
+    }
+
+    /// Effective slicer state byte: the cycled preview state when
+    /// `traps`, else the tile's stored state.
+    fn slicer_state(self, stored: u8) -> u8 {
+        if self.traps {
+            (self.tick / 4 % (SLICER_RET as u32 + 1)) as u8
+        } else {
+            stored
+        }
+    }
+
+    /// Effective spike state byte (see [`Self::slicer_state`]).
+    fn spike_state(self, stored: u8) -> u8 {
+        if self.traps {
+            (self.tick / 3 % SPIKE_A.len() as u32) as u8
+        } else {
+            stored
+        }
+    }
+}
+
+/// Render one room at animation phase `anim`. [`render_room`] is the
+/// `Anim::REST` (static) special case.
+#[must_use]
+pub fn render_room_animated(
+    level: &Level,
+    room_id: u8,
+    bg: &BiomeTables,
+    mode: RenderMode,
+    anim: Anim,
+) -> Option<Frame> {
     let room_idx = usize::from(room_id).checked_sub(1)?;
     if room_idx >= level.rooms.len() {
         return None;
@@ -307,8 +370,15 @@ pub fn render_room(
     // `drawexitb` skips stairs when the current room is the prince's
     // entry point (`FRAMEADV.S:1635` `cmp KidStartScrn beq :nostairs`).
     let draw_stairs = room_id != level.prince_start().screen;
-    let canvas = Canvas::compose(&ctx, bg, draw_stairs);
+    let canvas = Canvas::compose(&ctx, bg, draw_stairs, anim);
     canvas.into_frame(mode)
+}
+
+/// Tile kinds whose appearance varies with [`Anim`] — used by callers
+/// (the editor) to decide which rooms need re-rendering each tick.
+#[must_use]
+pub fn is_animated_kind(kind: TileKind) -> bool {
+    matches!(kind, TileKind::Torch | TileKind::Slicer | TileKind::Spikes)
 }
 
 // ---------------------------------------------------------------------------
@@ -476,7 +546,7 @@ impl Canvas {
     }
 
     /// Compose every cell of `ctx.room` onto a fresh canvas.
-    fn compose(ctx: &RoomContext, bg: &BiomeTables, draw_stairs: bool) -> Self {
+    fn compose(ctx: &RoomContext, bg: &BiomeTables, draw_stairs: bool, anim: Anim) -> Self {
         let mut canvas = Self::new();
         // Three on-screen rows, bottom → top — matches `FRAMEADV.S:62
         // SURE` (`ldy #2 :row sty rowno ... dey jmp :row`). Order
@@ -521,6 +591,7 @@ impl Canvas {
                     ay,
                     dy,
                     draw_stairs,
+                    anim,
                 );
             }
         }
@@ -553,6 +624,7 @@ impl Canvas {
                 blockxco,
                 ceil_above_y,
                 ceil_dy,
+                anim,
             );
         }
         canvas
@@ -664,16 +736,17 @@ fn draw_block(
     ay: i32,
     dy: i32,
     draw_stairs: bool,
+    anim: Anim,
 ) {
     draw_c(canvas, bg, me.kind, below_left, blockxco, dy, left.kind);
     draw_mc(canvas, bg, me.kind, below_left.kind, blockxco, dy, ay);
     draw_b(canvas, bg, left, below_left, blockxco, ay, dy, bg.biome);
-    draw_mb(canvas, bg, left.kind, blockxco, ay, dy, draw_stairs);
+    draw_mb(canvas, bg, left.kind, blockxco, ay, dy, draw_stairs, anim);
     draw_d(canvas, bg, me, blockxco, dy);
     draw_md(canvas, bg, me, blockxco, dy);
     draw_a(canvas, bg, me, left.kind, blockxco, ay);
-    draw_ma(canvas, bg, me, blockxco, ay);
-    draw_front(canvas, bg, me, blockxco, ay);
+    draw_ma(canvas, bg, me, blockxco, ay, anim);
+    draw_front(canvas, bg, me, blockxco, ay, anim);
 }
 
 /// Reduced per-cell draw used for the ceiling pass — C, B, D, Front
@@ -689,11 +762,12 @@ fn draw_d_only(
     blockxco: i32,
     ay: i32,
     dy: i32,
+    anim: Anim,
 ) {
     draw_c(canvas, bg, me.kind, below_left, blockxco, dy, left.kind);
     draw_b(canvas, bg, left, below_left, blockxco, ay, dy, bg.biome);
     draw_d(canvas, bg, me, blockxco, dy);
-    draw_front(canvas, bg, me, blockxco, ay);
+    draw_front(canvas, bg, me, blockxco, ay, anim);
 }
 
 fn draw_a(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, left: TileKind, blockxco: i32, ay: i32) {
@@ -886,6 +960,7 @@ fn draw_d(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, dy: i3
 /// tile kinds that have a visible at-rest spillover:
 /// torch flame, loose-floor B-edge, closed-gate bar grill, and the
 /// exit-door stairs / door stack.
+#[allow(clippy::too_many_arguments)]
 fn draw_mb(
     canvas: &mut Canvas,
     bg: &BiomeTables,
@@ -894,16 +969,18 @@ fn draw_mb(
     ay: i32,
     dy: i32,
     draw_stairs: bool,
+    anim: Anim,
 ) {
     match left {
         TileKind::Torch => {
             // SETUPFLAME (`GAMEBG.S:735`): no flame on the leftmost
             // torch (would draw off the room's left edge), advance
-            // X by 1 byte, drop Y by 43 px, frame 0 is at-rest.
+            // X by 1 byte, drop Y by 43 px. Frame cycles with `anim`
+            // (frame 0 at rest) — the flame is ambient in-game.
             if blockxco == 0 {
                 return;
             }
-            if let Some(piece) = bg.resolve(TORCH_FLAME[0]) {
+            if let Some(piece) = bg.resolve(TORCH_FLAME[anim.torch_frame()]) {
                 canvas.blit(piece, blockxco + 1, ay - 43, Opacity::Sta);
             }
         }
@@ -943,10 +1020,12 @@ fn draw_md(_canvas: &mut Canvas, _bg: &BiomeTables, _me: Tile, _blockxco: i32, _
 /// `drawma`'s `flask` / `sword` cases are intentionally not ported:
 /// their at-rest visual already comes from the generic `PIECE_A` entry,
 /// matching the existing "uses the BGDATA piece" simplification.
-fn draw_ma(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i32) {
+fn draw_ma(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i32, anim: Anim) {
     match me.kind {
-        TileKind::Spikes => draw_spike_a(canvas, bg, me, blockxco, ay),
-        TileKind::Slicer => draw_slicer_a(canvas, bg, me, blockxco, ay),
+        TileKind::Spikes => draw_spike_a(canvas, bg, anim.spike_state(me.modifier), blockxco, ay),
+        TileKind::Slicer => {
+            draw_slicer_a(canvas, bg, anim.slicer_state(me.modifier), blockxco, ay);
+        }
         _ => {}
     }
 }
@@ -955,8 +1034,7 @@ fn draw_ma(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i
 /// [`SPIKE_EXT`] when bit 7 is set), then `spikea,x` OR'd at `Ay − 1`.
 /// Frame `0x00` entries draw nothing (retracted), so at rest this is a
 /// no-op over the generic floor base.
-fn draw_spike_a(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i32) {
-    let state = me.modifier;
+fn draw_spike_a(canvas: &mut Canvas, bg: &BiomeTables, state: u8, blockxco: i32, ay: i32) {
     let idx = if state & 0x80 != 0 {
         SPIKE_EXT
     } else {
@@ -986,9 +1064,9 @@ fn slicer_seq_index(state: u8) -> usize {
 /// `drawslicera` (`FRAMEADV.S:1548`): bottom piece OR'd at `Ay`, then
 /// the top piece OR'd at `Ay − SLICER_GAP[i]`. The "smeared" bottom
 /// (state bit 7) falls back to the clean bottom when its entry is 0.
-fn draw_slicer_a(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i32) {
-    let idx = slicer_seq_index(me.modifier);
-    let bot_id = if me.modifier & 0x80 != 0 && SLICER_BOT2[idx] != 0 {
+fn draw_slicer_a(canvas: &mut Canvas, bg: &BiomeTables, state: u8, blockxco: i32, ay: i32) {
+    let idx = slicer_seq_index(state);
+    let bot_id = if state & 0x80 != 0 && SLICER_BOT2[idx] != 0 {
         SLICER_BOT2[idx]
     } else {
         SLICER_BOT[idx]
@@ -1137,7 +1215,7 @@ fn draw_exit_door(
     }
 }
 
-fn draw_front(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i32) {
+fn draw_front(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i32, anim: Anim) {
     // `drawfrnt` (`FRAMEADV.S:760`) jumps straight to `drawslicerf` for
     // a slicer, bypassing the generic `FRONT_I` lookup. The front piece
     // is `slicerfrnt[i]` at `Ay`. The engine draws it with `maddfore`
@@ -1145,7 +1223,7 @@ fn draw_front(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay
     // front face composites onto the mechanism behind it without
     // stamping a black bounding box.
     if me.kind == TileKind::Slicer {
-        let id = SLICER_FRNT[slicer_seq_index(me.modifier)];
+        let id = SLICER_FRNT[slicer_seq_index(anim.slicer_state(me.modifier))];
         if id != 0 {
             if let Some(piece) = bg.resolve(id) {
                 canvas.blit(piece, blockxco, ay, Opacity::Or);
@@ -1435,6 +1513,48 @@ mod tests {
         assert!(
             count_above_strip(&slicer) > count_above_strip(&empty),
             "slicer mechanism should add pixels above the floor strip"
+        );
+    }
+
+    #[test]
+    fn animation_phase_changes_output() {
+        // A torch + slicer room at a non-rest phase must differ from the
+        // at-rest render, and `Anim::REST` via the animated entry point
+        // must equal the static `render_room` output.
+        let mut tiles = [Tile::default(); ROOM_WIDTH * ROOM_HEIGHT];
+        tiles[ROOM_WIDTH + 3] = Tile {
+            kind: TileKind::Torch,
+            variant: 0,
+            modifier: 0,
+        };
+        tiles[ROOM_WIDTH + 6] = Tile {
+            kind: TileKind::Slicer,
+            variant: 0,
+            modifier: 0,
+        };
+        let level = synth_level_with(tiles);
+        let tables = BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap();
+        let rest = render_room(&level, 1, &tables, RenderMode::Monochrome).unwrap();
+        let moved = render_room_animated(
+            &level,
+            1,
+            &tables,
+            RenderMode::Monochrome,
+            Anim {
+                tick: 20,
+                traps: true,
+            },
+        )
+        .unwrap();
+        assert_ne!(
+            rest.pixels, moved.pixels,
+            "animated phase should differ from the rest pose"
+        );
+        let rest2 =
+            render_room_animated(&level, 1, &tables, RenderMode::Monochrome, Anim::REST).unwrap();
+        assert_eq!(
+            rest.pixels, rest2.pixels,
+            "Anim::REST must match the static render"
         );
     }
 
