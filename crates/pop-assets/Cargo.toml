@@ -15,4 +15,5 @@ description = "POP (Apple II) asset readers: level binaries, disk images, sprite
 workspace = true
 
 [dependencies]
+directories = "5"
 thiserror = "1"
