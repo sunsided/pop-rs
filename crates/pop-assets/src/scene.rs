@@ -50,7 +50,9 @@
 //!   empty at rest, so a no-op today.
 //! * Gate bars at partial heights — gates always render fully closed.
 //! * Depressed press-plate state — uses the up-state piece.
-//! * Flask bubbles / sword gleam — uses the BGDATA piece.
+//! * Flask bubbles (`drawflaska`) — builder-skipped in the original;
+//!   we draw only the static flask base from `PIECE_A`. (The sword is
+//!   now drawn via `drawsworda` in `draw_ma`.)
 //! * Half-piece climbup rendering — N/A for static scene browsing.
 //!
 //! Static rooms render correctly; dynamic objects look "frozen".
@@ -71,7 +73,7 @@ use crate::bgdata::{
     MASK_A, MASK_B, PANEL_B, PANEL_B0_SENTINEL, PANEL_C, PANEL_C0_SENTINEL, PIECE_A, PIECE_A_Y,
     PIECE_B, PIECE_B_Y, PIECE_C, PIECE_D, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES, SLICER_BOT,
     SLICER_BOT2, SLICER_FRNT, SLICER_GAP, SLICER_RET, SLICER_SEQ, SLICER_TOP, SPACE_B, SPACE_B_Y,
-    SPIKE_A, SPIKE_EXT, STAIRS, TOP_REPAIR, TORCH_FLAME,
+    SPIKE_A, SPIKE_EXT, STAIRS, SWORDGLEAM0, SWORDGLEAM1, TOP_REPAIR, TORCH_FLAME,
 };
 use crate::draz::image_table::{self, Image, ImageTable};
 use crate::hires::{self, Frame, RenderMode};
@@ -1017,14 +1019,28 @@ fn draw_md(_canvas: &mut Canvas, _bg: &BiomeTables, _me: Tile, _blockxco: i32, _
 /// retracted mechanism (top + bottom housing) that was previously
 /// missing — leaving slicer cells as bare floor with a visible gap.
 ///
-/// `drawma`'s `flask` / `sword` cases are intentionally not ported:
-/// their at-rest visual already comes from the generic `PIECE_A` entry,
-/// matching the existing "uses the BGDATA piece" simplification.
+/// `drawma`'s `flask` case is not ported: the flask's at-rest base
+/// comes from its non-empty `PIECE_A`, and the bubble overlay is
+/// builder-skipped in the original engine anyway. The `sword` case
+/// *is* ported — `PIECE_A[sword]` is empty, so the sword sprite must
+/// come from `drawsworda` or the cell is bare floor.
 fn draw_ma(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay: i32, anim: Anim) {
     match me.kind {
         TileKind::Spikes => draw_spike_a(canvas, bg, anim.spike_state(me.modifier), blockxco, ay),
         TileKind::Slicer => {
             draw_slicer_a(canvas, bg, anim.slicer_state(me.modifier), blockxco, ay);
+        }
+        TileKind::Sword => {
+            // drawsworda (`FRAMEADV.S:1530`): swordgleam1 when state==1,
+            // else swordgleam0, at (blockxco, Ay) with `sta`.
+            let id = if me.modifier == 1 {
+                SWORDGLEAM1
+            } else {
+                SWORDGLEAM0
+            };
+            if let Some(piece) = bg.resolve(id) {
+                canvas.blit(piece, blockxco, ay, Opacity::Sta);
+            }
         }
         _ => {}
     }
@@ -1513,6 +1529,52 @@ mod tests {
         assert!(
             count_above_strip(&slicer) > count_above_strip(&empty),
             "slicer mechanism should add pixels above the floor strip"
+        );
+    }
+
+    #[test]
+    fn sword_renders_on_floor() {
+        // Regression: sword cells rendered as bare floor — PIECE_A[sword]
+        // is 0x00 and the sword sprite comes from `drawsworda`, which was
+        // initially not ported (the "triangular missing floor" in LV1
+        // R15). draw_ma now draws swordgleam0.
+        let idx = ROOM_WIDTH + 5; // middle row, col 5
+        let mut tiles = [Tile::default(); ROOM_WIDTH * ROOM_HEIGHT];
+        tiles[idx] = Tile {
+            kind: TileKind::Sword,
+            variant: 0,
+            modifier: 0,
+        };
+        let sword = render_room(
+            &synth_level_with(tiles),
+            1,
+            &BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap(),
+            RenderMode::Monochrome,
+        )
+        .unwrap();
+        let tables = BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap();
+        let empty = render_room(
+            &synth_level_with([Tile::default(); ROOM_WIDTH * ROOM_HEIGHT]),
+            1,
+            &tables,
+            RenderMode::Monochrome,
+        )
+        .unwrap();
+        let count = |f: &Frame| -> usize {
+            let mut n = 0;
+            for y in 80..124u32 {
+                for x in 140..168u32 {
+                    let i = ((y * f.width + x) * 4) as usize;
+                    if f.pixels[i..i + 3] != [0, 0, 0] {
+                        n += 1;
+                    }
+                }
+            }
+            n
+        };
+        assert!(
+            count(&sword) > count(&empty),
+            "sword sprite should add pixels over the bare floor cell"
         );
     }
 

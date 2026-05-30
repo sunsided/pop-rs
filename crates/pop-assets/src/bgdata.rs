@@ -160,6 +160,15 @@ pub const PANEL_B0_SENTINEL: u8 = 0x9e;
 /// Sentinel for "default" panel C-piece value.
 pub const PANEL_C0_SENTINEL: u8 = 0x9f;
 
+/// Sword sprite lying on the floor (`BGDATA.S:156 swordgleam0 = $99`).
+/// `drawsworda` (`FRAMEADV.S:1530`) draws this at `(blockxco, Ay)` with
+/// `sta` opacity — `PIECE_A[sword]` is empty, so without it the sword
+/// cell is bare floor.
+pub const SWORDGLEAM0: u8 = 0x99;
+/// Alternate sword sprite (`BGDATA.S:155 swordgleam1 = $b3`), used when
+/// the sword tile's state byte is 1.
+pub const SWORDGLEAM1: u8 = 0xb3;
+
 /// Arch-to-panel transition A-piece (`BGDATA.S:168 archpanel = $a1`,
 /// aka `archtop3sp`). `drawa` (`FRAMEADV.S:1151`) substitutes this for
 /// the empty `PIECE_A[panelwof]` when a `panelwof` cell's left neighbour
