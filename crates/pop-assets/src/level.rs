@@ -75,7 +75,7 @@
 //! | `215..256`  |    41 | (padding)        |                                       |
 //!
 //! `INFO[0]` is `number-of-screens + 1` per the loop in `SUBS.S:1442`
-//! (see [`Level::screen_count`]).
+//! (see [`Level::screen_count_plus_one`]).
 
 use std::path::Path;
 
@@ -806,13 +806,13 @@ mod tests {
     }
 
     #[test]
-    fn every_level_screen_count_is_at_least_one() {
+    fn every_level_has_at_least_one_screen_used() {
         // INFO[0] is "rooms used + 1" — a level with at least one
-        // playable room has INFO[0] >= 2.
+        // playable room must have INFO[0] >= 2.
         for n in 0u8..=14 {
             let lv = level(n);
             assert!(
-                lv.screen_count_plus_one() >= 1,
+                lv.screen_count_plus_one() >= 2,
                 "LEVEL{n} INFO[0] = {}",
                 lv.screen_count_plus_one()
             );

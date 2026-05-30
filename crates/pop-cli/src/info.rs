@@ -73,15 +73,18 @@ fn print_level(path: &std::path::Path, level: &Level) {
         );
     }
 
-    if let Some(sword) = level.sword_start() {
-        if let Some((col, row)) = sword.col_row() {
-            println!(
+    match level.sword_start() {
+        None => println!("  sword start:  none"),
+        Some(sword) => match sword.col_row() {
+            Some((col, row)) => println!(
                 "  sword start:  room {} tile {} ({}, {})",
                 sword.screen, sword.block, col, row,
-            );
-        }
-    } else {
-        println!("  sword start:  none");
+            ),
+            None => println!(
+                "  sword start:  room {} tile {} (out of range)",
+                sword.screen, sword.block,
+            ),
+        },
     }
 
     let guards = level.guard_spawns();
@@ -89,16 +92,24 @@ fn print_level(path: &std::path::Path, level: &Level) {
     println!("  guards:   {guard_count}");
     for (room_idx, guard) in guards.iter().enumerate() {
         if let Some(g) = guard {
-            let (col, row) = g.col_row().unwrap_or((0, 0));
-            println!(
-                "    room {:>2}: tile {:>2} ({}, {}) prog=0x{:02x} face=0x{:02x}",
-                room_idx + 1,
-                g.block,
-                col,
-                row,
-                g.prog,
-                g.face_raw,
-            );
+            match g.col_row() {
+                Some((col, row)) => println!(
+                    "    room {:>2}: tile {:>2} ({}, {}) prog=0x{:02x} face=0x{:02x}",
+                    room_idx + 1,
+                    g.block,
+                    col,
+                    row,
+                    g.prog,
+                    g.face_raw,
+                ),
+                None => println!(
+                    "    room {:>2}: tile {:>2} (out of range) prog=0x{:02x} face=0x{:02x}",
+                    room_idx + 1,
+                    g.block,
+                    g.prog,
+                    g.face_raw,
+                ),
+            }
         }
     }
 
