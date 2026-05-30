@@ -4,6 +4,7 @@
 //!
 //! - `info` — identify and dump a level file's structure.
 //! - `draz` — inspect / render POP's `DRAZ/` sprite and screen assets.
+//! - `discover` — list POP data roots found on the host.
 //!
 //! Future subcommands (`editor`, `play`, …) land behind their own
 //! Cargo features so headless / CI builds stay light.
@@ -12,6 +13,7 @@
 
 use clap::{Parser, Subcommand};
 
+mod discover;
 mod draz;
 mod info;
 
@@ -34,6 +36,9 @@ enum Cmd {
     Info(info::Args),
     /// Extract / preview POP's `DRAZ/` sprite and screen assets.
     Draz(draz::Args),
+    /// List POP data roots found on the host (env vars, in-tree,
+    /// system data dirs).
+    Discover(discover::Args),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -41,5 +46,6 @@ fn main() -> anyhow::Result<()> {
     match cli.cmd {
         Cmd::Info(args) => info::run(&args),
         Cmd::Draz(args) => draz::run(&args),
+        Cmd::Discover(args) => discover::run(&args),
     }
 }
