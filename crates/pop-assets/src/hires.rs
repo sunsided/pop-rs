@@ -122,20 +122,18 @@ pub const fn row_byte_offset(y: u8) -> u16 {
     y0 * 0x400 + y1 * 0x80 + y2 * 0x28
 }
 
-/// Lone-pixel colour palette for the NTSC mode.
-///
-/// Index: `(high_bit << 1) | cell_parity`. A cell with both halves lit
-/// is white regardless of palette half.
-const NTSC_LONE: [[u8; 4]; 4] = [
-    // (0, 0) — no high bit, even cell column: violet
-    [0xff, 0x44, 0xfd, 0xff],
-    // (0, 1) — no high bit, odd cell column: green
-    [0x14, 0xf0, 0x53, 0xff],
-    // (1, 0) — high bit set, even cell column: blue
-    [0x00, 0x80, 0xff, 0xff],
-    // (1, 1) — high bit set, odd cell column: orange
-    [0xff, 0x80, 0x00, 0xff],
-];
+/// Subcarrier phase offset (radians) for the artifact-colour demod.
+/// Tuned against an Apple II palace (LEVEL 4) screenshot: this value
+/// lands the palace brick floor on brown, its ornaments on vivid blue,
+/// and the dungeon bricks on blue — matching what a composite monitor
+/// shows. The three biomes differ purely by their sprite data (high
+/// bits + dither), so one correct decode renders all of them.
+const NTSC_HUE: f32 = 0.0;
+/// Chroma gain. Higher = more saturated artifact colour; the YIQ luma
+/// term carries brightness so this only scales the colour swing.
+const NTSC_SAT: f32 = 1.5;
+/// Demodulation window, in oversampled samples (one subcarrier cycle).
+const NTSC_WIN: usize = 4;
 
 const BLACK: [u8; 4] = [0x00, 0x00, 0x00, 0xff];
 const WHITE: [u8; 4] = [0xff, 0xff, 0xff, 0xff];
@@ -245,30 +243,83 @@ fn render_row_mono(row: &[u8], out: &mut [u8]) {
     }
 }
 
+/// Decode one hi-res scanline into RGBA using an NTSC artifact-colour
+/// model (`Y`/`I`/`Q` over a sliding sample window), rather than the
+/// hard 6-colour cell approximation.
+///
+/// This reproduces what a composite monitor does: the bandwidth-limited
+/// chroma/luma filters blend the per-pixel dither into the smooth
+/// intermediate tones the game relies on — orange-on-black dither reads
+/// as brown, orange-on-white as beige, while solid colour runs stay
+/// vivid blue / orange / violet / green. A pure per-pixel palette can't
+/// produce those browns because single hi-res only has six dot colours.
+///
+/// Method: build a 2×-oversampled binary signal where each lit pixel
+/// fills two samples and a set high bit delays its byte by one sample
+/// (the half-dot shift that rotates violet/green → blue/orange). Then
+/// for each output pixel demodulate luma (`Y`, window average) and
+/// chroma (`I`/`Q`, the signal mixed against the period-4 subcarrier)
+/// over a one-cycle window and convert `YIQ → RGB`.
+#[allow(clippy::cast_precision_loss, clippy::many_single_char_names)]
 fn render_row_ntsc(row: &[u8], out: &mut [u8]) {
     let width = row.len() * 7;
-    let mut bits = vec![false; width];
-    unpack_row_bits(row, &mut bits);
-    for (x, &lit) in bits.iter().enumerate() {
-        let i = x * 4;
-        if !lit {
-            out[i..i + 4].copy_from_slice(&BLACK);
-            continue;
+    // 2× oversample; +2 tail so the last pixel's window never indexes
+    // out of bounds.
+    let mut sig = vec![0.0f32; width * 2 + 2];
+    for x in 0..width {
+        let byte = row[x / 7];
+        if (byte >> (x % 7)) & 1 == 1 {
+            let shift = usize::from((byte >> 7) & 1);
+            sig[2 * x + shift] = 1.0;
+            sig[2 * x + 1 + shift] = 1.0;
         }
-        // Color cells span pixel pairs (2k, 2k+1). The partner is the
-        // other half of this cell.
-        let partner_x = x ^ 1;
-        let partner_lit = partner_x < width && bits[partner_x];
-        if partner_lit {
-            out[i..i + 4].copy_from_slice(&WHITE);
-            continue;
-        }
-        let cell_idx = x / 2;
-        let cell_parity = u8::try_from(cell_idx & 1).expect("cell parity in 0..2");
-        let high_bit = (row[x / 7] >> 7) & 1;
-        let palette_idx = (high_bit << 1) | cell_parity;
-        out[i..i + 4].copy_from_slice(&NTSC_LONE[palette_idx as usize]);
     }
+    // Edge-replicate the 2-sample tail so the rightmost pixel's window
+    // doesn't read padding zeros — otherwise a fully-lit line would
+    // fringe to colour at its right edge instead of staying white.
+    if width > 0 {
+        let last = sig[2 * width - 1];
+        sig[2 * width] = last;
+        sig[2 * width + 1] = last;
+    }
+    // Subcarrier samples for the four phases (period = 4 samples).
+    let mut cos_p = [0.0f32; 4];
+    let mut sin_p = [0.0f32; 4];
+    for (p, (c, s)) in cos_p.iter_mut().zip(sin_p.iter_mut()).enumerate() {
+        let a = std::f32::consts::TAU * (p as f32) / 4.0 + NTSC_HUE;
+        *c = a.cos();
+        *s = a.sin();
+    }
+    // One-cycle demodulation window per output pixel.
+    for x in 0..width {
+        let base = 2 * x;
+        let (mut y, mut iq_i, mut iq_q) = (0.0f32, 0.0f32, 0.0f32);
+        for k in 0..NTSC_WIN {
+            let s = sig[base + k];
+            let p = (base + k) & 3;
+            y += s;
+            iq_i += s * cos_p[p];
+            iq_q += s * sin_p[p];
+        }
+        let y = y / NTSC_WIN as f32;
+        let i_term = iq_i / NTSC_WIN as f32 * 2.0 * NTSC_SAT;
+        let q_term = iq_q / NTSC_WIN as f32 * 2.0 * NTSC_SAT;
+        let r = y + 0.956 * i_term + 0.619 * q_term;
+        let g = y - 0.272 * i_term - 0.647 * q_term;
+        let b = y - 1.106 * i_term + 1.703 * q_term;
+        let o = x * 4;
+        out[o] = clamp_u8(r);
+        out[o + 1] = clamp_u8(g);
+        out[o + 2] = clamp_u8(b);
+        out[o + 3] = 0xff;
+    }
+}
+
+/// Clamp a 0.0..=1.0 intensity to a 0..=255 byte.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn clamp_u8(v: f32) -> u8 {
+    // Clamped to 0..=1 then scaled, so the result is always in 0..=255.
+    (v.clamp(0.0, 1.0) * 255.0).round() as u8
 }
 
 #[cfg(test)]
@@ -440,35 +491,36 @@ mod tests {
     }
 
     #[test]
-    fn ntsc_alternating_pattern_produces_violet_and_green() {
-        // 0x55 = 0b0101_0101 — pixels 0, 2, 4, 6 lit within each byte.
-        // The lone lit pixels at the start of byte 0 are:
-        //   x=0: lone, cell 0 (parity 0), high=0 → violet
-        //   x=2: lone, cell 1 (parity 1), high=0 → green
-        //   x=4: lone, cell 2 (parity 0), high=0 → violet
-        // (x=6 pairs with x=7 from the next byte's bit 0, which is also
-        // lit under 0x55, so x=6 + 7 → white. We assert the unambiguous
-        // first three colour cells.)
+    fn ntsc_lit_dither_produces_saturated_colour() {
+        // 0x55 = 0b0101_0101 — every other pixel lit, high bit clear.
+        // The NTSC decode turns this into a saturated artifact colour
+        // (violet family on hardware), not grey/white.
         let page = make_page(|_| [0x55; HIRES_BYTES_PER_ROW]);
         let f = render(&page, RenderMode::NtscColor);
-        assert_eq!(f.pixel(0, 0).unwrap(), NTSC_LONE[0], "x=0 should be violet");
-        assert_eq!(f.pixel(2, 0).unwrap(), NTSC_LONE[1], "x=2 should be green");
-        assert_eq!(f.pixel(4, 0).unwrap(), NTSC_LONE[0], "x=4 should be violet");
+        let px = f.pixel(2, 0).unwrap();
+        assert_ne!(px, TEST_BLACK, "lit dither should not be black");
+        assert_ne!(px, TEST_WHITE, "lit dither should be coloured, not white");
+        // Saturated: max channel clearly above min (a real artifact hue,
+        // not a grey). The exact hue is calibration-dependent.
+        let max = px[0].max(px[1]).max(px[2]);
+        let min = px[0].min(px[1]).min(px[2]);
+        assert!(
+            i32::from(max) - i32::from(min) > 60,
+            "0x55 should read as a saturated colour, got {px:?}"
+        );
     }
 
     #[test]
-    fn ntsc_high_bit_swaps_to_orange_and_blue() {
-        // 0xd5 = 0b1101_0101 — same pixel pattern as 0x55 but with the
-        // high bit set. The lone pixels at x=0/2/4 now render from the
-        // orange-blue palette half:
-        //   x=0: high=1, cell parity 0 → blue
-        //   x=2: high=1, cell parity 1 → orange
-        //   x=4: high=1, cell parity 0 → blue
-        let page = make_page(|_| [0xd5; HIRES_BYTES_PER_ROW]);
-        let f = render(&page, RenderMode::NtscColor);
-        assert_eq!(f.pixel(0, 0).unwrap(), NTSC_LONE[2], "x=0 should be blue");
-        assert_eq!(f.pixel(2, 0).unwrap(), NTSC_LONE[3], "x=2 should be orange");
-        assert_eq!(f.pixel(4, 0).unwrap(), NTSC_LONE[2], "x=4 should be blue");
+    fn ntsc_high_bit_rotates_hue() {
+        // 0xd5 = same pixel pattern as 0x55 with the high bit set: the
+        // half-dot delay rotates the artifact hue (violet → blue family).
+        let a = render(&make_page(|_| [0x55; HIRES_BYTES_PER_ROW]), RenderMode::NtscColor);
+        let b = render(&make_page(|_| [0xd5; HIRES_BYTES_PER_ROW]), RenderMode::NtscColor);
+        assert_ne!(
+            a.pixel(2, 0).unwrap(),
+            b.pixel(2, 0).unwrap(),
+            "the high bit must change the artifact hue"
+        );
     }
 
     #[test]
