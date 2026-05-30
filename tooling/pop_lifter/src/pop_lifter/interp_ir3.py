@@ -253,10 +253,11 @@ def run(
             except _TailCallSignal as tc:
                 nxt = _resolve_tail(ctx, routine, trace.home_module, tc.target)
                 if nxt is None:
-                    raise InterpError(
-                        f"tail-call target {tc.target!r} unresolved from "
-                        f"module {trace.home_module!r} (external/ambiguous)"
-                    )
+                    # Top-level tail-call to an external/ambiguous target
+                    # — the crate emits `crate::ext::<name>(cpu); return;`
+                    # for these, which is a no-op then end-of-routine. End
+                    # the run with the current trace to match.
+                    return trace
                 routine, owner = nxt
                 trace.home_module = owner
                 continue
@@ -446,13 +447,13 @@ def _exec_stmt(stmt: Stmt, ctx: _Ctx, trace: Trace) -> None:
         resolved = _resolve_call_ctx(ctx, trace.home_module, stmt.target)
         if resolved is None:
             # External (no owner) or ambiguous (reused name in several
-            # modules) from this caller — exactly what the crate emits as
-            # an `ext` no-op stub. We can't faithfully reproduce that, so
-            # skip the routine rather than risk a false divergence.
-            raise InterpError(
-                f"call target {stmt.target!r} unresolved from module "
-                f"{trace.home_module!r} (external/ambiguous)"
-            )
+            # modules) from this caller — the crate emits `crate::ext::
+            # <name>(cpu)` for these and `ext.rs` defines each stub as
+            # `pub fn <name>(cpu: &mut Cpu) {}` (a pure no-op). Match
+            # that behaviour exactly by no-oping the call here too, so
+            # the rest of the routine still compares instead of the
+            # whole comparison being skipped.
+            return
         callee, owner = resolved
         if trace.call_depth >= _MAX_CALL_DEPTH:
             # A real 6502 would overflow its 256-byte stack long before
@@ -481,10 +482,11 @@ def _exec_stmt(stmt: Stmt, ctx: _Ctx, trace: Trace) -> None:
                 except _TailCallSignal as tc:
                     nxt = _resolve_tail(ctx, callee, owner, tc.target)
                     if nxt is None:
-                        raise InterpError(
-                            f"tail-call target {tc.target!r} unresolved from "
-                            f"module {owner!r} (external/ambiguous)"
-                        )
+                        # Mirror the crate: `crate::ext::<name>(cpu);
+                        # return;` ends the callee's tail-call chain
+                        # with a no-op. Break to fall back into the
+                        # outer call frame's continuation.
+                        break
                     callee, owner = nxt
         finally:
             trace.home_module = saved_home
