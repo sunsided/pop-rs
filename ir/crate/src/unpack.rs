@@ -1037,7 +1037,7 @@ pub fn FADEIN(cpu: &mut Cpu) {
     loop {
         cpu.set_x(cpu.reg.x.wrapping_sub(1));
         cpu.set_x(cpu.reg.x.wrapping_sub(1));
-        // raw: ??? stlx $E1            ; UNPACK.S:705
+        // 65816 (IIgs-only, not modeled): stlx $E1  ; UNPACK.S:705
         if cpu.flags.z {
             break;
         }

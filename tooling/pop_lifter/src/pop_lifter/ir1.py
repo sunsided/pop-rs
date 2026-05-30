@@ -924,6 +924,9 @@ OPS_65816 = frozenset({
     "xce", "rep", "sep", "mvn", "mvp", "phb", "plb", "phk", "phd", "pld",
     "tcd", "tdc", "tcs", "tsc", "txy", "tyx", "jml", "jsl", "rtl", "brl",
     "cop", "per", "wdm", "xba", "pei", "pea",
+    # 65816 24-bit absolute stores. POP uses `stlx` (the `,x`-indexed form
+    # of `stl`) in `UNPACK/FADEIN`'s IIgs SHR scan-line-clear loop.
+    "stl", "stlx",
 })
 
 

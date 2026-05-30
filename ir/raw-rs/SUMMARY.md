@@ -13,7 +13,7 @@ Lowered / Deferred count *top-level* statements that became real Rust vs. those 
 | `CTRLSUBS.S` | 86 | 578 | 0 | 100.0% |
 | `FRAMEADV.S` | 66 | 531 | 0 | 100.0% |
 | `GAMEBG.S` | 41 | 332 | 0 | 100.0% |
-| `GRAFIX.S` | 98 | 591 | 9 | 98.5% |
+| `GRAFIX.S` | 98 | 591 | 8 | 98.7% |
 | `HIRES.S` | 42 | 153 | 0 | 100.0% |
 | `MASTER.S` | 60 | 372 | 0 | 100.0% |
 | `MISC.S` | 27 | 236 | 0 | 100.0% |
@@ -23,7 +23,7 @@ Lowered / Deferred count *top-level* statements that became real Rust vs. those 
 | `SUBS.S` | 68 | 608 | 0 | 100.0% |
 | `TOPCTRL.S` | 51 | 443 | 0 | 100.0% |
 | `UNPACK.S` | 21 | 108 | 11 | 90.8% |
-| **total** | **826** | **5737** | **20** | **99.7%** |
+| **total** | **826** | **5737** | **19** | **99.7%** |
 
 ## Skipped (no liftable entry points)
 

@@ -1983,7 +1983,6 @@ pub fn VBLI(cpu: &mut Cpu) {
     cpu.mem[sym::vblflag] = cpu.mem[sym::vblflag].wrapping_shr(1) | ((cpu.flags.c as u8) << 7);
     cpu.flags.c = _c != 0;
     cpu.set_nz(cpu.mem[sym::vblflag]);
-    // raw: ??? rti             ; GRAFIX.S:1978
     return;
 }
 

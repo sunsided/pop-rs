@@ -2100,7 +2100,6 @@ impl Cpu {
         self.mem[sym::vblflag] = self.mem[sym::vblflag].wrapping_shr(1) | ((self.flags.c as u8) << 7);
         self.flags.c = _c != 0;
         self.set_nz(self.mem[sym::vblflag]);
-        // raw: ??? rti             ; GRAFIX.S:1978
         return;
     }
 

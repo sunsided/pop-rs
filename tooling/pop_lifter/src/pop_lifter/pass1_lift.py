@@ -372,6 +372,16 @@ def _lift_instr(
     if mnemonic == "rts":
         return Return(src=src)
 
+    if mnemonic == "rti":
+        # 6502 `rti` pops the processor status flags and the return PC.
+        # POP uses it only in interrupt handlers (e.g. `GRAFIX/VBLI`,
+        # reached via the $FFFE vector). Our model doesn't simulate IRQs,
+        # so these routines are never entered through normal control
+        # flow; lifting `rti` as `Return` is the closest honest
+        # approximation and keeps the routine structured rather than
+        # carrying an opaque `Unsupported` atom.
+        return Return(src=src)
+
     if mnemonic == "jmp":
         if not line.operand:
             return Unsupported(mnemonic=mnemonic, operand=None, src=src)
