@@ -260,8 +260,21 @@ struct Canvas {
 
 impl Canvas {
     fn new() -> Self {
+        // Original `CLS` (`HIRES.S:206`) fills the hires page with
+        // `lda #$80` ("black2") — bit 7 of every byte set. That bit
+        // is the NTSC palette-select; for unlit pixels it doesn't
+        // change `black-stays-black`, but it DOES affect downstream
+        // `AND`/`OR` operations: `MASK_B`'s AND can preserve or
+        // clear the palette bit per the mask sprite, and a later
+        // `pieceb` OR then paints lit pixels with whichever palette
+        // bit survives. Initialising to `0x00` instead silently
+        // shifts NTSC artifact colours inside `domaskb` carved
+        // regions — visible as the "triangular gaps" in the floor
+        // strip alongside columns / arches.
         Self {
-            bytes: Box::new([0; (ROOM_WIDTH_BYTES as usize) * (ROOM_HEIGHT_PX as usize)]),
+            bytes: Box::new(
+                [0x80; (ROOM_WIDTH_BYTES as usize) * (ROOM_HEIGHT_PX as usize)],
+            ),
         }
     }
 
@@ -301,8 +314,17 @@ impl Canvas {
     /// Compose every cell of `ctx.room` onto a fresh canvas.
     fn compose(ctx: &RoomContext, bg: &BiomeTables, draw_stairs: bool) -> Self {
         let mut canvas = Self::new();
-        // Three on-screen rows, top → bottom.
-        for (row, &dy_byte) in BLOCK_BOT_ROW.iter().enumerate().take(ROOM_HEIGHT) {
+        // Three on-screen rows, bottom → top — matches `FRAMEADV.S:62
+        // SURE` (`ldy #2 :row sty rowno ... dey jmp :row`). Order
+        // matters: row 1's tall sprites (e.g. red-biome
+        // `SPACE_B[1]` 52-px window, drawn at `Ay − 20`) extend
+        // upward into row 0's pixel area. With bottom-up rendering
+        // row 0 is processed *after* row 1, so row 0's own `pieced`
+        // (STA opacity at the bottom of its A-section) cleanly
+        // overwrites any bleed-up before the frame is finalised.
+        // Top-down rendering produced the visible "window bleeds
+        // through floor" artefact in LV12 R19 / R20.
+        for (row, &dy_byte) in BLOCK_BOT_ROW.iter().enumerate().take(ROOM_HEIGHT).rev() {
             let dy = i32::from(dy_byte);
             let ay = dy - i32::from(D_HEIGHT);
             for col in 0..ROOM_WIDTH {
