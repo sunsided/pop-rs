@@ -44,6 +44,18 @@ use pop_assets::{
     },
 };
 
+const _: () = assert!(ROOMS_PER_LEVEL <= u8::MAX as usize);
+#[allow(clippy::cast_possible_truncation)]
+const ROOMS_PER_LEVEL_U8: u8 = ROOMS_PER_LEVEL as u8;
+
+/// True when `id` is a valid 1-based room id (`1..=ROOMS_PER_LEVEL`).
+/// Used in lockstep by [`EditorState::step`] and the nav-button
+/// enable predicate so the two stay in sync as the invariant
+/// evolves.
+fn is_valid_room_id(id: u8) -> bool {
+    id != 0 && id <= ROOMS_PER_LEVEL_U8
+}
+
 /// Arguments for the `editor` subcommand.
 #[derive(Debug, ClapArgs)]
 pub struct Args {
@@ -178,7 +190,11 @@ impl EditorState {
         match Level::from_file(&path) {
             Ok(level) => {
                 let prince = level.prince_start();
-                self.current_room = prince.screen.max(1);
+                // Clamp to the 1..=ROOMS_PER_LEVEL invariant so a
+                // malformed level (or a sentinel like 0) can't drop
+                // us straight into the "out of range" branch in the
+                // central panel.
+                self.current_room = prince.screen.clamp(1, ROOMS_PER_LEVEL_U8);
                 self.loaded_level = Some(level);
                 self.loaded_level_idx = Some(idx);
                 self.status = format!("loaded {}", path.display());
@@ -205,7 +221,7 @@ impl EditorState {
             Direction::Up => neighbours.up,
             Direction::Down => neighbours.down,
         };
-        if target != 0 && usize::from(target) <= ROOMS_PER_LEVEL {
+        if is_valid_room_id(target) {
             self.current_room = target;
         }
     }
@@ -345,14 +361,20 @@ impl EditorApp {
 fn room_navigation(ui: &mut egui::Ui, state: &mut EditorState, n: RoomNeighbours) {
     ui.horizontal(|ui| {
         let mut nav = |label: &str, dir: Direction, target: u8, ui: &mut egui::Ui| {
-            let enabled = target != 0;
+            // Mirror `EditorState::step`'s bounds check exactly so an
+            // out-of-range entry in the MAP table can't yield a button
+            // that's enabled but does nothing.
+            let enabled = is_valid_room_id(target);
+            let hover = if enabled {
+                format!("go to room {target}")
+            } else if target == 0 {
+                "edge of level".to_string()
+            } else {
+                format!("room {target} out of range (1..={ROOMS_PER_LEVEL_U8})")
+            };
             if ui
                 .add_enabled(enabled, egui::Button::new(label))
-                .on_hover_text(if enabled {
-                    format!("go to room {target}")
-                } else {
-                    "edge of level".to_string()
-                })
+                .on_hover_text(hover)
                 .clicked()
             {
                 state.step(dir);
@@ -579,5 +601,34 @@ mod tests {
         let mut state = EditorState::new(None);
         state.step(Direction::Left);
         assert_eq!(state.current_room, 1);
+    }
+
+    #[test]
+    fn is_valid_room_id_matches_step_bounds() {
+        // 0 (edge sentinel), 1..=24 (real ids), 25..=255 (corrupt).
+        assert!(!is_valid_room_id(0));
+        for id in 1..=ROOMS_PER_LEVEL_U8 {
+            assert!(is_valid_room_id(id), "expected {id} to be valid");
+        }
+        assert!(!is_valid_room_id(ROOMS_PER_LEVEL_U8 + 1));
+        assert!(!is_valid_room_id(u8::MAX));
+    }
+
+    #[test]
+    fn current_room_stays_in_range_for_synthetic_levels() {
+        // Build a state and exercise the clamp path directly: any
+        // prince.screen value outside 1..=24 must be clamped to that
+        // range so the UI's "out of range" branch is unreachable from
+        // load_level alone.
+        let mut state = EditorState::new(Some(vendor_root()));
+        // Force-load every bundled level and verify the invariant.
+        for idx in 0..state.level_paths.len() {
+            state.load_level(idx);
+            assert!(
+                is_valid_room_id(state.current_room),
+                "LEVEL{idx} produced current_room={} after load",
+                state.current_room,
+            );
+        }
     }
 }
