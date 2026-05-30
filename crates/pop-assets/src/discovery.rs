@@ -32,8 +32,8 @@ pub fn bundled_levels_dir() -> Option<PathBuf> {
             return Some(p);
         }
     }
-    let in_tree = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../vendor/pop-apple2/04 Support/Levels");
+    let in_tree =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vendor/pop-apple2/04 Support/Levels");
     if levels_dir_looks_valid(&in_tree) {
         return Some(in_tree);
     }

@@ -3,6 +3,7 @@
 //! Subcommand tree:
 //!
 //! - `info` — identify and dump a level file's structure.
+//! - `draz` — inspect / render POP's `DRAZ/` sprite and screen assets.
 //!
 //! Future subcommands (`editor`, `play`, …) land behind their own
 //! Cargo features so headless / CI builds stay light.
@@ -11,6 +12,7 @@
 
 use clap::{Parser, Subcommand};
 
+mod draz;
 mod info;
 
 /// `pop` — Prince of Persia (Apple II) toolkit.
@@ -30,11 +32,14 @@ enum Cmd {
     ///
     /// With no argument, scans every bundled `LEVEL{N}` file.
     Info(info::Args),
+    /// Extract / preview POP's `DRAZ/` sprite and screen assets.
+    Draz(draz::Args),
 }
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.cmd {
         Cmd::Info(args) => info::run(&args),
+        Cmd::Draz(args) => draz::run(&args),
     }
 }

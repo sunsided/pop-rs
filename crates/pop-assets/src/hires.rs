@@ -9,6 +9,9 @@
 //!
 //! * [`row_byte_offset`] — the canonical Apple II row interleave.
 //! * [`render`] — turn an 8 KiB page into a 280 × 192 RGBA [`Frame`].
+//! * [`render_linear`] — render a non-interleaved `(width_bytes, height)`
+//!   bitmap (the layout used by POP's `IMG.CHTAB*` / `IMG.BGTAB*` sprite
+//!   tables) into a `(width_bytes * 7, height)` RGBA [`Frame`].
 //! * [`Frame`] — a row-major RGBA pixel buffer with explicit dimensions.
 //!
 //! Two render modes are supported:
@@ -165,21 +168,76 @@ pub fn render(page: &[u8; HIRES_PAGE_BYTES], mode: RenderMode) -> Frame {
     }
 }
 
-/// Unpack a row's 40 bytes into 280 per-pixel "lit" bits, LSB-first
-/// within each byte (so bit 0 of byte 0 is the leftmost pixel).
-fn unpack_row_bits(row: &[u8]) -> [bool; HIRES_WIDTH] {
-    let mut bits = [false; HIRES_WIDTH];
+/// Render a non-interleaved bitmap of `width_bytes × height` (POP's
+/// sprite / image-table format) to an RGBA [`Frame`].
+///
+/// `bytes` must be exactly `width_bytes * height` long. Within each
+/// byte, bit 0 is the leftmost pixel and bit 6 is the rightmost (bit 7
+/// is the NTSC palette select). The resulting frame is
+/// `width_bytes * 7` pixels wide.
+///
+/// # Row order
+///
+/// POP stores sprite bitmaps **bottom-up**: bytes `[0..width_bytes]`
+/// are the *bottom* row of the displayed sprite, and the last
+/// `width_bytes` bytes are the *top* row. This matches the `FASTLAY`
+/// blitter in `HIRES.S` (around line 421), which seeds `X` from `YCO`
+/// (the lowest visible scan-line of the sprite) and advances `IMAGE`
+/// forward in lockstep with `dex` — so the first byte of the bitmap
+/// corresponds to the lowest screen row. The "left-right, top-bottom"
+/// comment near `HIRES.S:186` describes the draw order on screen
+/// (which is bottom-up here), not in-memory order.
+///
+/// `render_linear` flips during read so callers always get a frame
+/// with row 0 = the visual top of the sprite.
+///
+/// # Errors
+///
+/// Returns `None` if `bytes.len() != width_bytes * height`.
+#[must_use]
+pub fn render_linear(bytes: &[u8], width_bytes: u8, height: u8, mode: RenderMode) -> Option<Frame> {
+    let w_bytes = usize::from(width_bytes);
+    let h = usize::from(height);
+    if bytes.len() != w_bytes * h {
+        return None;
+    }
+    let w_pixels = w_bytes * 7;
+    let mut pixels = vec![0u8; w_pixels * h * 4];
+    for y in 0..h {
+        // POP sprites are stored bottom-up; flip so row 0 of the output
+        // frame is the visual top of the sprite.
+        let src_y = h - 1 - y;
+        let row = &bytes[src_y * w_bytes..(src_y + 1) * w_bytes];
+        let out_row = &mut pixels[y * w_pixels * 4..(y + 1) * w_pixels * 4];
+        match mode {
+            RenderMode::Monochrome => render_row_mono(row, out_row),
+            RenderMode::NtscColor => render_row_ntsc(row, out_row),
+        }
+    }
+    Some(Frame {
+        width: u32::try_from(w_pixels).ok()?,
+        height: u32::from(height),
+        pixels,
+    })
+}
+
+/// Unpack a row of `row.len() * 7` per-pixel "lit" bits into `bits`,
+/// LSB-first within each byte (so bit 0 of byte 0 is the leftmost
+/// pixel). Panics in debug if `bits.len() != row.len() * 7`.
+fn unpack_row_bits(row: &[u8], bits: &mut [bool]) {
+    debug_assert_eq!(bits.len(), row.len() * 7);
     for (byte_idx, &b) in row.iter().enumerate() {
         let base = byte_idx * 7;
         for p in 0..7 {
             bits[base + p] = (b >> p) & 1 == 1;
         }
     }
-    bits
 }
 
 fn render_row_mono(row: &[u8], out: &mut [u8]) {
-    let bits = unpack_row_bits(row);
+    let width = row.len() * 7;
+    let mut bits = vec![false; width];
+    unpack_row_bits(row, &mut bits);
     for (x, &lit) in bits.iter().enumerate() {
         let i = x * 4;
         let color = if lit { WHITE } else { BLACK };
@@ -188,7 +246,9 @@ fn render_row_mono(row: &[u8], out: &mut [u8]) {
 }
 
 fn render_row_ntsc(row: &[u8], out: &mut [u8]) {
-    let bits = unpack_row_bits(row);
+    let width = row.len() * 7;
+    let mut bits = vec![false; width];
+    unpack_row_bits(row, &mut bits);
     for (x, &lit) in bits.iter().enumerate() {
         let i = x * 4;
         if !lit {
@@ -198,7 +258,7 @@ fn render_row_ntsc(row: &[u8], out: &mut [u8]) {
         // Color cells span pixel pairs (2k, 2k+1). The partner is the
         // other half of this cell.
         let partner_x = x ^ 1;
-        let partner_lit = partner_x < HIRES_WIDTH && bits[partner_x];
+        let partner_lit = partner_x < width && bits[partner_x];
         if partner_lit {
             out[i..i + 4].copy_from_slice(&WHITE);
             continue;
@@ -230,6 +290,38 @@ mod tests {
     const TEST_BLACK: [u8; 4] = [0x00, 0x00, 0x00, 0xff];
 
     #[test]
+    fn render_linear_flips_rows_bottom_up_to_top_down() {
+        // POP sprite memory layout: bytes [0..width_bytes] = visual
+        // bottom row, last `width_bytes` = visual top row. After
+        // render_linear, the output frame must have row 0 = visual top.
+        //
+        // 1-byte-wide, 2-line sprite: lit bottom row, dark top row in
+        // memory. Output frame row 0 should be black, row 1 should be
+        // white (lit).
+        let bytes = [
+            0x7f, // memory row 0 = visual bottom: all 7 pixels lit
+            0x00, // memory row 1 = visual top:    all 7 pixels dark
+        ];
+        let frame = render_linear(&bytes, 1, 2, RenderMode::Monochrome).unwrap();
+        assert_eq!(frame.width, 7);
+        assert_eq!(frame.height, 2);
+        // Output row 0 = top of display = memory row 1 (dark).
+        for x in 0..7 {
+            assert_eq!(frame.pixel(x, 0).unwrap(), TEST_BLACK, "top row x={x}");
+        }
+        // Output row 1 = bottom of display = memory row 0 (lit).
+        for x in 0..7 {
+            assert_eq!(frame.pixel(x, 1).unwrap(), TEST_WHITE, "bottom row x={x}");
+        }
+    }
+
+    #[test]
+    fn render_linear_rejects_size_mismatch() {
+        // 2-byte-wide, 3-line sprite needs 6 bytes; pass 5.
+        assert!(render_linear(&[0u8; 5], 2, 3, RenderMode::Monochrome).is_none());
+    }
+
+    #[test]
     fn row_interleave_is_bijective_over_192_rows() {
         // Every display row 0..192 gets a unique 40-byte slice; the
         // union covers exactly 192 * 40 = 7680 bytes — no overlap, no
@@ -238,7 +330,10 @@ mod tests {
         let mut count = 0usize;
         for y in 0..HIRES_HEIGHT {
             let off = row_byte_offset(u8::try_from(y).unwrap()) as usize;
-            assert!(off + HIRES_BYTES_PER_ROW <= HIRES_PAGE_BYTES, "row {y} out of page");
+            assert!(
+                off + HIRES_BYTES_PER_ROW <= HIRES_PAGE_BYTES,
+                "row {y} out of page"
+            );
             for cell in &mut covered[off..off + HIRES_BYTES_PER_ROW] {
                 assert!(!*cell, "row {y} overlaps an earlier row at offset {off}");
                 *cell = true;
@@ -315,7 +410,13 @@ mod tests {
         // of row 0 (the leftmost 7 pixels of the screen).
         let mut bytes = [0u8; HIRES_BYTES_PER_ROW];
         bytes[0] = 0b0000_0001;
-        let page = make_page(move |y| if y == 0 { bytes } else { [0; HIRES_BYTES_PER_ROW] });
+        let page = make_page(move |y| {
+            if y == 0 {
+                bytes
+            } else {
+                [0; HIRES_BYTES_PER_ROW]
+            }
+        });
         let f = render(&page, RenderMode::Monochrome);
         assert_eq!(f.pixel(0, 0).unwrap(), TEST_WHITE);
         for x in 1..7 {
@@ -324,7 +425,13 @@ mod tests {
 
         let mut bytes = [0u8; HIRES_BYTES_PER_ROW];
         bytes[0] = 0b0100_0000;
-        let page = make_page(move |y| if y == 0 { bytes } else { [0; HIRES_BYTES_PER_ROW] });
+        let page = make_page(move |y| {
+            if y == 0 {
+                bytes
+            } else {
+                [0; HIRES_BYTES_PER_ROW]
+            }
+        });
         let f = render(&page, RenderMode::Monochrome);
         for x in 0..6 {
             assert_eq!(f.pixel(x, 0).unwrap(), TEST_BLACK, "x={x} should be black");
