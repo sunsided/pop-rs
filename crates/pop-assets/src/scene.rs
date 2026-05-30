@@ -115,6 +115,147 @@ impl BiomeTables {
             PieceRef::Table2(i) => self.table2.images.get(usize::from(i)),
         }
     }
+
+    /// Heuristic diagnostics for the loaded BGTAB pair.
+    ///
+    /// The vendored `vendor/pop-apple2/` tree is the 3.5"-only recovered
+    /// source (`widemeadows/Prince-of-Persia-Apple-II`), and per Peter
+    /// Ferrie's [POP protection writeup][ferrie] the rebuilt-from-source
+    /// asset binaries shipped with truncated graphics. The truncation
+    /// is visible in red-biome rooms — sprite ID `0x1b` (`looseb` from
+    /// `BGDATA.S:143`, drawn by `FRAMEADV.S:1388 drawlooseb` into every
+    /// cell right of a `LooseFloor`) collapses to a 1×1 placeholder in
+    /// `IMG.BGTAB.RED1` where the palace / dungeon equivalents carry a
+    /// 28×13 floor-edge sprite. The renderer faithfully reproduces the
+    /// engine's algorithm against whatever bytes the table holds, so
+    /// the visible gap is a real-asset issue, not a renderer bug.
+    ///
+    /// This method walks the loaded tables and returns one
+    /// [`BiomeTablesIssue`] per pattern it recognises. Non-fatal —
+    /// callers (the editor especially) can surface them as a banner so
+    /// users wondering "why does my LV13 floor have gaps" find an
+    /// answer.
+    ///
+    /// See `docs/copy-protection.md` for the full story and the
+    /// retail-image extraction workaround.
+    ///
+    /// [ferrie]: https://pferrie.epizy.com/misc/lowlevel14.htm
+    #[must_use]
+    pub fn load_diagnostics(&self) -> Vec<BiomeTablesIssue> {
+        // The truncated assets in the vendored 3.5" rebuild are
+        // distinguishable by a very specific fingerprint — sprites
+        // that became `1×1` (= 1 byte = `0x80`, the canonical
+        // CLS-fill byte) **placeholders**. Real BGTAB sprites are
+        // never that small in the 1989 build, even when narrower
+        // than a cell: DUN1's `looseb` is 21×12 (3 hires bytes wide,
+        // a deliberate sub-cell width) but very much a real sprite.
+        //
+        // We therefore probe known-used sprite ids and flag only
+        // genuine 1×1 placeholders. The set is intentionally narrow
+        // — if more cases surface, add them here with a citation to
+        // the engine reference.
+        let mut issues = Vec::new();
+        for (sprite_id, role) in PROBED_SPRITES {
+            let idx = usize::from(*sprite_id - 1);
+            if let Some(img) = self.table1.images.get(idx) {
+                if is_placeholder(img) {
+                    issues.push(BiomeTablesIssue::TruncatedSprite {
+                        biome: self.biome,
+                        table: BgTable::One,
+                        sprite_id: *sprite_id,
+                        width_bytes: img.width_bytes,
+                        height: img.height,
+                        role,
+                    });
+                }
+            }
+        }
+        issues
+    }
+}
+
+/// Sprite IDs whose absence has visible renderer consequences and
+/// which the truncated 3.5" rebuild is known to have stripped. Each
+/// row is `(sprite_id, short role description with engine ref)`.
+///
+/// Keep the list small — false positives on legitimate sub-cell-width
+/// sprites (DUN1's 21×12 `looseb`, palace decorative pieces, etc.)
+/// would just train users to ignore the diagnostic.
+const PROBED_SPRITES: &[(u8, &str)] = &[
+    (
+        LOOSE_B,
+        "`looseb` — `drawlooseb` spillover (FRAMEADV.S:1388)",
+    ),
+];
+
+/// A BGTAB sprite is a "placeholder" iff it's a single byte. Real
+/// game sprites have meaningful width × height even when narrower
+/// than a cell.
+fn is_placeholder(img: &Image) -> bool {
+    img.width_bytes == 1 && img.height == 1
+}
+
+/// Which of a biome's two BGTAB image tables a diagnostic refers to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BgTable {
+    /// `IMG.BGTAB.{biome}1`.
+    One,
+    /// `IMG.BGTAB.{biome}2`.
+    Two,
+}
+
+/// A non-fatal data-completeness finding from
+/// [`BiomeTables::load_diagnostics`].
+///
+/// See `docs/copy-protection.md` (the "Data-completeness caveat"
+/// section) for context: the vendored upstream is the 3.5" rebuild
+/// Peter Ferrie flagged as carrying truncated graphics data.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BiomeTablesIssue {
+    /// A specific sprite resolves to a 1×1 placeholder — the
+    /// fingerprint of the 3.5"-rebuild truncation.
+    TruncatedSprite {
+        /// Biome whose tables were loaded.
+        biome: Biome,
+        /// Which of the two BGTAB tables (1 or 2) the sprite came from.
+        table: BgTable,
+        /// Sprite id (raw byte, bit 7 = table-2 select).
+        sprite_id: u8,
+        /// Sprite width as recorded in the file header.
+        width_bytes: u8,
+        /// Sprite height as recorded in the file header.
+        height: u8,
+        /// Short human-readable description of what this sprite is
+        /// used for in the engine.
+        role: &'static str,
+    },
+}
+
+impl std::fmt::Display for BiomeTablesIssue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TruncatedSprite {
+                biome,
+                table,
+                sprite_id,
+                width_bytes,
+                height,
+                role,
+            } => {
+                let table_n = match table {
+                    BgTable::One => 1,
+                    BgTable::Two => 2,
+                };
+                write!(
+                    f,
+                    "IMG.BGTAB.{biome}{table_n} sprite 0x{sprite_id:02x} ({role}) \
+                     is a {width_bytes}×{height} placeholder — likely the truncated 3.5\" \
+                     rebuild; see docs/copy-protection.md",
+                    biome = biome.short_name(),
+                )
+            }
+        }
+    }
 }
 
 /// Render one room of a level to a 280×192 RGBA frame.
@@ -925,6 +1066,60 @@ mod tests {
         // — a stricter pin would just track vendor-file fingerprints.
         assert!(tables.table1.images.len() >= 30);
         assert!(tables.table2.images.len() >= 10);
+    }
+
+    #[test]
+    fn dungeon_and_palace_load_diagnostics_are_clean() {
+        // The vendored DUN / PAL tables match the canonical 1989 build
+        // (per Peter Ferrie's writeup, only the red biome shipped
+        // truncated in the 3.5" rebuild). Diagnostics should be empty.
+        for biome in [Biome::Dungeon, Biome::Palace] {
+            let tables = BiomeTables::load(&vendor_root(), biome).expect("biome tables load");
+            let issues = tables.load_diagnostics();
+            assert!(
+                issues.is_empty(),
+                "{biome:?} should load without diagnostics; got: {issues:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn red_biome_surfaces_known_truncation() {
+        // Pin the fingerprint flagged in #109 / #110 / #112: in
+        // `IMG.BGTAB.RED1` sprite 0x1b (`looseb`) collapses to a 1×1
+        // placeholder where DUN1 carries 21×12 and PAL1 carries
+        // 28×13. The diagnostic exists so the editor can surface a
+        // clear explanation instead of silently rendering with the
+        // visible floor gaps.
+        let tables = BiomeTables::load(&vendor_root(), Biome::Red).expect("RED tables load");
+        let issues = tables.load_diagnostics();
+        assert_eq!(
+            issues,
+            vec![BiomeTablesIssue::TruncatedSprite {
+                biome: Biome::Red,
+                table: BgTable::One,
+                sprite_id: 0x1b,
+                width_bytes: 1,
+                height: 1,
+                role: "`looseb` — `drawlooseb` spillover (FRAMEADV.S:1388)",
+            }],
+        );
+    }
+
+    #[test]
+    fn truncated_sprite_diagnostic_message_mentions_workaround() {
+        // The Display impl must point at `docs/copy-protection.md` so
+        // the editor banner (and any future stderr-warning surface)
+        // gets users to the workaround in one hop.
+        let tables = BiomeTables::load(&vendor_root(), Biome::Red).unwrap();
+        let msg = tables
+            .load_diagnostics()
+            .iter()
+            .map(|i| format!("{i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(msg.contains("docs/copy-protection.md"), "got:\n{msg}");
+        assert!(msg.contains("IMG.BGTAB.RED1"), "got:\n{msg}");
     }
 
     #[test]

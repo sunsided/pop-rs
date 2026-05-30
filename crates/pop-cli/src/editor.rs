@@ -409,6 +409,12 @@ struct EditorApp {
     /// Diagnostic from the last sprite-load attempt, shown next to the
     /// `Real sprites` checkbox when it's empty.
     render_status: String,
+    /// Cumulative non-fatal asset-completeness warnings from
+    /// [`BiomeTables::load_diagnostics`] — surfaced as a one-line
+    /// banner in the toolbar so users wondering why their red-biome
+    /// floors have gaps find the writeup in one hop. See
+    /// `docs/copy-protection.md`.
+    asset_warnings: Vec<String>,
 }
 
 /// Pixels per tile at zoom == 1.0. Matches the real BGTAB cell shape:
@@ -436,6 +442,7 @@ impl EditorApp {
             biome_cache: HashMap::new(),
             room_textures: Vec::new(),
             render_status: String::new(),
+            asset_warnings: Vec::new(),
         }
     }
 
@@ -478,6 +485,17 @@ impl EditorApp {
             Some(t) => t,
             None => match BiomeTables::load(&root, biome) {
                 Ok(t) => {
+                    // Heuristic check for the truncated 3.5"-rebuild
+                    // asset fingerprint (see docs/copy-protection.md).
+                    // Surface non-fatal warnings; dedupe so loading
+                    // multiple levels of the same biome doesn't stack
+                    // duplicates.
+                    for issue in t.load_diagnostics() {
+                        let msg = format!("{issue}");
+                        if !self.asset_warnings.contains(&msg) {
+                            self.asset_warnings.push(msg);
+                        }
+                    }
                     self.biome_cache.insert(biome, t);
                     self.biome_cache.get(&biome).expect("just inserted")
                 }
@@ -660,6 +678,7 @@ impl EditorApp {
                     self.state.set_root(p);
                     self.biome_cache.clear();
                     self.room_textures.clear();
+                    self.asset_warnings.clear();
                     self.pending_initial_load = true;
                 }
             }
@@ -690,6 +709,26 @@ impl EditorApp {
             if !self.render_status.is_empty() {
                 ui.separator();
                 ui.label(&self.render_status);
+            }
+            if !self.asset_warnings.is_empty() {
+                ui.separator();
+                // Banner in warning yellow with a tooltip carrying the
+                // full message + a pointer at the writeup.
+                let count = self.asset_warnings.len();
+                let summary = if count == 1 {
+                    "asset warning".to_string()
+                } else {
+                    format!("{count} asset warnings")
+                };
+                let label = egui::RichText::new(format!("⚠ {summary}"))
+                    .color(Color32::from_rgb(240, 200, 80));
+                ui.label(label).on_hover_ui(|ui| {
+                    for w in &self.asset_warnings {
+                        ui.label(w);
+                    }
+                    ui.add_space(4.0);
+                    ui.label("See docs/copy-protection.md for the workaround.");
+                });
             }
         });
         action
