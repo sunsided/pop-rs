@@ -65,7 +65,7 @@
 )]
 
 use crate::bgdata::{
-    Biome, PieceRef, BLOCK_B, BLOCK_BOT_ROW, BLOCK_C, BLOCK_D, BLOCK_FR, B_STRIPE,
+    Biome, PieceRef, ARCHPANEL, BLOCK_B, BLOCK_BOT_ROW, BLOCK_C, BLOCK_D, BLOCK_FR, B_STRIPE,
     CELL_WIDTH_BYTES, DOOR, DOOR_MASK, D_HEIGHT, FLOOR_B, FLOOR_B_Y, FRONT_I, FRONT_X, FRONT_Y,
     GATE_8B, GATE_8C, GATE_B1, GATE_BOT_ORA, GATE_C_MASK, LOOSE_A, LOOSE_B, LOOSE_B_Y, LOOSE_D,
     MASK_A, MASK_B, PANEL_B, PANEL_B0_SENTINEL, PANEL_C, PANEL_C0_SENTINEL, PIECE_A, PIECE_A_Y,
@@ -697,6 +697,19 @@ fn draw_d_only(
 }
 
 fn draw_a(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, left: TileKind, blockxco: i32, ay: i32) {
+    // `drawa` special (`FRAMEADV.S:1136-1155`): when a panel-without-floor
+    // cell's left neighbour is an `archtop1`, the arch curve "ends to the
+    // left of a panel" and the engine draws the `archpanel` transition
+    // piece in place of the (empty) `PIECE_A[panelwof]`, with no A-mask.
+    // Without it the cell between an arch and a right-edge wall panel is
+    // blank — the gap seen left of LV4 R6's panelwof.
+    if left == TileKind::ArchTop1 && me.kind == TileKind::PanelWithoutFloor {
+        if let Some(piece) = bg.resolve(ARCHPANEL) {
+            let y = ay + i32::from(PIECE_A_Y[me.kind as usize]);
+            canvas.blit(piece, blockxco, y, Opacity::Or);
+        }
+        return;
+    }
     if left_intrudes(left) {
         if let Some(mask) = bg.resolve(MASK_A[me.kind as usize]) {
             canvas.blit(mask, blockxco, ay, Opacity::And);
@@ -1422,6 +1435,60 @@ mod tests {
         assert!(
             count_above_strip(&slicer) > count_above_strip(&empty),
             "slicer mechanism should add pixels above the floor strip"
+        );
+    }
+
+    #[test]
+    fn archpanel_bridges_arch_to_panel() {
+        // Regression: a panelwof whose left neighbour is an archtop1
+        // must draw the `archpanel` transition piece (sprite 0xa1) in
+        // its A-section — PIECE_A[panelwof] is empty, so without the
+        // `drawa` special (FRAMEADV.S:1151) the cell between an arch and
+        // a wall panel was blank (the gap left of LV4 R6's panelwof).
+        let panel_at = 5usize; // row 0, col 5
+        let with_arch = {
+            let mut tiles = [Tile::default(); ROOM_WIDTH * ROOM_HEIGHT];
+            tiles[panel_at - 1] = Tile {
+                kind: TileKind::ArchTop1,
+                variant: 0,
+                modifier: 0,
+            };
+            tiles[panel_at] = Tile {
+                kind: TileKind::PanelWithoutFloor,
+                variant: 0,
+                modifier: 2,
+            };
+            synth_level_with(tiles)
+        };
+        let without_arch = {
+            // Left neighbour is Empty → no archpanel substitution.
+            let mut tiles = [Tile::default(); ROOM_WIDTH * ROOM_HEIGHT];
+            tiles[panel_at] = Tile {
+                kind: TileKind::PanelWithoutFloor,
+                variant: 0,
+                modifier: 2,
+            };
+            synth_level_with(tiles)
+        };
+        let tables = BiomeTables::load(&vendor_root(), Biome::Palace).unwrap();
+        let a = render_room(&with_arch, 1, &tables, RenderMode::Monochrome).unwrap();
+        let b = render_room(&without_arch, 1, &tables, RenderMode::Monochrome).unwrap();
+        // Panel cell A-section: x 140..168, above the top-row D-strip.
+        let count = |f: &Frame| -> usize {
+            let mut n = 0;
+            for y in 20..60u32 {
+                for x in 140..168u32 {
+                    let i = ((y * f.width + x) * 4) as usize;
+                    if f.pixels[i..i + 3] != [0, 0, 0] {
+                        n += 1;
+                    }
+                }
+            }
+            n
+        };
+        assert!(
+            count(&a) > count(&b),
+            "archpanel piece should fill the arch-to-panel cell"
         );
     }
 

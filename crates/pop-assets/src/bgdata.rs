@@ -160,6 +160,12 @@ pub const PANEL_B0_SENTINEL: u8 = 0x9e;
 /// Sentinel for "default" panel C-piece value.
 pub const PANEL_C0_SENTINEL: u8 = 0x9f;
 
+/// Arch-to-panel transition A-piece (`BGDATA.S:168 archpanel = $a1`,
+/// aka `archtop3sp`). `drawa` (`FRAMEADV.S:1151`) substitutes this for
+/// the empty `PIECE_A[panelwof]` when a `panelwof` cell's left neighbour
+/// is an `archtop1` — it closes the arch curve against the wall panel.
+pub const ARCHPANEL: u8 = 0xa1;
+
 // ---------------------------------------------------------------------------
 // Loose floor (BGDATA.S:140-148) — frames cycle through the animation.
 // ---------------------------------------------------------------------------
