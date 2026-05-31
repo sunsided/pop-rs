@@ -311,9 +311,7 @@ fn same_biome_alias(piece_id: u8) -> Option<u8> {
 /// piece, but covers each kind's signature sprites.
 fn tile_sprite_ids(tile: Tile) -> Vec<u8> {
     let k = tile.kind as usize;
-    let mut ids = vec![
-        PIECE_A[k], PIECE_B[k], PIECE_C[k], PIECE_D[k], FRONT_I[k],
-    ];
+    let mut ids = vec![PIECE_A[k], PIECE_B[k], PIECE_C[k], PIECE_D[k], FRONT_I[k]];
     match tile.kind {
         TileKind::Block => {
             let v = block_variant(tile.modifier);
@@ -538,6 +536,59 @@ pub fn compose_room_bytes(
     // entry point (`FRAMEADV.S:1635` `cmp KidStartScrn beq :nostairs`).
     let draw_stairs = room_id != level.prince_start().screen;
     Some(Canvas::compose(&ctx, bg, draw_stairs, anim).bytes)
+}
+
+/// Compose **only the foreground** (`FRONT_I`) pieces of a room into a
+/// fresh top-down byte buffer (front pixels on black) — the same front
+/// pass [`compose_room_bytes`] runs inline, isolated.
+///
+/// A character layer (the Prince, guards) draws *between* the scene
+/// background and these front pieces: composite the character over
+/// [`compose_room_bytes`], then restore the bytes this buffer marks as
+/// foreground so columns / near floor-edges occlude the character — the
+/// `drawfrnt`-after-`drawchar` order of the original. Returns `None` for
+/// an out-of-range `room_id`.
+#[must_use]
+pub fn compose_foreground_bytes(
+    level: &Level,
+    room_id: u8,
+    bg: &BiomeTables,
+    anim: Anim,
+) -> Option<Box<[u8; ROOM_BYTES]>> {
+    let room_idx = usize::from(room_id).checked_sub(1)?;
+    if room_idx >= level.rooms.len() {
+        return None;
+    }
+    let ctx = RoomContext::from_level(level, room_idx);
+    let mut canvas = Canvas::new();
+    for (row, &dy_byte) in BLOCK_BOT_ROW.iter().enumerate().take(ROOM_HEIGHT).rev() {
+        let ay = i32::from(dy_byte) - i32::from(D_HEIGHT);
+        for col in 0..ROOM_WIDTH {
+            let blockxco = (col as i32) * i32::from(CELL_WIDTH_BYTES);
+            draw_front(
+                &mut canvas,
+                bg,
+                ctx.tile(col as i32, row as i32),
+                blockxco,
+                ay,
+                anim,
+            );
+        }
+    }
+    // Ceiling row's front pieces (the above-neighbour's bottom row).
+    let ceil_ay: i32 = -1;
+    for col in 0..ROOM_WIDTH {
+        let blockxco = (col as i32) * i32::from(CELL_WIDTH_BYTES);
+        draw_front(
+            &mut canvas,
+            bg,
+            ctx.above_bottom_row(col),
+            blockxco,
+            ceil_ay,
+            anim,
+        );
+    }
+    Some(canvas.bytes)
 }
 
 /// Like [`render_room_animated`], but also returns the top-down linear
@@ -1520,6 +1571,23 @@ mod tests {
     }
 
     #[test]
+    fn foreground_is_a_nonempty_subset_of_the_full_room() {
+        let level = load_level(1);
+        let bg = BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap();
+        let full = compose_room_bytes(&level, 1, &bg, Anim::REST).unwrap();
+        let fg = compose_foreground_bytes(&level, 1, &bg, Anim::REST).unwrap();
+        // Bytes the pass touched differ from the `0x80` "black2" CLS fill.
+        let touched = |b: &[u8]| b.iter().filter(|&&x| x != 0x80).count();
+        // Room 1 has front pieces (columns / floor edges) ...
+        assert!(touched(&fg[..]) > 0, "room 1 has foreground pieces");
+        // ... but they're only part of the full render.
+        assert!(
+            touched(&fg[..]) < touched(&full[..]),
+            "foreground is a subset of the full room"
+        );
+    }
+
+    #[test]
     fn dungeon_tables_load() {
         let tables = BiomeTables::load(&vendor_root(), Biome::Dungeon).expect("DUN1 + DUN2 load");
         // Both tables ship a non-trivial number of sprites. Exact
@@ -1796,8 +1864,16 @@ mod tests {
                     modifier: 0,
                 };
             }
-            compose_room_bytes(&synth_level_with(t), 1, &tables, Anim { tick: st * 4, traps: true })
-                .unwrap()
+            compose_room_bytes(
+                &synth_level_with(t),
+                1,
+                &tables,
+                Anim {
+                    tick: st * 4,
+                    traps: true,
+                },
+            )
+            .unwrap()
         };
         for st in 0u32..=6 {
             let base = render(false, st);
@@ -1855,8 +1931,8 @@ mod tests {
         // The tower biome's BLOCK_B[1] (0x6f) is truncated; the same-biome
         // alias makes a variant-1 block render its wall from the intact
         // variant-0 sprite (0x84) — so a variant-1 block's right-face
-            // cell renders identically to a variant-0 block's, in the tower's
-            // own colour (not the dungeon-fallback colour).
+        // cell renders identically to a variant-0 block's, in the tower's
+        // own colour (not the dungeon-fallback colour).
         let cell = ROOM_WIDTH + 4; // middle row, col 4; col 5 gets the wall
         let mk = |modifier: u8| {
             let mut tiles = [Tile::default(); ROOM_WIDTH * ROOM_HEIGHT];

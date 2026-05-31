@@ -52,6 +52,11 @@ const JUMP_VY: i32 = -12;
 /// run so he can edge up to gaps.
 const STEP_PX: i32 = 2;
 
+/// Half the Prince's collision width, px. He stops with his leading edge
+/// this far from a wall, so his body sits beside it rather than the sprite
+/// centre landing on the cell boundary (and half of him inside the wall).
+const COLLIDE_HALF: i32 = 7;
+
 /// Top-level game mode. Expands toward the full
 /// `Title → Attract → Demo → Playing → Paused → GameOver → Win` machine
 /// from #92; only `Title` / `Playing` exist today.
@@ -193,13 +198,13 @@ impl Prince {
         let target_col = col_of(target_x);
 
         // A solid tile at the destination column, on his row, is a wall:
-        // stop flush against it without entering.
+        // stop with his leading edge against it, not his centre.
         if target_col != cur_col && is_solid_at(room, target_col, self.row) {
-            let cur = i32::try_from(cur_col).unwrap_or(0);
+            let wall = i32::try_from(target_col).unwrap_or(0);
             self.x = if dir > 0 {
-                (cur + 1) * CELL_W - 1
+                wall * CELL_W - COLLIDE_HALF
             } else {
-                cur * CELL_W
+                (wall + 1) * CELL_W + COLLIDE_HALF
             }
             .clamp(X_MIN, X_MAX);
             return;
@@ -346,6 +351,8 @@ impl World {
                 } else {
                     &art.stand
                 };
+                // The full scene (background + foreground) before the kid.
+                let scene_bytes = bytes.clone();
                 // Centre the sprite's byte span on the Prince's column;
                 // sit its bottom scan-line on his feet.
                 let byte_x = self.prince.x / 7 - i32::from(img.width_bytes) / 2;
@@ -359,6 +366,25 @@ impl World {
                     top_y,
                     self.prince.facing_right,
                 );
+                // Restore the foreground over the kid so columns / near
+                // floor-edges occlude him (the original's drawfrnt-after-
+                // drawchar order). A byte the foreground pass touched
+                // (≠ the `0x80` "black2" CLS fill) reverts to the pre-kid
+                // scene byte.
+                if let Some(fg) = scene::compose_foreground_bytes(
+                    &self.level,
+                    self.room_id,
+                    &self.tables,
+                    Anim::REST,
+                ) {
+                    for (out, (&scene, &front)) in
+                        bytes.iter_mut().zip(scene_bytes.iter().zip(fg.iter()))
+                    {
+                        if front != 0x80 {
+                            *out = scene;
+                        }
+                    }
+                }
             }
         }
         hires::render_linear_topdown(&bytes[..], ROOM_WIDTH_BYTES, ROOM_HEIGHT_PX, mode)
