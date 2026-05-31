@@ -41,15 +41,29 @@ pub enum Mode {
     Playing,
 }
 
-/// The two kid sprites the host loads for the renderer: the standing pose
-/// and the free-fall pose. A full FRAMEDEF-driven frame set (the run /
-/// turn / jump cycles) arrives with the animation engine (#94 / #95).
+/// The kid sprites the host loads: the standing pose, the free-fall pose,
+/// and the 8-frame run cycle. A full FRAMEDEF-driven frame set (turn /
+/// jump / climb) and a sequence interpreter arrive with the rest of the
+/// animation engine (#94 / #95).
 pub struct KidArt {
     /// `stand` frame (FRAMEDEF 15 → CHTAB1 image 15).
     pub stand: Image,
     /// `freefall` frame (FRAMEDEF 106 → CHTAB2 image 54).
     pub fall: Image,
+    /// The 8-frame run cycle (SEQTABLE `runcyc1..8` = FRAMEDEF 7-14 →
+    /// CHTAB1 images 7-14), paired one-to-one with [`RUN_CHX`].
+    pub run: Vec<Image>,
 }
+
+/// Per-frame horizontal step of the run cycle, in pixels — the `chx`
+/// operands of SEQTABLE `runcyc1..8`. Indexed by the run phase.
+const RUN_CHX: [i32; 8] = [5, 1, 2, 4, 5, 2, 3, 4];
+
+/// Horizontal pixel bounds that keep the Prince on screen. No tile-level
+/// wall / ledge collision yet (that's the next slice) — he just can't
+/// walk off the 280 px room edge.
+const X_MIN: i32 = 7;
+const X_MAX: i32 = 273;
 
 /// The player character's physical state in pixel space.
 struct Prince {
@@ -68,6 +82,10 @@ struct Prince {
     on_ground: bool,
     /// Facing right (sprite mirrored) vs left.
     facing_right: bool,
+    /// Phase into the 8-frame run cycle ([`RUN_CHX`] / `KidArt::run`).
+    run_phase: usize,
+    /// `true` while he is stepping this tick (drives run vs stand frame).
+    moving: bool,
 }
 
 impl Prince {
@@ -94,14 +112,13 @@ impl Prince {
             landing_y,
             on_ground: spawn_feet >= landing_y,
             facing_right: faces_right(start.face_raw),
+            run_phase: 0,
+            moving: false,
         }
     }
 
     /// Advance one tick of gravity until he lands on `landing_y`.
-    fn update(&mut self) {
-        if self.on_ground {
-            return;
-        }
+    fn fall(&mut self) {
         self.vy += GRAVITY;
         self.feet_y += self.vy;
         if self.feet_y >= self.landing_y {
@@ -109,6 +126,21 @@ impl Prince {
             self.vy = 0;
             self.on_ground = true;
         }
+    }
+
+    /// Run one tick in `dir` (`-1` left, `+1` right, `0` idle): face the
+    /// way he moves, advance the run cycle, and step by that frame's
+    /// `chx`, clamped to the room. `dir == 0` returns him to standing.
+    fn walk(&mut self, dir: i32) {
+        if dir == 0 {
+            self.moving = false;
+            self.run_phase = 0;
+            return;
+        }
+        self.facing_right = dir > 0;
+        self.run_phase = (self.run_phase + 1) % RUN_CHX.len();
+        self.x = (self.x + RUN_CHX[self.run_phase] * dir).clamp(X_MIN, X_MAX);
+        self.moving = true;
     }
 }
 
@@ -183,10 +215,10 @@ impl World {
 
     /// Advance one logic frame given the latest input.
     ///
-    /// Today: arrow left / right page through rooms (a browse aid until
-    /// the controller takes the arrows for movement), and the Prince's
-    /// gravity advances every tick. Kid update / guards / tiles / sound
-    /// slot in here in order as later subsystems land (#94+).
+    /// In `Playing`: while airborne the Prince falls under gravity (no
+    /// steering mid-air yet); once grounded, the left / right arrows run
+    /// him that way. Guards / tiles / sound slot in here in order as later
+    /// subsystems land (#94+).
     pub fn tick(&mut self, input: InputState) {
         self.frame = self.frame.wrapping_add(1);
         match self.mode {
@@ -196,13 +228,13 @@ impl World {
                 }
             }
             Mode::Playing => {
-                if input.right && !self.prev.right {
-                    self.room_id = step_room(self.room_id, 1);
+                if self.prince.on_ground {
+                    self.prince.walk(walk_dir(input));
+                } else {
+                    self.prince.fall();
                 }
-                if input.left && !self.prev.left {
-                    self.room_id = step_room(self.room_id, -1);
-                }
-                self.prince.update();
+                // The room on screen follows the Prince.
+                self.room_id = self.prince.room;
             }
         }
         self.prev = input;
@@ -222,10 +254,12 @@ impl World {
             scene::compose_room_bytes(&self.level, self.room_id, &self.tables, Anim::REST)?;
         if let Some(art) = &self.art {
             if self.room_id == self.prince.room {
-                let img = if self.prince.on_ground {
-                    &art.stand
-                } else {
+                let img = if !self.prince.on_ground {
                     &art.fall
+                } else if self.prince.moving {
+                    art.run.get(self.prince.run_phase).unwrap_or(&art.stand)
+                } else {
+                    &art.stand
                 };
                 // Centre the sprite's byte span on the Prince's column;
                 // sit its bottom scan-line on his feet.
@@ -320,13 +354,16 @@ fn faces_right(face_raw: u8) -> bool {
     (face_raw ^ 0xff) & 0x80 == 0
 }
 
-/// Step a 1-based `room` by `delta`, wrapping within
-/// `1..=ROOMS_PER_LEVEL`.
-fn step_room(room: u8, delta: i32) -> u8 {
-    let count = i32::try_from(ROOMS_PER_LEVEL).unwrap_or(1).max(1);
-    let zero_based = i32::from(room) - 1;
-    let next = (zero_based + delta).rem_euclid(count) + 1;
-    u8::try_from(next).unwrap_or(1)
+/// Run direction from input: `+1` right, `-1` left, `0` idle. Right wins
+/// if both are held.
+fn walk_dir(input: InputState) -> i32 {
+    if input.right {
+        1
+    } else if input.left {
+        -1
+    } else {
+        0
+    }
 }
 
 #[cfg(test)]
@@ -354,6 +391,8 @@ mod tests {
         KidArt {
             stand: chtab1.images.get(14).expect("stand frame").clone(),
             fall: chtab2.images.get(53).expect("freefall frame").clone(),
+            // Run frames 7-14 = CHTAB1 indices 6..14.
+            run: (6..14).map(|i| chtab1.images[i].clone()).collect(),
         }
     }
 
@@ -368,12 +407,25 @@ mod tests {
     }
 
     #[test]
-    fn step_room_wraps_both_directions() {
-        let last = u8::try_from(ROOMS_PER_LEVEL).unwrap();
-        assert_eq!(step_room(1, -1), last);
-        assert_eq!(step_room(last, 1), 1);
-        assert_eq!(step_room(5, 1), 6);
-        assert_eq!(step_room(5, -1), 4);
+    fn walk_dir_prefers_right() {
+        let none = InputState::default();
+        assert_eq!(walk_dir(none), 0);
+        assert_eq!(
+            walk_dir(InputState {
+                right: true,
+                ..none
+            }),
+            1
+        );
+        assert_eq!(walk_dir(InputState { left: true, ..none }), -1);
+        assert_eq!(
+            walk_dir(InputState {
+                left: true,
+                right: true,
+                ..none
+            }),
+            1
+        );
     }
 
     #[test]
@@ -444,17 +496,27 @@ mod tests {
     }
 
     #[test]
-    fn right_arrow_edge_advances_room() {
+    fn grounded_prince_runs_right_on_arrow() {
         let mut world = World::new(load_level1(), dungeon_tables());
-        let start = world.room_id();
+        // Let him land first (no steering mid-air).
+        for _ in 0..30 {
+            world.tick(InputState::default());
+            if world.prince_on_ground() {
+                break;
+            }
+        }
+        assert!(world.prince_on_ground());
+        let x0 = world.prince.x;
         let held = InputState {
             right: true,
             ..InputState::default()
         };
         world.tick(held);
-        let after = world.room_id();
-        assert_eq!(after, step_room(start, 1));
-        world.tick(held);
-        assert_eq!(world.room_id(), after);
+        assert!(world.prince.moving, "arrow puts him in the run state");
+        assert!(world.prince.facing_right);
+        assert!(world.prince.x > x0, "he advances to the right");
+        // Releasing returns him to standing.
+        world.tick(InputState::default());
+        assert!(!world.prince.moving);
     }
 }

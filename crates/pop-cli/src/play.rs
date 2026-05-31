@@ -108,23 +108,31 @@ fn load_tables(root: &std::path::Path, biome: Biome) -> anyhow::Result<BiomeTabl
 /// CHTAB indices for the kid frames the renderer draws, traced from the
 /// engine. FRAMEDEF maps a frame to `(table, image)` via `Fimage` /
 /// `Fsword` (`CTRLSUBS.S decodeim`); POP image tables are 1-based, so the
-/// 0-based index is `image - 1`.
+/// 0-based index is `image - 1`. The run frames (`Fsword = 0`) live in
+/// CHTAB1 alongside `stand`.
 ///
 /// - `stand` = FRAMEDEF 15 (`$0f,9`) → CHTAB1 image 15 → index 14.
+/// - `run` = SEQTABLE `runcyc1..8` = FRAMEDEF 7-14 → CHTAB1 images 7-14
+///   → indices 6..14.
 /// - `freefall` = FRAMEDEF 106 (`$36,$40`) → CHTAB2 image 54 → index 53.
 const STAND_INDEX: usize = 14;
 const FALL_INDEX: usize = 53;
+const RUN_INDICES: std::ops::Range<usize> = 6..14;
 
-/// Load the kid sprite set (`stand` + `freefall`) from `DRAZ/I`, or
-/// `None` if a table or frame is missing — non-fatal, the host then
-/// renders the bare scene rather than refusing to start.
+/// Load the kid sprite set (`stand` + run cycle + `freefall`) from
+/// `DRAZ/I`, or `None` if a table or frame is missing — non-fatal, the
+/// host then renders the bare scene rather than refusing to start.
 fn load_kid_art(root: &std::path::Path) -> Option<KidArt> {
     let dir = discovery::draz_dir_in(root)?.join("I");
     let chtab1 = ImageTable::from_file(dir.join("IMG.CHTAB1")).ok()?;
     let chtab2 = ImageTable::from_file(dir.join("IMG.CHTAB2")).ok()?;
+    let run = RUN_INDICES
+        .map(|i| chtab1.images.get(i).cloned())
+        .collect::<Option<Vec<_>>>()?;
     Some(KidArt {
         stand: chtab1.images.get(STAND_INDEX)?.clone(),
         fall: chtab2.images.get(FALL_INDEX)?.clone(),
+        run,
     })
 }
 
