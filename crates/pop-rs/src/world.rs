@@ -132,7 +132,7 @@ impl World {
             let start = self.level.prince_start();
             if start.screen == self.room_id {
                 let (x, y) = kid_pixel_pos(start.block, img.width_bytes, img.height);
-                sprite::overlay(&mut frame, img, x, y, mode);
+                sprite::overlay(&mut frame, img, x, y, mode, faces_right(start.face_raw));
             }
         }
         Some(frame)
@@ -153,12 +153,15 @@ fn clamp_start_room(screen: u8) -> u8 {
     screen.clamp(1, last)
 }
 
-/// Top-left pixel position for a standing kid whose feet rest on the
-/// floor of tile `block` (`col + row * ROOM_WIDTH`). The sprite is
-/// centred horizontally in its tile column; `y` puts its bottom scan-line
-/// on the row's floor (`BLOCK_BOT_ROW`). Approximate placement — the
-/// exact POP character coordinate (sub-tile `charx`) arrives with the
-/// movement controller (#94).
+/// Top-left pixel position for the standing kid at his raw INFO start
+/// tile `block` (`col + row * ROOM_WIDTH`). The sprite is centred in its
+/// tile column; `y` puts its bottom scan-line on that row's floor
+/// (`BLOCK_BOT_ROW`).
+///
+/// This is the *spawn* point, drawn faithfully — on LV1 that's an empty
+/// top-left ledge the engine immediately drops the kid from (`SUBS.S`
+/// `:special1 → jumpseq stepfall`). A static sprite can't show the fall;
+/// the real spawn-and-drop lands with the movement controller (#94).
 fn kid_pixel_pos(block: u8, width_bytes: u8, height: u8) -> (i32, i32) {
     let cols = i32::try_from(ROOM_WIDTH).unwrap_or(10).max(1);
     let col = i32::from(block) % cols;
@@ -169,6 +172,18 @@ fn kid_pixel_pos(block: u8, width_bytes: u8, height: u8) -> (i32, i32) {
     let x = col * cell_w + (cell_w - sprite_w) / 2;
     let y = floor_y - i32::from(height) + 1;
     (x, y)
+}
+
+/// Whether to mirror the kid sprite so he faces right.
+///
+/// CHTAB character frames are stored facing **left** ("normal"); POP
+/// mirrors them to face right (`CTRLSUBS.S:354-355`). The runtime
+/// `CharFace` is `KidStartFace ^ $ff` (`SUBS.S:1516`), and a non-negative
+/// `CharFace` (high bit clear) means facing right. So we flip when the
+/// high bit of `face_raw ^ $ff` is clear. LV1 spawns with
+/// `KidStartFace = $ff` → `CharFace = 0` → faces right → mirror.
+fn faces_right(face_raw: u8) -> bool {
+    (face_raw ^ 0xff) & 0x80 == 0
 }
 
 /// Step a 1-based `room` by `delta`, wrapping within
@@ -228,7 +243,7 @@ mod tests {
 
     #[test]
     fn kid_pixel_pos_centers_in_column_and_sits_on_floor() {
-        // 14 px wide (2 bytes) × 41 px tall standing sprite.
+        // 14 px (2-byte) wide × 41 px tall standing sprite.
         // block 0 → col 0, row 0; floor row 0 = 65.
         let (x, y) = kid_pixel_pos(0, 2, 41);
         assert_eq!(x, (28 - 14) / 2); // centred in the 28 px column
@@ -237,6 +252,17 @@ mod tests {
         let (x, y) = kid_pixel_pos(13, 2, 41);
         assert_eq!(x, 3 * 28 + (28 - 14) / 2);
         assert_eq!(y, 128 - 41 + 1);
+    }
+
+    #[test]
+    fn faces_right_decodes_kidstartface() {
+        // LV1: KidStartFace $ff → CharFace 0 → faces right → mirror.
+        assert!(faces_right(0xff));
+        // CharFace -1 (face_raw $00) → faces left → no mirror.
+        assert!(!faces_right(0x00));
+        // High bit of CharFace decides: $7f^$ff=$80 (left), $80^$ff=$7f (right).
+        assert!(!faces_right(0x7f));
+        assert!(faces_right(0x80));
     }
 
     #[test]
