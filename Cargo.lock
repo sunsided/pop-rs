@@ -2381,6 +2381,7 @@ dependencies = [
  "eframe",
  "png 0.17.16",
  "pop-assets",
+ "pop-rs",
  "rfd",
 ]
 
@@ -2394,6 +2395,9 @@ dependencies = [
 [[package]]
 name = "pop-rs"
 version = "0.0.0"
+dependencies = [
+ "pop-assets",
+]
 
 [[package]]
 name = "potential_utf"

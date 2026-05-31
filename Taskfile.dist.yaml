@@ -86,6 +86,16 @@ tasks:
     cmds:
       - cargo run {{.PROFILE_FLAG}} -p pop-cli --bin pop --features editor -- editor {{.CLI_ARGS}}
 
+  play:
+    desc: "Launch the game in a window (gated on the `game` feature). Pass args after --, e.g. task play -- --level 2 or task play -- --mono."
+    aliases: [game]
+    deps: [submodules]
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found - install Rust from https://rustup.rs/"
+    cmds:
+      - cargo run {{.PROFILE_FLAG}} -p pop-cli --bin pop --features game -- play {{.CLI_ARGS}}
+
   test:
     desc: "Run the workspace test suite. Pass args after --, e.g. task test -- reader."
     preconditions:
