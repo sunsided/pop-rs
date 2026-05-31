@@ -48,7 +48,7 @@ impl World {
     /// Starts in [`Mode::Playing`] at the prince's start room.
     #[must_use]
     pub fn new(level: Level, tables: BiomeTables) -> Self {
-        let room_id = level.prince_start().screen.max(1);
+        let room_id = clamp_start_room(level.prince_start().screen);
         Self {
             level,
             tables,
@@ -118,6 +118,15 @@ fn pressed(i: InputState) -> bool {
     i.left || i.right || i.up || i.down || i.shift
 }
 
+/// Clamp a raw `KidStartScrn` into the `1..=ROOMS_PER_LEVEL` room
+/// invariant (mirrors the editor's spawn clamp). A 0 or out-of-range
+/// start room would otherwise make [`World::render`] return `None` and
+/// the host open a blank window.
+fn clamp_start_room(screen: u8) -> u8 {
+    let last = u8::try_from(ROOMS_PER_LEVEL).unwrap_or(1).max(1);
+    screen.clamp(1, last)
+}
+
 /// Step a 1-based `room` by `delta`, wrapping within
 /// `1..=ROOMS_PER_LEVEL`.
 fn step_room(room: u8, delta: i32) -> u8 {
@@ -130,6 +139,16 @@ fn step_room(room: u8, delta: i32) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clamp_start_room_keeps_invariant() {
+        let last = u8::try_from(ROOMS_PER_LEVEL).unwrap();
+        assert_eq!(clamp_start_room(0), 1); // floor
+        assert_eq!(clamp_start_room(1), 1);
+        assert_eq!(clamp_start_room(last), last);
+        assert_eq!(clamp_start_room(last + 1), last); // ceil
+        assert_eq!(clamp_start_room(u8::MAX), last); // ceil
+    }
 
     #[test]
     fn step_room_wraps_both_directions() {
