@@ -12,6 +12,7 @@
 //! same pipeline in follow-ups.
 
 use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 use anyhow::anyhow;
 use clap::Args as ClapArgs;
@@ -105,6 +106,14 @@ const FRAME_W: u16 = 280;
 const FRAME_H: u16 = 192;
 const DEFAULT_SCALE: f32 = 3.0;
 
+/// Fixed logic-tick cadence. egui may call `update` at the display
+/// refresh rate (often 60–144 Hz), but the game logic must advance at a
+/// deterministic, host-independent rate, so `update` steps the world at
+/// most once per `TICK`. ~12.5 Hz placeholder (matches the editor's
+/// animation step); pinned to POP's real frame-advance rate when the
+/// physics loop lands (#82 / #94).
+const TICK: Duration = Duration::from_millis(80);
+
 /// eframe application: owns the engine and the GPU texture for the
 /// current frame, re-uploading only when the displayed room changes.
 struct GameApp {
@@ -113,6 +122,8 @@ struct GameApp {
     texture: Option<TextureHandle>,
     /// Room id currently uploaded to `texture`; `None` forces a render.
     displayed_room: Option<u8>,
+    /// Wall-clock time of the last logic tick; `None` until the first.
+    last_tick: Option<Instant>,
 }
 
 impl GameApp {
@@ -122,6 +133,7 @@ impl GameApp {
             mode,
             texture: None,
             displayed_room: None,
+            last_tick: None,
         }
     }
 
@@ -164,7 +176,19 @@ impl eframe::App for GameApp {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
 
-        self.world.tick(input);
+        // Advance the world at a fixed cadence rather than at the host
+        // repaint rate. egui can call `update` far more often than the
+        // logic should step; `request_repaint_after(TICK)` below keeps
+        // it ticking without busy-spinning. (Mirrors the editor's
+        // ANIM_STEP gate.)
+        let now = Instant::now();
+        let waiting = self
+            .last_tick
+            .is_some_and(|t| now.duration_since(t) < TICK);
+        if !waiting {
+            self.last_tick = Some(now);
+            self.world.tick(input);
+        }
         self.refresh_texture(ctx);
 
         egui::CentralPanel::default()
@@ -188,7 +212,7 @@ impl eframe::App for GameApp {
                 );
             });
 
-        // Keep ticking so held-key edges and (later) animation advance.
-        ctx.request_repaint();
+        // Wake again in time for the next logic tick (no busy-spin).
+        ctx.request_repaint_after(TICK);
     }
 }

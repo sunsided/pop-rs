@@ -25,8 +25,8 @@ workspace = true
 # wanted for headless / CI builds. Requires a newer Rust than the
 # default-feature build (eframe's MSRV moves faster than ours).
 editor = ["dep:eframe", "dep:rfd"]
-# `pop run` — windowed game host (Path B, #79/#91). Same eframe stack as
-# the editor; pulls in the `pop-rs` engine. Optional for the same
+# `pop play` — windowed game host (Path B, #79/#91). Same eframe stack
+# as the editor; pulls in the `pop-rs` engine. Optional for the same
 # headless / CI / MSRV reasons as `editor`.
 game = ["dep:eframe", "dep:pop-rs"]
 
