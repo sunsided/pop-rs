@@ -169,6 +169,15 @@ impl BiomeTables {
         }
     }
 
+    /// `true` if `piece_id` resolves to a truncated sprite in *this*
+    /// biome's own tables — i.e. a loading conflict that [`Self::resolve`]
+    /// works around via an alias or the fallback biome. The editor uses
+    /// this to flag affected cells even though they render fine.
+    #[must_use]
+    pub fn is_conflicted(&self, piece_id: u8) -> bool {
+        self.raw_lookup(piece_id).is_some_and(is_truncated)
+    }
+
     /// Heuristic diagnostics for the loaded BGTAB pair.
     ///
     /// The vendored `vendor/pop-apple2/` tree is the 3.5"-only recovered
@@ -270,7 +279,7 @@ fn is_placeholder(img: &Image) -> bool {
 ///
 /// The 3.5" rebuild collapsed stripped sprites to degenerate sizes —
 /// `looseb` (`0x1b`) and the variant-1 block wall (`0x6f`) are both
-/// `1 byte × 1 px` in `IMG.BGTAB.RED1`, but they don't all share the
+/// `1 byte × 1 px` in `IMG.BGTAB.TWR1`, but they don't all share the
 /// `0x80` fill byte that [`is_placeholder`] keys on. Any real BGTAB
 /// sprite is at least a few pixels tall (the shortest, the floor
 /// D-strip, is 3 px), so a height of `<= 1` (or zero width) is a
@@ -287,13 +296,66 @@ fn is_truncated(img: &Image) -> bool {
 /// state byte selects `BLOCK_B` between `0x84` (variant 0) and `0x6f`
 /// (variant 1); the C/D/front pieces are identical for both, and the
 /// two wall sprites differ only by a one-pixel brick offset. The 3.5"
-/// rebuild stripped `0x6f` in tower biome but kept `0x84`, so a red
-/// variant-1 wall reads correctly (and in red colour) from `0x84`.
+/// rebuild stripped `0x6f` in tower biome but kept `0x84`, so a tower
+/// variant-1 wall reads correctly (in its own colour) from `0x84`.
 fn same_biome_alias(piece_id: u8) -> Option<u8> {
     match piece_id {
         x if x == BLOCK_B[1] => Some(BLOCK_B[0]),
         _ => None,
     }
+}
+
+/// Sprite IDs a tile contributes when drawn — its generic pieces plus
+/// any variant / special sprites. Used to flag cells whose render hit a
+/// truncated (substituted) sprite. Not exhaustive of every spilled
+/// piece, but covers each kind's signature sprites.
+fn tile_sprite_ids(tile: Tile) -> Vec<u8> {
+    let k = tile.kind as usize;
+    let mut ids = vec![
+        PIECE_A[k], PIECE_B[k], PIECE_C[k], PIECE_D[k], FRONT_I[k],
+    ];
+    match tile.kind {
+        TileKind::Block => {
+            let v = block_variant(tile.modifier);
+            ids.extend([BLOCK_B[v], BLOCK_C[v], BLOCK_D[v], BLOCK_FR[v]]);
+        }
+        TileKind::LooseFloor => ids.extend([LOOSE_B, LOOSE_A[0], LOOSE_D[0]]),
+        TileKind::Sword => ids.extend([SWORDGLEAM0, SWORDGLEAM1]),
+        TileKind::Slicer => {
+            ids.extend(SLICER_BOT);
+            ids.extend(SLICER_TOP);
+            ids.extend(SLICER_FRNT);
+        }
+        _ => {}
+    }
+    ids
+}
+
+/// `(col, row)` of cells in `room_id` whose tile draws a sprite that is
+/// truncated in `bg`'s own tables — a loading conflict the renderer
+/// worked around (alias / fallback) but the editor should still flag.
+/// Empty when nothing is conflicted (e.g. a complete biome).
+#[must_use]
+pub fn conflicted_cells(level: &Level, room_id: u8, bg: &BiomeTables) -> Vec<(usize, usize)> {
+    let Some(room_idx) = usize::from(room_id).checked_sub(1) else {
+        return Vec::new();
+    };
+    let Some(room) = level.rooms.get(room_idx) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for row in 0..ROOM_HEIGHT {
+        for col in 0..ROOM_WIDTH {
+            let tile = room.tiles[row * ROOM_WIDTH + col];
+            if tile_sprite_ids(tile)
+                .into_iter()
+                .any(|id| id != 0 && bg.is_conflicted(id))
+            {
+                out.push((col, row));
+            }
+        }
+    }
+    out
 }
 
 /// Which of a biome's two BGTAB image tables a diagnostic refers to.
@@ -1687,14 +1749,32 @@ mod tests {
             };
             synth_level_with(tiles)
         };
-        let red = BiomeTables::load(&vendor_root(), Biome::Tower)
+        let tower = BiomeTables::load(&vendor_root(), Biome::Tower)
             .unwrap()
             .with_fallback(BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap());
-        let v0 = render_room(&mk(0), 1, &red, RenderMode::NtscColor).unwrap();
-        let v1 = render_room(&mk(1), 1, &red, RenderMode::NtscColor).unwrap();
+        let v0 = render_room(&mk(0), 1, &tower, RenderMode::NtscColor).unwrap();
+        let v1 = render_room(&mk(1), 1, &tower, RenderMode::NtscColor).unwrap();
         assert_eq!(
             v0.pixels, v1.pixels,
-            "variant-1 block wall should alias to the variant-0 sprite in red"
+            "variant-1 block wall should alias to the variant-0 sprite in tower"
+        );
+    }
+
+    #[test]
+    fn conflicted_cells_flags_tower_truncations_not_dungeon() {
+        // A tower room with loose / pressplate / block:01 tiles draws
+        // truncated sprites (#112) and should be flagged; the same tiles
+        // under the complete dungeon tables are not conflicted.
+        let level = load_level(9);
+        let tower = BiomeTables::load(&vendor_root(), Biome::Tower).unwrap();
+        let dungeon = BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap();
+        assert!(
+            !conflicted_cells(&level, 5, &tower).is_empty(),
+            "tower room 5 should flag truncated-sprite cells"
+        );
+        assert!(
+            conflicted_cells(&level, 5, &dungeon).is_empty(),
+            "dungeon tables are complete for these tiles — no conflicts"
         );
     }
 

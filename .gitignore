@@ -32,3 +32,4 @@ dist/
 /ir/*.ir2
 /ir/*.ir3
 !/ir/pilot/
+mapref/

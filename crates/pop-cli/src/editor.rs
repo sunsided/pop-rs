@@ -403,6 +403,12 @@ struct EditorApp {
     /// recomputed on each full texture refresh so the per-tick update
     /// only re-renders rooms that actually change.
     animated_rooms: Vec<usize>,
+    /// Per-room `(col, row)` cells that draw a sprite truncated in the
+    /// biome's own tables (#112) — worked around by the renderer but
+    /// flagged in the editor. Indexed `0..ROOMS_PER_LEVEL`.
+    conflict_cells: Vec<Vec<(usize, usize)>>,
+    /// Toggle for the loading-conflict cell markers.
+    show_conflicts: bool,
     /// `Some((room, col, row))` when the mouse is hovering over a
     /// tile; surfaces in the status bar.
     hover: Option<(u8, u8, u8)>,
@@ -456,6 +462,8 @@ impl EditorApp {
             anim_tick: 0,
             last_anim_step: None,
             animated_rooms: Vec::new(),
+            conflict_cells: Vec::new(),
+            show_conflicts: true,
             hover: None,
             pending_fit: true,
             pending_initial_load: true,
@@ -529,7 +537,7 @@ impl EditorApp {
                 }
                 Err(e) => {
                     self.render_status =
-                        format!("failed to load {} sprites: {e}", biome.short_name());
+                        format!("failed to load {} sprites: {e}", biome.name());
                     return;
                 }
             },
@@ -599,9 +607,19 @@ impl EditorApp {
                 })
                 .map(|(idx, _)| idx)
                 .collect();
+            // Cache loading-conflict cells per room for the marker overlay.
+            self.conflict_cells = (0..ROOMS_PER_LEVEL)
+                .map(|idx| {
+                    u8::try_from(idx + 1)
+                        .ok()
+                        .filter(|_| layout.positions[idx].is_some())
+                        .map(|room_id| scene::conflicted_cells(level, room_id, tables))
+                        .unwrap_or_default()
+                })
+                .collect();
             self.render_status = format!(
                 "{} sprites ready ({} rooms)",
-                biome.short_name(),
+                biome.name(),
                 self.room_textures.iter().filter(|t| t.is_some()).count()
             );
         }
@@ -810,6 +828,8 @@ impl EditorApp {
             ui.checkbox(&mut self.show_labels, "tile labels");
             ui.checkbox(&mut self.show_room_ids, "room IDs");
             ui.checkbox(&mut self.show_coords, "cell coords");
+            ui.checkbox(&mut self.show_conflicts, "⚠ conflicts")
+                .on_hover_text("Mark cells whose sprite was truncated in the biome (#112) and worked around");
             ui.separator();
             if ui.button("Fit view").clicked() {
                 self.pending_fit = true;
@@ -1014,6 +1034,21 @@ impl EditorApp {
         }
         if self.show_coords {
             draw_cell_coords(painter, panel_rect.min, self.pan, tile_w, tile_h, rx, ry);
+        }
+        if self.show_conflicts {
+            if let Some(cells) = self.conflict_cells.get(room_idx) {
+                for &(col, row) in cells {
+                    draw_conflict_marker(
+                        painter,
+                        panel_rect.min,
+                        self.pan,
+                        tile_w,
+                        tile_h,
+                        rx + i32::try_from(col).unwrap_or(0),
+                        ry + i32::try_from(row).unwrap_or(0),
+                    );
+                }
+            }
         }
         if snapshot.prince.screen == room_id {
             if let Some((col, row)) = snapshot.prince.col_row() {
@@ -1292,6 +1327,36 @@ fn draw_marker(
         text,
         egui::FontId::proportional((r * 1.1).clamp(8.0, 18.0)),
         Color32::WHITE,
+    );
+}
+
+/// Flag a cell whose sprite was truncated in the biome and worked
+/// around (#112): a small amber asterisk in the cell's top-right corner.
+#[allow(clippy::cast_precision_loss)]
+fn draw_conflict_marker(
+    painter: &egui::Painter,
+    panel_origin: Pos2,
+    pan: Vec2,
+    tile_w: f32,
+    tile_h: f32,
+    tile_x: i32,
+    tile_y: i32,
+) {
+    if tile_w < 12.0 {
+        return;
+    }
+    // Top-right corner (clear of the top-left label and bottom-right
+    // coordinate overlays).
+    let cx = panel_origin.x + pan.x + (tile_x as f32 + 1.0) * tile_w - tile_w * 0.16;
+    let cy = panel_origin.y + pan.y + tile_y as f32 * tile_h + tile_h * 0.16;
+    let r = (tile_h * 0.14).clamp(5.0, 11.0);
+    painter.circle_filled(Pos2::new(cx, cy), r, Color32::from_black_alpha(180));
+    painter.text(
+        Pos2::new(cx, cy),
+        egui::Align2::CENTER_CENTER,
+        "✶",
+        egui::FontId::proportional((r * 1.6).clamp(8.0, 18.0)),
+        Color32::from_rgb(255, 180, 0),
     );
 }
 

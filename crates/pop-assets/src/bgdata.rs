@@ -382,6 +382,16 @@ impl Biome {
             Self::Tower => "TWR",
         }
     }
+
+    /// Full human-readable name (`"Dungeon"`, `"Palace"`, `"Tower"`).
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Dungeon => "Dungeon",
+            Self::Palace => "Palace",
+            Self::Tower => "Tower",
+        }
+    }
 }
 
 /// Resolved reference into a biome's two BGTAB image tables.
