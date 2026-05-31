@@ -123,12 +123,14 @@ pub const fn row_byte_offset(y: u8) -> u16 {
 }
 
 /// Subcarrier phase offset (radians) for the artifact-colour demod.
-/// Tuned against an Apple II palace (LEVEL 4) screenshot: this value
-/// lands the palace brick floor on brown, its ornaments on vivid blue,
-/// and the dungeon bricks on blue — matching what a composite monitor
-/// shows. The three biomes differ purely by their sprite data (high
-/// bits + dither), so one correct decode renders all of them.
-const NTSC_HUE: f32 = 0.0;
+/// Calibrated so the four base hi-res artifact colours come out
+/// canonical — even/high-clear → violet, odd/high-clear → green,
+/// even/high-set → blue, odd/high-set → orange — which makes the decode
+/// physically correct for every biome (they differ only by sprite
+/// data). Warm dithered fills (palace / red brick) then read as
+/// tan/gold; a composite monitor's darker, warmer response renders the
+/// same hue as the brown seen in screenshots.
+const NTSC_HUE: f32 = 0.4;
 /// Chroma gain. Higher = more saturated artifact colour; the YIQ luma
 /// term carries brightness so this only scales the colour swing.
 const NTSC_SAT: f32 = 1.5;
@@ -488,6 +490,33 @@ mod tests {
             assert_eq!(f.pixel(x, 0).unwrap(), TEST_BLACK, "x={x} should be black");
         }
         assert_eq!(f.pixel(6, 0).unwrap(), TEST_WHITE);
+    }
+
+    #[test]
+    fn ntsc_base_artifact_colours_are_canonical() {
+        // The four single-pixel hi-res patterns must decode to the
+        // canonical artifact hues, which guarantees the decode is right
+        // for every biome (they differ only by sprite data).
+        let probe = |byte: u8, x: u32| -> [u8; 3] {
+            let page = make_page(|_| [byte; HIRES_BYTES_PER_ROW]);
+            let f = render(&page, RenderMode::NtscColor);
+            let p = f.pixel(x, 0).unwrap();
+            [p[0], p[1], p[2]]
+        };
+        let dominant = |c: [u8; 3]| -> &'static str {
+            let [r, g, b] = c;
+            match (r > 160, g > 160, b > 160) {
+                (true, false, true) => "violet",
+                (false, true, false) => "green",
+                (false, _, true) => "blue",
+                (true, _, false) => "orange",
+                _ => "other",
+            }
+        };
+        assert_eq!(dominant(probe(0x55, 2)), "violet", "even/high-clear");
+        assert_eq!(dominant(probe(0x2a, 3)), "green", "odd/high-clear");
+        assert_eq!(dominant(probe(0xd5, 2)), "blue", "even/high-set");
+        assert_eq!(dominant(probe(0xaa, 3)), "orange", "odd/high-set");
     }
 
     #[test]
