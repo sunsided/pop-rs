@@ -20,6 +20,7 @@ use eframe::egui::{self, Color32, ColorImage, Pos2, Rect, TextureHandle, Vec2};
 
 use pop_assets::bgdata::Biome;
 use pop_assets::discovery;
+use pop_assets::draz::image_table::{Image, ImageTable};
 use pop_assets::hires::RenderMode;
 use pop_assets::level::Level;
 use pop_assets::scene::BiomeTables;
@@ -71,7 +72,11 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
     } else {
         RenderMode::NtscColor
     };
-    let app = GameApp::new(World::new(level, tables), mode);
+    let mut world = World::new(level, tables);
+    if let Some(kid) = load_kid_sprite(&root) {
+        world = world.with_kid(kid);
+    }
+    let app = GameApp::new(world, mode);
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -98,6 +103,20 @@ fn load_tables(root: &std::path::Path, biome: Biome) -> anyhow::Result<BiomeTabl
         }
     }
     Ok(tables)
+}
+
+/// The standing-Prince frame. `FRAMEDEF` maps the `stand` sequence to
+/// image 15 (`:15 db $0f,… ;stand`); POP image tables are 1-based, so
+/// that's 0-based index 14 in `IMG.CHTAB1`.
+const STAND_IMAGE_INDEX: usize = 14;
+
+/// Load the standing-Prince sprite from `DRAZ/I/IMG.CHTAB1`, or `None`
+/// if the table or frame is missing — non-fatal, the host then renders
+/// the bare scene rather than refusing to start.
+fn load_kid_sprite(root: &std::path::Path) -> Option<Image> {
+    let path = discovery::draz_dir_in(root)?.join("I").join("IMG.CHTAB1");
+    let table = ImageTable::from_file(path).ok()?;
+    table.images.get(STAND_IMAGE_INDEX).cloned()
 }
 
 /// POP's hi-res frame is 280×192; the window opens at this integer
@@ -151,8 +170,7 @@ impl GameApp {
             usize::try_from(frame.height).unwrap_or(0),
         ];
         let image = ColorImage::from_rgba_unmultiplied(size, &frame.pixels);
-        self.texture =
-            Some(ctx.load_texture("pop-frame", image, egui::TextureOptions::NEAREST));
+        self.texture = Some(ctx.load_texture("pop-frame", image, egui::TextureOptions::NEAREST));
         self.displayed_room = Some(self.world.room_id());
     }
 }
@@ -182,9 +200,7 @@ impl eframe::App for GameApp {
         // it ticking without busy-spinning. (Mirrors the editor's
         // ANIM_STEP gate.)
         let now = Instant::now();
-        let waiting = self
-            .last_tick
-            .is_some_and(|t| now.duration_since(t) < TICK);
+        let waiting = self.last_tick.is_some_and(|t| now.duration_since(t) < TICK);
         if !waiting {
             self.last_tick = Some(now);
             self.world.tick(input);
@@ -201,8 +217,7 @@ impl eframe::App for GameApp {
                     .floor()
                     .max(1.0);
                 let draw = Vec2::new(f32::from(FRAME_W) * scale, f32::from(FRAME_H) * scale);
-                let origin = ui.min_rect().min
-                    + ((avail - draw) * 0.5).max(Vec2::ZERO);
+                let origin = ui.min_rect().min + ((avail - draw) * 0.5).max(Vec2::ZERO);
                 let rect = Rect::from_min_size(origin, draw);
                 ui.painter().image(
                     texture.id(),
