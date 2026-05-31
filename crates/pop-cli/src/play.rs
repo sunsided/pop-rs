@@ -1,4 +1,4 @@
-//! `pop run` — windowed game host (Path B, #79 / #91).
+//! `pop play` — windowed game host (Path B, #79 / #91).
 //!
 //! The first runtime milestone: open a real window, run a frame loop,
 //! and display a 280×192 [`pop_assets::hires::Frame`] scaled up with
@@ -25,7 +25,7 @@ use pop_assets::scene::BiomeTables;
 use pop_rs::backend::InputState;
 use pop_rs::World;
 
-/// Arguments for the `run` subcommand.
+/// Arguments for the `play` subcommand.
 #[derive(Debug, ClapArgs)]
 pub struct Args {
     /// POP data root to load from. Overrides discovery. Should be a
@@ -41,7 +41,7 @@ pub struct Args {
     pub mono: bool,
 }
 
-/// Run the `run` subcommand.
+/// Run the `play` subcommand.
 ///
 /// # Errors
 ///
@@ -81,7 +81,7 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
             ]),
         ..Default::default()
     };
-    eframe::run_native("pop run", options, Box::new(|_cc| Ok(Box::new(app))))
+    eframe::run_native("pop play", options, Box::new(|_cc| Ok(Box::new(app))))
         .map_err(|e| anyhow!("eframe failed to launch: {e}"))
 }
 

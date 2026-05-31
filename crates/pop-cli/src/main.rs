@@ -7,9 +7,8 @@
 //! - `discover` — list POP data roots found on the host.
 //! - `editor` — egui level browser (gated on the `editor` Cargo
 //!   feature so headless / CI builds stay light).
-//!
-//! Future runtime subcommands (`play`, …) land behind their own Cargo
-//! features the same way.
+//! - `play` — windowed game host (gated on the `game` Cargo feature,
+//!   for the same headless / CI reasons).
 
 #![cfg_attr(not(test), warn(missing_docs))]
 
@@ -21,7 +20,7 @@ mod draz;
 mod editor;
 mod info;
 #[cfg(feature = "game")]
-mod run;
+mod play;
 
 /// `pop` — Prince of Persia (Apple II) toolkit.
 #[derive(Debug, Parser)]
@@ -48,9 +47,9 @@ enum Cmd {
     /// Open the egui level browser.
     #[cfg(feature = "editor")]
     Editor(editor::Args),
-    /// Run the game in a window (boots into a level; arrows page rooms).
+    /// Play the game in a window (boots into a level; arrows page rooms).
     #[cfg(feature = "game")]
-    Run(run::Args),
+    Play(play::Args),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -62,6 +61,6 @@ fn main() -> anyhow::Result<()> {
         #[cfg(feature = "editor")]
         Cmd::Editor(args) => editor::run(&args),
         #[cfg(feature = "game")]
-        Cmd::Run(args) => run::run(&args),
+        Cmd::Play(args) => play::run(&args),
     }
 }
