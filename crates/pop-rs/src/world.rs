@@ -17,9 +17,7 @@
 use pop_assets::bgdata::{BLOCK_BOT_ROW, CELL_WIDTH_BYTES, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES};
 use pop_assets::draz::image_table::Image;
 use pop_assets::hires::{self, Frame, RenderMode};
-use pop_assets::level::{
-    Level, Room, RoomNeighbours, TileKind, ROOMS_PER_LEVEL, ROOM_HEIGHT, ROOM_WIDTH,
-};
+use pop_assets::level::{Level, Room, TileKind, ROOMS_PER_LEVEL, ROOM_HEIGHT, ROOM_WIDTH};
 use pop_assets::scene::{self, Anim, BiomeTables};
 use pop_assets::sprite;
 
@@ -39,7 +37,7 @@ const VERT_DIST: i32 = 10;
 const CELL_W: i32 = CELL_WIDTH_BYTES as i32 * 7;
 
 /// Room width in pixels. Crossing it moves the Prince into the linked
-/// neighbour room ([`RoomNeighbours`]).
+/// neighbour room (see [`Level::room_links`]).
 const ROOM_W: i32 = ROOM_WIDTH_BYTES as i32 * 7;
 
 /// Per-frame horizontal step of the run cycle, in pixels — the `chx`
@@ -230,28 +228,6 @@ impl Prince {
             }
         }
     }
-
-    /// Carry the Prince into the linked neighbour room when he steps past
-    /// the left or right edge; clamp him at the level boundary when there
-    /// is no neighbour that way. His row / feet carry over — POP rooms
-    /// align vertically.
-    fn cross_horizontal(&mut self, links: RoomNeighbours) {
-        if self.x >= ROOM_W {
-            if links.right != 0 {
-                self.room = links.right;
-                self.x -= ROOM_W;
-            } else {
-                self.x = ROOM_W - 1;
-            }
-        } else if self.x < 0 {
-            if links.left != 0 {
-                self.room = links.left;
-                self.x += ROOM_W;
-            } else {
-                self.x = 0;
-            }
-        }
-    }
 }
 
 /// High-level game state for one loaded level.
@@ -323,6 +299,49 @@ impl World {
         self.prince.on_ground
     }
 
+    /// Carry the Prince into a neighbour room when he steps off the left
+    /// or right edge — but only if the neighbour's edge column is open at
+    /// his row. A solid edge tile there is a wall (POP treats the shared
+    /// boundary as a wall when either side's edge tile is solid), so he
+    /// stops at the boundary instead of warping into it. No neighbour
+    /// (`0`) is the level edge: also a wall.
+    fn cross_horizontal_edge(&mut self) {
+        let Some(&links) = self
+            .level
+            .room_links()
+            .get(usize::from(self.prince.room).saturating_sub(1))
+        else {
+            return;
+        };
+        let row = self.prince.row;
+        if self.prince.x >= ROOM_W {
+            // Off the right edge → enter the right neighbour at its col 0.
+            if links.right != 0 && self.room_col_open(links.right, 0, row) {
+                self.prince.room = links.right;
+                self.prince.x -= ROOM_W;
+            } else {
+                self.prince.x = ROOM_W - COLLIDE_HALF;
+            }
+        } else if self.prince.x < 0 {
+            // Off the left edge → enter the left neighbour at its last col.
+            if links.left != 0 && self.room_col_open(links.left, ROOM_WIDTH - 1, row) {
+                self.prince.room = links.left;
+                self.prince.x += ROOM_W;
+            } else {
+                self.prince.x = COLLIDE_HALF;
+            }
+        }
+    }
+
+    /// `true` if `(col, row)` of room id `room` is a non-solid tile the
+    /// Prince could step into. Missing room → `false` (treat as a wall).
+    fn room_col_open(&self, room: u8, col: usize, row: usize) -> bool {
+        self.level
+            .rooms
+            .get(usize::from(room).saturating_sub(1))
+            .is_some_and(|r| !is_solid_at(r, col, row))
+    }
+
     /// Advance one logic frame given the latest input.
     ///
     /// In `Playing`, once grounded: Up jumps, SHIFT + arrow takes a
@@ -352,13 +371,7 @@ impl World {
                     }
                 }
                 // Carry him into a neighbour room if he stepped off an edge.
-                if let Some(&links) = self
-                    .level
-                    .room_links()
-                    .get(usize::from(self.prince.room).saturating_sub(1))
-                {
-                    self.prince.cross_horizontal(links);
-                }
+                self.cross_horizontal_edge();
                 // The room on screen follows the Prince.
                 self.room_id = self.prince.room;
             }
@@ -739,26 +752,34 @@ mod tests {
     }
 
     #[test]
-    fn walking_off_the_left_edge_enters_the_neighbour_room() {
-        // LV1 room 1's left link is room 5 (col 0 row 1 is Torch, not a
-        // wall), so walking left off the edge crosses into it.
+    fn walled_neighbour_edge_blocks_transition() {
+        // LV1 room 1's left link is room 5, but room 5's right column (col 9)
+        // is a Block at row 1 — the shared boundary is a wall. Walking left
+        // off the edge must NOT cross; he stops in room 1.
         let mut world = landed_world();
         assert_eq!(world.room_id(), 1);
-        let mut entered = None;
         for _ in 0..30 {
             world.tick(InputState {
                 left: true,
                 ..InputState::default()
             });
-            if world.room_id() != 1 {
-                entered = Some(world.room_id());
-                break;
-            }
         }
-        assert_eq!(entered, Some(5), "left of room 1 is room 5");
+        assert_eq!(world.room_id(), 1, "room 5's edge wall blocks the crossing");
+        assert!(world.prince.x >= 0, "he stays inside room 1");
+    }
+
+    #[test]
+    fn open_neighbour_edge_transitions() {
+        // Force him onto row 0 (room 5's col 9 there is a Gate, not solid)
+        // just past room 1's left edge: the crossing into room 5 succeeds.
+        let mut world = landed_world();
+        world.prince.row = 0;
+        world.prince.x = -1;
+        world.cross_horizontal_edge();
+        assert_eq!(world.prince.room, 5, "open boundary crosses into room 5");
         assert!(
             world.prince.x >= ROOM_W / 2,
-            "he wraps to the right side of the new room"
+            "he wraps to the right side of room 5"
         );
     }
 
