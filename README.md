@@ -8,6 +8,8 @@ The original 6502 source is vendored as a git submodule at
 [`vendor/pop-apple2/`](./vendor/pop-apple2). It is read by the lifter and is
 **not** modified.
 
+![Status quo](.readme/pop.png)
+
 ## Status
 
 Pass 0 ([Merlin] lex/parse) and a first slice of Pass 1 (mechanical lift to IR1
