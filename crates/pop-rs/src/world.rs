@@ -193,21 +193,21 @@ impl Prince {
         self.facing_right = dir > 0;
         self.moving = true;
 
-        let cur_col = col_of(self.x);
-        let target_x = (self.x + dx).clamp(X_MIN, X_MAX);
-        let target_col = col_of(target_x);
+        let mut target_x = (self.x + dx).clamp(X_MIN, X_MAX);
 
-        // A solid tile at the destination column, on his row, is a wall:
-        // stop with his leading edge against it, not his centre.
-        if target_col != cur_col && is_solid_at(room, target_col, self.row) {
-            let wall = i32::try_from(target_col).unwrap_or(0);
-            self.x = if dir > 0 {
+        // Collide on his *leading edge*, not his centre — his body reaches
+        // the wall before his centre crosses the cell boundary. If the
+        // column under the leading edge is solid, stop the edge flush
+        // against the wall.
+        let lead_col = col_of(target_x + dir * COLLIDE_HALF);
+        if is_solid_at(room, lead_col, self.row) {
+            let wall = i32::try_from(lead_col).unwrap_or(0);
+            target_x = if dir > 0 {
                 wall * CELL_W - COLLIDE_HALF
             } else {
                 (wall + 1) * CELL_W + COLLIDE_HALF
             }
             .clamp(X_MIN, X_MAX);
-            return;
         }
 
         self.x = target_x;
@@ -651,6 +651,29 @@ mod tests {
             }
         }
         assert!(fell, "walking off the ledge should start a fall");
+    }
+
+    #[test]
+    fn running_into_a_wall_stops_before_it() {
+        // Running right, he drops to row 2 at the col-4 gap, then meets the
+        // col-9 Block wall. His leading edge must never pass the wall's
+        // left edge (`9 * CELL_W`), even though his centre stays left of it.
+        let mut world = landed_world();
+        let mut max_lead = 0;
+        for _ in 0..300 {
+            world.tick(InputState {
+                right: true,
+                ..InputState::default()
+            });
+            max_lead = max_lead.max(world.prince.x + COLLIDE_HALF);
+        }
+        assert!(
+            max_lead <= 9 * CELL_W,
+            "leading edge {max_lead} passed the wall at {}",
+            9 * CELL_W
+        );
+        // And he actually got close to it (didn't stall early).
+        assert!(max_lead >= 8 * CELL_W, "he should reach the wall");
     }
 
     #[test]
