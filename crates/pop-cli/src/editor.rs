@@ -403,6 +403,11 @@ struct EditorApp {
     /// recomputed on each full texture refresh so the per-tick update
     /// only re-renders rooms that actually change.
     animated_rooms: Vec<usize>,
+    /// Canvas viewport rect captured on the last `canvas()` call. The
+    /// per-tick animation refresh uses it to skip re-baking animated
+    /// rooms scrolled off-screen — the dominant cost in large levels
+    /// (e.g. LV9), where torches put most rooms in `animated_rooms`.
+    last_canvas_rect: Option<Rect>,
     /// Per-room `(col, row)` cells that draw a sprite truncated in the
     /// biome's own tables (#112) — worked around by the renderer but
     /// flagged in the editor. Indexed `0..ROOMS_PER_LEVEL`.
@@ -462,6 +467,7 @@ impl EditorApp {
             anim_tick: 0,
             last_anim_step: None,
             animated_rooms: Vec::new(),
+            last_canvas_rect: None,
             conflict_cells: Vec::new(),
             show_conflicts: true,
             hover: None,
@@ -637,8 +643,35 @@ impl EditorApp {
         }
     }
 
+    /// The subset of [`Self::animated_rooms`] whose on-screen rect
+    /// intersects `viewport` at the current pan / zoom. Off-screen
+    /// animated rooms are skipped each tick — they're re-baked when they
+    /// next scroll into view, and since the trap/torch preview is
+    /// non-physical the phase "jump" on re-entry is invisible.
+    fn visible_animated_rooms(&self, viewport: Rect) -> Vec<usize> {
+        let Some(layout) = &self.state.layout else {
+            return Vec::new();
+        };
+        let tile_w = self.tile_w();
+        let tile_h = self.tile_h();
+        let room_size = Vec2::new(tile_w * ROOM_WIDTH as f32, tile_h * ROOM_HEIGHT as f32);
+        self.animated_rooms
+            .iter()
+            .copied()
+            .filter(|&idx| {
+                let Some((rx, ry)) = layout.positions[idx] else {
+                    return false;
+                };
+                let min =
+                    viewport.min + self.pan + Vec2::new(rx as f32 * tile_w, ry as f32 * tile_h);
+                viewport.intersects(Rect::from_min_size(min, room_size))
+            })
+            .collect()
+    }
+
     /// Advance the animation a step if enough wall-clock has elapsed,
-    /// re-rendering only the animated rooms, and keep egui repainting.
+    /// re-rendering only the on-screen animated rooms, and keep egui
+    /// repainting.
     fn step_animation(&mut self, ctx: &egui::Context) {
         if !self.animate || self.animated_rooms.is_empty() {
             return;
@@ -651,9 +684,17 @@ impl EditorApp {
         }
         self.last_anim_step = Some(now);
         self.anim_tick = self.anim_tick.wrapping_add(1);
-        let anim = self.current_anim();
-        let rooms = self.animated_rooms.clone();
-        self.refresh_room_textures(ctx, anim, Some(&rooms));
+        // Cull to the visible rooms before re-baking. The tick still
+        // advances above, so off-screen rooms pick up the current phase
+        // when they scroll back in.
+        let rooms = match self.last_canvas_rect {
+            Some(rect) => self.visible_animated_rooms(rect),
+            None => self.animated_rooms.clone(),
+        };
+        if !rooms.is_empty() {
+            let anim = self.current_anim();
+            self.refresh_room_textures(ctx, anim, Some(&rooms));
+        }
         ctx.request_repaint_after(STEP);
     }
 
@@ -926,6 +967,7 @@ impl EditorApp {
 
         let (resp, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
         let panel_rect = resp.rect;
+        self.last_canvas_rect = Some(panel_rect);
 
         if self.pending_fit {
             self.fit_to_view(panel_rect);

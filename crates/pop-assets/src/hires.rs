@@ -151,6 +151,9 @@ pub fn render(page: &[u8; HIRES_PAGE_BYTES], mode: RenderMode) -> Frame {
     const _: () = assert!(HIRES_HEIGHT <= u32::MAX as usize);
 
     let mut pixels = vec![0u8; HIRES_WIDTH * HIRES_HEIGHT * 4];
+    // Scratch reused across rows so the NTSC demod doesn't heap-allocate
+    // a per-scanline signal buffer 192× per frame.
+    let mut ntsc_scratch: Vec<f32> = Vec::new();
     for y in 0u8..HIRES_HEIGHT as u8 {
         let row_start = row_byte_offset(y) as usize;
         let row = &page[row_start..row_start + HIRES_BYTES_PER_ROW];
@@ -158,7 +161,7 @@ pub fn render(page: &[u8; HIRES_PAGE_BYTES], mode: RenderMode) -> Frame {
         let out_row = &mut pixels[y_usize * HIRES_WIDTH * 4..(y_usize + 1) * HIRES_WIDTH * 4];
         match mode {
             RenderMode::Monochrome => render_row_mono(row, out_row),
-            RenderMode::NtscColor => render_row_ntsc(row, out_row),
+            RenderMode::NtscColor => render_row_ntsc(row, out_row, &mut ntsc_scratch),
         }
     }
     Frame {
@@ -203,6 +206,8 @@ pub fn render_linear(bytes: &[u8], width_bytes: u8, height: u8, mode: RenderMode
     }
     let w_pixels = w_bytes * 7;
     let mut pixels = vec![0u8; w_pixels * h * 4];
+    // Scratch reused across rows — see `render` for the rationale.
+    let mut ntsc_scratch: Vec<f32> = Vec::new();
     for y in 0..h {
         // POP sprites are stored bottom-up; flip so row 0 of the output
         // frame is the visual top of the sprite.
@@ -211,7 +216,7 @@ pub fn render_linear(bytes: &[u8], width_bytes: u8, height: u8, mode: RenderMode
         let out_row = &mut pixels[y * w_pixels * 4..(y + 1) * w_pixels * 4];
         match mode {
             RenderMode::Monochrome => render_row_mono(row, out_row),
-            RenderMode::NtscColor => render_row_ntsc(row, out_row),
+            RenderMode::NtscColor => render_row_ntsc(row, out_row, &mut ntsc_scratch),
         }
     }
     Some(Frame {
@@ -263,11 +268,13 @@ fn render_row_mono(row: &[u8], out: &mut [u8]) {
 /// chroma (`I`/`Q`, the signal mixed against the period-4 subcarrier)
 /// over a one-cycle window and convert `YIQ → RGB`.
 #[allow(clippy::cast_precision_loss, clippy::many_single_char_names)]
-fn render_row_ntsc(row: &[u8], out: &mut [u8]) {
+fn render_row_ntsc(row: &[u8], out: &mut [u8], sig: &mut Vec<f32>) {
     let width = row.len() * 7;
     // 2× oversample; +2 tail so the last pixel's window never indexes
-    // out of bounds.
-    let mut sig = vec![0.0f32; width * 2 + 2];
+    // out of bounds. `sig` is caller-owned scratch: clear + resize reuses
+    // the existing allocation and zeroes it for this row.
+    sig.clear();
+    sig.resize(width * 2 + 2, 0.0);
     for x in 0..width {
         let byte = row[x / 7];
         if (byte >> (x % 7)) & 1 == 1 {
