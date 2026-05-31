@@ -20,12 +20,12 @@ use eframe::egui::{self, Color32, ColorImage, Pos2, Rect, TextureHandle, Vec2};
 
 use pop_assets::bgdata::Biome;
 use pop_assets::discovery;
-use pop_assets::draz::image_table::{Image, ImageTable};
+use pop_assets::draz::image_table::ImageTable;
 use pop_assets::hires::RenderMode;
 use pop_assets::level::Level;
 use pop_assets::scene::BiomeTables;
 use pop_rs::backend::InputState;
-use pop_rs::World;
+use pop_rs::{KidArt, World};
 
 /// Arguments for the `play` subcommand.
 #[derive(Debug, ClapArgs)]
@@ -73,8 +73,8 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         RenderMode::NtscColor
     };
     let mut world = World::new(level, tables);
-    if let Some(kid) = load_kid_sprite(&root) {
-        world = world.with_kid(kid);
+    if let Some(art) = load_kid_art(&root) {
+        world = world.with_kid_art(art);
     }
     let app = GameApp::new(world, mode);
 
@@ -105,18 +105,27 @@ fn load_tables(root: &std::path::Path, biome: Biome) -> anyhow::Result<BiomeTabl
     Ok(tables)
 }
 
-/// The standing-Prince frame. `FRAMEDEF` maps the `stand` sequence to
-/// image 15 (`:15 db $0f,… ;stand`); POP image tables are 1-based, so
-/// that's 0-based index 14 in `IMG.CHTAB1`.
-const STAND_IMAGE_INDEX: usize = 14;
+/// CHTAB indices for the kid frames the renderer draws, traced from the
+/// engine. FRAMEDEF maps a frame to `(table, image)` via `Fimage` /
+/// `Fsword` (`CTRLSUBS.S decodeim`); POP image tables are 1-based, so the
+/// 0-based index is `image - 1`.
+///
+/// - `stand` = FRAMEDEF 15 (`$0f,9`) → CHTAB1 image 15 → index 14.
+/// - `freefall` = FRAMEDEF 106 (`$36,$40`) → CHTAB2 image 54 → index 53.
+const STAND_INDEX: usize = 14;
+const FALL_INDEX: usize = 53;
 
-/// Load the standing-Prince sprite from `DRAZ/I/IMG.CHTAB1`, or `None`
-/// if the table or frame is missing — non-fatal, the host then renders
-/// the bare scene rather than refusing to start.
-fn load_kid_sprite(root: &std::path::Path) -> Option<Image> {
-    let path = discovery::draz_dir_in(root)?.join("I").join("IMG.CHTAB1");
-    let table = ImageTable::from_file(path).ok()?;
-    table.images.get(STAND_IMAGE_INDEX).cloned()
+/// Load the kid sprite set (`stand` + `freefall`) from `DRAZ/I`, or
+/// `None` if a table or frame is missing — non-fatal, the host then
+/// renders the bare scene rather than refusing to start.
+fn load_kid_art(root: &std::path::Path) -> Option<KidArt> {
+    let dir = discovery::draz_dir_in(root)?.join("I");
+    let chtab1 = ImageTable::from_file(dir.join("IMG.CHTAB1")).ok()?;
+    let chtab2 = ImageTable::from_file(dir.join("IMG.CHTAB2")).ok()?;
+    Some(KidArt {
+        stand: chtab1.images.get(STAND_INDEX)?.clone(),
+        fall: chtab2.images.get(FALL_INDEX)?.clone(),
+    })
 }
 
 /// POP's hi-res frame is 280×192; the window opens at this integer
