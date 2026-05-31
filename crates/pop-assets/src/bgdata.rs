@@ -318,16 +318,19 @@ pub const BLOCK_BOT_ROW: [u8; 3] = [
 // ---------------------------------------------------------------------------
 
 /// Which BGTAB set a level draws from. Mirrors the three values of
-/// `MISC.S:772 bgset1` — the Apple II port ships exactly three biomes;
-/// `IMG.BGTAB.{TWR1,TWR2}` in the vendor tree are unused.
+/// `MISC.S:772 bgset1`, which `MASTER.S:524 bg1trk hex 05,00,07` maps to
+/// disk tracks 5 / 0 / 7 — i.e. three distinct tilesets. The vendor
+/// tree's `IMG.BGTAB.{RED1,RED2}` is the *unused* fourth set (a gold,
+/// truncated leftover); bgset 2 is the blue, tower-style `TWR`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Biome {
-    /// Levels 0-3 — `IMG.BGTAB.DUN1` + `IMG.BGTAB.DUN2`.
+    /// Levels 0-3 — `IMG.BGTAB.DUN1` + `IMG.BGTAB.DUN2` (bgset 0).
     Dungeon,
-    /// Levels 4-6, 10-11, 14 — `IMG.BGTAB.PAL1` + `IMG.BGTAB.PAL2`.
+    /// Levels 4-6, 10-11, 14 — `IMG.BGTAB.PAL1` + `IMG.BGTAB.PAL2` (bgset 1).
     Palace,
-    /// Levels 7-9, 12-13 — `IMG.BGTAB.RED1` + `IMG.BGTAB.RED2`.
-    Red,
+    /// Levels 7-9, 12-13 — `IMG.BGTAB.TWR1` + `IMG.BGTAB.TWR2` (bgset 2).
+    /// A blue, dungeon-like "tower" set (not the unused gold `RED`).
+    Tower,
 }
 
 /// Per-level biome, indexed by **0-based** level number (LEVEL0..LEVEL14).
@@ -341,13 +344,13 @@ pub const LEVEL_BIOME: [Biome; 15] = [
     Biome::Palace,  // LEVEL4
     Biome::Palace,  // LEVEL5
     Biome::Palace,  // LEVEL6
-    Biome::Red,     // LEVEL7
-    Biome::Red,     // LEVEL8
-    Biome::Red,     // LEVEL9
+    Biome::Tower,   // LEVEL7
+    Biome::Tower,   // LEVEL8
+    Biome::Tower,   // LEVEL9
     Biome::Palace,  // LEVEL10
     Biome::Palace,  // LEVEL11
-    Biome::Red,     // LEVEL12
-    Biome::Red,     // LEVEL13
+    Biome::Tower,   // LEVEL12
+    Biome::Tower,   // LEVEL13
     Biome::Palace,  // LEVEL14
 ];
 
@@ -366,17 +369,27 @@ impl Biome {
         match self {
             Self::Dungeon => ("IMG.BGTAB.DUN1", "IMG.BGTAB.DUN2"),
             Self::Palace => ("IMG.BGTAB.PAL1", "IMG.BGTAB.PAL2"),
-            Self::Red => ("IMG.BGTAB.RED1", "IMG.BGTAB.RED2"),
+            Self::Tower => ("IMG.BGTAB.TWR1", "IMG.BGTAB.TWR2"),
         }
     }
 
-    /// Short ASCII name (`"DUN"`, `"PAL"`, `"RED"`), used in UI.
+    /// Short ASCII name (`"DUN"`, `"PAL"`, `"TWR"`), used in UI.
     #[must_use]
     pub const fn short_name(self) -> &'static str {
         match self {
             Self::Dungeon => "DUN",
             Self::Palace => "PAL",
-            Self::Red => "RED",
+            Self::Tower => "TWR",
+        }
+    }
+
+    /// Full human-readable name (`"Dungeon"`, `"Palace"`, `"Tower"`).
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Dungeon => "Dungeon",
+            Self::Palace => "Palace",
+            Self::Tower => "Tower",
         }
     }
 }
@@ -454,7 +467,7 @@ mod tests {
         assert_eq!(Biome::for_level(0), Some(Biome::Dungeon));
         assert_eq!(Biome::for_level(3), Some(Biome::Dungeon));
         assert_eq!(Biome::for_level(4), Some(Biome::Palace));
-        assert_eq!(Biome::for_level(7), Some(Biome::Red));
+        assert_eq!(Biome::for_level(7), Some(Biome::Tower));
         assert_eq!(Biome::for_level(14), Some(Biome::Palace));
         assert_eq!(Biome::for_level(15), None);
     }
@@ -465,7 +478,7 @@ mod tests {
         assert_eq!(t1, "IMG.BGTAB.DUN1");
         assert_eq!(t2, "IMG.BGTAB.DUN2");
         assert_eq!(Biome::Palace.bgtab_filenames().0, "IMG.BGTAB.PAL1");
-        assert_eq!(Biome::Red.bgtab_filenames().0, "IMG.BGTAB.RED1");
+        assert_eq!(Biome::Tower.bgtab_filenames().0, "IMG.BGTAB.TWR1");
     }
 
     #[test]

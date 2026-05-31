@@ -95,7 +95,7 @@ pub struct BiomeTables {
     /// Optional fallback biome. When a sprite in this biome resolves to
     /// a truncated 3.5"-rebuild placeholder (see [`is_placeholder`]),
     /// [`Self::resolve`] substitutes the same sprite from this fallback
-    /// — the editor attaches a complete dungeon set so red-biome rooms
+    /// — the editor attaches a complete dungeon set so tower-biome rooms
     /// render correctly despite the #112 truncation. `None` keeps the
     /// faithful (truncated) behaviour. See `docs/copy-protection.md`.
     fallback: Option<Box<BiomeTables>>,
@@ -135,21 +135,47 @@ impl BiomeTables {
         self
     }
 
-    fn resolve(&self, piece_id: u8) -> Option<&Image> {
-        let img = match PieceRef::resolve(piece_id)? {
+    /// Raw table lookup for `piece_id`, no truncation handling.
+    fn raw_lookup(&self, piece_id: u8) -> Option<&Image> {
+        match PieceRef::resolve(piece_id)? {
             PieceRef::Table1(i) => self.table1.images.get(usize::from(i)),
             PieceRef::Table2(i) => self.table2.images.get(usize::from(i)),
-        };
+        }
+    }
+
+    fn resolve(&self, piece_id: u8) -> Option<&Image> {
+        let img = self.raw_lookup(piece_id);
         match img {
-            // Truncated 3.5"-rebuild sprite → substitute the same sprite
-            // from the fallback biome if one is attached.
-            Some(im) if is_truncated(im) => self
-                .fallback
-                .as_deref()
-                .and_then(|fb| fb.resolve(piece_id))
-                .or(Some(im)),
+            Some(im) if is_truncated(im) => {
+                // 1. Prefer a near-identical sprite *in this biome* so the
+                //    substitute keeps the biome's colour (e.g. block-wall
+                //    variant 1 `0x6f` -> variant 0 `0x84`, which differ
+                //    only in a trivial brick offset). The dungeon fallback
+                //    would render this wall in the wrong (dungeon) colour.
+                if let Some(alias) = same_biome_alias(piece_id) {
+                    if let Some(a) = self.raw_lookup(alias) {
+                        if !is_truncated(a) {
+                            return Some(a);
+                        }
+                    }
+                }
+                // 2. Otherwise substitute from the fallback biome.
+                self.fallback
+                    .as_deref()
+                    .and_then(|fb| fb.resolve(piece_id))
+                    .or(Some(im))
+            }
             other => other,
         }
+    }
+
+    /// `true` if `piece_id` resolves to a truncated sprite in *this*
+    /// biome's own tables — i.e. a loading conflict that [`Self::resolve`]
+    /// works around via an alias or the fallback biome. The editor uses
+    /// this to flag affected cells even though they render fine.
+    #[must_use]
+    pub fn is_conflicted(&self, piece_id: u8) -> bool {
+        self.raw_lookup(piece_id).is_some_and(is_truncated)
     }
 
     /// Heuristic diagnostics for the loaded BGTAB pair.
@@ -158,7 +184,7 @@ impl BiomeTables {
     /// source (`widemeadows/Prince-of-Persia-Apple-II`), and per Peter
     /// Ferrie's [POP protection writeup][ferrie] the rebuilt-from-source
     /// asset binaries shipped with truncated graphics. The truncation
-    /// is visible in red-biome rooms — sprite ID `0x1b` (`looseb` from
+    /// is visible in tower-biome rooms — sprite ID `0x1b` (`looseb` from
     /// `BGDATA.S:143`, drawn by `FRAMEADV.S:1388 drawlooseb` into every
     /// cell right of a `LooseFloor`) collapses to a 1×1 placeholder in
     /// `IMG.BGTAB.RED1` where the palace / dungeon equivalents carry a
@@ -253,13 +279,83 @@ fn is_placeholder(img: &Image) -> bool {
 ///
 /// The 3.5" rebuild collapsed stripped sprites to degenerate sizes —
 /// `looseb` (`0x1b`) and the variant-1 block wall (`0x6f`) are both
-/// `1 byte × 1 px` in `IMG.BGTAB.RED1`, but they don't all share the
+/// `1 byte × 1 px` in `IMG.BGTAB.TWR1`, but they don't all share the
 /// `0x80` fill byte that [`is_placeholder`] keys on. Any real BGTAB
 /// sprite is at least a few pixels tall (the shortest, the floor
 /// D-strip, is 3 px), so a height of `<= 1` (or zero width) is a
 /// reliable "this slot was stripped" signal for substitution.
 fn is_truncated(img: &Image) -> bool {
     img.width_bytes == 0 || img.height <= 1
+}
+
+/// A near-identical sprite *within the same biome* to use when
+/// `piece_id` is truncated, preferred over the cross-biome fallback so
+/// the substitute keeps the biome's colour.
+///
+/// The only case today: the two solid-block wall variants. A block's
+/// state byte selects `BLOCK_B` between `0x84` (variant 0) and `0x6f`
+/// (variant 1); the C/D/front pieces are identical for both, and the
+/// two wall sprites differ only by a one-pixel brick offset. The 3.5"
+/// rebuild stripped `0x6f` in tower biome but kept `0x84`, so a tower
+/// variant-1 wall reads correctly (in its own colour) from `0x84`.
+fn same_biome_alias(piece_id: u8) -> Option<u8> {
+    match piece_id {
+        x if x == BLOCK_B[1] => Some(BLOCK_B[0]),
+        _ => None,
+    }
+}
+
+/// Sprite IDs a tile contributes when drawn — its generic pieces plus
+/// any variant / special sprites. Used to flag cells whose render hit a
+/// truncated (substituted) sprite. Not exhaustive of every spilled
+/// piece, but covers each kind's signature sprites.
+fn tile_sprite_ids(tile: Tile) -> Vec<u8> {
+    let k = tile.kind as usize;
+    let mut ids = vec![
+        PIECE_A[k], PIECE_B[k], PIECE_C[k], PIECE_D[k], FRONT_I[k],
+    ];
+    match tile.kind {
+        TileKind::Block => {
+            let v = block_variant(tile.modifier);
+            ids.extend([BLOCK_B[v], BLOCK_C[v], BLOCK_D[v], BLOCK_FR[v]]);
+        }
+        TileKind::LooseFloor => ids.extend([LOOSE_B, LOOSE_A[0], LOOSE_D[0]]),
+        TileKind::Sword => ids.extend([SWORDGLEAM0, SWORDGLEAM1]),
+        TileKind::Slicer => {
+            ids.extend(SLICER_BOT);
+            ids.extend(SLICER_TOP);
+            ids.extend(SLICER_FRNT);
+        }
+        _ => {}
+    }
+    ids
+}
+
+/// `(col, row)` of cells in `room_id` whose tile draws a sprite that is
+/// truncated in `bg`'s own tables — a loading conflict the renderer
+/// worked around (alias / fallback) but the editor should still flag.
+/// Empty when nothing is conflicted (e.g. a complete biome).
+#[must_use]
+pub fn conflicted_cells(level: &Level, room_id: u8, bg: &BiomeTables) -> Vec<(usize, usize)> {
+    let Some(room_idx) = usize::from(room_id).checked_sub(1) else {
+        return Vec::new();
+    };
+    let Some(room) = level.rooms.get(room_idx) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for row in 0..ROOM_HEIGHT {
+        for col in 0..ROOM_WIDTH {
+            let tile = room.tiles[row * ROOM_WIDTH + col];
+            if tile_sprite_ids(tile)
+                .into_iter()
+                .any(|id| id != 0 && bg.is_conflicted(id))
+            {
+                out.push((col, row));
+            }
+        }
+    }
+    out
 }
 
 /// Which of a biome's two BGTAB image tables a diagnostic refers to.
@@ -592,7 +688,7 @@ impl Canvas {
         let mut canvas = Self::new();
         // Three on-screen rows, bottom → top — matches `FRAMEADV.S:62
         // SURE` (`ldy #2 :row sty rowno ... dey jmp :row`). Order
-        // matters: row 1's tall sprites (e.g. red-biome
+        // matters: row 1's tall sprites (e.g. tower-biome
         // `SPACE_B[1]` 52-px window, drawn at `Ay − 20`) extend
         // upward into row 0's pixel area. With bottom-up rendering
         // row 0 is processed *after* row 1, so row 0's own `pieced`
@@ -1319,7 +1415,7 @@ fn draw_front(canvas: &mut Canvas, bg: &BiomeTables, me: Tile, blockxco: i32, ay
 /// explicitly skipped in the **level-editor build** (`do EditorDisk /
 /// cmp #2 / beq :ndunj`, `FRAMEADV.S:794`), which draws posts with
 /// `maddfore` in every biome. We're a viewer/editor, so we follow the
-/// editor path — and it's also what avoids the red-biome posts
+/// editor path — and it's also what avoids the tower-biome posts
 /// clobbering their floor edge.
 ///
 /// Our flat blit has no masked mode, so `Or` is the faithful
@@ -1369,7 +1465,7 @@ mod tests {
     #[test]
     fn dungeon_and_palace_load_diagnostics_are_clean() {
         // The vendored DUN / PAL tables match the canonical 1989 build
-        // (per Peter Ferrie's writeup, only the red biome shipped
+        // (per Peter Ferrie's writeup, only the tower biome shipped
         // truncated in the 3.5" rebuild). Diagnostics should be empty.
         for biome in [Biome::Dungeon, Biome::Palace] {
             let tables = BiomeTables::load(&vendor_root(), biome).expect("biome tables load");
@@ -1382,19 +1478,19 @@ mod tests {
     }
 
     #[test]
-    fn red_biome_surfaces_known_truncation() {
+    fn tower_biome_surfaces_known_truncation() {
         // Pin the fingerprint flagged in #109 / #110 / #112: in
-        // `IMG.BGTAB.RED1` sprite 0x1b (`looseb`) collapses to a 1×1
+        // `IMG.BGTAB.TWR1` sprite 0x1b (`looseb`) collapses to a 1×1
         // placeholder where DUN1 carries 21×12 and PAL1 carries
         // 28×13. The diagnostic exists so the editor can surface a
         // clear explanation instead of silently rendering with the
         // visible floor gaps.
-        let tables = BiomeTables::load(&vendor_root(), Biome::Red).expect("RED tables load");
+        let tables = BiomeTables::load(&vendor_root(), Biome::Tower).expect("TWR tables load");
         let issues = tables.load_diagnostics();
         assert_eq!(
             issues,
             vec![BiomeTablesIssue::TruncatedSprite {
-                biome: Biome::Red,
+                biome: Biome::Tower,
                 table: BgTable::One,
                 sprite_id: 0x1b,
                 width_bytes: 1,
@@ -1435,7 +1531,7 @@ mod tests {
         // The Display impl must point at `docs/copy-protection.md` so
         // the editor banner (and any future stderr-warning surface)
         // gets users to the workaround in one hop.
-        let tables = BiomeTables::load(&vendor_root(), Biome::Red).unwrap();
+        let tables = BiomeTables::load(&vendor_root(), Biome::Tower).unwrap();
         let msg = tables
             .load_diagnostics()
             .iter()
@@ -1443,7 +1539,7 @@ mod tests {
             .collect::<Vec<_>>()
             .join("\n");
         assert!(msg.contains("docs/copy-protection.md"), "got:\n{msg}");
-        assert!(msg.contains("IMG.BGTAB.RED1"), "got:\n{msg}");
+        assert!(msg.contains("IMG.BGTAB.TWR1"), "got:\n{msg}");
     }
 
     #[test]
@@ -1608,14 +1704,14 @@ mod tests {
     }
 
     #[test]
-    fn red_biome_fallback_fills_truncated_sprites() {
-        // Red biome's looseb (0x1b) etc. are truncated 1x1 placeholders
+    fn tower_biome_fallback_fills_truncated_sprites() {
+        // The tower biome's looseb (0x1b) etc. are truncated 1x1 placeholders
         // (#112). Attaching a dungeon fallback should substitute the
         // complete sprite, filling the floor edges that were gaps.
         // LV9 R5 has loose + up-pressplate tiles that spill 0x1b.
         let level = load_level(9);
-        let plain = BiomeTables::load(&vendor_root(), Biome::Red).unwrap();
-        let with_fb = BiomeTables::load(&vendor_root(), Biome::Red)
+        let plain = BiomeTables::load(&vendor_root(), Biome::Tower).unwrap();
+        let with_fb = BiomeTables::load(&vendor_root(), Biome::Tower)
             .unwrap()
             .with_fallback(BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap());
         let a = render_room(&level, 5, &plain, RenderMode::Monochrome).unwrap();
@@ -1633,6 +1729,52 @@ mod tests {
         assert!(
             lit(&b) > lit(&a),
             "fallback should fill truncated floor edges with more lit pixels"
+        );
+    }
+
+    #[test]
+    fn block_variant1_wall_uses_same_biome_variant0_in_tower() {
+        // The tower biome's BLOCK_B[1] (0x6f) is truncated; the same-biome
+        // alias makes a variant-1 block render its wall from the intact
+        // variant-0 sprite (0x84) — so a variant-1 block's right-face
+            // cell renders identically to a variant-0 block's, in the tower's
+            // own colour (not the dungeon-fallback colour).
+        let cell = ROOM_WIDTH + 4; // middle row, col 4; col 5 gets the wall
+        let mk = |modifier: u8| {
+            let mut tiles = [Tile::default(); ROOM_WIDTH * ROOM_HEIGHT];
+            tiles[cell] = Tile {
+                kind: TileKind::Block,
+                variant: 0,
+                modifier,
+            };
+            synth_level_with(tiles)
+        };
+        let tower = BiomeTables::load(&vendor_root(), Biome::Tower)
+            .unwrap()
+            .with_fallback(BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap());
+        let v0 = render_room(&mk(0), 1, &tower, RenderMode::NtscColor).unwrap();
+        let v1 = render_room(&mk(1), 1, &tower, RenderMode::NtscColor).unwrap();
+        assert_eq!(
+            v0.pixels, v1.pixels,
+            "variant-1 block wall should alias to the variant-0 sprite in tower"
+        );
+    }
+
+    #[test]
+    fn conflicted_cells_flags_tower_truncations_not_dungeon() {
+        // A tower room with loose / pressplate / block:01 tiles draws
+        // truncated sprites (#112) and should be flagged; the same tiles
+        // under the complete dungeon tables are not conflicted.
+        let level = load_level(9);
+        let tower = BiomeTables::load(&vendor_root(), Biome::Tower).unwrap();
+        let dungeon = BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap();
+        assert!(
+            !conflicted_cells(&level, 5, &tower).is_empty(),
+            "tower room 5 should flag truncated-sprite cells"
+        );
+        assert!(
+            conflicted_cells(&level, 5, &dungeon).is_empty(),
+            "dungeon tables are complete for these tiles — no conflicts"
         );
     }
 
