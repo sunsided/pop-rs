@@ -214,18 +214,27 @@ impl Prince {
 
         // Follow the floor in the (possibly new) column; fall if it
         // dropped. Skip while he's stepping across the room edge — the
-        // neighbour room's floor takes over once `cross_horizontal` moves
-        // him there.
+        // neighbour room's floor takes over once `cross_horizontal_edge`
+        // moves him there (and settles him in the new room).
         if (0..ROOM_W).contains(&self.x) {
-            let (lrow, lfeet) = settle(room, col_of(self.x), self.row);
-            if lrow == self.row {
-                self.feet_y = lfeet;
-            } else {
-                self.on_ground = false;
-                self.vy = 0;
-                self.landing_row = lrow;
-                self.landing_y = lfeet;
-            }
+            self.settle_floor(room);
+        }
+    }
+
+    /// Reconcile his feet against the floor of his current column in
+    /// `room`: rest on it when one is there, otherwise begin a fall to the
+    /// floor below. Used by `move_h` and right after a room crossing so the
+    /// neighbour room's floor (or a fall) takes effect immediately.
+    fn settle_floor(&mut self, room: &Room) {
+        let (lrow, lfeet) = settle(room, col_of(self.x), self.row);
+        if lrow == self.row {
+            self.feet_y = lfeet;
+            self.on_ground = true;
+        } else {
+            self.on_ground = false;
+            self.vy = 0;
+            self.landing_row = lrow;
+            self.landing_y = lfeet;
         }
     }
 }
@@ -314,21 +323,39 @@ impl World {
             return;
         };
         let row = self.prince.row;
-        if self.prince.x >= ROOM_W {
+        let crossed = if self.prince.x >= ROOM_W {
             // Off the right edge → enter the right neighbour at its col 0.
             if links.right != 0 && self.room_col_open(links.right, 0, row) {
                 self.prince.room = links.right;
                 self.prince.x -= ROOM_W;
+                true
             } else {
                 self.prince.x = ROOM_W - COLLIDE_HALF;
+                false
             }
         } else if self.prince.x < 0 {
             // Off the left edge → enter the left neighbour at its last col.
             if links.left != 0 && self.room_col_open(links.left, ROOM_WIDTH - 1, row) {
                 self.prince.room = links.left;
                 self.prince.x += ROOM_W;
+                true
             } else {
                 self.prince.x = COLLIDE_HALF;
+                false
+            }
+        } else {
+            false
+        };
+        // Reconcile his feet against the new room's entry column right away
+        // — otherwise, if input is released this tick, `walk(0)` never
+        // settles him and he'd hover over a floorless entry.
+        if crossed {
+            if let Some(room) = self
+                .level
+                .rooms
+                .get(usize::from(self.prince.room).saturating_sub(1))
+            {
+                self.prince.settle_floor(room);
             }
         }
     }
@@ -781,6 +808,24 @@ mod tests {
             world.prince.x >= ROOM_W / 2,
             "he wraps to the right side of room 5"
         );
+        // The cross reconciles his feet against room 5's entry column
+        // immediately (col 9 row 0 is a Gate — a floor), so he doesn't hover.
+        assert!(world.prince_on_ground());
+        assert_eq!(world.prince.feet_y, floor_y(0));
+    }
+
+    #[test]
+    fn settle_floor_falls_over_a_gap() {
+        // Room 1 col 4 row 1 is Empty (a gap) over Rubble at row 2: settling
+        // there must start a fall, not leave him hovering.
+        let mut world = landed_world();
+        world.prince.row = 1;
+        world.prince.x = 4 * CELL_W + CELL_W / 2;
+        world.prince.on_ground = true;
+        let room = &world.level.rooms[0];
+        world.prince.settle_floor(room);
+        assert!(!world.prince.on_ground, "no floor at row 1 → he falls");
+        assert_eq!(world.prince.landing_row, 2);
     }
 
     #[test]
