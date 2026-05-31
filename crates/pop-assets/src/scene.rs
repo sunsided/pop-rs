@@ -490,6 +490,18 @@ impl Anim {
     }
 }
 
+/// Width, in hi-res bytes, of a composed room byte buffer (one byte =
+/// 7 pixels). Equal to [`crate::bgdata::ROOM_WIDTH_BYTES`].
+pub const ROOM_BYTES_WIDTH: usize = ROOM_WIDTH_BYTES as usize;
+/// Height, in scan-lines, of a composed room byte buffer. Equal to
+/// [`crate::bgdata::ROOM_HEIGHT_PX`].
+pub const ROOM_BYTES_HEIGHT: usize = ROOM_HEIGHT_PX as usize;
+/// Length of a room's top-down linear hi-res byte buffer
+/// (`ROOM_BYTES_WIDTH * ROOM_BYTES_HEIGHT`). The decoded RGBA frame is
+/// `ROOM_BYTES_WIDTH * 7` (= 280) pixels wide × `ROOM_BYTES_HEIGHT`
+/// (= 192) tall.
+pub const ROOM_BYTES: usize = ROOM_BYTES_WIDTH * ROOM_BYTES_HEIGHT;
+
 /// Render one room at animation phase `anim`. [`render_room`] is the
 /// `Anim::REST` (static) special case.
 #[must_use]
@@ -500,6 +512,23 @@ pub fn render_room_animated(
     mode: RenderMode,
     anim: Anim,
 ) -> Option<Frame> {
+    Some(render_room_animated_with_bytes(level, room_id, bg, mode, anim)?.0)
+}
+
+/// Compose one room at phase `anim` to its **top-down** linear hi-res
+/// bytes (`ROOM_BYTES_WIDTH × ROOM_BYTES_HEIGHT`, row 0 = visual top) —
+/// the pre-decode form [`render_room_animated`] turns into a [`Frame`].
+///
+/// Callers doing incremental updates compose successive phases, diff
+/// them row-by-row, and decode only the changed scan-lines via
+/// [`decode_room_rows`]. Returns `None` for an out-of-range `room_id`.
+#[must_use]
+pub fn compose_room_bytes(
+    level: &Level,
+    room_id: u8,
+    bg: &BiomeTables,
+    anim: Anim,
+) -> Option<Box<[u8; ROOM_BYTES]>> {
     let room_idx = usize::from(room_id).checked_sub(1)?;
     if room_idx >= level.rooms.len() {
         return None;
@@ -508,8 +537,40 @@ pub fn render_room_animated(
     // `drawexitb` skips stairs when the current room is the prince's
     // entry point (`FRAMEADV.S:1635` `cmp KidStartScrn beq :nostairs`).
     let draw_stairs = room_id != level.prince_start().screen;
-    let canvas = Canvas::compose(&ctx, bg, draw_stairs, anim);
-    canvas.into_frame(mode)
+    Some(Canvas::compose(&ctx, bg, draw_stairs, anim).bytes)
+}
+
+/// Like [`render_room_animated`], but also returns the top-down linear
+/// hi-res bytes it decoded from, so callers can cache them for
+/// incremental [`compose_room_bytes`] diffs. The [`Frame`] is identical
+/// to what `render_room_animated` returns for the same arguments.
+#[must_use]
+pub fn render_room_animated_with_bytes(
+    level: &Level,
+    room_id: u8,
+    bg: &BiomeTables,
+    mode: RenderMode,
+    anim: Anim,
+) -> Option<(Frame, Box<[u8; ROOM_BYTES]>)> {
+    let bytes = compose_room_bytes(level, room_id, bg, anim)?;
+    let frame = hires::render_linear_topdown(&bytes[..], ROOM_WIDTH_BYTES, ROOM_HEIGHT_PX, mode)?;
+    Some((frame, bytes))
+}
+
+/// Decode scan-lines `[y0, y1)` of a room's [`compose_room_bytes`]
+/// buffer into an RGBA [`Frame`] of `(y1 - y0)` rows. The rows are
+/// byte-identical to the matching rows of the full
+/// [`render_room_animated`] output — see
+/// [`hires::render_linear_topdown_rows`]. Returns `None` on a range
+/// error.
+#[must_use]
+pub fn decode_room_rows(
+    bytes: &[u8; ROOM_BYTES],
+    y0: usize,
+    y1: usize,
+    mode: RenderMode,
+) -> Option<Frame> {
+    hires::render_linear_topdown_rows(&bytes[..], ROOM_WIDTH_BYTES, ROOM_HEIGHT_PX, y0, y1, mode)
 }
 
 /// Tile kinds whose appearance varies with [`Anim`] — used by callers
@@ -766,19 +827,6 @@ impl Canvas {
             );
         }
         canvas
-    }
-
-    fn into_frame(self, mode: RenderMode) -> Option<Frame> {
-        // hires::render_linear flips bottom-up; our canvas is top-down,
-        // so pre-flip rows before handing off.
-        let row_bytes = usize::from(ROOM_WIDTH_BYTES);
-        let mut flipped = vec![0u8; self.bytes.len()];
-        for y in 0..usize::from(ROOM_HEIGHT_PX) {
-            let src = &self.bytes[y * row_bytes..(y + 1) * row_bytes];
-            let dst_y = usize::from(ROOM_HEIGHT_PX) - 1 - y;
-            flipped[dst_y * row_bytes..(dst_y + 1) * row_bytes].copy_from_slice(src);
-        }
-        hires::render_linear(&flipped, ROOM_WIDTH_BYTES, ROOM_HEIGHT_PX, mode)
     }
 }
 

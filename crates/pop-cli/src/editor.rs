@@ -403,6 +403,11 @@ struct EditorApp {
     /// recomputed on each full texture refresh so the per-tick update
     /// only re-renders rooms that actually change.
     animated_rooms: Vec<usize>,
+    /// Canvas viewport rect captured on the last `canvas()` call. The
+    /// per-tick animation refresh uses it to skip re-baking animated
+    /// rooms scrolled off-screen — the dominant cost in large levels
+    /// (e.g. LV9), where torches put most rooms in `animated_rooms`.
+    last_canvas_rect: Option<Rect>,
     /// Per-room `(col, row)` cells that draw a sprite truncated in the
     /// biome's own tables (#112) — worked around by the renderer but
     /// flagged in the editor. Indexed `0..ROOMS_PER_LEVEL`.
@@ -423,10 +428,20 @@ struct EditorApp {
     /// Per-biome BGTAB cache. Loaded lazily on level-load; one entry
     /// per biome encountered (max 3) and reused across levels.
     biome_cache: HashMap<Biome, BiomeTables>,
+    /// Biome of the currently-loaded level, cached on each full texture
+    /// refresh so the animation tick can look its tables up in
+    /// [`Self::biome_cache`] without re-deriving it from the path.
+    current_biome: Option<Biome>,
     /// Per-room rendered sprite textures for [`EditorState::loaded_level`].
     /// Indexed `0..ROOMS_PER_LEVEL` = POP room `1..24`. Cleared on
     /// every level load.
     room_textures: Vec<Option<TextureHandle>>,
+    /// Per-room top-down hi-res bytes of the last rendered phase, kept
+    /// alongside [`Self::room_textures`] so the animation tick can diff
+    /// successive phases and re-decode / upload only the changed
+    /// scan-lines via `TextureHandle::set_partial`. Indexed
+    /// `0..ROOMS_PER_LEVEL`; `None` for unplaced / unrendered rooms.
+    room_bytes: Vec<Option<Box<[u8; scene::ROOM_BYTES]>>>,
     /// Diagnostic from the last sprite-load attempt, shown next to the
     /// `Real sprites` checkbox when it's empty.
     render_status: String,
@@ -446,6 +461,8 @@ const BASE_TILE_H: f32 = 64.0;
 /// Min / max zoom — guards against accidental zoom-to-infinity.
 const MIN_ZOOM: f32 = 0.15;
 const MAX_ZOOM: f32 = 8.0;
+/// Minimum wall-clock between animation steps (~12.5 fps).
+const ANIM_STEP: Duration = Duration::from_millis(80);
 
 impl EditorApp {
     fn new(state: EditorState) -> Self {
@@ -462,13 +479,16 @@ impl EditorApp {
             anim_tick: 0,
             last_anim_step: None,
             animated_rooms: Vec::new(),
+            last_canvas_rect: None,
             conflict_cells: Vec::new(),
             show_conflicts: true,
             hover: None,
             pending_fit: true,
             pending_initial_load: true,
             biome_cache: HashMap::new(),
+            current_biome: None,
             room_textures: Vec::new(),
+            room_bytes: Vec::new(),
             render_status: String::new(),
             asset_warnings: Vec::new(),
         }
@@ -480,6 +500,8 @@ impl EditorApp {
         let full = only.is_none();
         if full {
             self.room_textures.clear();
+            self.room_bytes.clear();
+            self.current_biome = None;
             self.render_status.clear();
             // Recomputed below for the level's own biome — otherwise a
             // tower-biome warning lingers after switching to a clean level.
@@ -515,6 +537,8 @@ impl EditorApp {
             self.render_status = format!("LEVEL{level_number} has no biome mapping");
             return;
         };
+        // Cache for the animation tick's table lookup (see `step_animation`).
+        self.current_biome = Some(biome);
         let tables = match self.biome_cache.get(&biome) {
             Some(t) => t,
             None => match BiomeTables::load(&root, biome) {
@@ -563,6 +587,7 @@ impl EditorApp {
             RenderMode::Monochrome
         };
         self.room_textures.resize(ROOMS_PER_LEVEL, None);
+        self.room_bytes.resize(ROOMS_PER_LEVEL, None);
         for (idx, slot) in layout.positions.iter().enumerate() {
             if slot.is_none() {
                 continue;
@@ -575,7 +600,8 @@ impl EditorApp {
             let Ok(room_id) = u8::try_from(idx + 1) else {
                 continue;
             };
-            let Some(frame) = scene::render_room_animated(level, room_id, tables, mode, anim)
+            let Some((frame, bytes)) =
+                scene::render_room_animated_with_bytes(level, room_id, tables, mode, anim)
             else {
                 continue;
             };
@@ -590,6 +616,9 @@ impl EditorApp {
                 egui::TextureOptions::NEAREST,
             );
             self.room_textures[idx] = Some(tex);
+            // Cache the source bytes so the animation tick can diff against
+            // them and upload only the changed scan-lines.
+            self.room_bytes[idx] = Some(bytes);
         }
         if full {
             // Cache which placed rooms contain an animated tile, so the
@@ -637,24 +666,128 @@ impl EditorApp {
         }
     }
 
+    /// The subset of [`Self::animated_rooms`] whose on-screen rect
+    /// intersects `viewport` at the current pan / zoom. Off-screen
+    /// animated rooms are skipped each tick — they're re-baked when they
+    /// next scroll into view, and since the trap/torch preview is
+    /// non-physical the phase "jump" on re-entry is invisible.
+    fn visible_animated_rooms(&self, viewport: Rect) -> Vec<usize> {
+        let Some(layout) = &self.state.layout else {
+            return Vec::new();
+        };
+        let tile_w = self.tile_w();
+        let tile_h = self.tile_h();
+        let room_size = Vec2::new(tile_w * ROOM_WIDTH as f32, tile_h * ROOM_HEIGHT as f32);
+        self.animated_rooms
+            .iter()
+            .copied()
+            .filter(|&idx| {
+                let Some((rx, ry)) = layout.positions[idx] else {
+                    return false;
+                };
+                let min =
+                    viewport.min + self.pan + Vec2::new(rx as f32 * tile_w, ry as f32 * tile_h);
+                viewport.intersects(Rect::from_min_size(min, room_size))
+            })
+            .collect()
+    }
+
     /// Advance the animation a step if enough wall-clock has elapsed,
-    /// re-rendering only the animated rooms, and keep egui repainting.
+    /// uploading only the changed scan-lines of the on-screen animated
+    /// rooms, and keep egui repainting.
     fn step_animation(&mut self, ctx: &egui::Context) {
         if !self.animate || self.animated_rooms.is_empty() {
             return;
         }
-        const STEP: Duration = Duration::from_millis(80);
         let now = Instant::now();
-        if self.last_anim_step.is_some_and(|t| now.duration_since(t) < STEP) {
-            ctx.request_repaint_after(STEP);
+        if self
+            .last_anim_step
+            .is_some_and(|t| now.duration_since(t) < ANIM_STEP)
+        {
+            ctx.request_repaint_after(ANIM_STEP);
             return;
         }
         self.last_anim_step = Some(now);
         self.anim_tick = self.anim_tick.wrapping_add(1);
+        // Cull to the on-screen animated rooms. The tick still advances
+        // above, so off-screen rooms pick up the current phase when they
+        // scroll back in.
+        let rooms = match self.last_canvas_rect {
+            Some(rect) => self.visible_animated_rooms(rect),
+            None => self.animated_rooms.clone(),
+        };
+        if !rooms.is_empty() {
+            let patches = self.build_room_patches(&rooms);
+            self.upload_room_patches(patches);
+        }
+        ctx.request_repaint_after(ANIM_STEP);
+    }
+
+    /// Re-compose each room in `rooms` at the current phase, diff it
+    /// against the cached phase, and decode only the changed scan-lines.
+    /// Pure read of `self` (no texture mutation) so it can hold the
+    /// level + tables borrows; the caller uploads via
+    /// [`Self::upload_room_patches`]. The dominant per-tick cost used to
+    /// be the full-room NTSC decode + GPU re-upload — both now scale with
+    /// the changed-row count instead of the whole 280×192 room.
+    fn build_room_patches(&self, rooms: &[usize]) -> Vec<RoomPatch> {
         let anim = self.current_anim();
-        let rooms = self.animated_rooms.clone();
-        self.refresh_room_textures(ctx, anim, Some(&rooms));
-        ctx.request_repaint_after(STEP);
+        let mode = if self.ntsc_mode {
+            RenderMode::NtscColor
+        } else {
+            RenderMode::Monochrome
+        };
+        let (Some(level), Some(biome)) = (self.state.loaded_level.as_ref(), self.current_biome)
+        else {
+            return Vec::new();
+        };
+        let Some(tables) = self.biome_cache.get(&biome) else {
+            return Vec::new();
+        };
+        let mut patches = Vec::new();
+        for &idx in rooms {
+            let Ok(room_id) = u8::try_from(idx + 1) else {
+                continue;
+            };
+            let Some(new_bytes) = scene::compose_room_bytes(level, room_id, tables, anim) else {
+                continue;
+            };
+            let span = match self.room_bytes.get(idx).and_then(Option::as_ref) {
+                Some(old) => dirty_row_span(&old[..], &new_bytes[..]),
+                // No cached phase (room just scrolled into view, or first
+                // tick): treat the whole room as dirty.
+                None => Some((0, scene::ROOM_BYTES_HEIGHT)),
+            };
+            let Some((y0, y1)) = span else {
+                continue; // unchanged this tick — skip decode + upload
+            };
+            let Some(frame) = scene::decode_room_rows(&new_bytes, y0, y1, mode) else {
+                continue;
+            };
+            patches.push(RoomPatch {
+                idx,
+                y0,
+                frame,
+                bytes: new_bytes,
+            });
+        }
+        patches
+    }
+
+    /// Upload each patch's changed-row strip to its room texture and
+    /// refresh the byte cache.
+    fn upload_room_patches(&mut self, patches: Vec<RoomPatch>) {
+        for patch in patches {
+            let width = usize::try_from(patch.frame.width).unwrap_or(0);
+            let height = usize::try_from(patch.frame.height).unwrap_or(0);
+            let image = ColorImage::from_rgba_unmultiplied([width, height], &patch.frame.pixels);
+            if let Some(Some(tex)) = self.room_textures.get_mut(patch.idx) {
+                tex.set_partial([0, patch.y0], image, egui::TextureOptions::NEAREST);
+            }
+            if let Some(slot) = self.room_bytes.get_mut(patch.idx) {
+                *slot = Some(patch.bytes);
+            }
+        }
     }
 
     fn tile_w(&self) -> f32 {
@@ -745,6 +878,38 @@ impl EditorApp {
             (viewport.min.to_vec2() + viewport.max.to_vec2()) * 0.5 - viewport.min.to_vec2();
         self.pan = viewport_center - center_world;
     }
+}
+
+/// A single room's pending partial texture update for an animation tick.
+struct RoomPatch {
+    /// Room index (0-based) into `room_textures` / `room_bytes`.
+    idx: usize,
+    /// Top scan-line of the changed strip — the `set_partial` Y offset.
+    y0: usize,
+    /// Decoded RGBA strip, `280 × (changed rows)`.
+    frame: pop_assets::hires::Frame,
+    /// Freshly composed room bytes that replace the cache entry.
+    bytes: Box<[u8; scene::ROOM_BYTES]>,
+}
+
+/// First changed scan-line and one-past-the-last changed scan-line
+/// between two composed room byte buffers, or `None` if identical.
+/// Bounds the per-tick decode + `set_partial` upload to the rows an
+/// animation step actually changed.
+fn dirty_row_span(old: &[u8], new: &[u8]) -> Option<(usize, usize)> {
+    let w = scene::ROOM_BYTES_WIDTH;
+    let mut first: Option<usize> = None;
+    let mut last = 0usize;
+    for y in 0..scene::ROOM_BYTES_HEIGHT {
+        let r = y * w..(y + 1) * w;
+        if old[r.clone()] != new[r] {
+            if first.is_none() {
+                first = Some(y);
+            }
+            last = y + 1;
+        }
+    }
+    first.map(|f| (f, last))
 }
 
 impl eframe::App for EditorApp {
@@ -926,6 +1091,7 @@ impl EditorApp {
 
         let (resp, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
         let panel_rect = resp.rect;
+        self.last_canvas_rect = Some(panel_rect);
 
         if self.pending_fit {
             self.fit_to_view(panel_rect);
