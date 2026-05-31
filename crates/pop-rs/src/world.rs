@@ -17,7 +17,9 @@
 use pop_assets::bgdata::{BLOCK_BOT_ROW, CELL_WIDTH_BYTES, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES};
 use pop_assets::draz::image_table::Image;
 use pop_assets::hires::{self, Frame, RenderMode};
-use pop_assets::level::{Level, Room, TileKind, ROOMS_PER_LEVEL, ROOM_HEIGHT, ROOM_WIDTH};
+use pop_assets::level::{
+    Level, Room, RoomNeighbours, TileKind, ROOMS_PER_LEVEL, ROOM_HEIGHT, ROOM_WIDTH,
+};
 use pop_assets::scene::{self, Anim, BiomeTables};
 use pop_assets::sprite;
 
@@ -36,13 +38,13 @@ const VERT_DIST: i32 = 10;
 /// Tile column width in pixels (`CELL_WIDTH_BYTES * 7`).
 const CELL_W: i32 = CELL_WIDTH_BYTES as i32 * 7;
 
+/// Room width in pixels. Crossing it moves the Prince into the linked
+/// neighbour room ([`RoomNeighbours`]).
+const ROOM_W: i32 = ROOM_WIDTH_BYTES as i32 * 7;
+
 /// Per-frame horizontal step of the run cycle, in pixels — the `chx`
 /// operands of SEQTABLE `runcyc1..8`. Indexed by the run phase.
 const RUN_CHX: [i32; 8] = [5, 1, 2, 4, 5, 2, 3, 4];
-
-/// Horizontal pixel bounds that keep the Prince inside the 280 px room.
-const X_MIN: i32 = 7;
-const X_MAX: i32 = 273;
 
 /// Initial upward velocity of a jump, px per tick (negative = up). A
 /// simple vertical hop; the running leap and ledge grabs come later (#120).
@@ -193,35 +195,61 @@ impl Prince {
         self.facing_right = dir > 0;
         self.moving = true;
 
-        let mut target_x = (self.x + dx).clamp(X_MIN, X_MAX);
+        let mut target_x = self.x + dx;
 
         // Collide on his *leading edge*, not his centre — his body reaches
         // the wall before his centre crosses the cell boundary. If the
         // column under the leading edge is solid, stop the edge flush
-        // against the wall.
-        let lead_col = col_of(target_x + dir * COLLIDE_HALF);
-        if is_solid_at(room, lead_col, self.row) {
-            let wall = i32::try_from(lead_col).unwrap_or(0);
+        // against the wall. (Off-room columns aren't walls — they're the
+        // doorway to a neighbour, handled by `cross_horizontal`.)
+        let lead = target_x + dir * COLLIDE_HALF;
+        if (0..ROOM_W).contains(&lead) && is_solid_at(room, col_of(lead), self.row) {
+            let wall = i32::try_from(col_of(lead)).unwrap_or(0);
             target_x = if dir > 0 {
                 wall * CELL_W - COLLIDE_HALF
             } else {
                 (wall + 1) * CELL_W + COLLIDE_HALF
-            }
-            .clamp(X_MIN, X_MAX);
+            };
         }
 
         self.x = target_x;
 
-        // Follow the floor in the (possibly new) column; fall if it dropped.
-        let col = col_of(self.x);
-        let (lrow, lfeet) = settle(room, col, self.row);
-        if lrow == self.row {
-            self.feet_y = lfeet;
-        } else {
-            self.on_ground = false;
-            self.vy = 0;
-            self.landing_row = lrow;
-            self.landing_y = lfeet;
+        // Follow the floor in the (possibly new) column; fall if it
+        // dropped. Skip while he's stepping across the room edge — the
+        // neighbour room's floor takes over once `cross_horizontal` moves
+        // him there.
+        if (0..ROOM_W).contains(&self.x) {
+            let (lrow, lfeet) = settle(room, col_of(self.x), self.row);
+            if lrow == self.row {
+                self.feet_y = lfeet;
+            } else {
+                self.on_ground = false;
+                self.vy = 0;
+                self.landing_row = lrow;
+                self.landing_y = lfeet;
+            }
+        }
+    }
+
+    /// Carry the Prince into the linked neighbour room when he steps past
+    /// the left or right edge; clamp him at the level boundary when there
+    /// is no neighbour that way. His row / feet carry over — POP rooms
+    /// align vertically.
+    fn cross_horizontal(&mut self, links: RoomNeighbours) {
+        if self.x >= ROOM_W {
+            if links.right != 0 {
+                self.room = links.right;
+                self.x -= ROOM_W;
+            } else {
+                self.x = ROOM_W - 1;
+            }
+        } else if self.x < 0 {
+            if links.left != 0 {
+                self.room = links.left;
+                self.x += ROOM_W;
+            } else {
+                self.x = 0;
+            }
         }
     }
 }
@@ -322,6 +350,14 @@ impl World {
                     } else {
                         self.prince.walk(dir, room);
                     }
+                }
+                // Carry him into a neighbour room if he stepped off an edge.
+                if let Some(&links) = self
+                    .level
+                    .room_links()
+                    .get(usize::from(self.prince.room).saturating_sub(1))
+                {
+                    self.prince.cross_horizontal(links);
                 }
                 // The room on screen follows the Prince.
                 self.room_id = self.prince.room;
@@ -699,6 +735,30 @@ mod tests {
             min_lead >= 4 * CELL_W,
             "left edge {min_lead} passed the wall at {}",
             4 * CELL_W
+        );
+    }
+
+    #[test]
+    fn walking_off_the_left_edge_enters_the_neighbour_room() {
+        // LV1 room 1's left link is room 5 (col 0 row 1 is Torch, not a
+        // wall), so walking left off the edge crosses into it.
+        let mut world = landed_world();
+        assert_eq!(world.room_id(), 1);
+        let mut entered = None;
+        for _ in 0..30 {
+            world.tick(InputState {
+                left: true,
+                ..InputState::default()
+            });
+            if world.room_id() != 1 {
+                entered = Some(world.room_id());
+                break;
+            }
+        }
+        assert_eq!(entered, Some(5), "left of room 1 is room 5");
+        assert!(
+            world.prince.x >= ROOM_W / 2,
+            "he wraps to the right side of the new room"
         );
     }
 
