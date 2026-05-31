@@ -148,8 +148,6 @@ struct GameApp {
     world: World,
     mode: RenderMode,
     texture: Option<TextureHandle>,
-    /// Room id currently uploaded to `texture`; `None` forces a render.
-    displayed_room: Option<u8>,
     /// Wall-clock time of the last logic tick; `None` until the first.
     last_tick: Option<Instant>,
 }
@@ -160,17 +158,12 @@ impl GameApp {
             world,
             mode,
             texture: None,
-            displayed_room: None,
             last_tick: None,
         }
     }
 
-    /// Re-render and upload the current room if it changed since the
-    /// last upload.
+    /// Re-render the current world state and upload it to the texture.
     fn refresh_texture(&mut self, ctx: &egui::Context) {
-        if self.displayed_room == Some(self.world.room_id()) && self.texture.is_some() {
-            return;
-        }
         let Some(frame) = self.world.render(self.mode) else {
             return;
         };
@@ -180,7 +173,6 @@ impl GameApp {
         ];
         let image = ColorImage::from_rgba_unmultiplied(size, &frame.pixels);
         self.texture = Some(ctx.load_texture("pop-frame", image, egui::TextureOptions::NEAREST));
-        self.displayed_room = Some(self.world.room_id());
     }
 }
 
@@ -213,8 +205,10 @@ impl eframe::App for GameApp {
         if !waiting {
             self.last_tick = Some(now);
             self.world.tick(input);
+            // The world is dynamic now (the Prince moves), so re-render
+            // every tick — not just when the room changes.
+            self.refresh_texture(ctx);
         }
-        self.refresh_texture(ctx);
 
         egui::CentralPanel::default()
             .frame(egui::Frame::none().fill(Color32::BLACK))

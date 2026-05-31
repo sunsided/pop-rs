@@ -13,11 +13,11 @@
 //! the floor. The controller (run / turn / jump / climb) and the rest of
 //! the per-frame subsystem order land next (#94 / #95).
 
-use pop_assets::bgdata::{BLOCK_BOT_ROW, CELL_WIDTH_BYTES};
+use pop_assets::bgdata::{BLOCK_BOT_ROW, CELL_WIDTH_BYTES, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES};
 use pop_assets::draz::image_table::Image;
-use pop_assets::hires::{Frame, RenderMode};
+use pop_assets::hires::{self, Frame, RenderMode};
 use pop_assets::level::{Level, Room, TileKind, ROOMS_PER_LEVEL, ROOM_HEIGHT, ROOM_WIDTH};
-use pop_assets::scene::{self, BiomeTables};
+use pop_assets::scene::{self, Anim, BiomeTables};
 use pop_assets::sprite;
 
 use crate::backend::InputState;
@@ -215,7 +215,11 @@ impl World {
     /// level (shouldn't happen for a valid level).
     #[must_use]
     pub fn render(&self, mode: RenderMode) -> Option<Frame> {
-        let mut frame = scene::render_room(&self.level, self.room_id, &self.tables, mode)?;
+        // Composite the Prince into the room's hi-res *byte* buffer before
+        // NTSC decode — that keeps his artifact colours tied to his true
+        // screen column (an RGBA overlay would swap orange/blue on mirror).
+        let mut bytes =
+            scene::compose_room_bytes(&self.level, self.room_id, &self.tables, Anim::REST)?;
         if let Some(art) = &self.art {
             if self.room_id == self.prince.room {
                 let img = if self.prince.on_ground {
@@ -223,13 +227,22 @@ impl World {
                 } else {
                     &art.fall
                 };
-                let sprite_w = i32::from(img.width_bytes) * 7;
-                let x = self.prince.x - sprite_w / 2;
-                let y = self.prince.feet_y - i32::from(img.height) + 1;
-                sprite::overlay(&mut frame, img, x, y, mode, self.prince.facing_right);
+                // Centre the sprite's byte span on the Prince's column;
+                // sit its bottom scan-line on his feet.
+                let byte_x = self.prince.x / 7 - i32::from(img.width_bytes) / 2;
+                let top_y = self.prince.feet_y - i32::from(img.height) + 1;
+                sprite::composite_hires(
+                    &mut bytes[..],
+                    usize::from(ROOM_WIDTH_BYTES),
+                    usize::from(ROOM_HEIGHT_PX),
+                    img,
+                    byte_x,
+                    top_y,
+                    self.prince.facing_right,
+                );
             }
         }
-        Some(frame)
+        hires::render_linear_topdown(&bytes[..], ROOM_WIDTH_BYTES, ROOM_HEIGHT_PX, mode)
     }
 }
 
