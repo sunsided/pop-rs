@@ -426,7 +426,7 @@ struct EditorApp {
     render_status: String,
     /// Cumulative non-fatal asset-completeness warnings from
     /// [`BiomeTables::load_diagnostics`] — surfaced as a one-line
-    /// banner in the toolbar so users wondering why their red-biome
+    /// banner in the toolbar so users wondering why their tower-biome
     /// floors have gaps find the writeup in one hop. See
     /// `docs/copy-protection.md`.
     asset_warnings: Vec<String>,
@@ -474,7 +474,7 @@ impl EditorApp {
             self.room_textures.clear();
             self.render_status.clear();
             // Recomputed below for the level's own biome — otherwise a
-            // red-biome warning lingers after switching to a clean level.
+            // tower-biome warning lingers after switching to a clean level.
             self.asset_warnings.clear();
         }
         let Some(level) = &self.state.loaded_level else {
@@ -511,11 +511,12 @@ impl EditorApp {
             Some(t) => t,
             None => match BiomeTables::load(&root, biome) {
                 Ok(t) => {
-                    // Red biome's BGTAB is the truncated 3.5" rebuild
-                    // (#112). Attach a complete dungeon set as a fallback
-                    // so placeholder sprites (e.g. looseb 0x1b) render
-                    // with the real dungeon sprite instead of a gap.
-                    let t = if biome == Biome::Red {
+                    // The tower (bgset 2) BGTAB is partly truncated by the
+                    // 3.5" rebuild (#112). Attach a complete dungeon set as
+                    // a fallback so placeholder sprites (e.g. looseb 0x1b)
+                    // render with the real (and same blue-family) dungeon
+                    // sprite instead of a gap.
+                    let t = if biome == Biome::Tower {
                         match BiomeTables::load(&root, Biome::Dungeon) {
                             Ok(fb) => t.with_fallback(fb),
                             Err(_) => t,
