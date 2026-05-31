@@ -17,3 +17,4 @@ pub mod draz;
 pub mod hires;
 pub mod level;
 pub mod scene;
+pub mod sprite;
