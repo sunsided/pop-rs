@@ -1737,8 +1737,8 @@ mod tests {
         // The tower biome's BLOCK_B[1] (0x6f) is truncated; the same-biome
         // alias makes a variant-1 block render its wall from the intact
         // variant-0 sprite (0x84) — so a variant-1 block's right-face
-        // cell renders identically to a variant-0 block's, in red colour
-        // (not the dungeon-fallback colour).
+            // cell renders identically to a variant-0 block's, in the tower's
+            // own colour (not the dungeon-fallback colour).
         let cell = ROOM_WIDTH + 4; // middle row, col 4; col 5 gets the wall
         let mk = |modifier: u8| {
             let mut tiles = [Tile::default(); ROOM_WIDTH * ROOM_HEIGHT];
