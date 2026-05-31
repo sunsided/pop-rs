@@ -8,7 +8,11 @@ The original 6502 source is vendored as a git submodule at
 [`vendor/pop-apple2/`](./vendor/pop-apple2). It is read by the lifter and is
 **not** modified.
 
-![Status quo](.readme/pop.png)
+![Status quo: game](.readme/pop.png)
+
+For level/tile inspection, an editor is available:
+
+![Status quo: editor](.readme/editor.png)
 
 ## Status
 
