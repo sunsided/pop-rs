@@ -20,12 +20,12 @@ use eframe::egui::{self, Color32, ColorImage, Pos2, Rect, TextureHandle, Vec2};
 
 use pop_assets::bgdata::Biome;
 use pop_assets::discovery;
-use pop_assets::draz::image_table::{Image, ImageTable};
+use pop_assets::draz::image_table::ImageTable;
 use pop_assets::hires::RenderMode;
 use pop_assets::level::Level;
 use pop_assets::scene::BiomeTables;
 use pop_rs::backend::InputState;
-use pop_rs::World;
+use pop_rs::{KidArt, World};
 
 /// Arguments for the `play` subcommand.
 #[derive(Debug, ClapArgs)]
@@ -73,8 +73,8 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         RenderMode::NtscColor
     };
     let mut world = World::new(level, tables);
-    if let Some(kid) = load_kid_sprite(&root) {
-        world = world.with_kid(kid);
+    if let Some(art) = load_kid_art(&root) {
+        world = world.with_kid_art(art);
     }
     let app = GameApp::new(world, mode);
 
@@ -105,18 +105,35 @@ fn load_tables(root: &std::path::Path, biome: Biome) -> anyhow::Result<BiomeTabl
     Ok(tables)
 }
 
-/// The standing-Prince frame. `FRAMEDEF` maps the `stand` sequence to
-/// image 15 (`:15 db $0f,… ;stand`); POP image tables are 1-based, so
-/// that's 0-based index 14 in `IMG.CHTAB1`.
-const STAND_IMAGE_INDEX: usize = 14;
+/// CHTAB indices for the kid frames the renderer draws, traced from the
+/// engine. FRAMEDEF maps a frame to `(table, image)` via `Fimage` /
+/// `Fsword` (`CTRLSUBS.S decodeim`); POP image tables are 1-based, so the
+/// 0-based index is `image - 1`. The run frames (`Fsword = 0`) live in
+/// CHTAB1 alongside `stand`.
+///
+/// - `stand` = FRAMEDEF 15 (`$0f,9`) → CHTAB1 image 15 → index 14.
+/// - `run` = SEQTABLE `runcyc1..8` = FRAMEDEF 7-14 → CHTAB1 images 7-14
+///   → indices 6..14.
+/// - `freefall` = FRAMEDEF 106 (`$36,$40`) → CHTAB2 image 54 → index 53.
+const STAND_INDEX: usize = 14;
+const FALL_INDEX: usize = 53;
+const RUN_INDICES: std::ops::Range<usize> = 6..14;
 
-/// Load the standing-Prince sprite from `DRAZ/I/IMG.CHTAB1`, or `None`
-/// if the table or frame is missing — non-fatal, the host then renders
-/// the bare scene rather than refusing to start.
-fn load_kid_sprite(root: &std::path::Path) -> Option<Image> {
-    let path = discovery::draz_dir_in(root)?.join("I").join("IMG.CHTAB1");
-    let table = ImageTable::from_file(path).ok()?;
-    table.images.get(STAND_IMAGE_INDEX).cloned()
+/// Load the kid sprite set (`stand` + run cycle + `freefall`) from
+/// `DRAZ/I`, or `None` if a table or frame is missing — non-fatal, the
+/// host then renders the bare scene rather than refusing to start.
+fn load_kid_art(root: &std::path::Path) -> Option<KidArt> {
+    let dir = discovery::draz_dir_in(root)?.join("I");
+    let chtab1 = ImageTable::from_file(dir.join("IMG.CHTAB1")).ok()?;
+    let chtab2 = ImageTable::from_file(dir.join("IMG.CHTAB2")).ok()?;
+    let run = RUN_INDICES
+        .map(|i| chtab1.images.get(i).cloned())
+        .collect::<Option<Vec<_>>>()?;
+    Some(KidArt {
+        stand: chtab1.images.get(STAND_INDEX)?.clone(),
+        fall: chtab2.images.get(FALL_INDEX)?.clone(),
+        run,
+    })
 }
 
 /// POP's hi-res frame is 280×192; the window opens at this integer
@@ -128,10 +145,9 @@ const DEFAULT_SCALE: f32 = 3.0;
 /// Fixed logic-tick cadence. egui may call `update` at the display
 /// refresh rate (often 60–144 Hz), but the game logic must advance at a
 /// deterministic, host-independent rate, so `update` steps the world at
-/// most once per `TICK`. ~12.5 Hz placeholder (matches the editor's
-/// animation step); pinned to POP's real frame-advance rate when the
-/// physics loop lands (#82 / #94).
-const TICK: Duration = Duration::from_millis(80);
+/// most once per `TICK`. ~18 Hz, close to POP's ~17 fps logic rate (#82);
+/// pinned exactly when the controller's timing is tuned (#94).
+const TICK: Duration = Duration::from_millis(55);
 
 /// eframe application: owns the engine and the GPU texture for the
 /// current frame, re-uploading only when the displayed room changes.
@@ -139,8 +155,6 @@ struct GameApp {
     world: World,
     mode: RenderMode,
     texture: Option<TextureHandle>,
-    /// Room id currently uploaded to `texture`; `None` forces a render.
-    displayed_room: Option<u8>,
     /// Wall-clock time of the last logic tick; `None` until the first.
     last_tick: Option<Instant>,
 }
@@ -151,17 +165,12 @@ impl GameApp {
             world,
             mode,
             texture: None,
-            displayed_room: None,
             last_tick: None,
         }
     }
 
-    /// Re-render and upload the current room if it changed since the
-    /// last upload.
+    /// Re-render the current world state and upload it to the texture.
     fn refresh_texture(&mut self, ctx: &egui::Context) {
-        if self.displayed_room == Some(self.world.room_id()) && self.texture.is_some() {
-            return;
-        }
         let Some(frame) = self.world.render(self.mode) else {
             return;
         };
@@ -171,7 +180,6 @@ impl GameApp {
         ];
         let image = ColorImage::from_rgba_unmultiplied(size, &frame.pixels);
         self.texture = Some(ctx.load_texture("pop-frame", image, egui::TextureOptions::NEAREST));
-        self.displayed_room = Some(self.world.room_id());
     }
 }
 
@@ -204,8 +212,10 @@ impl eframe::App for GameApp {
         if !waiting {
             self.last_tick = Some(now);
             self.world.tick(input);
+            // The world is dynamic now (the Prince moves), so re-render
+            // every tick — not just when the room changes.
+            self.refresh_texture(ctx);
         }
-        self.refresh_texture(ctx);
 
         egui::CentralPanel::default()
             .frame(egui::Frame::none().fill(Color32::BLACK))
