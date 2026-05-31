@@ -1269,6 +1269,18 @@ fn slicer_seq_index(state: u8) -> usize {
 /// `drawslicera` (`FRAMEADV.S:1548`): bottom piece OR'd at `Ay`, then
 /// the top piece OR'd at `Ay − SLICER_GAP[i]`. The "smeared" bottom
 /// (state bit 7) falls back to the clean bottom when its entry is 0.
+///
+/// Editor deviation from the engine: in the original the top blade
+/// retracts *upward into the cell above* as the slicer opens (`Ay −
+/// slicergap` rises up to 85 px above `Ay`, well past the cell's top
+/// edge — over open passage it shows there, over a solid tile it gets
+/// clobbered). In a per-cell editor preview that protrusion looks wrong
+/// — the upper blade appears in the wrong cell, leaving the slicer's own
+/// top-right empty mid-animation. We instead clamp the top piece so it
+/// hangs from its own cell's ceiling: the whole chomper stays
+/// self-contained in its cell, with the open gap between the retracted
+/// halves still visible. The bottom piece already fits (max height = one
+/// cell) so it needs no clamp.
 fn draw_slicer_a(canvas: &mut Canvas, bg: &BiomeTables, state: u8, blockxco: i32, ay: i32) {
     let idx = slicer_seq_index(state);
     let bot_id = if state & 0x80 != 0 && SLICER_BOT2[idx] != 0 {
@@ -1284,7 +1296,15 @@ fn draw_slicer_a(canvas: &mut Canvas, bg: &BiomeTables, state: u8, blockxco: i32
     let top_id = SLICER_TOP[idx];
     if top_id != 0 {
         if let Some(piece) = bg.resolve(top_id) {
-            let y = ay - i32::from(SLICER_GAP[idx]);
+            // Engine Y for the top piece's bottom row.
+            let engine_y = ay - i32::from(SLICER_GAP[idx]);
+            // The cell's top scan-line: `Ay` is the A-section bottom,
+            // `BLOCK_HEIGHT − D_HEIGHT` rows above it is the ceiling.
+            let cell_top = ay - (i32::from(crate::bgdata::BLOCK_HEIGHT) - i32::from(D_HEIGHT));
+            // Lowest bottom-row that still keeps the whole piece inside
+            // the cell (piece extends `height − 1` rows upward).
+            let min_bottom = cell_top + i32::from(piece.height) - 1;
+            let y = engine_y.max(min_bottom);
             canvas.blit(piece, blockxco, y, Opacity::Or);
         }
     }
@@ -1749,6 +1769,56 @@ mod tests {
             count_above_strip(&slicer) > count_above_strip(&empty),
             "slicer mechanism should add pixels above the floor strip"
         );
+    }
+
+    #[test]
+    fn slicer_stays_within_its_own_cell() {
+        // Regression: the engine telescopes the slicer's top blade up to
+        // ~85 px above `Ay`, which lands it in the cell *above* the
+        // slicer mid-animation — in a per-cell editor preview that shows
+        // as a second, broken slicer one cell up while the slicer's own
+        // top-right stays black. `draw_slicer_a` now clamps the top piece
+        // into its own cell. Pin it: across every animation phase, a
+        // slicer adds zero pixels to the cell above (here `Empty`), so
+        // the column above its own cell top is byte-identical with and
+        // without the slicer.
+        let tables = BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap();
+        let col = 5usize;
+        let w = ROOM_BYTES_WIDTH;
+        // Middle-row slicer: Ay = 125, cell top = 125 - (63 - 3) = 65.
+        let cell_top = 65usize;
+        let render = |slicer: bool, st: u32| -> Box<[u8; ROOM_BYTES]> {
+            let mut t = [Tile::default(); ROOM_WIDTH * ROOM_HEIGHT];
+            if slicer {
+                t[ROOM_WIDTH + col] = Tile {
+                    kind: TileKind::Slicer,
+                    variant: 0,
+                    modifier: 0,
+                };
+            }
+            compose_room_bytes(&synth_level_with(t), 1, &tables, Anim { tick: st * 4, traps: true })
+                .unwrap()
+        };
+        for st in 0u32..=6 {
+            let base = render(false, st);
+            let with = render(true, st);
+            for y in 0..cell_top {
+                for c in 0..4usize {
+                    let i = y * w + col * 4 + c;
+                    assert_eq!(
+                        base[i], with[i],
+                        "slicer leaked a pixel into the cell above at y={y} \
+                         byte={c} (state {st})"
+                    );
+                }
+            }
+            // And it must still draw *something* inside its own cell.
+            let own: usize = (cell_top..ROOM_BYTES_HEIGHT)
+                .flat_map(|y| (0..4).map(move |c| (y, c)))
+                .filter(|&(y, c)| with[y * w + col * 4 + c] != base[y * w + col * 4 + c])
+                .count();
+            assert!(own > 0, "slicer drew nothing in its own cell (state {st})");
+        }
     }
 
     #[test]

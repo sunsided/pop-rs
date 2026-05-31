@@ -33,3 +33,5 @@ dist/
 /ir/*.ir3
 !/ir/pilot/
 mapref/
+/*.png
+
