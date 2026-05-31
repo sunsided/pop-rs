@@ -52,10 +52,10 @@ const JUMP_VY: i32 = -12;
 /// run so he can edge up to gaps.
 const STEP_PX: i32 = 2;
 
-/// Half the Prince's collision width, px. He stops with his leading edge
-/// this far from a wall, so his body sits beside it rather than the sprite
-/// centre landing on the cell boundary (and half of him inside the wall).
-const COLLIDE_HALF: i32 = 7;
+/// Half the Prince's collision width, px. His centre stops this far from a
+/// wall — matched to [`VERT_DIST`] so he keeps about the same gap from a
+/// wall as his feet keep from the bottom of the tile he stands on.
+const COLLIDE_HALF: i32 = VERT_DIST;
 
 /// Top-level game mode. Expands toward the full
 /// `Title → Attract → Demo → Playing → Paused → GameOver → Win` machine
@@ -674,6 +674,32 @@ mod tests {
         );
         // And he actually got close to it (didn't stall early).
         assert!(max_lead >= 8 * CELL_W, "he should reach the wall");
+    }
+
+    #[test]
+    fn running_into_a_left_wall_stops_before_it() {
+        // Drop to row 2, then run back left into the col-3 block wall.
+        let mut world = landed_world();
+        for _ in 0..60 {
+            world.tick(InputState {
+                right: true,
+                ..InputState::default()
+            });
+        }
+        let mut min_lead = i32::MAX;
+        for _ in 0..200 {
+            world.tick(InputState {
+                left: true,
+                ..InputState::default()
+            });
+            min_lead = min_lead.min(world.prince.x - COLLIDE_HALF);
+        }
+        // His leading (left) edge can't pass the col-3 wall's right edge.
+        assert!(
+            min_lead >= 4 * CELL_W,
+            "left edge {min_lead} passed the wall at {}",
+            4 * CELL_W
+        );
     }
 
     #[test]
