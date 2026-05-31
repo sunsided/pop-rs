@@ -145,10 +145,9 @@ const DEFAULT_SCALE: f32 = 3.0;
 /// Fixed logic-tick cadence. egui may call `update` at the display
 /// refresh rate (often 60–144 Hz), but the game logic must advance at a
 /// deterministic, host-independent rate, so `update` steps the world at
-/// most once per `TICK`. ~12.5 Hz placeholder (matches the editor's
-/// animation step); pinned to POP's real frame-advance rate when the
-/// physics loop lands (#82 / #94).
-const TICK: Duration = Duration::from_millis(80);
+/// most once per `TICK`. ~18 Hz, close to POP's ~17 fps logic rate (#82);
+/// pinned exactly when the controller's timing is tuned (#94).
+const TICK: Duration = Duration::from_millis(55);
 
 /// eframe application: owns the engine and the GPU texture for the
 /// current frame, re-uploading only when the displayed room changes.

@@ -65,6 +65,15 @@ const RUN_CHX: [i32; 8] = [5, 1, 2, 4, 5, 2, 3, 4];
 const X_MIN: i32 = 7;
 const X_MAX: i32 = 273;
 
+/// Initial upward velocity of a jump, px per tick (negative = up). A
+/// simple vertical hop; the running leap and ledge grabs come with
+/// collision (#94).
+const JUMP_VY: i32 = -12;
+
+/// Distance per tick of a careful step (SHIFT held), px — slower than the
+/// run so he can edge up to gaps.
+const STEP_PX: i32 = 2;
+
 /// The player character's physical state in pixel space.
 struct Prince {
     /// Room the kid is in (1-based). He's only drawn while this is the
@@ -117,15 +126,24 @@ impl Prince {
         }
     }
 
-    /// Advance one tick of gravity until he lands on `landing_y`.
-    fn fall(&mut self) {
+    /// Advance one airborne tick: gravity pulls `vy` down, move, and land
+    /// when he's falling (`vy >= 0`) and reaches `landing_y`. Works for
+    /// both a fall and the up-then-down arc of a jump.
+    fn physics(&mut self) {
         self.vy += GRAVITY;
         self.feet_y += self.vy;
-        if self.feet_y >= self.landing_y {
+        if self.vy >= 0 && self.feet_y >= self.landing_y {
             self.feet_y = self.landing_y;
             self.vy = 0;
             self.on_ground = true;
         }
+    }
+
+    /// Launch a standing jump (a vertical hop back onto the same floor).
+    fn jump(&mut self) {
+        self.vy = JUMP_VY;
+        self.on_ground = false;
+        self.moving = false;
     }
 
     /// Run one tick in `dir` (`-1` left, `+1` right, `0` idle): face the
@@ -140,6 +158,15 @@ impl Prince {
         self.facing_right = dir > 0;
         self.run_phase = (self.run_phase + 1) % RUN_CHX.len();
         self.x = (self.x + RUN_CHX[self.run_phase] * dir).clamp(X_MIN, X_MAX);
+        self.moving = true;
+    }
+
+    /// Take one careful step in `dir` (SHIFT held): a slow `STEP_PX` move
+    /// with the run animation, for edging up to a gap.
+    fn step(&mut self, dir: i32) {
+        self.facing_right = dir > 0;
+        self.run_phase = (self.run_phase + 1) % RUN_CHX.len();
+        self.x = (self.x + STEP_PX * dir).clamp(X_MIN, X_MAX);
         self.moving = true;
     }
 }
@@ -215,10 +242,10 @@ impl World {
 
     /// Advance one logic frame given the latest input.
     ///
-    /// In `Playing`: while airborne the Prince falls under gravity (no
-    /// steering mid-air yet); once grounded, the left / right arrows run
-    /// him that way. Guards / tiles / sound slot in here in order as later
-    /// subsystems land (#94+).
+    /// In `Playing`, once grounded: Up jumps, SHIFT + arrow takes a
+    /// careful step, a bare arrow runs him that way, nothing stands. While
+    /// airborne he follows gravity (no steering mid-air yet). Guards /
+    /// tiles / sound slot in here in order as later subsystems land (#94+).
     pub fn tick(&mut self, input: InputState) {
         self.frame = self.frame.wrapping_add(1);
         match self.mode {
@@ -229,9 +256,20 @@ impl World {
             }
             Mode::Playing => {
                 if self.prince.on_ground {
-                    self.prince.walk(walk_dir(input));
+                    let dir = walk_dir(input);
+                    if input.up && !self.prev.up {
+                        self.prince.jump();
+                    } else if input.shift {
+                        if dir == 0 {
+                            self.prince.walk(0); // stand
+                        } else {
+                            self.prince.step(dir);
+                        }
+                    } else {
+                        self.prince.walk(dir);
+                    }
                 } else {
-                    self.prince.fall();
+                    self.prince.physics();
                 }
                 // The room on screen follows the Prince.
                 self.room_id = self.prince.room;
@@ -518,5 +556,54 @@ mod tests {
         // Releasing returns him to standing.
         world.tick(InputState::default());
         assert!(!world.prince.moving);
+    }
+
+    fn landed_world() -> World {
+        let mut world = World::new(load_level1(), dungeon_tables());
+        for _ in 0..30 {
+            world.tick(InputState::default());
+            if world.prince_on_ground() {
+                break;
+            }
+        }
+        assert!(world.prince_on_ground());
+        world
+    }
+
+    #[test]
+    fn up_arrow_jumps_and_lands_back() {
+        let mut world = landed_world();
+        let floor = world.prince.feet_y;
+        world.tick(InputState {
+            up: true,
+            ..InputState::default()
+        });
+        assert!(!world.prince_on_ground(), "Up launches a jump");
+        // A couple of airborne ticks: he rises off the floor.
+        world.tick(InputState::default());
+        world.tick(InputState::default());
+        assert!(world.prince.feet_y < floor, "the jump rises off the floor");
+        // Then he comes back down to the same floor.
+        for _ in 0..30 {
+            world.tick(InputState::default());
+            if world.prince_on_ground() {
+                break;
+            }
+        }
+        assert!(world.prince_on_ground(), "the jump lands");
+        assert_eq!(world.prince.feet_y, floor, "back on the same floor");
+    }
+
+    #[test]
+    fn shift_arrow_takes_a_careful_step() {
+        let mut world = landed_world();
+        let x0 = world.prince.x;
+        world.tick(InputState {
+            shift: true,
+            right: true,
+            ..InputState::default()
+        });
+        assert!(world.prince.facing_right);
+        assert_eq!(world.prince.x - x0, STEP_PX, "careful step moves STEP_PX");
     }
 }
