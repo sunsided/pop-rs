@@ -17,7 +17,7 @@
 use pop_assets::bgdata::{BLOCK_BOT_ROW, CELL_WIDTH_BYTES, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES};
 use pop_assets::draz::image_table::Image;
 use pop_assets::hires::{self, Frame, RenderMode};
-use pop_assets::level::{Level, Room, TileKind, ROOMS_PER_LEVEL, ROOM_HEIGHT, ROOM_WIDTH};
+use pop_assets::level::{Level, Room, Tile, TileKind, ROOMS_PER_LEVEL, ROOM_HEIGHT, ROOM_WIDTH};
 use pop_assets::scene::{self, Anim, BiomeTables};
 use pop_assets::sprite;
 
@@ -39,6 +39,10 @@ const CELL_W: i32 = CELL_WIDTH_BYTES as i32 * 7;
 /// Room width in pixels. Crossing it moves the Prince into the linked
 /// neighbour room (see [`Level::room_links`]).
 const ROOM_W: i32 = ROOM_WIDTH_BYTES as i32 * 7;
+
+/// Room height in pixels. Falling past it drops the Prince into the room
+/// below (the `down` link).
+const ROOM_H: i32 = ROOM_HEIGHT_PX as i32;
 
 /// Per-frame horizontal step of the run cycle, in pixels — the `chx`
 /// operands of SEQTABLE `runcyc1..8`. Indexed by the run phase.
@@ -125,7 +129,8 @@ impl Prince {
         let (landing_row, landing_y) = level
             .rooms
             .get(usize::from(room) - 1)
-            .map_or((spawn_row, spawn_feet), |r| settle(r, col, spawn_row));
+            .and_then(|r| settle(r, col, spawn_row))
+            .unwrap_or((spawn_row, spawn_feet));
         let on_ground = spawn_feet >= landing_y;
         Prince {
             room,
@@ -139,20 +144,6 @@ impl Prince {
             facing_right: faces_right(start.face_raw),
             run_phase: 0,
             moving: false,
-        }
-    }
-
-    /// Advance one airborne tick: gravity pulls `vy` down, move, and land
-    /// when he's falling (`vy >= 0`) and reaches `landing_y`. Works for
-    /// both a fall and the up-then-down arc of a jump.
-    fn physics(&mut self) {
-        self.vy += GRAVITY;
-        self.feet_y += self.vy;
-        if self.vy >= 0 && self.feet_y >= self.landing_y {
-            self.feet_y = self.landing_y;
-            self.row = self.landing_row;
-            self.vy = 0;
-            self.on_ground = true;
         }
     }
 
@@ -226,15 +217,28 @@ impl Prince {
     /// floor below. Used by `move_h` and right after a room crossing so the
     /// neighbour room's floor (or a fall) takes effect immediately.
     fn settle_floor(&mut self, room: &Room) {
-        let (lrow, lfeet) = settle(room, col_of(self.x), self.row);
-        if lrow == self.row {
-            self.feet_y = lfeet;
-            self.on_ground = true;
-        } else {
-            self.on_ground = false;
-            self.vy = 0;
-            self.landing_row = lrow;
-            self.landing_y = lfeet;
+        match settle(room, col_of(self.x), self.row) {
+            // Floor right at his row: he stays grounded on it.
+            Some((lrow, lfeet)) if lrow == self.row => {
+                self.feet_y = lfeet;
+                self.on_ground = true;
+            }
+            // A floor lower in this room: fall to it.
+            Some((lrow, lfeet)) => {
+                self.on_ground = false;
+                self.vy = 0;
+                self.landing_row = lrow;
+                self.landing_y = lfeet;
+            }
+            // No floor in this column: fall past the bottom. `landing_y`
+            // beyond the room signals `World::fall_step` to carry him into
+            // the room below (or land him at the bottom if there's none).
+            None => {
+                self.on_ground = false;
+                self.vy = 0;
+                self.landing_row = ROOM_HEIGHT - 1;
+                self.landing_y = ROOM_H + 1;
+            }
         }
     }
 }
@@ -360,6 +364,83 @@ impl World {
         }
     }
 
+    /// One airborne tick: gravity, then carry him into the room below each
+    /// time he falls past the bottom edge (the `down` link), until a floor
+    /// in his column catches him. Also runs the up-then-down arc of a jump.
+    fn fall_step(&mut self) {
+        self.prince.vy += GRAVITY;
+        self.prince.feet_y += self.prince.vy;
+
+        // Descend through `down`-linked rooms while he's below the floor.
+        while self.prince.feet_y >= ROOM_H {
+            let room_idx = usize::from(self.prince.room).saturating_sub(1);
+            let down = self.level.room_links().get(room_idx).map_or(0, |l| l.down);
+            if down == 0 {
+                // Bottom of the level: land on the bottom-row floor.
+                self.prince.feet_y = floor_y(ROOM_HEIGHT - 1);
+                self.prince.vy = 0;
+                self.prince.row = ROOM_HEIGHT - 1;
+                self.prince.on_ground = true;
+                return;
+            }
+            self.prince.room = down;
+            self.prince.feet_y -= ROOM_H;
+            // Re-aim the landing at the column's floor in the new room.
+            let col = col_of(self.prince.x);
+            match self
+                .level
+                .rooms
+                .get(usize::from(down).saturating_sub(1))
+                .and_then(|r| settle(r, col, 0))
+            {
+                Some((lrow, lfeet)) => {
+                    self.prince.landing_row = lrow;
+                    self.prince.landing_y = lfeet;
+                }
+                None => self.prince.landing_y = ROOM_H + 1, // open here too → keep falling
+            }
+        }
+
+        // Land once he reaches the floor he's aimed at in the current room.
+        if self.prince.vy >= 0 && self.prince.feet_y >= self.prince.landing_y {
+            self.prince.feet_y = self.prince.landing_y;
+            self.prince.vy = 0;
+            self.prince.row = self.prince.landing_row;
+            self.prince.on_ground = true;
+        }
+    }
+
+    /// Break a loose floor the grounded Prince stands on: the cell becomes
+    /// a hole (`Empty`) — in the level data, so both the renderer and the
+    /// floor physics see it — and he drops through to the room below.
+    /// Instant for now; the original's shake-then-fall delay is later
+    /// polish (#96 tile interactions).
+    fn break_loose_floor_under_feet(&mut self) {
+        if !self.prince.on_ground {
+            return;
+        }
+        let room_idx = usize::from(self.prince.room).saturating_sub(1);
+        let col = col_of(self.prince.x);
+        let row = self.prince.row;
+        let on_loose = self
+            .level
+            .rooms
+            .get(room_idx)
+            .and_then(|r| r.tile_at(col, row))
+            .is_some_and(|t| t.kind == TileKind::LooseFloor);
+        if !on_loose {
+            return;
+        }
+        if let Some(r) = self.level.rooms.get_mut(room_idx) {
+            r.tiles[row * ROOM_WIDTH + col] = Tile::default();
+        }
+        // Drop through the fresh hole (`fall_step` carries him below).
+        self.prince.on_ground = false;
+        self.prince.vy = 0;
+        self.prince.landing_row = ROOM_HEIGHT - 1;
+        self.prince.landing_y = ROOM_H + 1;
+    }
+
     /// `true` if `(col, row)` of room id `room` is a non-solid tile the
     /// Prince could step into. Missing room → `false` (treat as a wall).
     fn room_col_open(&self, room: u8, col: usize, row: usize) -> bool {
@@ -386,7 +467,7 @@ impl World {
             Mode::Playing => {
                 let room_idx = usize::from(self.prince.room).saturating_sub(1);
                 if !self.prince.on_ground {
-                    self.prince.physics();
+                    self.fall_step();
                 } else if input.up && !self.prev.up {
                     self.prince.jump();
                 } else if let Some(room) = self.level.rooms.get(room_idx) {
@@ -399,6 +480,8 @@ impl World {
                 }
                 // Carry him into a neighbour room if he stepped off an edge.
                 self.cross_horizontal_edge();
+                // A loose floor under his feet gives way — he drops through.
+                self.break_loose_floor_under_feet();
                 // The room on screen follows the Prince.
                 self.room_id = self.prince.room;
             }
@@ -501,22 +584,30 @@ fn is_solid_at(room: &Room, col: usize, row: usize) -> bool {
 }
 
 /// Where the kid's feet rest when dropped straight down from
-/// (`col`, `from_row`): `(row, feet_y)` of the first floor-bearing tile,
-/// or the top of the first solid block, falling back to the bottom row.
-fn settle(room: &Room, col: usize, from_row: usize) -> (usize, i32) {
+/// (`col`, `from_row`): `Some((row, feet_y))` for the first floor-bearing
+/// tile (or the top of the first solid block), or `None` when the column
+/// is open all the way down — in which case the caller falls through to
+/// the room below.
+fn settle(room: &Room, col: usize, from_row: usize) -> Option<(usize, i32)> {
     for r in from_row..ROOM_HEIGHT {
         let Some(kind) = room.tile_at(col, r).map(|t| t.kind) else {
             continue;
         };
         if tile_has_floor(kind) {
-            return (r, floor_y(r));
+            return Some((r, floor_y(r)));
         }
         if tile_is_solid(kind) {
             let top = r.saturating_sub(1);
-            return (top, floor_y(top));
+            return Some((top, floor_y(top)));
+        }
+        // The bottom row is the room's floor base, so it supports any tile
+        // standing on it (pillars, torches, …). Only a genuinely `Empty`
+        // bottom cell is a hole the kid falls through to the room below.
+        if r == ROOM_HEIGHT - 1 && kind != TileKind::Empty {
+            return Some((r, floor_y(r)));
         }
     }
-    (ROOM_HEIGHT - 1, floor_y(ROOM_HEIGHT - 1))
+    None
 }
 
 /// `true` for tiles the kid stands *on*, feet at that row's floor line.
@@ -642,9 +733,7 @@ mod tests {
         // LV1 room 1 col 0 = Empty / Torch / Block → stand on the row-2
         // block top, i.e. row 1's floor line.
         let level = load_level1();
-        let (row, feet) = settle(&level.rooms[0], 0, 0);
-        assert_eq!(row, 1);
-        assert_eq!(feet, floor_y(1));
+        assert_eq!(settle(&level.rooms[0], 0, 0), Some((1, floor_y(1))));
     }
 
     #[test]
@@ -730,50 +819,41 @@ mod tests {
     }
 
     #[test]
-    fn running_into_a_wall_stops_before_it() {
-        // Running right, he drops to row 2 at the col-4 gap, then meets the
-        // col-9 Block wall. His leading edge must never pass the wall's
-        // left edge (`9 * CELL_W`), even though his centre stays left of it.
+    fn move_h_stops_at_the_right_wall() {
+        // Row 2: col 8 is Floor, col 9 is a Block wall. Driving him right
+        // must stop his leading edge at the wall (`9 * CELL_W`). Exercised
+        // through `move_h` directly so the col-6 loose floor (which would
+        // drop him out of the room) doesn't interfere.
         let mut world = landed_world();
-        let mut max_lead = 0;
-        for _ in 0..300 {
-            world.tick(InputState {
-                right: true,
-                ..InputState::default()
-            });
-            max_lead = max_lead.max(world.prince.x + COLLIDE_HALF);
+        world.prince.row = 2;
+        world.prince.x = 8 * CELL_W + CELL_W / 2;
+        for _ in 0..30 {
+            let room = &world.level.rooms[0];
+            world.prince.move_h(5, room);
         }
         assert!(
-            max_lead <= 9 * CELL_W,
-            "leading edge {max_lead} passed the wall at {}",
+            world.prince.x + COLLIDE_HALF <= 9 * CELL_W,
+            "leading edge {} passed the wall at {}",
+            world.prince.x + COLLIDE_HALF,
             9 * CELL_W
         );
-        // And he actually got close to it (didn't stall early).
-        assert!(max_lead >= 8 * CELL_W, "he should reach the wall");
     }
 
     #[test]
-    fn running_into_a_left_wall_stops_before_it() {
-        // Drop to row 2, then run back left into the col-3 block wall.
+    fn move_h_stops_at_the_left_wall() {
+        // Row 2: col 4 is Rubble, col 3 is a Block wall. Driving him left
+        // must stop his leading edge at the wall's right side (`4 * CELL_W`).
         let mut world = landed_world();
-        for _ in 0..60 {
-            world.tick(InputState {
-                right: true,
-                ..InputState::default()
-            });
+        world.prince.row = 2;
+        world.prince.x = 4 * CELL_W + CELL_W / 2;
+        for _ in 0..30 {
+            let room = &world.level.rooms[0];
+            world.prince.move_h(-5, room);
         }
-        let mut min_lead = i32::MAX;
-        for _ in 0..200 {
-            world.tick(InputState {
-                left: true,
-                ..InputState::default()
-            });
-            min_lead = min_lead.min(world.prince.x - COLLIDE_HALF);
-        }
-        // His leading (left) edge can't pass the col-3 wall's right edge.
         assert!(
-            min_lead >= 4 * CELL_W,
-            "left edge {min_lead} passed the wall at {}",
+            world.prince.x - COLLIDE_HALF >= 4 * CELL_W,
+            "leading edge {} passed the wall at {}",
+            world.prince.x - COLLIDE_HALF,
             4 * CELL_W
         );
     }
@@ -826,6 +906,51 @@ mod tests {
         world.prince.settle_floor(room);
         assert!(!world.prince.on_ground, "no floor at row 1 → he falls");
         assert_eq!(world.prince.landing_row, 2);
+    }
+
+    #[test]
+    fn falling_past_the_bottom_enters_the_room_below() {
+        // Force a fall through an open column (as a broken loose floor would
+        // leave): `landing_y` beyond the room means nothing caught him, so
+        // he drops into room 1's down link (room 2).
+        let mut world = landed_world();
+        assert_eq!(world.room_id(), 1);
+        world.prince.on_ground = false;
+        world.prince.vy = 0;
+        world.prince.feet_y = ROOM_H - 1;
+        world.prince.landing_y = ROOM_H + 1;
+        for _ in 0..50 {
+            world.tick(InputState::default());
+            if world.prince_on_ground() {
+                break;
+            }
+        }
+        assert_eq!(world.room_id(), 2, "room 1's down link is room 2");
+        assert!(world.prince_on_ground(), "he lands in room 2");
+        assert!(world.prince.feet_y < ROOM_H, "feet inside the new room");
+    }
+
+    #[test]
+    fn breaking_a_loose_floor_drops_him_to_the_room_below() {
+        // Running right from the spawn he drops to row 2, reaches the col-6
+        // loose floor, which gives way and drops him into room 2 (LV1 D=2).
+        let mut world = landed_world();
+        assert_eq!(world.room_id(), 1);
+        let mut reached_room_2 = false;
+        for _ in 0..300 {
+            world.tick(InputState {
+                right: true,
+                ..InputState::default()
+            });
+            if world.room_id() == 2 {
+                reached_room_2 = true;
+                break;
+            }
+        }
+        assert!(
+            reached_room_2,
+            "the col-6 loose floor should drop him into room 2"
+        );
     }
 
     #[test]
