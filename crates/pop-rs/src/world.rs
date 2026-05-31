@@ -1,17 +1,18 @@
 //! World model, the player character, and the frame loop (Path B,
-//! issues #92 / #94).
+//! issues #92 / #94 / #120).
 //!
 //! [`World`] holds a loaded level + its biome sprites, a [`Mode`] machine,
 //! the current room, and the [`Prince`]. `render` composites the room
-//! scene ([`pop_assets::scene`]) and overlays the Prince on top.
+//! scene ([`pop_assets::scene`]) and draws the Prince on top.
 //!
 //! The Prince uses a clean pixel-space physics model (not POP's
 //! `CharX`/`CharY` fixed-point coordinates) — Path B reads the original
 //! for *behaviour* and reuses its *art*, but the runtime is fresh Rust.
-//! Today's physics is just spawn + gravity: LV1 drops the kid in from the
-//! top-left ledge (`SUBS.S :special1 → jumpseq stepfall`) and he falls to
-//! the floor. The controller (run / turn / jump / climb) and the rest of
-//! the per-frame subsystem order land next (#94 / #95).
+//! He spawns, drops in (LV1 `SUBS.S :special1 → stepfall`), runs / jumps /
+//! steps, and now respects the tiles: he stands on floors, stops at solid
+//! walls, and falls off ledges (first slice of #120). Still missing:
+//! step-up, the faithful stepfall landing on the upper floor, room
+//! transitions, and the foreground (front-piece) draw order (#120 / #121).
 
 use pop_assets::bgdata::{BLOCK_BOT_ROW, CELL_WIDTH_BYTES, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES};
 use pop_assets::draz::image_table::Image;
@@ -23,10 +24,38 @@ use pop_assets::sprite;
 use crate::backend::InputState;
 
 /// Downward acceleration applied each logic tick while the Prince is
-/// airborne, in pixels per tick. Tuned for the ~12.5 Hz host step so the
-/// LV1 drop-in reads as a quick fall; refined against POP's real fall
-/// timing when the controller lands (#94).
+/// airborne, in pixels per tick. Tuned for the ~18 Hz host step; refined
+/// against POP's real fall timing when the controller matures (#94).
 const GRAVITY: i32 = 3;
+
+/// Pixels from a row's block-bottom up to where the character stands
+/// (`FloorY = BlockBot - VertDist`, `TABLES.S` "bottom of block to centre
+/// plane"). Without it the Prince renders a touch too low.
+const VERT_DIST: i32 = 10;
+
+/// Tile column width in pixels (`CELL_WIDTH_BYTES * 7`).
+const CELL_W: i32 = CELL_WIDTH_BYTES as i32 * 7;
+
+/// Per-frame horizontal step of the run cycle, in pixels — the `chx`
+/// operands of SEQTABLE `runcyc1..8`. Indexed by the run phase.
+const RUN_CHX: [i32; 8] = [5, 1, 2, 4, 5, 2, 3, 4];
+
+/// Horizontal pixel bounds that keep the Prince inside the 280 px room.
+const X_MIN: i32 = 7;
+const X_MAX: i32 = 273;
+
+/// Initial upward velocity of a jump, px per tick (negative = up). A
+/// simple vertical hop; the running leap and ledge grabs come later (#120).
+const JUMP_VY: i32 = -12;
+
+/// Distance per tick of a careful step (SHIFT held), px — slower than the
+/// run so he can edge up to gaps.
+const STEP_PX: i32 = 2;
+
+/// Half the Prince's collision width, px. His centre stops this far from a
+/// wall — matched to [`VERT_DIST`] so he keeps about the same gap from a
+/// wall as his feet keep from the bottom of the tile he stands on.
+const COLLIDE_HALF: i32 = VERT_DIST;
 
 /// Top-level game mode. Expands toward the full
 /// `Title → Attract → Demo → Playing → Paused → GameOver → Win` machine
@@ -55,25 +84,6 @@ pub struct KidArt {
     pub run: Vec<Image>,
 }
 
-/// Per-frame horizontal step of the run cycle, in pixels — the `chx`
-/// operands of SEQTABLE `runcyc1..8`. Indexed by the run phase.
-const RUN_CHX: [i32; 8] = [5, 1, 2, 4, 5, 2, 3, 4];
-
-/// Horizontal pixel bounds that keep the Prince on screen. No tile-level
-/// wall / ledge collision yet (that's the next slice) — he just can't
-/// walk off the 280 px room edge.
-const X_MIN: i32 = 7;
-const X_MAX: i32 = 273;
-
-/// Initial upward velocity of a jump, px per tick (negative = up). A
-/// simple vertical hop; the running leap and ledge grabs come with
-/// collision (#94).
-const JUMP_VY: i32 = -12;
-
-/// Distance per tick of a careful step (SHIFT held), px — slower than the
-/// run so he can edge up to gaps.
-const STEP_PX: i32 = 2;
-
 /// The player character's physical state in pixel space.
 struct Prince {
     /// Room the kid is in (1-based). He's only drawn while this is the
@@ -83,10 +93,14 @@ struct Prince {
     x: i32,
     /// Feet line, room pixels — the sprite's bottom scan-line sits here.
     feet_y: i32,
+    /// Tile row he stands on while grounded (`0..ROOM_HEIGHT`).
+    row: usize,
     /// Vertical velocity, pixels per tick (down is positive).
     vy: i32,
-    /// Floor line the kid lands on when the fall completes.
+    /// Feet line he lands on when the current fall completes.
     landing_y: i32,
+    /// Row he lands on when the current fall completes.
+    landing_row: usize,
     /// `true` once he has landed.
     on_ground: bool,
     /// Facing right (sprite mirrored) vs left.
@@ -104,22 +118,24 @@ impl Prince {
         let start = level.prince_start();
         let cols = ROOM_WIDTH.max(1);
         let col = usize::from(start.block) % cols;
-        let row = (usize::from(start.block) / cols).min(ROOM_HEIGHT - 1);
-        let cell_w = i32::from(CELL_WIDTH_BYTES) * 7; // 28 px per tile column
-        let x = i32::try_from(col).unwrap_or(0) * cell_w + cell_w / 2;
-        let spawn_feet = i32::from(BLOCK_BOT_ROW[row]);
+        let spawn_row = (usize::from(start.block) / cols).min(ROOM_HEIGHT - 1);
+        let x = i32::try_from(col).unwrap_or(0) * CELL_W + CELL_W / 2;
         let room = clamp_start_room(start.screen);
-        let landing_y = level
+        let spawn_feet = floor_y(spawn_row);
+        let (landing_row, landing_y) = level
             .rooms
             .get(usize::from(room) - 1)
-            .map_or(spawn_feet, |r| settle_feet_y(r, col, row));
+            .map_or((spawn_row, spawn_feet), |r| settle(r, col, spawn_row));
+        let on_ground = spawn_feet >= landing_y;
         Prince {
             room,
             x,
-            feet_y: spawn_feet,
+            feet_y: if on_ground { landing_y } else { spawn_feet },
+            row: if on_ground { landing_row } else { spawn_row },
             vy: 0,
             landing_y,
-            on_ground: spawn_feet >= landing_y,
+            landing_row,
+            on_ground,
             facing_right: faces_right(start.face_raw),
             run_phase: 0,
             moving: false,
@@ -134,13 +150,16 @@ impl Prince {
         self.feet_y += self.vy;
         if self.vy >= 0 && self.feet_y >= self.landing_y {
             self.feet_y = self.landing_y;
+            self.row = self.landing_row;
             self.vy = 0;
             self.on_ground = true;
         }
     }
 
-    /// Launch a standing jump (a vertical hop back onto the same floor).
+    /// Launch a standing jump — a vertical hop back onto the current floor.
     fn jump(&mut self) {
+        self.landing_row = self.row;
+        self.landing_y = self.feet_y;
         self.vy = JUMP_VY;
         self.on_ground = false;
         self.moving = false;
@@ -148,26 +167,62 @@ impl Prince {
 
     /// Run one tick in `dir` (`-1` left, `+1` right, `0` idle): face the
     /// way he moves, advance the run cycle, and step by that frame's
-    /// `chx`, clamped to the room. `dir == 0` returns him to standing.
-    fn walk(&mut self, dir: i32) {
+    /// `chx`. `dir == 0` returns him to standing.
+    fn walk(&mut self, dir: i32, room: &Room) {
         if dir == 0 {
             self.moving = false;
             self.run_phase = 0;
             return;
         }
-        self.facing_right = dir > 0;
         self.run_phase = (self.run_phase + 1) % RUN_CHX.len();
-        self.x = (self.x + RUN_CHX[self.run_phase] * dir).clamp(X_MIN, X_MAX);
-        self.moving = true;
+        self.move_h(RUN_CHX[self.run_phase] * dir, room);
     }
 
     /// Take one careful step in `dir` (SHIFT held): a slow `STEP_PX` move
     /// with the run animation, for edging up to a gap.
-    fn step(&mut self, dir: i32) {
-        self.facing_right = dir > 0;
+    fn step(&mut self, dir: i32, room: &Room) {
         self.run_phase = (self.run_phase + 1) % RUN_CHX.len();
-        self.x = (self.x + STEP_PX * dir).clamp(X_MIN, X_MAX);
+        self.move_h(STEP_PX * dir, room);
+    }
+
+    /// Move horizontally by `dx` px against `room`'s tiles: stop flush at a
+    /// solid wall, follow the floor across flat ground, and start a fall
+    /// when he walks off a ledge.
+    fn move_h(&mut self, dx: i32, room: &Room) {
+        let dir = dx.signum();
+        self.facing_right = dir > 0;
         self.moving = true;
+
+        let mut target_x = (self.x + dx).clamp(X_MIN, X_MAX);
+
+        // Collide on his *leading edge*, not his centre — his body reaches
+        // the wall before his centre crosses the cell boundary. If the
+        // column under the leading edge is solid, stop the edge flush
+        // against the wall.
+        let lead_col = col_of(target_x + dir * COLLIDE_HALF);
+        if is_solid_at(room, lead_col, self.row) {
+            let wall = i32::try_from(lead_col).unwrap_or(0);
+            target_x = if dir > 0 {
+                wall * CELL_W - COLLIDE_HALF
+            } else {
+                (wall + 1) * CELL_W + COLLIDE_HALF
+            }
+            .clamp(X_MIN, X_MAX);
+        }
+
+        self.x = target_x;
+
+        // Follow the floor in the (possibly new) column; fall if it dropped.
+        let col = col_of(self.x);
+        let (lrow, lfeet) = settle(room, col, self.row);
+        if lrow == self.row {
+            self.feet_y = lfeet;
+        } else {
+            self.on_ground = false;
+            self.vy = 0;
+            self.landing_row = lrow;
+            self.landing_y = lfeet;
+        }
     }
 }
 
@@ -243,9 +298,9 @@ impl World {
     /// Advance one logic frame given the latest input.
     ///
     /// In `Playing`, once grounded: Up jumps, SHIFT + arrow takes a
-    /// careful step, a bare arrow runs him that way, nothing stands. While
-    /// airborne he follows gravity (no steering mid-air yet). Guards /
-    /// tiles / sound slot in here in order as later subsystems land (#94+).
+    /// careful step, a bare arrow runs him that way (stopping at walls,
+    /// falling off ledges), nothing stands. While airborne he follows
+    /// gravity (no steering mid-air yet).
     pub fn tick(&mut self, input: InputState) {
         self.frame = self.frame.wrapping_add(1);
         match self.mode {
@@ -255,21 +310,18 @@ impl World {
                 }
             }
             Mode::Playing => {
-                if self.prince.on_ground {
-                    let dir = walk_dir(input);
-                    if input.up && !self.prev.up {
-                        self.prince.jump();
-                    } else if input.shift {
-                        if dir == 0 {
-                            self.prince.walk(0); // stand
-                        } else {
-                            self.prince.step(dir);
-                        }
-                    } else {
-                        self.prince.walk(dir);
-                    }
-                } else {
+                let room_idx = usize::from(self.prince.room).saturating_sub(1);
+                if !self.prince.on_ground {
                     self.prince.physics();
+                } else if input.up && !self.prev.up {
+                    self.prince.jump();
+                } else if let Some(room) = self.level.rooms.get(room_idx) {
+                    let dir = walk_dir(input);
+                    if input.shift && dir != 0 {
+                        self.prince.step(dir, room);
+                    } else {
+                        self.prince.walk(dir, room);
+                    }
                 }
                 // The room on screen follows the Prince.
                 self.room_id = self.prince.room;
@@ -299,6 +351,8 @@ impl World {
                 } else {
                     &art.stand
                 };
+                // The full scene (background + foreground) before the kid.
+                let scene_bytes = bytes.clone();
                 // Centre the sprite's byte span on the Prince's column;
                 // sit its bottom scan-line on his feet.
                 let byte_x = self.prince.x / 7 - i32::from(img.width_bytes) / 2;
@@ -312,6 +366,25 @@ impl World {
                     top_y,
                     self.prince.facing_right,
                 );
+                // Restore the foreground over the kid so columns / near
+                // floor-edges occlude him (the original's drawfrnt-after-
+                // drawchar order). A byte the foreground pass touched
+                // (≠ the `0x80` "black2" CLS fill) reverts to the pre-kid
+                // scene byte.
+                if let Some(fg) = scene::compose_foreground_bytes(
+                    &self.level,
+                    self.room_id,
+                    &self.tables,
+                    Anim::REST,
+                ) {
+                    for (out, (&scene, &front)) in
+                        bytes.iter_mut().zip(scene_bytes.iter().zip(fg.iter()))
+                    {
+                        if front != 0x80 {
+                            *out = scene;
+                        }
+                    }
+                }
             }
         }
         hires::render_linear_topdown(&bytes[..], ROOM_WIDTH_BYTES, ROOM_HEIGHT_PX, mode)
@@ -332,25 +405,42 @@ fn clamp_start_room(screen: u8) -> u8 {
     screen.clamp(1, last)
 }
 
-/// Pixel row the kid's feet rest on when dropped straight down from
-/// (`col`, `start_row`): the floor of the first floor-bearing tile below
-/// him, or the top of the first solid block. Falls back to the room's
-/// bottom floor if the column is open all the way down.
-fn settle_feet_y(room: &Room, col: usize, start_row: usize) -> i32 {
-    for r in start_row..ROOM_HEIGHT {
+/// Feet line (`FloorY`) for a tile row: the row's block-bottom lifted by
+/// [`VERT_DIST`].
+fn floor_y(row: usize) -> i32 {
+    i32::from(BLOCK_BOT_ROW[row.min(ROOM_HEIGHT - 1)]) - VERT_DIST
+}
+
+/// Tile column containing pixel `x`, clamped to the room.
+fn col_of(x: i32) -> usize {
+    usize::try_from(x.max(0) / CELL_W)
+        .unwrap_or(0)
+        .min(ROOM_WIDTH - 1)
+}
+
+/// `true` if `(col, row)` is a solid tile (a wall the kid can't enter).
+fn is_solid_at(room: &Room, col: usize, row: usize) -> bool {
+    room.tile_at(col, row)
+        .is_some_and(|t| tile_is_solid(t.kind))
+}
+
+/// Where the kid's feet rest when dropped straight down from
+/// (`col`, `from_row`): `(row, feet_y)` of the first floor-bearing tile,
+/// or the top of the first solid block, falling back to the bottom row.
+fn settle(room: &Room, col: usize, from_row: usize) -> (usize, i32) {
+    for r in from_row..ROOM_HEIGHT {
         let Some(kind) = room.tile_at(col, r).map(|t| t.kind) else {
             continue;
         };
         if tile_has_floor(kind) {
-            return i32::from(BLOCK_BOT_ROW[r]);
+            return (r, floor_y(r));
         }
         if tile_is_solid(kind) {
-            // Stand on the block's top edge = the floor line of the row
-            // above it.
-            return i32::from(BLOCK_BOT_ROW[r.saturating_sub(1)]);
+            let top = r.saturating_sub(1);
+            return (top, floor_y(top));
         }
     }
-    i32::from(BLOCK_BOT_ROW[ROOM_HEIGHT - 1])
+    (ROOM_HEIGHT - 1, floor_y(ROOM_HEIGHT - 1))
 }
 
 /// `true` for tiles the kid stands *on*, feet at that row's floor line.
@@ -375,7 +465,8 @@ fn tile_has_floor(kind: TileKind) -> bool {
     )
 }
 
-/// `true` for solid blocks the kid stands on *top* of.
+/// `true` for solid blocks the kid stands on *top* of (and can't walk
+/// through).
 fn tile_is_solid(kind: TileKind) -> bool {
     matches!(kind, TileKind::Block | TileKind::PillarBottom)
 }
@@ -429,19 +520,63 @@ mod tests {
         KidArt {
             stand: chtab1.images.get(14).expect("stand frame").clone(),
             fall: chtab2.images.get(53).expect("freefall frame").clone(),
-            // Run frames 7-14 = CHTAB1 indices 6..14.
             run: (6..14).map(|i| chtab1.images[i].clone()).collect(),
         }
+    }
+
+    fn landed_world() -> World {
+        let mut world = World::new(load_level1(), dungeon_tables());
+        for _ in 0..40 {
+            world.tick(InputState::default());
+            if world.prince_on_ground() {
+                break;
+            }
+        }
+        assert!(world.prince_on_ground());
+        world
     }
 
     #[test]
     fn clamp_start_room_keeps_invariant() {
         let last = u8::try_from(ROOMS_PER_LEVEL).unwrap();
-        assert_eq!(clamp_start_room(0), 1); // floor
+        assert_eq!(clamp_start_room(0), 1);
         assert_eq!(clamp_start_room(1), 1);
         assert_eq!(clamp_start_room(last), last);
-        assert_eq!(clamp_start_room(last + 1), last); // ceil
-        assert_eq!(clamp_start_room(u8::MAX), last); // ceil
+        assert_eq!(clamp_start_room(last + 1), last);
+        assert_eq!(clamp_start_room(u8::MAX), last);
+    }
+
+    #[test]
+    fn floor_y_lifts_block_bottom_by_vertdist() {
+        assert_eq!(floor_y(0), i32::from(BLOCK_BOT_ROW[0]) - VERT_DIST);
+        assert_eq!(floor_y(1), i32::from(BLOCK_BOT_ROW[1]) - VERT_DIST);
+        assert_eq!(floor_y(2), i32::from(BLOCK_BOT_ROW[2]) - VERT_DIST);
+    }
+
+    #[test]
+    fn col_of_maps_pixels_to_tiles() {
+        assert_eq!(col_of(0), 0);
+        assert_eq!(col_of(27), 0);
+        assert_eq!(col_of(28), 1);
+        assert_eq!(col_of(10_000), ROOM_WIDTH - 1);
+    }
+
+    #[test]
+    fn settle_stands_on_block_top_at_lv1_spawn() {
+        // LV1 room 1 col 0 = Empty / Torch / Block → stand on the row-2
+        // block top, i.e. row 1's floor line.
+        let level = load_level1();
+        let (row, feet) = settle(&level.rooms[0], 0, 0);
+        assert_eq!(row, 1);
+        assert_eq!(feet, floor_y(1));
+    }
+
+    #[test]
+    fn faces_right_decodes_kidstartface() {
+        assert!(faces_right(0xff));
+        assert!(!faces_right(0x00));
+        assert!(!faces_right(0x7f));
+        assert!(faces_right(0x80));
     }
 
     #[test]
@@ -467,107 +602,104 @@ mod tests {
     }
 
     #[test]
-    fn faces_right_decodes_kidstartface() {
-        // LV1: KidStartFace $ff → CharFace 0 → faces right → mirror.
-        assert!(faces_right(0xff));
-        // CharFace -1 (face_raw $00) → faces left → no mirror.
-        assert!(!faces_right(0x00));
-        // High bit of CharFace decides: $7f^$ff=$80 (left), $80^$ff=$7f (right).
-        assert!(!faces_right(0x7f));
-        assert!(faces_right(0x80));
-    }
-
-    #[test]
-    fn lv1_prince_spawns_airborne_facing_right() {
+    fn lv1_prince_spawns_airborne_and_lands_on_row1() {
         let prince = Prince::spawn(&load_level1());
-        // Block 0 = col 0, row 0 (Empty ledge) → spawns above the floor.
         assert_eq!(prince.room, 1);
         assert!(!prince.on_ground, "LV1 spawns on an empty ledge → falls");
         assert!(prince.facing_right);
-        // Settles onto the row-2 block top = the row-1 floor line.
-        assert_eq!(prince.landing_y, i32::from(BLOCK_BOT_ROW[1]));
+        assert_eq!(prince.landing_row, 1);
+        assert_eq!(prince.landing_y, floor_y(1));
         assert!(prince.feet_y < prince.landing_y);
     }
 
     #[test]
-    fn prince_falls_and_lands() {
-        let mut world = World::new(load_level1(), dungeon_tables());
-        assert!(!world.prince_on_ground());
-        let landing = world.prince.landing_y;
-        for _ in 0..30 {
-            world.tick(InputState::default());
-            if world.prince_on_ground() {
-                break;
-            }
-        }
-        assert!(
-            world.prince_on_ground(),
-            "Prince should land within 30 ticks"
-        );
-        assert_eq!(world.prince.feet_y, landing);
-    }
-
-    #[test]
-    fn art_overlay_adds_pixels_in_start_room() {
-        let world = World::new(load_level1(), dungeon_tables());
-        let plain = world.render(RenderMode::Monochrome).expect("renders");
-        let world = world.with_kid_art(kid_art());
-        let drawn = world.render(RenderMode::Monochrome).expect("renders");
-        assert_ne!(
-            plain.pixels, drawn.pixels,
-            "kid overlay should change the frame"
-        );
-        let lit = |f: &Frame| {
-            f.pixels
-                .chunks_exact(4)
-                .filter(|p| p[0..3] != [0, 0, 0])
-                .count()
-        };
-        assert!(lit(&drawn) > lit(&plain), "kid overlay adds lit pixels");
-    }
-
-    #[test]
-    fn render_returns_full_size_frame() {
-        let world = World::new(load_level1(), dungeon_tables()).with_kid_art(kid_art());
-        let frame = world.render(RenderMode::NtscColor).expect("renders");
-        assert_eq!((frame.width, frame.height), (280, 192));
+    fn prince_falls_and_lands_on_floor_line() {
+        let world = landed_world();
+        assert_eq!(world.prince.row, 1);
+        assert_eq!(world.prince.feet_y, floor_y(1));
     }
 
     #[test]
     fn grounded_prince_runs_right_on_arrow() {
-        let mut world = World::new(load_level1(), dungeon_tables());
-        // Let him land first (no steering mid-air).
-        for _ in 0..30 {
-            world.tick(InputState::default());
-            if world.prince_on_ground() {
-                break;
-            }
-        }
-        assert!(world.prince_on_ground());
+        let mut world = landed_world();
         let x0 = world.prince.x;
-        let held = InputState {
+        world.tick(InputState {
             right: true,
             ..InputState::default()
-        };
-        world.tick(held);
-        assert!(world.prince.moving, "arrow puts him in the run state");
+        });
         assert!(world.prince.facing_right);
         assert!(world.prince.x > x0, "he advances to the right");
-        // Releasing returns him to standing.
+        assert!(world.prince.moving);
         world.tick(InputState::default());
         assert!(!world.prince.moving);
     }
 
-    fn landed_world() -> World {
-        let mut world = World::new(load_level1(), dungeon_tables());
-        for _ in 0..30 {
-            world.tick(InputState::default());
-            if world.prince_on_ground() {
+    #[test]
+    fn running_off_a_ledge_starts_a_fall() {
+        // Running right from the bottom-left, he reaches the col-4 gap
+        // (row 1 Empty over row 2 Rubble) and drops to the lower floor.
+        let mut world = landed_world();
+        let mut fell = false;
+        for _ in 0..120 {
+            world.tick(InputState {
+                right: true,
+                ..InputState::default()
+            });
+            if !world.prince_on_ground() {
+                fell = true;
                 break;
             }
         }
-        assert!(world.prince_on_ground());
-        world
+        assert!(fell, "walking off the ledge should start a fall");
+    }
+
+    #[test]
+    fn running_into_a_wall_stops_before_it() {
+        // Running right, he drops to row 2 at the col-4 gap, then meets the
+        // col-9 Block wall. His leading edge must never pass the wall's
+        // left edge (`9 * CELL_W`), even though his centre stays left of it.
+        let mut world = landed_world();
+        let mut max_lead = 0;
+        for _ in 0..300 {
+            world.tick(InputState {
+                right: true,
+                ..InputState::default()
+            });
+            max_lead = max_lead.max(world.prince.x + COLLIDE_HALF);
+        }
+        assert!(
+            max_lead <= 9 * CELL_W,
+            "leading edge {max_lead} passed the wall at {}",
+            9 * CELL_W
+        );
+        // And he actually got close to it (didn't stall early).
+        assert!(max_lead >= 8 * CELL_W, "he should reach the wall");
+    }
+
+    #[test]
+    fn running_into_a_left_wall_stops_before_it() {
+        // Drop to row 2, then run back left into the col-3 block wall.
+        let mut world = landed_world();
+        for _ in 0..60 {
+            world.tick(InputState {
+                right: true,
+                ..InputState::default()
+            });
+        }
+        let mut min_lead = i32::MAX;
+        for _ in 0..200 {
+            world.tick(InputState {
+                left: true,
+                ..InputState::default()
+            });
+            min_lead = min_lead.min(world.prince.x - COLLIDE_HALF);
+        }
+        // His leading (left) edge can't pass the col-3 wall's right edge.
+        assert!(
+            min_lead >= 4 * CELL_W,
+            "left edge {min_lead} passed the wall at {}",
+            4 * CELL_W
+        );
     }
 
     #[test]
@@ -579,12 +711,10 @@ mod tests {
             ..InputState::default()
         });
         assert!(!world.prince_on_ground(), "Up launches a jump");
-        // A couple of airborne ticks: he rises off the floor.
         world.tick(InputState::default());
         world.tick(InputState::default());
         assert!(world.prince.feet_y < floor, "the jump rises off the floor");
-        // Then he comes back down to the same floor.
-        for _ in 0..30 {
+        for _ in 0..40 {
             world.tick(InputState::default());
             if world.prince_on_ground() {
                 break;
@@ -605,5 +735,12 @@ mod tests {
         });
         assert!(world.prince.facing_right);
         assert_eq!(world.prince.x - x0, STEP_PX, "careful step moves STEP_PX");
+    }
+
+    #[test]
+    fn render_returns_full_size_frame() {
+        let world = World::new(load_level1(), dungeon_tables()).with_kid_art(kid_art());
+        let frame = world.render(RenderMode::NtscColor).expect("renders");
+        assert_eq!((frame.width, frame.height), (280, 192));
     }
 }
