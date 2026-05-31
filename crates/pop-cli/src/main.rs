@@ -20,6 +20,8 @@ mod draz;
 #[cfg(feature = "editor")]
 mod editor;
 mod info;
+#[cfg(feature = "game")]
+mod run;
 
 /// `pop` — Prince of Persia (Apple II) toolkit.
 #[derive(Debug, Parser)]
@@ -46,6 +48,9 @@ enum Cmd {
     /// Open the egui level browser.
     #[cfg(feature = "editor")]
     Editor(editor::Args),
+    /// Run the game in a window (boots into a level; arrows page rooms).
+    #[cfg(feature = "game")]
+    Run(run::Args),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -56,5 +61,7 @@ fn main() -> anyhow::Result<()> {
         Cmd::Discover(args) => discover::run(&args),
         #[cfg(feature = "editor")]
         Cmd::Editor(args) => editor::run(&args),
+        #[cfg(feature = "game")]
+        Cmd::Run(args) => run::run(&args),
     }
 }

@@ -1,0 +1,188 @@
+//! Minimal world model and frame loop (Path B, issue #92).
+//!
+//! First milestone: a windowed host needs *something* to tick and draw.
+//! [`World`] holds a loaded level and its biome sprites, tracks a current
+//! room and a frame counter, and renders that room to a [`Frame`] via the
+//! existing [`pop_assets::scene`] compositor. The mode machine starts at
+//! [`Mode::Playing`]; the title-screen asset path lands in a follow-up.
+//!
+//! This is deliberately thin — no Prince, no physics yet. It exists to
+//! prove the host pipeline (window → loop → input → render) end to end
+//! before gameplay subsystems (#93+) hang off [`World::tick`].
+
+use pop_assets::hires::{Frame, RenderMode};
+use pop_assets::level::{Level, ROOMS_PER_LEVEL};
+use pop_assets::scene::{self, BiomeTables};
+
+use crate::backend::InputState;
+
+/// Top-level game mode. Expands toward the full
+/// `Title → Attract → Demo → Playing → Paused → GameOver → Win` machine
+/// from #92; only `Title` / `Playing` exist today.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Mode {
+    /// Title screen (asset blit). Not yet wired to a decoded image — see
+    /// the title-decode follow-up. A directional/shift press advances to
+    /// [`Mode::Playing`].
+    Title,
+    /// In a level, browsing rooms. No Prince / physics yet.
+    Playing,
+}
+
+/// High-level game state for one loaded level.
+pub struct World {
+    level: Level,
+    tables: BiomeTables,
+    /// Current room, 1-based (`1..=ROOMS_PER_LEVEL`).
+    room_id: u8,
+    /// Monotonic frame counter, advanced once per [`World::tick`].
+    frame: u64,
+    /// Current top-level mode.
+    mode: Mode,
+    /// Previous frame's input, for key-press edge detection.
+    prev: InputState,
+}
+
+impl World {
+    /// Build a world from a parsed level and its biome sprite tables.
+    /// Starts in [`Mode::Playing`] at the prince's start room.
+    #[must_use]
+    pub fn new(level: Level, tables: BiomeTables) -> Self {
+        let room_id = level.prince_start().screen.max(1);
+        Self {
+            level,
+            tables,
+            room_id,
+            frame: 0,
+            mode: Mode::Playing,
+            prev: InputState::default(),
+        }
+    }
+
+    /// Current room (1-based).
+    #[must_use]
+    pub fn room_id(&self) -> u8 {
+        self.room_id
+    }
+
+    /// Frames elapsed since construction.
+    #[must_use]
+    pub fn frame(&self) -> u64 {
+        self.frame
+    }
+
+    /// Current mode.
+    #[must_use]
+    pub fn mode(&self) -> Mode {
+        self.mode
+    }
+
+    /// Advance one logic frame given the latest input.
+    ///
+    /// PR1 behaviour: left / right step through the level's rooms on
+    /// key-press edges, so the host's input → state → render path is
+    /// observable. Real per-frame gameplay (kid update, guards, tiles)
+    /// hangs off here in later subsystems (#93+).
+    pub fn tick(&mut self, input: InputState) {
+        self.frame = self.frame.wrapping_add(1);
+        match self.mode {
+            Mode::Title => {
+                if pressed(input) && !pressed(self.prev) {
+                    self.mode = Mode::Playing;
+                }
+            }
+            Mode::Playing => {
+                if input.right && !self.prev.right {
+                    self.room_id = step_room(self.room_id, 1);
+                }
+                if input.left && !self.prev.left {
+                    self.room_id = step_room(self.room_id, -1);
+                }
+            }
+        }
+        self.prev = input;
+    }
+
+    /// Render the current frame to RGBA.
+    ///
+    /// `None` only if the current room id is out of range for the loaded
+    /// level (shouldn't happen for a valid level).
+    #[must_use]
+    pub fn render(&self, mode: RenderMode) -> Option<Frame> {
+        scene::render_room(&self.level, self.room_id, &self.tables, mode)
+    }
+}
+
+/// `true` if any directional or shift key is held.
+fn pressed(i: InputState) -> bool {
+    i.left || i.right || i.up || i.down || i.shift
+}
+
+/// Step a 1-based `room` by `delta`, wrapping within
+/// `1..=ROOMS_PER_LEVEL`.
+fn step_room(room: u8, delta: i32) -> u8 {
+    let count = i32::try_from(ROOMS_PER_LEVEL).unwrap_or(1).max(1);
+    let zero_based = i32::from(room) - 1;
+    let next = (zero_based + delta).rem_euclid(count) + 1;
+    u8::try_from(next).unwrap_or(1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn step_room_wraps_both_directions() {
+        let last = u8::try_from(ROOMS_PER_LEVEL).unwrap();
+        assert_eq!(step_room(1, -1), last);
+        assert_eq!(step_room(last, 1), 1);
+        assert_eq!(step_room(5, 1), 6);
+        assert_eq!(step_room(5, -1), 4);
+    }
+
+    #[test]
+    fn world_renders_level_one_start_room() {
+        use pop_assets::bgdata::Biome;
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../vendor/pop-apple2/04 Support");
+        let level = Level::from_file(root.join("Levels").join("LEVEL1")).expect("LEVEL1 loads");
+        let start = level.prince_start().screen.max(1);
+        let tables = BiomeTables::load(&root, Biome::Dungeon).expect("dungeon tables load");
+        let world = World::new(level, tables);
+        assert_eq!(world.room_id(), start);
+
+        let frame = world
+            .render(RenderMode::NtscColor)
+            .expect("start room renders");
+        assert_eq!((frame.width, frame.height), (280, 192));
+        let lit = frame
+            .pixels
+            .chunks_exact(4)
+            .filter(|p| p[0..3] != [0, 0, 0])
+            .count();
+        assert!(lit > 0, "rendered start room should have non-black pixels");
+    }
+
+    #[test]
+    fn right_arrow_edge_advances_room() {
+        use pop_assets::bgdata::Biome;
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../vendor/pop-apple2/04 Support");
+        let level = Level::from_file(root.join("Levels").join("LEVEL1")).expect("LEVEL1 loads");
+        let tables = BiomeTables::load(&root, Biome::Dungeon).expect("dungeon tables load");
+        let mut world = World::new(level, tables);
+        let start = world.room_id();
+
+        let held = InputState {
+            right: true,
+            ..InputState::default()
+        };
+        // First tick on a press edge advances exactly once...
+        world.tick(held);
+        let after = world.room_id();
+        assert_eq!(after, step_room(start, 1));
+        // ...and holding it without release does not advance again.
+        world.tick(held);
+        assert_eq!(world.room_id(), after);
+    }
+}

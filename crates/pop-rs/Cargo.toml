@@ -10,6 +10,9 @@ description = "Rust port of the original Prince of Persia (Apple II) game logic.
 [lints]
 workspace = true
 
+[dependencies]
+pop-assets = { path = "../pop-assets" }
+
 [features]
 default = []
 backend-sdl2 = []
