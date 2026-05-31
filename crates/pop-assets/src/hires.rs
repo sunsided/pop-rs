@@ -226,6 +226,77 @@ pub fn render_linear(bytes: &[u8], width_bytes: u8, height: u8, mode: RenderMode
     })
 }
 
+/// Render a **top-down** linear bitmap (`width_bytes × height`, row 0 =
+/// the visual top) to an RGBA [`Frame`].
+///
+/// Unlike [`render_linear`], which assumes POP's bottom-up sprite-table
+/// layout and flips during read, this takes bytes already in display
+/// order — the layout the scene compositor's room canvas holds. Thin
+/// wrapper over [`render_linear_topdown_rows`] for the whole frame.
+///
+/// # Errors
+///
+/// Returns `None` if `bytes.len() != width_bytes * height`.
+#[must_use]
+pub fn render_linear_topdown(
+    bytes: &[u8],
+    width_bytes: u8,
+    height: u8,
+    mode: RenderMode,
+) -> Option<Frame> {
+    render_linear_topdown_rows(bytes, width_bytes, height, 0, usize::from(height), mode)
+}
+
+/// Decode scan-lines `[y0, y1)` of a **top-down** linear bitmap
+/// (`width_bytes × height`, row 0 = visual top) into an RGBA [`Frame`]
+/// of `(y1 - y0)` rows.
+///
+/// Each output row is decoded purely from its own source bytes — the
+/// artifact-colour demod has no vertical term — so a row sub-range is
+/// byte-identical to the matching rows of a full
+/// [`render_linear_topdown`]. That makes this the decode primitive for
+/// incremental texture updates: a caller re-composes a frame, diffs it
+/// against the previous one, and decodes / uploads only the changed
+/// scan-lines via `egui::TextureHandle::set_partial`.
+///
+/// # Errors
+///
+/// Returns `None` if `bytes.len() != width_bytes * height`, if the range
+/// is inverted (`y0 > y1`), or if `y1 > height`.
+#[must_use]
+pub fn render_linear_topdown_rows(
+    bytes: &[u8],
+    width_bytes: u8,
+    height: u8,
+    y0: usize,
+    y1: usize,
+    mode: RenderMode,
+) -> Option<Frame> {
+    let w_bytes = usize::from(width_bytes);
+    let h = usize::from(height);
+    if bytes.len() != w_bytes * h || y0 > y1 || y1 > h {
+        return None;
+    }
+    let w_pixels = w_bytes * 7;
+    let rows = y1 - y0;
+    let mut pixels = vec![0u8; w_pixels * rows * 4];
+    // Scratch reused across rows — see `render` for the rationale.
+    let mut ntsc_scratch: Vec<f32> = Vec::new();
+    for (out_y, src_y) in (y0..y1).enumerate() {
+        let row = &bytes[src_y * w_bytes..(src_y + 1) * w_bytes];
+        let out_row = &mut pixels[out_y * w_pixels * 4..(out_y + 1) * w_pixels * 4];
+        match mode {
+            RenderMode::Monochrome => render_row_mono(row, out_row),
+            RenderMode::NtscColor => render_row_ntsc(row, out_row, &mut ntsc_scratch),
+        }
+    }
+    Some(Frame {
+        width: u32::try_from(w_pixels).ok()?,
+        height: u32::try_from(rows).ok()?,
+        pixels,
+    })
+}
+
 /// Unpack a row of `row.len() * 7` per-pixel "lit" bits into `bits`,
 /// LSB-first within each byte (so bit 0 of byte 0 is the leftmost
 /// pixel). Panics in debug if `bits.len() != row.len() * 7`.
