@@ -355,8 +355,10 @@ impl AnimViewer {
             usize::try_from(rendered.height).ok()?,
         ];
         let image = ColorImage::from_rgba_unmultiplied(size, &rendered.pixels);
+        // Name the texture by the full cache key — `mirror`/`ntsc` change the
+        // pixels for the same frame id, so they must disambiguate the label.
         Some(ctx.load_texture(
-            format!("anim-frame-{frame}"),
+            format!("anim-frame-{frame}-{ntsc}-{mirror}"),
             image,
             egui::TextureOptions::NEAREST,
         ))
