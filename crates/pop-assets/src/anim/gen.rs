@@ -23,6 +23,15 @@ pub(super) fn render_generated() -> String {
     let sections = super::parse::parse_framedef();
     let seqs = super::parse::parse_sequences();
 
+    // `SECTIONS` below references all three statics, so the parse must yield
+    // them — else the generated file would name undeclared statics. (The
+    // parser normally returns >3: the 3 used + empty trailing `ds` sections.)
+    assert!(
+        sections.len() >= 3,
+        "expected >=3 FRAMEDEF sections, got {} — the .S layout changed",
+        sections.len()
+    );
+
     let mut out = String::from(HEADER);
 
     // FRAMEDEF sections — only the three the runtime uses (main + the two
