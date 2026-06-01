@@ -13,6 +13,7 @@
 //! should swap (e.g. a stair climb up-right). Guard tables (CHTAB4+) preview
 //! when present; otherwise the frame shows a "CHTAB not loaded" note.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -49,8 +50,9 @@ pub struct AnimViewer {
     /// Manually flip the figure's facing (and its travel) from the
     /// auto-pick, e.g. to send a stair climb up-right instead of up-left.
     user_flip: bool,
-    /// Cached texture for the displayed `(frame id, ntsc, mirror)` triple.
-    cached: Option<(u8, bool, bool, TextureHandle)>,
+    /// Rendered sprite textures, keyed `(frame id, ntsc, mirror)`. Reused
+    /// across frames / loops; cleared when the data root changes.
+    cache: HashMap<(u8, bool, bool), TextureHandle>,
 }
 
 impl Default for AnimViewer {
@@ -66,7 +68,7 @@ impl Default for AnimViewer {
             speed_ms: 90,
             last_step: None,
             user_flip: false,
-            cached: None,
+            cache: HashMap::new(),
         }
     }
 }
@@ -86,7 +88,8 @@ impl AnimViewer {
             .resizable(true)
             .show(ctx, |ui| self.window_ui(ui, ntsc));
         self.open = open;
-        if self.playing {
+        // Keep ticking only while still open (the × may have just closed it).
+        if self.open && self.playing {
             ctx.request_repaint_after(Duration::from_millis(self.speed_ms));
         }
     }
@@ -97,15 +100,16 @@ impl AnimViewer {
         if self.loaded_root.as_deref() == Some(root) {
             return;
         }
+        // Commit (and stop retrying) only once the DRAZ dir actually exists,
+        // so sprites dropped in later, under an unchanged root, get picked up.
+        let Some(dir) = discovery::draz_dir_in(root).map(|d| d.join("I")) else {
+            return;
+        };
         self.loaded_root = Some(root.to_path_buf());
-        self.tables.clear();
-        self.cached = None;
-        if let Some(dir) = discovery::draz_dir_in(root).map(|d| d.join("I")) {
-            for n in 1..=8u8 {
-                let table = ImageTable::from_file(dir.join(format!("IMG.CHTAB{n}"))).ok();
-                self.tables.push(table);
-            }
-        }
+        self.cache.clear();
+        self.tables = (1..=8u8)
+            .map(|n| ImageTable::from_file(dir.join(format!("IMG.CHTAB{n}"))).ok())
+            .collect();
     }
 
     fn window_ui(&mut self, ui: &mut egui::Ui, ntsc: bool) {
@@ -166,13 +170,8 @@ impl AnimViewer {
                 self.step_manual(1, seq);
             }
             ui.checkbox(&mut self.looping, "loop");
-            if ui
-                .checkbox(&mut self.user_flip, "mirror")
-                .on_hover_text("Flip the figure's facing and travel direction")
-                .changed()
-            {
-                self.cached = None;
-            }
+            ui.checkbox(&mut self.user_flip, "mirror")
+                .on_hover_text("Flip the figure's facing and travel direction");
             ui.add(egui::Slider::new(&mut self.speed_ms, 30..=400).text("ms/frame"));
         });
     }
@@ -243,15 +242,14 @@ impl AnimViewer {
         let mirror = (net_dx > 0) ^ self.user_flip;
         let sx = if self.user_flip { -1.0 } else { 1.0 };
 
-        if self.cached.as_ref().map(|(f, n, m, _)| (*f, *n, *m))
-            != Some((frame.frame, ntsc, mirror))
-        {
-            self.cached = self
-                .render_sprite(ui.ctx(), frame.frame, ntsc, mirror)
-                .map(|t| (frame.frame, ntsc, mirror, t));
+        let key = (frame.frame, ntsc, mirror);
+        if !self.cache.contains_key(&key) {
+            if let Some(tex) = self.render_sprite(ui.ctx(), frame.frame, ntsc, mirror) {
+                self.cache.insert(key, tex);
+            }
         }
 
-        let Some((_, _, _, tex)) = &self.cached else {
+        let Some(tex) = self.cache.get(&key) else {
             painter.text(
                 rect.center(),
                 Align2::CENTER_CENTER,
@@ -317,7 +315,6 @@ impl AnimViewer {
     fn reset(&mut self) {
         self.frame_pos = 0;
         self.last_step = None;
-        self.cached = None;
     }
 
     /// Render one frame's CHTAB sprite to an egui texture, mirrored if

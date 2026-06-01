@@ -186,8 +186,11 @@ fn parse_framedef() -> Vec<FrameDef> {
         defs[idx - 1] = FrameDef {
             image: u8::try_from(vals[0] & 0xff).unwrap_or(0),
             sword: u8::try_from(vals[1] & 0xff).unwrap_or(0),
-            dx: i8::try_from(vals[2]).unwrap_or(0),
-            dy: i8::try_from(vals[3]).unwrap_or(0),
+            // `Fdx`/`Fdy` are signed bytes. The data writes them decimal
+            // (`-2`), but reinterpret the low byte as two's complement so a
+            // raw `$fe` would also decode to `-2` rather than failing to `0`.
+            dx: byte_i8(vals[2]),
+            dy: byte_i8(vals[3]),
             check: u8::try_from(vals[4] & 0xff).unwrap_or(0),
         };
     }
@@ -387,6 +390,11 @@ fn parse_sequences() -> Vec<AnimSequence> {
         .collect()
 }
 
+/// A sane upper bound on interpreter steps per sequence: every real one
+/// reaches a frame-loop, chain, or terminal far sooner. Hitting it means a
+/// parser desync or an unhandled opcode (a `debug_assert` fires).
+const MAX_STEPS: usize = 4000;
+
 /// Walk one sequence from `start`, accumulating frames until it loops on a
 /// frame it already emitted, chains into another named sequence, or hits a
 /// terminal opcode / the end of the stream.
@@ -406,12 +414,31 @@ fn walk(
     let mut loops_to = None;
     let mut chains_to = None;
 
-    for _ in 0..4000 {
+    // `goto` targets already taken — re-taking one can't reach a new frame
+    // (a pure-opcode loop), so we stop instead of spinning to the cap.
+    let mut goto_seen: HashSet<usize> = HashSet::new();
+    let mut steps = 0;
+    loop {
+        if steps >= MAX_STEPS {
+            debug_assert!(
+                false,
+                "animation `{name}` (#{id}) hit the {MAX_STEPS}-step cap — \
+                 parser desync or unhandled opcode?"
+            );
+            break;
+        }
+        steps += 1;
         let Some(tok) = prog.tokens.get(pos) else {
             break;
         };
         match tok {
             Tok::Int(n) => {
+                // Frame ids are bytes; 0 is the valid "blank" sentinel. An
+                // out-of-range value means an opcode byte leaked in as a frame.
+                debug_assert!(
+                    (0..=255).contains(n),
+                    "frame id {n} out of range in `{name}` (#{id})"
+                );
                 // Re-reaching a frame we already drew closes the loop (e.g.
                 // `goto stand` lands on the `act` before frame 15, not the
                 // frame itself).
@@ -432,7 +459,12 @@ fn walk(
                 turn = false;
                 pos += 1;
             }
-            Tok::Word(_) => pos += 1, // stray (consumed by its opcode otherwise)
+            Tok::Word(_) => {
+                // A `dw` is only reached as a `goto`/`ifwtless` operand; a
+                // bare one here means the assembler desynced.
+                debug_assert!(false, "stray `dw` token at {pos} in `{name}` (#{id})");
+                pos += 1;
+            }
             Tok::Op(op) => match op {
                 Opcode::Chx => {
                     dx += prog.int_at(pos + 1);
@@ -446,8 +478,11 @@ fn walk(
                     action = Some(u8::try_from(prog.int_at(pos + 1)).unwrap_or(0));
                     pos += 2;
                 }
-                // `tap`/`effect` take one operand; `ifwtless` a `dw` target
-                // we skip (the not-weightless fall-through) — one token each.
+                // One operand each: `tap`/`effect` an id, `ifwtless` a `dw`
+                // target. We always take the *not-weightless* fall-through
+                // (skip the target): the preview has no weight state, and not
+                // weightless is the in-game default. The weightless branch is
+                // deliberately not explored.
                 Opcode::Tap | Opcode::Effect | Opcode::Ifwtless => pos += 2,
                 Opcode::Setfall => pos += 3,
                 Opcode::Aboutface => {
@@ -471,6 +506,8 @@ fn walk(
                         // one; a jump to its own entry (e.g. `stand`) is a
                         // self-loop, caught when the frame is re-reached.
                         chains_to = Some(target);
+                        break;
+                    } else if !goto_seen.insert(t) {
                         break;
                     }
                     pos = t;
@@ -513,6 +550,12 @@ fn eval(expr: &str) -> i32 {
         }
     }
     total + sign * parse_num(&term)
+}
+
+/// Reinterpret a parsed operand's low byte as a signed two's-complement
+/// byte, so both a decimal `-2` and a raw `$fe` decode to `-2`.
+fn byte_i8(v: i32) -> i8 {
+    i8::from_ne_bytes([u8::try_from(v & 0xff).unwrap_or(0)])
 }
 
 fn parse_num(term: &str) -> i32 {
