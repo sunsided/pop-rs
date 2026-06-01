@@ -519,12 +519,16 @@ impl World {
         }
         let front = usize::try_from(front).unwrap_or(0);
         let room_idx = usize::from(self.prince.room).saturating_sub(1);
-        let ledge = self
-            .level
-            .rooms
-            .get(room_idx)
-            .and_then(|r| settle(r, front, to_row))
-            == Some((to_row, floor_y(to_row)));
+        let Some(room) = self.level.rooms.get(room_idx) else {
+            return false;
+        };
+        // A grabbable ledge is a floor *at* `to_row` he can stand on — not
+        // a solid block (a solid at `to_row` would `saturating_sub` to
+        // `(0, ..)` at the top row and read as a ledge into the wall, and a
+        // solid lower down resolves to its top a row higher). Climbing onto
+        // the top of a block is a follow-up (#120).
+        let ledge = settle(room, front, to_row) == Some((to_row, floor_y(to_row)))
+            && !is_solid_at(room, front, to_row);
         if !ledge {
             return false;
         }
@@ -580,7 +584,8 @@ impl World {
             }
             Mode::Playing => {
                 let room_idx = usize::from(self.prince.room).saturating_sub(1);
-                if self.prince.climb.is_some() {
+                let was_climbing = self.prince.climb.is_some();
+                if was_climbing {
                     self.climb_step();
                 } else if !self.prince.on_ground {
                     self.fall_step();
@@ -597,8 +602,10 @@ impl World {
                         self.prince.walk(dir, room);
                     }
                 }
-                // Room edges / loose floors don't apply mid-climb.
-                if self.prince.climb.is_none() {
+                // Room edges / loose floors don't apply mid-climb — including
+                // the tick a climb starts or finishes (he hasn't stepped on
+                // the landing tile yet).
+                if !was_climbing && self.prince.climb.is_none() {
                     // Carry him into a neighbour room if he stepped off an edge.
                     let crossed = self.cross_horizontal_edge();
                     // A loose floor under his feet gives way. Skip on the tick
@@ -1203,6 +1210,75 @@ mod tests {
         assert_eq!(world.prince.row, 0, "he reaches the upper floor (row 0)");
         assert!(world.prince_on_ground());
         assert_eq!(world.prince.feet_y, floor_y(0));
+    }
+
+    #[test]
+    fn up_facing_a_solid_top_tile_does_not_climb() {
+        // Row 0 col 8 is a Block. Facing it from row 1 must NOT read as a
+        // ledge (the top-row `saturating_sub` quirk) — Up falls back to a
+        // jump instead of climbing into the wall.
+        let mut world = World::new(load_level1(), dungeon_tables()).with_kid_art(kid_art());
+        for _ in 0..40 {
+            world.tick(InputState::default());
+            if world.prince_on_ground() {
+                break;
+            }
+        }
+        world.prince.row = 1;
+        world.prince.x = 7 * CELL_W + CELL_W / 2; // col 7 → front col 8 (Block)
+        world.prince.facing_right = true;
+        world.prince.on_ground = true;
+        world.prince.feet_y = floor_y(1);
+        world.tick(InputState {
+            up: true,
+            ..InputState::default()
+        });
+        assert!(
+            world.prince.climb.is_none(),
+            "no climb into a solid top tile"
+        );
+        assert!(!world.prince_on_ground(), "Up there jumps instead");
+    }
+
+    #[test]
+    fn climbing_onto_a_loose_floor_does_not_shatter_on_arrival() {
+        let mut world = World::new(load_level1(), dungeon_tables()).with_kid_art(kid_art());
+        for _ in 0..40 {
+            world.tick(InputState::default());
+            if world.prince_on_ground() {
+                break;
+            }
+        }
+        // Make the climb target (row 0 col 3) a loose floor.
+        let loose = *world.level.rooms[0].tile_at(6, 2).unwrap();
+        world.level.rooms[0].tiles[3] = loose;
+        world.prince.row = 1;
+        world.prince.x = 2 * CELL_W + CELL_W / 2;
+        world.prince.facing_right = true;
+        world.prince.on_ground = true;
+        world.prince.feet_y = floor_y(1);
+
+        world.tick(InputState {
+            up: true,
+            ..InputState::default()
+        });
+        assert!(
+            world.prince.climb.is_some(),
+            "climb starts onto the loose floor"
+        );
+        for _ in 0..30 {
+            world.tick(InputState::default());
+            if world.prince.climb.is_none() {
+                break;
+            }
+        }
+        // The loose floor must not break on the arrival tick — he's grounded
+        // on it, not already falling through.
+        assert_eq!(world.prince.row, 0);
+        assert!(
+            world.prince_on_ground(),
+            "loose floor doesn't shatter on the climb-landing tick"
+        );
     }
 
     #[test]
