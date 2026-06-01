@@ -110,8 +110,8 @@ fn load_tables(root: &std::path::Path, biome: Biome) -> anyhow::Result<BiomeTabl
 /// animation engine to index by frame (`pop_assets::anim::frame_sprite`).
 /// Slot `i` holds CHTAB `i+1`; a missing table is a `None` slot — non-fatal,
 /// an unresolved frame just renders the bare scene rather than refusing to
-/// start. CHTAB1-3 carry the kid; 4-8 (guard / shared art) load best-effort
-/// for later use.
+/// start. CHTAB1-3 carry the kid; slot 4 (guard body) is left empty, and
+/// 5-8 (shared / combat art) load best-effort for later use.
 fn load_chtabs(root: &std::path::Path) -> Vec<Option<ImageTable>> {
     let Some(dir) = discovery::draz_dir_in(root).map(|d| d.join("I")) else {
         return Vec::new();
@@ -121,7 +121,10 @@ fn load_chtabs(root: &std::path::Path) -> Vec<Option<ImageTable>> {
         load("IMG.CHTAB1"),
         load("IMG.CHTAB2"),
         load("IMG.CHTAB3"),
-        load("IMG.CHTAB4.A"),
+        // Slot 4 is the guard *body* (`IMG.CHTAB4.<variant>`, chosen per
+        // guard type — `.GD` / `.FAT` / …), not the Prince's. Leave it empty
+        // until the runtime spawns guards and knows which body to load.
+        None,
         load("IMG.CHTAB5"),
         load("IMG.CHTAB6.A"),
         load("IMG.CHTAB7"),

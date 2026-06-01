@@ -685,8 +685,11 @@ impl World {
                 // its first frame, not its second.
                 self.prince.cursor.advance();
                 if was_climbing {
+                    // The cursor was set to `climbup` when the climb began and
+                    // advances itself; don't re-play it here, or the tick it
+                    // chains `climbup → stand` (as the climb lands) would snap
+                    // the cursor back to climbup's first frame.
                     self.climb_step();
-                    self.prince.cursor.play("climbup");
                 } else if !self.prince.on_ground {
                     self.fall_step();
                     self.prince.cursor.play("freefall");
