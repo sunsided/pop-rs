@@ -40,16 +40,12 @@
 //! # What's not modelled (yet)
 //!
 //! Mid-animation frames cycle under [`Anim::traps`] (a non-physical editor
-//! preview): torch flame (ambient), spike/slicer extend-retract, and the
-//! loose-floor wobble (`LOOSE_A`/`LOOSE_D` frames + `LOOSE_B_Y` bob, #111).
-//! Still at-rest only:
+//! preview): torch flame (ambient), spike/slicer extend-retract, the
+//! loose-floor wobble (`LOOSE_A`/`LOOSE_D` frames + `LOOSE_B_Y` bob), and the
+//! gate grill / exit door rising open and shut (#111). Still at-rest only:
 //!
 //! * Spike B-edge spillover into the right neighbour (`drawspikeb`) —
 //!   empty at rest, so a no-op today.
-//! * Gate bars at partial heights — gates always render fully closed
-//!   (the partial `GATE_8B`/`GATE_8C` open frames, #111).
-//! * Exit door at partial heights — always closed (`drawexitb` `gateposn`
-//!   raise, #111).
 //! * Depressed press-plate state — uses the up-state piece.
 //! * Flask bubbles (`drawflaska`) — builder-skipped in the original;
 //!   we draw only the static flask base from `PIECE_A`. (The sword is
@@ -498,7 +494,40 @@ impl Anim {
             0
         }
     }
+
+    /// Pixels a previewed gate's grill has risen (open); `0` at rest. Cycled
+    /// open↔closed while `traps` — gates are otherwise fixed by level state.
+    fn gate_open(self) -> i32 {
+        if self.traps {
+            triangle(self.tick, GATE_OPEN_MAX, 2)
+        } else {
+            0
+        }
+    }
+
+    /// Pixels a previewed exit door has risen (open); `0` at rest.
+    fn exit_open(self) -> i32 {
+        if self.traps {
+            triangle(self.tick, EXIT_OPEN_MAX, 2)
+        } else {
+            0
+        }
+    }
 }
+
+/// A `0 → max → 0` triangle wave over `tick`, rising `step` px/tick — for
+/// cycling a previewed gate / door open and shut.
+fn triangle(tick: u32, max: u32, step: u32) -> i32 {
+    if max == 0 {
+        return 0;
+    }
+    let phase = tick.wrapping_mul(step) % (max * 2);
+    i32::try_from(phase.min(max * 2 - phase)).unwrap_or(0)
+}
+
+/// Full open travel of a previewed gate grill / exit door, px.
+const GATE_OPEN_MAX: u32 = 52;
+const EXIT_OPEN_MAX: u32 = 50;
 
 /// Width, in hi-res bytes, of a composed room byte buffer (one byte =
 /// 7 pixels). Equal to [`crate::bgdata::ROOM_WIDTH_BYTES`].
@@ -1257,10 +1286,10 @@ fn draw_mb(
             }
         }
         TileKind::Gate => {
-            draw_gate_bars(canvas, bg, blockxco, ay);
+            draw_gate_bars(canvas, bg, blockxco, ay, anim.gate_open());
         }
         TileKind::Exit => {
-            draw_exit_door(canvas, bg, blockxco, ay, dy, draw_stairs);
+            draw_exit_door(canvas, bg, blockxco, ay, dy, draw_stairs, anim.exit_open());
         }
         _ => {}
     }
@@ -1432,8 +1461,9 @@ fn draw_mc(
 /// matching the `:done` tail of `FRAMEADV.S:drawgateb` (without that
 /// top piece the rendered gate had a black horizontal gap at the top
 /// edge inside the bars).
-fn draw_gate_bars(canvas: &mut Canvas, bg: &BiomeTables, blockxco: i32, ay: i32) {
-    let gate_bot = ay - 1;
+fn draw_gate_bars(canvas: &mut Canvas, bg: &BiomeTables, blockxco: i32, ay: i32, open: i32) {
+    // The grill retracts upward as it opens: its bottom rises by `open`.
+    let gate_bot = ay - 1 - open;
     // Bottom strip: `gatebotORA` at gatebot − 2.
     if let Some(piece) = bg.resolve(GATE_BOT_ORA) {
         canvas.blit(piece, blockxco, gate_bot - 2, Opacity::Or);
@@ -1486,6 +1516,7 @@ fn draw_exit_door(
     ay: i32,
     dy: i32,
     draw_stairs: bool,
+    open: i32,
 ) {
     let canvas_h = i32::from(ROOM_HEIGHT_PX);
     if draw_stairs && blockxco < 36 {
@@ -1499,8 +1530,9 @@ fn draw_exit_door(
         // front so we don't re-index the BGTAB tables per slice.
         let door_mask = bg.resolve(DOOR_MASK);
         let door = bg.resolve(DOOR);
-        // state=0 → gateposn=0; door top starts at `ay − 14`.
-        let mut y = ay - 14;
+        // state=0 → gateposn=0; door bottom at `ay − 14`. As it opens the
+        // door rises, lifting its bottom by `open` (the gap appears below).
+        let mut y = ay - 14 - open;
         while y >= blockthr {
             if let Some(mask) = door_mask {
                 canvas.blit(mask, blockxco, y, Opacity::And);
@@ -2226,6 +2258,36 @@ mod tests {
             (1..33).any(|t| wobble(t).pixels != rest.pixels),
             "the previewed loose floor wobbles across ticks"
         );
+    }
+
+    #[test]
+    fn gate_and_exit_open_in_the_preview() {
+        // Both render closed at rest; the trap preview cycles them open (#111).
+        let tables = BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap();
+        for kind in [TileKind::Gate, TileKind::Exit] {
+            let tile = Tile {
+                kind,
+                variant: 0,
+                modifier: 0,
+            };
+            let level = Level::preview_tile(tile, 4, 1);
+            let rest = render_room_animated(&level, 1, &tables, RenderMode::Monochrome, Anim::REST)
+                .unwrap();
+            let cycle = |tick| {
+                render_room_animated(
+                    &level,
+                    1,
+                    &tables,
+                    RenderMode::Monochrome,
+                    Anim { tick, traps: true },
+                )
+                .unwrap()
+            };
+            assert!(
+                (1..40).any(|t| cycle(t).pixels != rest.pixels),
+                "{kind:?} should open across the trap-preview ticks"
+            );
+        }
     }
 
     #[test]
