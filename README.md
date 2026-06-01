@@ -67,6 +67,11 @@ tests/                      differential and golden-frame tests
 docs/                       architecture and per-module notes
 ```
 
+Animation tables under `crates/pop-assets/src/anim/generated.rs` are baked
+`@generated` Rust (from the vendored `FRAMEDEF.S`/`SEQTABLE.S`); the shipped
+crate has no runtime `.S` parse. Regenerate with `task gen:anim`; the
+`anim::tests::generated_matches_a_fresh_parse` drift test fails CI on staleness.
+
 ## The four lifter passes
 
 | Pass | Input | Output | Purpose |

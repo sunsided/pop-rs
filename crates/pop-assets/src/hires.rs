@@ -621,8 +621,14 @@ mod tests {
     fn ntsc_high_bit_rotates_hue() {
         // 0xd5 = same pixel pattern as 0x55 with the high bit set: the
         // half-dot delay rotates the artifact hue (violet → blue family).
-        let a = render(&make_page(|_| [0x55; HIRES_BYTES_PER_ROW]), RenderMode::NtscColor);
-        let b = render(&make_page(|_| [0xd5; HIRES_BYTES_PER_ROW]), RenderMode::NtscColor);
+        let a = render(
+            &make_page(|_| [0x55; HIRES_BYTES_PER_ROW]),
+            RenderMode::NtscColor,
+        );
+        let b = render(
+            &make_page(|_| [0xd5; HIRES_BYTES_PER_ROW]),
+            RenderMode::NtscColor,
+        );
         assert_ne!(
             a.pixel(2, 0).unwrap(),
             b.pixel(2, 0).unwrap(),
