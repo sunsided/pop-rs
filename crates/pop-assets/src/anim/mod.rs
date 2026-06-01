@@ -44,7 +44,7 @@ pub mod check {
 }
 
 /// One `FRAMEDEF.S` record: the sprite + offsets for a single frame.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FrameDef {
     /// `Fimage` — 1-based image index in its CHTAB; bit 7 selects the high
     /// CHTAB bank. Decoded (with `sword`) by [`Self::sprite`], so kept as a
@@ -73,6 +73,12 @@ pub struct SpriteRef {
 }
 
 impl FrameDef {
+    /// The blank frame — all-zero (`image == 0`, so [`Self::sprite`] is
+    /// `None`). Fills the gaps where the FRAMEDEF index skips a number. Equal
+    /// to [`FrameDef::default`], but usable in `const`/`static` context (which
+    /// `Default::default` is not).
+    pub const EMPTY: Self = Self::new(0, 0, 0, 0, 0);
+
     /// Construct a frame record (the 5-byte `FRAMEDEF.S` field order).
     #[must_use]
     pub const fn new(image: u8, sword: u8, dx: i8, dy: i8, check: u8) -> Self {
