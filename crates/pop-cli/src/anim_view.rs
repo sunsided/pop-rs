@@ -234,9 +234,11 @@ impl AnimViewer {
 
         // Drift the figure by the chx/chy accumulated up to this frame, so a
         // run cycle visibly travels. Bounded: frame_pos wraps at the loop.
+        // `chx` is forward motion (facing-relative); the sprites face *left*,
+        // so forward is screen-left — negate x or he moonwalks.
         let mut off = Vec2::ZERO;
         for f in &seq.frames[..=self.frame_pos] {
-            off += Vec2::new(f.dx as f32, f.dy as f32) * PREVIEW_SCALE;
+            off += Vec2::new(-f.dx as f32, f.dy as f32) * PREVIEW_SCALE;
         }
         let size = tex.size_vec2() * PREVIEW_SCALE;
         // Feet near the baseline, drifting with the locomotion offset.
