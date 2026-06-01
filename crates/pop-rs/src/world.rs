@@ -8,11 +8,12 @@
 //! The Prince uses a clean pixel-space physics model (not POP's
 //! `CharX`/`CharY` fixed-point coordinates) — Path B reads the original
 //! for *behaviour* and reuses its *art*, but the runtime is fresh Rust.
-//! He spawns, drops in (LV1 `SUBS.S :special1 → stepfall`), runs / jumps /
-//! steps, and now respects the tiles: he stands on floors, stops at solid
-//! walls, and falls off ledges (first slice of #120). Still missing:
-//! step-up, the faithful stepfall landing on the upper floor, room
-//! transitions, and the foreground (front-piece) draw order (#120 / #121).
+//! He spawns, drops in, runs / jumps / careful-steps, climbs ledges,
+//! walks between rooms, and falls / descends loose floors into the room
+//! below — respecting walls, floors and ledges (#120). Still rough: a
+//! proper per-action animation engine (#95), the shake-then-fall
+//! loose-floor delay (#96), and the NTSC half-dot / figure-offset
+//! character blit (#121 / #123).
 
 use pop_assets::bgdata::{BLOCK_BOT_ROW, CELL_WIDTH_BYTES, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES};
 use pop_assets::draz::image_table::Image;
@@ -86,6 +87,22 @@ pub struct KidArt {
     /// The 8-frame run cycle (SEQTABLE `runcyc1..8` = FRAMEDEF 7-14 →
     /// CHTAB1 images 7-14), paired one-to-one with [`RUN_CHX`].
     pub run: Vec<Image>,
+    /// The `climbup` pull-up animation (SEQTABLE `climbup` = FRAMEDEF
+    /// 135-149 → CHTAB3 images 13-27), played as he climbs a ledge.
+    pub climb: Vec<Image>,
+}
+
+/// In-progress ledge climb: linearly carries the Prince from where he
+/// stood up onto the ledge over the [`KidArt::climb`] frames.
+#[derive(Clone, Copy)]
+struct ClimbState {
+    /// Frame / interpolation step (`0..climb.len()`).
+    phase: usize,
+    from_x: i32,
+    from_feet: i32,
+    to_x: i32,
+    to_feet: i32,
+    to_row: usize,
 }
 
 /// The player character's physical state in pixel space.
@@ -113,6 +130,8 @@ struct Prince {
     run_phase: usize,
     /// `true` while he is stepping this tick (drives run vs stand frame).
     moving: bool,
+    /// `Some` while climbing a ledge (overrides walk / fall).
+    climb: Option<ClimbState>,
 }
 
 impl Prince {
@@ -144,6 +163,7 @@ impl Prince {
             facing_right: faces_right(start.face_raw),
             run_phase: 0,
             moving: false,
+            climb: None,
         }
     }
 
@@ -484,6 +504,66 @@ impl World {
             .is_some_and(|r| !is_solid_at(r, col, row))
     }
 
+    /// Start a ledge climb if the grounded Prince faces a floor one row up
+    /// in the next column. Returns `true` if it started. In-room only for
+    /// now — climbing into the room above is a follow-up under #120.
+    fn try_climb(&mut self) -> bool {
+        if self.prince.row == 0 {
+            return false;
+        }
+        let to_row = self.prince.row - 1;
+        let dir = if self.prince.facing_right { 1 } else { -1 };
+        let front = i32::try_from(col_of(self.prince.x)).unwrap_or(0) + dir;
+        if !(0..i32::try_from(ROOM_WIDTH).unwrap_or(0)).contains(&front) {
+            return false;
+        }
+        let front = usize::try_from(front).unwrap_or(0);
+        let room_idx = usize::from(self.prince.room).saturating_sub(1);
+        let ledge = self
+            .level
+            .rooms
+            .get(room_idx)
+            .and_then(|r| settle(r, front, to_row))
+            == Some((to_row, floor_y(to_row)));
+        if !ledge {
+            return false;
+        }
+        self.prince.climb = Some(ClimbState {
+            phase: 0,
+            from_x: self.prince.x,
+            from_feet: self.prince.feet_y,
+            to_x: i32::try_from(front).unwrap_or(0) * CELL_W + CELL_W / 2,
+            to_feet: floor_y(to_row),
+            to_row,
+        });
+        self.prince.on_ground = false;
+        self.prince.moving = false;
+        true
+    }
+
+    /// Advance one climb frame, interpolating his position up to the ledge;
+    /// on the last frame he lands grounded on it.
+    fn climb_step(&mut self) {
+        let Some(mut c) = self.prince.climb else {
+            return;
+        };
+        let frames = self.art.as_ref().map_or(1, |a| a.climb.len().max(1));
+        c.phase += 1;
+        if c.phase >= frames {
+            self.prince.x = c.to_x;
+            self.prince.feet_y = c.to_feet;
+            self.prince.row = c.to_row;
+            self.prince.on_ground = true;
+            self.prince.climb = None;
+        } else {
+            let t = i32::try_from(c.phase).unwrap_or(0);
+            let n = i32::try_from(frames).unwrap_or(1).max(1);
+            self.prince.x = c.from_x + (c.to_x - c.from_x) * t / n;
+            self.prince.feet_y = c.from_feet + (c.to_feet - c.from_feet) * t / n;
+            self.prince.climb = Some(c);
+        }
+    }
+
     /// Advance one logic frame given the latest input.
     ///
     /// In `Playing`, once grounded: Up jumps, SHIFT + arrow takes a
@@ -500,10 +580,15 @@ impl World {
             }
             Mode::Playing => {
                 let room_idx = usize::from(self.prince.room).saturating_sub(1);
-                if !self.prince.on_ground {
+                if self.prince.climb.is_some() {
+                    self.climb_step();
+                } else if !self.prince.on_ground {
                     self.fall_step();
                 } else if input.up && !self.prev.up {
-                    self.prince.jump();
+                    // Up grabs a ledge above-in-front, else it's a jump.
+                    if !self.try_climb() {
+                        self.prince.jump();
+                    }
                 } else if let Some(room) = self.level.rooms.get(room_idx) {
                     let dir = walk_dir(input);
                     if input.shift && dir != 0 {
@@ -512,13 +597,16 @@ impl World {
                         self.prince.walk(dir, room);
                     }
                 }
-                // Carry him into a neighbour room if he stepped off an edge.
-                let crossed = self.cross_horizontal_edge();
-                // A loose floor under his feet gives way — he drops through.
-                // Skip on the tick he just crossed a room edge: he hasn't
-                // stood on the destination's entry tile yet.
-                if !crossed {
-                    self.break_loose_floor_under_feet();
+                // Room edges / loose floors don't apply mid-climb.
+                if self.prince.climb.is_none() {
+                    // Carry him into a neighbour room if he stepped off an edge.
+                    let crossed = self.cross_horizontal_edge();
+                    // A loose floor under his feet gives way. Skip on the tick
+                    // he just crossed a room edge — he hasn't stood on the
+                    // destination's entry tile yet.
+                    if !crossed {
+                        self.break_loose_floor_under_feet();
+                    }
                 }
                 // The room on screen follows the Prince.
                 self.room_id = self.prince.room;
@@ -541,7 +629,10 @@ impl World {
             scene::compose_room_bytes(&self.level, self.room_id, &self.tables, Anim::REST)?;
         if let Some(art) = &self.art {
             if self.room_id == self.prince.room {
-                let img = if !self.prince.on_ground {
+                let img = if let Some(c) = &self.prince.climb {
+                    let last = art.climb.len().saturating_sub(1);
+                    art.climb.get(c.phase.min(last)).unwrap_or(&art.stand)
+                } else if !self.prince.on_ground {
                     &art.fall
                 } else if self.prince.moving {
                     art.run.get(self.prince.run_phase).unwrap_or(&art.stand)
@@ -733,10 +824,12 @@ mod tests {
         let dir = vendor_root().join("DRAZ").join("I");
         let chtab1 = ImageTable::from_file(dir.join("IMG.CHTAB1")).expect("CHTAB1 loads");
         let chtab2 = ImageTable::from_file(dir.join("IMG.CHTAB2")).expect("CHTAB2 loads");
+        let chtab3 = ImageTable::from_file(dir.join("IMG.CHTAB3")).expect("CHTAB3 loads");
         KidArt {
             stand: chtab1.images.get(14).expect("stand frame").clone(),
             fall: chtab2.images.get(53).expect("freefall frame").clone(),
             run: (6..14).map(|i| chtab1.images[i].clone()).collect(),
+            climb: (12..27).map(|i| chtab3.images[i].clone()).collect(),
         }
     }
 
@@ -1076,6 +1169,40 @@ mod tests {
         }
         assert!(world.prince_on_ground(), "the jump lands");
         assert_eq!(world.prince.feet_y, floor, "back on the same floor");
+    }
+
+    #[test]
+    fn up_at_a_ledge_climbs_to_the_floor_above() {
+        let mut world = World::new(load_level1(), dungeon_tables()).with_kid_art(kid_art());
+        for _ in 0..40 {
+            world.tick(InputState::default());
+            if world.prince_on_ground() {
+                break;
+            }
+        }
+        // Stand at row 1 col 2 (Floor), facing the row-0 col-3 Floor ledge.
+        world.prince.row = 1;
+        world.prince.x = 2 * CELL_W + CELL_W / 2;
+        world.prince.feet_y = floor_y(1);
+        world.prince.facing_right = true;
+        world.prince.on_ground = true;
+
+        world.tick(InputState {
+            up: true,
+            ..InputState::default()
+        });
+        assert!(world.prince.climb.is_some(), "Up at a ledge starts a climb");
+
+        for _ in 0..30 {
+            world.tick(InputState::default());
+            if world.prince.climb.is_none() {
+                break;
+            }
+        }
+        assert!(world.prince.climb.is_none(), "the climb completes");
+        assert_eq!(world.prince.row, 0, "he reaches the upper floor (row 0)");
+        assert!(world.prince_on_ground());
+        assert_eq!(world.prince.feet_y, floor_y(0));
     }
 
     #[test]
