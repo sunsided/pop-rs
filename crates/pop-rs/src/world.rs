@@ -15,9 +15,10 @@
 //! [`AnimCursor`] (the #95 playback engine — stand / run / fall / climb
 //! wired; turn-in-place, faithful jump arcs and combat still to come). Loose
 //! floors bob their own tile as they wobble, then give way; a crash or hard
-//! landing jolts the screen (#96). Still rough: the falling-rubble mob +
-//! rubble tile that round out #96, and the NTSC half-dot / figure-offset
-//! blit (#121 / #123).
+//! landing jolts the screen (#96). The drawn figure centres on his logical x
+//! per frame, facing-aware, and his wall gap matches what's drawn (#123).
+//! Still rough: the falling-rubble mob + rubble tile that round out #96, and
+//! the NTSC half-dot / sub-byte figure parity (#121).
 
 use pop_assets::bgdata::{BLOCK_BOT_ROW, CELL_WIDTH_BYTES, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES};
 use pop_assets::draz::image_table::{Image, ImageTable};
@@ -186,7 +187,7 @@ impl Prince {
     /// per-frame `chx` (a fixed [`STEP_PX`] when careful). The cursor was
     /// advanced for this tick already, so its `current()` frame is the one to
     /// move and draw by.
-    fn locomote(&mut self, dir: i32, careful: bool, room: &Room) {
+    fn locomote(&mut self, dir: i32, careful: bool, half_w: i32, room: &Room) {
         if dir == 0 {
             self.cursor.play("stand");
             return;
@@ -198,13 +199,13 @@ impl Prince {
         } else {
             self.cursor.current().map_or(0, |f| f.dx)
         };
-        self.move_h(dx * dir, room);
+        self.move_h(dx * dir, half_w, room);
     }
 
     /// Move horizontally by `dx` px against `room`'s tiles: stop flush at a
     /// solid wall, follow the floor across flat ground, and start a fall
     /// when he walks off a ledge.
-    fn move_h(&mut self, dx: i32, room: &Room) {
+    fn move_h(&mut self, dx: i32, half_w: i32, room: &Room) {
         let dir = dx.signum();
         // A zero-`dx` frame (the run cycle's windup) mustn't flip him to
         // facing left — keep the facing the caller set.
@@ -214,18 +215,19 @@ impl Prince {
 
         let mut target_x = self.x + dx;
 
-        // Collide on his *leading edge*, not his centre — his body reaches
-        // the wall before his centre crosses the cell boundary. If the
-        // column under the leading edge is solid, stop the edge flush
+        // Collide on the drawn figure's *leading edge*, `half_w` from his
+        // centre (the current frame's figure half-width, #123) — his body
+        // reaches the wall before his centre crosses the cell boundary. If
+        // the column under the leading edge is solid, stop the edge flush
         // against the wall. (Off-room columns aren't walls — they're the
         // doorway to a neighbour, handled by `cross_horizontal`.)
-        let lead = target_x + dir * COLLIDE_HALF;
+        let lead = target_x + dir * half_w;
         if (0..ROOM_W).contains(&lead) && is_solid_at(room, col_of(lead), self.row) {
             let wall = i32::try_from(col_of(lead)).unwrap_or(0);
             target_x = if dir > 0 {
-                wall * CELL_W - COLLIDE_HALF
+                wall * CELL_W - half_w
             } else {
-                (wall + 1) * CELL_W + COLLIDE_HALF
+                (wall + 1) * CELL_W + half_w
             };
         }
 
@@ -346,6 +348,17 @@ impl World {
             .get(usize::from(sprite.chtab).checked_sub(1)?)?
             .as_ref()?;
         table.images.get(sprite.index)
+    }
+
+    /// The wall-collision half-width (px) for the current animation frame —
+    /// half the drawn figure's width ([`figure_half_width`]), so the wall gap
+    /// matches what's drawn (#123). [`COLLIDE_HALF`] when no sprite is loaded.
+    fn current_figure_half_width(&self) -> i32 {
+        self.prince
+            .cursor
+            .current()
+            .and_then(|f| self.frame_image(f.frame))
+            .map_or(COLLIDE_HALF, figure_half_width)
     }
 
     /// Current room (1-based).
@@ -703,7 +716,8 @@ impl World {
                     }
                 } else if let Some(room) = self.level.rooms.get(room_idx) {
                     let dir = walk_dir(input);
-                    self.prince.locomote(dir, input.shift, room);
+                    let half_w = self.current_figure_half_width();
+                    self.prince.locomote(dir, input.shift, half_w, room);
                 }
                 // A hard landing thuds the floor — the impact jolt of a fall
                 // or jump. A climb finishes with no downward speed, so it
@@ -761,9 +775,11 @@ impl World {
             {
                 // The full scene (background + foreground) before the kid.
                 let scene_bytes = bytes.clone();
-                // Centre the sprite's byte span on the Prince's column;
-                // sit its bottom scan-line on his feet.
-                let byte_x = self.prince.x / 7 - i32::from(img.width_bytes) / 2;
+                // Centre the figure (its true span within the box, mirror-
+                // aware) on the Prince's column; sit its bottom scan-line on
+                // his feet.
+                let byte_x =
+                    self.prince.x / 7 - figure_center_offset(img, self.prince.facing_right);
                 let top_y = self.prince.feet_y - i32::from(img.height) + 1;
                 sprite::composite_hires(
                     &mut bytes[..],
@@ -920,6 +936,38 @@ fn col_of(x: i32) -> usize {
         .min(ROOM_WIDTH - 1)
 }
 
+/// Byte-column offset to subtract from a character's logical byte column
+/// (`x / 7`) so the drawn *figure* — its true span within the sprite box
+/// ([`sprite::figure_byte_span`]), mirrored when `flip` — is centred on him
+/// rather than the (often wider) box. Falls back to half the box width (the
+/// pre-#123 box-centring) when the sprite has no set pixels. Byte-granular;
+/// the sub-byte residual is the #121 half-dot concern.
+fn figure_center_offset(img: &Image, flip: bool) -> i32 {
+    let w = i32::from(img.width_bytes);
+    match sprite::figure_byte_span(img) {
+        Some((lo, hi)) => {
+            let mid = (i32::from(lo) + i32::from(hi)) / 2;
+            if flip {
+                (w - 1) - mid
+            } else {
+                mid
+            }
+        }
+        None => w / 2,
+    }
+}
+
+/// Half the drawn figure's width in px — the per-frame wall-collision
+/// half-extent ([`sprite::figure_byte_span`] width × 7, halved). Facing-
+/// symmetric (the mirror doesn't change the width). [`COLLIDE_HALF`] for a
+/// blank sprite.
+fn figure_half_width(img: &Image) -> i32 {
+    match sprite::figure_byte_span(img) {
+        Some((lo, hi)) => (i32::from(hi) - i32::from(lo) + 1) * 7 / 2,
+        None => COLLIDE_HALF,
+    }
+}
+
 /// `true` if `(col, row)` is a solid tile (a wall the kid can't enter).
 fn is_solid_at(room: &Room, col: usize, row: usize) -> bool {
     room.tile_at(col, row)
@@ -1069,6 +1117,45 @@ mod tests {
     }
 
     #[test]
+    fn figure_centres_on_x_for_both_facings() {
+        use pop_assets::draz::image_table::Image;
+        // 5-byte box; the figure occupies byte cols 1..=3 (odd width → an
+        // exact byte centre), sitting off-centre within the box.
+        let img = Image {
+            width_bytes: 5,
+            height: 1,
+            bitmap: vec![0, 0b000_0001, 0b000_0001, 0b000_0001, 0],
+        };
+        let (lo, hi) = sprite::figure_byte_span(&img).expect("non-empty figure");
+        let x_byte = 20;
+        // Replicate how `composite_hires` maps a source byte to a drawn column.
+        let drawn_centre = |flip: bool| {
+            let byte_x = x_byte - figure_center_offset(&img, flip);
+            let w = i32::from(img.width_bytes);
+            let col = |c: i32| {
+                if flip {
+                    byte_x + (w - 1 - c)
+                } else {
+                    byte_x + c
+                }
+            };
+            (col(i32::from(lo)) + col(i32::from(hi))) / 2
+        };
+        // The drawn figure lands on x's byte column regardless of facing —
+        // the asymmetry the box-centring caused is gone.
+        assert_eq!(
+            drawn_centre(false),
+            x_byte,
+            "left-facing figure centred on x"
+        );
+        assert_eq!(
+            drawn_centre(true),
+            x_byte,
+            "right-facing figure centred on x"
+        );
+    }
+
+    #[test]
     fn settle_stands_on_block_top_at_lv1_spawn() {
         // LV1 room 1 col 0 = Empty / Torch / Block → stand on the row-2
         // block top, i.e. row 1's floor line.
@@ -1196,7 +1283,7 @@ mod tests {
         world.prince.x = 8 * CELL_W + CELL_W / 2;
         for _ in 0..30 {
             let room = &world.level.rooms[0];
-            world.prince.move_h(5, room);
+            world.prince.move_h(5, COLLIDE_HALF, room);
         }
         assert!(
             world.prince.x + COLLIDE_HALF <= 9 * CELL_W,
@@ -1215,7 +1302,7 @@ mod tests {
         world.prince.x = 4 * CELL_W + CELL_W / 2;
         for _ in 0..30 {
             let room = &world.level.rooms[0];
-            world.prince.move_h(-5, room);
+            world.prince.move_h(-5, COLLIDE_HALF, room);
         }
         assert!(
             world.prince.x - COLLIDE_HALF >= 4 * CELL_W,
