@@ -107,9 +107,11 @@ pub fn figure_byte_span(img: &Image) -> Option<(u8, u8)> {
         return None;
     }
     let mut span: Option<(u8, u8)> = None;
-    for bx in 0..w {
-        if (0..h).any(|sy| img.bitmap[sy * w + bx] & 0x7f != 0) {
-            let bx = u8::try_from(bx).unwrap_or(u8::MAX);
+    // `width_bytes` is a `u8`, so the column index is one too — iterate it
+    // directly and avoid a fallible cast (`bx` provably never exceeds 254).
+    for bx in 0..img.width_bytes {
+        let col = usize::from(bx);
+        if (0..h).any(|sy| img.bitmap[sy * w + col] & 0x7f != 0) {
             span = Some(match span {
                 Some((lo, _)) => (lo, bx),
                 None => (bx, bx),

@@ -181,25 +181,38 @@ impl Prince {
         self.on_ground = false;
     }
 
-    /// One grounded locomotion tick in `dir` (`-1` left, `+1` right, `0`
-    /// idle). Idle plays `stand`; otherwise he runs (or careful-steps with
-    /// SHIFT held), facing `dir` and stepping by the run sequence's current
-    /// per-frame `chx` (a fixed [`STEP_PX`] when careful). The cursor was
-    /// advanced for this tick already, so its `current()` frame is the one to
-    /// move and draw by.
+    /// One grounded locomotion step in `dir` (`-1` left, `+1` right, `0`
+    /// idle), once [`Self::select_locomotion`] has chosen this tick's
+    /// sequence. Idle holds position; otherwise he steps by the run sequence's
+    /// current per-frame `chx` (a fixed [`STEP_PX`] when careful). The cursor
+    /// was advanced for this tick already, so its `current()` frame is the one
+    /// to move and draw by.
     fn locomote(&mut self, dir: i32, careful: bool, half_w: i32, room: &Room) {
         if dir == 0 {
-            self.cursor.play("stand");
+            // Idle — `select_locomotion` already set `stand`; hold position.
             return;
         }
-        self.facing_right = dir > 0;
-        self.cursor.play("startrun");
         let dx = if careful {
             STEP_PX
         } else {
             self.cursor.current().map_or(0, |f| f.dx)
         };
         self.move_h(dx * dir, half_w, room);
+    }
+
+    /// Pick this tick's locomotion sequence (and facing) for `dir`: idle
+    /// (`dir == 0`) plays `stand`, otherwise face `dir` and run (`startrun`).
+    /// Split out from [`Self::locomote`] so the caller can size collision from
+    /// the *selected* frame: a stand→run (or freefall→run) switch resets the
+    /// cursor to a different frame, so `half_w` must come from the frame we're
+    /// about to move and draw by, not the one we just advanced off (#134).
+    fn select_locomotion(&mut self, dir: i32) {
+        if dir == 0 {
+            self.cursor.play("stand");
+        } else {
+            self.facing_right = dir > 0;
+            self.cursor.play("startrun");
+        }
     }
 
     /// Move horizontally by `dx` px against `room`'s tiles: stop flush at a
@@ -408,6 +421,10 @@ impl World {
                 self.prince.x -= ROOM_W;
                 true
             } else {
+                // Blocked edge (no neighbour, or its entry column is closed):
+                // nudge him back inside by the constant box half-width, not the
+                // per-frame figure `half_w`. These guards only stop him warping
+                // off-room; the figure-extent wall stop is `move_h`'s job (#123).
                 self.prince.x = ROOM_W - COLLIDE_HALF;
                 false
             }
@@ -418,6 +435,8 @@ impl World {
                 self.prince.x += ROOM_W;
                 true
             } else {
+                // Blocked left edge — see the right-edge note above: a
+                // warp-guard clamp, not the figure-extent wall stop.
                 self.prince.x = COLLIDE_HALF;
                 false
             }
@@ -716,6 +735,10 @@ impl World {
                     }
                 } else if let Some(room) = self.level.rooms.get(room_idx) {
                     let dir = walk_dir(input);
+                    // Choose the sequence first, then size collision from the
+                    // frame we're about to move and draw by — not the one we
+                    // just advanced off (a stand→run switch changes it) (#134).
+                    self.prince.select_locomotion(dir);
                     let half_w = self.current_figure_half_width();
                     self.prince.locomote(dir, input.shift, half_w, room);
                 }
@@ -963,6 +986,10 @@ fn figure_center_offset(img: &Image, flip: bool) -> i32 {
 /// blank sprite.
 fn figure_half_width(img: &Image) -> i32 {
     match sprite::figure_byte_span(img) {
+        // Integer division truncates *down*: an odd-byte-span figure rounds
+        // its half-extent toward the centre (a 3-byte span = 21px → 10, not
+        // 10.5), so the wall stop is at most a half-pixel generous. Deliberate
+        // byte-granular rounding; the sub-byte residual is the #121 concern.
         Some((lo, hi)) => (i32::from(hi) - i32::from(lo) + 1) * 7 / 2,
         None => COLLIDE_HALF,
     }
@@ -1153,6 +1180,39 @@ mod tests {
             x_byte,
             "right-facing figure centred on x"
         );
+    }
+
+    #[test]
+    fn even_span_centre_truncates_and_half_extent_is_exact() {
+        use pop_assets::draz::image_table::Image;
+        // 4-byte box, figure on byte cols 1..=2 (even span → fractional byte
+        // centre at 1.5). `figure_center_offset` truncates *down* to 1, so the
+        // drawn figure shifts a half-byte between facings — the byte-granular
+        // residual deferred to #121.
+        let img = Image {
+            width_bytes: 4,
+            height: 1,
+            bitmap: vec![0, 0b000_0001, 0b000_0001, 0],
+        };
+        assert_eq!(sprite::figure_byte_span(&img), Some((1, 2)));
+        assert_eq!(figure_center_offset(&img, false), 1, "(1+2)/2 truncated");
+        assert_eq!(figure_center_offset(&img, true), 2, "(w-1) - 1");
+        // Even span → the half-extent divides cleanly: 2 bytes = 14px → 7.
+        assert_eq!(figure_half_width(&img), 7);
+    }
+
+    #[test]
+    fn odd_span_half_extent_truncates_down() {
+        use pop_assets::draz::image_table::Image;
+        // 3-byte span = 21px wide; the half-extent truncates *down* to 10 (from
+        // 10.5), making the wall stop at most a half-pixel generous (#123).
+        let img = Image {
+            width_bytes: 3,
+            height: 1,
+            bitmap: vec![0b000_0001, 0b000_0001, 0b000_0001],
+        };
+        assert_eq!(sprite::figure_byte_span(&img), Some((0, 2)));
+        assert_eq!(figure_half_width(&img), 10);
     }
 
     #[test]
