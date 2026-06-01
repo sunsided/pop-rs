@@ -11,10 +11,10 @@
 //! He spawns, drops in, runs / jumps / careful-steps, climbs ledges,
 //! walks between rooms, and falls / descends loose floors into the room
 //! below — respecting walls, floors and ledges (#120). Loose floors now
-//! wobble before they give way and jolt the screen as they crash (#96).
-//! Still rough: a proper per-action animation engine (#95), the falling
-//! rubble + per-tile tremble that round out #96, and the NTSC half-dot /
-//! figure-offset character blit (#121 / #123).
+//! bob their own tile as they wobble, then give way; a crash or hard
+//! landing jolts the screen (#96). Still rough: a proper per-action
+//! animation engine (#95), the falling-rubble mob + rubble tile that round
+//! out #96, and the NTSC half-dot / figure-offset blit (#121 / #123).
 
 use pop_assets::bgdata::{BLOCK_BOT_ROW, CELL_WIDTH_BYTES, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES};
 use pop_assets::draz::image_table::Image;
@@ -76,9 +76,10 @@ const SHAKE_TICKS: u8 = 4;
 /// Vertical roll of the crash / landing jolt, px.
 const SHAKE_AMPLITUDE: i32 = 2;
 
-/// Vertical roll of the gentle tremble while a loose floor wobbles, px —
-/// the visible "this floor is about to give" cue before it drops.
-const WOBBLE_AMPLITUDE: i32 = 1;
+/// Per-frame downward bob (px) of a loose floor's own tile while it
+/// wobbles — POP's dedicated loose-block shudder (`FRAMEADV.S drawloosed`
+/// offsets the block by `looseby`), local to the tile, not a screen roll.
+const LOOSE_BOB: [usize; 4] = [0, 1, 2, 1];
 
 /// Minimum downward speed at touchdown that thuds the floor (jolts the
 /// screen, `MOVER.S SHAKEM`). Below it a gentle step-down lands quietly.
@@ -735,6 +736,10 @@ impl World {
         // screen column (an RGBA overlay would swap orange/blue on mirror).
         let mut bytes =
             scene::compose_room_bytes(&self.level, self.room_id, &self.tables, Anim::REST)?;
+        // Bob any loose floor that's wobbling — its own tile shudders (POP's
+        // `drawloosed`), done before the Prince so he rides the steady floor
+        // line rather than jittering with it.
+        self.jiggle_loose_tiles(&mut bytes[..]);
         if let Some(art) = &self.art {
             if self.room_id == self.prince.room {
                 let img = if let Some(c) = &self.prince.climb {
@@ -788,26 +793,54 @@ impl World {
         Some(self.apply_shake(frame))
     }
 
-    /// Vertical screen-roll this frame, px (0 when steady). The sign flips
-    /// each frame so the picture shudders rather than slides. A crash or hard
-    /// landing jolt (`SHAKE_AMPLITUDE`, counted down by [`World::shake`])
-    /// outranks the gentle [`WOBBLE_AMPLITUDE`] tremble shown while a loose
-    /// floor in the room on screen is still wobbling.
+    /// Bob each wobbling loose floor in the room on screen by shifting its
+    /// own cell down a pixel or two ([`LOOSE_BOB`]) — the dedicated loose-
+    /// block shudder POP draws (`FRAMEADV.S drawloosed`), local to the tile.
+    /// Operates on the composed hi-res *byte* buffer (`ROOM_WIDTH_BYTES`
+    /// wide, row 0 = top); a vertical shift keeps each column's artifact
+    /// parity, so no colour swap. The exposed top band gets the `0x80` CLS
+    /// fill — a thin gap that reads as the block dropping.
+    fn jiggle_loose_tiles(&self, bytes: &mut [u8]) {
+        let dy = LOOSE_BOB[usize::try_from(self.frame).unwrap_or(0) % LOOSE_BOB.len()];
+        if dy == 0 {
+            return;
+        }
+        let w = usize::from(ROOM_WIDTH_BYTES);
+        for arm in self.loose.iter().filter(|l| l.room == self.room_id) {
+            let row = arm.row.min(ROOM_HEIGHT - 1);
+            let bot = usize::from(BLOCK_BOT_ROW[row]);
+            let top = if row == 0 {
+                0
+            } else {
+                usize::from(BLOCK_BOT_ROW[row - 1]) + 1
+            };
+            let x0 = arm.col * usize::from(CELL_WIDTH_BYTES);
+            let x1 = (x0 + usize::from(CELL_WIDTH_BYTES)).min(w);
+            // Descend so each source row is still original when it's read.
+            for y in (top..=bot).rev() {
+                for x in x0..x1 {
+                    bytes[y * w + x] = if y >= top + dy {
+                        bytes[(y - dy) * w + x]
+                    } else {
+                        0x80
+                    };
+                }
+            }
+        }
+    }
+
+    /// Vertical screen-roll this frame, px (0 when steady) — the brief jolt
+    /// of an impact (a loose-floor crash or a hard landing), counted down by
+    /// [`World::shake`]. The sign flips each frame so the picture shudders
+    /// rather than slides. The loose-floor *wobble* is a per-tile bob
+    /// ([`World::jiggle_loose_tiles`]), not a whole-screen roll.
     fn shake_dy(&self) -> i32 {
-        if self.shake > 0 {
-            if self.shake % 2 == 0 {
-                SHAKE_AMPLITUDE
-            } else {
-                -SHAKE_AMPLITUDE
-            }
-        } else if self.loose.iter().any(|l| l.room == self.room_id) {
-            if self.frame % 2 == 0 {
-                WOBBLE_AMPLITUDE
-            } else {
-                -WOBBLE_AMPLITUDE
-            }
-        } else {
+        if self.shake == 0 {
             0
+        } else if self.shake % 2 == 0 {
+            SHAKE_AMPLITUDE
+        } else {
+            -SHAKE_AMPLITUDE
         }
     }
 
@@ -1394,16 +1427,21 @@ mod tests {
     }
 
     #[test]
-    fn a_wobbling_loose_floor_trembles_the_view() {
+    fn a_wobbling_loose_floor_jiggles_only_its_tile() {
         let mut world = on_loose_floor();
         world.shake = 0; // ignore any leftover jolt from the drop-in landing
-        assert_eq!(world.shake_dy(), 0, "steady before he steps on it");
+        world.frame = 2; // LOOSE_BOB[2] = 2 px down, so the bob is visible
+        let rest = world.render(RenderMode::Monochrome).expect("renders");
         world.arm_loose_floor_under_feet();
-        assert_eq!(world.room_id, world.prince.room, "the wobble is in view");
-        assert_ne!(
+        let wobbling = world.render(RenderMode::Monochrome).expect("renders");
+        assert_eq!(
             world.shake_dy(),
             0,
-            "a loose floor in view trembles while it wobbles"
+            "the wobble no longer rolls the whole screen"
+        );
+        assert_ne!(
+            rest.pixels, wobbling.pixels,
+            "the loose tile itself bobs while it wobbles"
         );
     }
 
