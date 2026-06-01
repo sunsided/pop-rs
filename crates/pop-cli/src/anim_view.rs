@@ -219,6 +219,7 @@ impl AnimViewer {
                 if self.mode == PreviewMode::Characters {
                     ui.separator();
                     ui.label("body:");
+                    let prev = self.guard;
                     egui::ComboBox::from_id_salt("guard-body")
                         .selected_text(self.guard.label())
                         .show_ui(ui, |ui| {
@@ -226,6 +227,14 @@ impl AnimViewer {
                                 ui.selectable_value(&mut self.guard, g, g.label());
                             }
                         });
+                    // The Prince's own sequences (run / stand / …) always
+                    // render the kid from CHTAB1-3; the guard art lives in the
+                    // *guard* sequences (CHTAB5+). So when the body switches,
+                    // jump the selection to a matching sequence — otherwise
+                    // picking "Guard" on a Prince sequence shows no change.
+                    if self.guard != prev {
+                        self.jump_to_body_sequence();
+                    }
                 }
             });
         });
@@ -275,6 +284,26 @@ impl AnimViewer {
                 self.char_preview(ui, ntsc, seq);
             });
         });
+    }
+
+    /// Jump the selection to a sequence that suits the chosen body: the first
+    /// one drawing guard art (CHTAB5+) for a guard, else `stand` for the kid.
+    fn jump_to_body_sequence(&mut self) {
+        let seqs = anim::animations();
+        let target = if self.guard == GuardKind::None {
+            seqs.iter().position(|s| s.name == "stand")
+        } else {
+            seqs.iter().position(|s| {
+                s.frames
+                    .iter()
+                    .any(|f| anim::frame_sprite(f.frame).is_some_and(|sp| sp.chtab >= 5))
+            })
+        };
+        if let Some(i) = target {
+            self.selected = i;
+            self.frame_pos = 0;
+            self.last_step = None;
+        }
     }
 
     #[allow(clippy::cast_precision_loss)] // small POP pixel deltas

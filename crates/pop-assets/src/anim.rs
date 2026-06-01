@@ -104,11 +104,17 @@ pub struct AnimSequence {
     pub chains_to: Option<String>,
 }
 
-/// All `FRAMEDEF` records, 0-based (`frame_defs()[n]` is frame `n + 1`).
+/// The `FRAMEDEF.S` 5-byte tables in order: main `Fdef`, then the `altset1`
+/// (chtable4) and `altset2` (chtable6) alternates.
+fn sections() -> &'static [Vec<FrameDef>] {
+    static SECTIONS: OnceLock<Vec<Vec<FrameDef>>> = OnceLock::new();
+    SECTIONS.get_or_init(parse_framedef).as_slice()
+}
+
+/// All main `FRAMEDEF` records, 0-based (`frame_defs()[n]` is frame `n + 1`).
 #[must_use]
 pub fn frame_defs() -> &'static [FrameDef] {
-    static DEFS: OnceLock<Vec<FrameDef>> = OnceLock::new();
-    DEFS.get_or_init(parse_framedef)
+    sections().first().map_or(&[], Vec::as_slice)
 }
 
 /// The `FRAMEDEF` record for frame id `frame` (1-based), if defined.
@@ -119,7 +125,9 @@ pub fn frame_def(frame: u8) -> Option<FrameDef> {
         .copied()
 }
 
-/// The CHTAB sprite for frame id `frame` (1-based), if any.
+/// The CHTAB sprite for frame id `frame` (1-based), if any. Guard-range
+/// frames decode straight to the guard CHTABs (5/6/7), so guard sequences
+/// render guards without a per-character remap.
 #[must_use]
 pub fn frame_sprite(frame: u8) -> Option<SpriteRef> {
     frame_def(frame)?.sprite()
@@ -136,24 +144,27 @@ pub fn animations() -> &'static [AnimSequence] {
 // FRAMEDEF.S
 // ---------------------------------------------------------------------------
 
-fn parse_framedef() -> Vec<FrameDef> {
-    let mut defs: Vec<FrameDef> = Vec::new();
-    let mut in_table = false;
+/// Parse every 5-byte `FRAMEDEF.S` table in order: the main `Fdef`, then the
+/// `altset1` / `altset2` alternates (each its own `:1`-based block, separated
+/// by `ds` padding). The 3-byte `swordtab` yields entries with < 5 values and
+/// is skipped.
+fn parse_framedef() -> Vec<Vec<FrameDef>> {
+    let mut sections: Vec<Vec<FrameDef>> = vec![Vec::new()];
+    let mut started = false;
     for raw in FRAMEDEF_SRC.lines() {
         let line = strip_comment(raw);
         let trimmed = line.trim();
         if trimmed == "Fdef" {
-            in_table = true;
+            started = true;
             continue;
         }
-        if !in_table {
+        if !started {
             continue;
         }
-        // The main frame table runs until the first `ds` padding, which
-        // begins the `altset1`/`altset2`/`swordtab` alternates (each its own
-        // `:1`-based table in a different format).
+        // `ds` padding ends one table and begins the next alternate set.
         if trimmed.starts_with("ds ") {
-            break;
+            sections.push(Vec::new());
+            continue;
         }
         // Entries look like `:N db a,b,c,d,e`.
         let Some(rest) = trimmed.strip_prefix(':') else {
@@ -171,6 +182,7 @@ fn parse_framedef() -> Vec<FrameDef> {
         if vals.len() < 5 {
             continue;
         }
+        let defs = sections.last_mut().expect("at least one section");
         if defs.len() < idx {
             defs.resize(
                 idx,
@@ -194,7 +206,7 @@ fn parse_framedef() -> Vec<FrameDef> {
             check: u8::try_from(vals[4] & 0xff).unwrap_or(0),
         };
     }
-    defs
+    sections
 }
 
 // ---------------------------------------------------------------------------
