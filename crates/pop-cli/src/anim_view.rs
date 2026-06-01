@@ -254,13 +254,19 @@ impl AnimViewer {
         }
         self.selected = self.selected.min(seqs.len() - 1);
 
+        let guard = self.guard;
         egui::SidePanel::left("anim_list")
             .default_width(170.0)
             .show_inside(ui, |ui| {
-                ui.label(format!("{} sequences", seqs.len()));
+                // Only the sequences that exist for the selected body.
+                let shown = seqs.iter().filter(|s| seq_for_body(s, guard)).count();
+                ui.label(format!("{shown} sequences"));
                 ui.separator();
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     for (i, s) in seqs.iter().enumerate() {
+                        if !seq_for_body(s, guard) {
+                            continue;
+                        }
                         let label = format!("#{:>3}  {}  ({}f)", s.id, s.name, s.frames.len());
                         if ui.selectable_label(self.selected == i, label).clicked()
                             && self.selected != i
@@ -296,27 +302,18 @@ impl AnimViewer {
         }
     }
 
-    /// Jump the selection to a sequence that suits the chosen body: the most
-    /// guard-bodied one (most frames remapping to chtable4) for a guard, else
-    /// `stand` for the kid.
+    /// After a body switch, keep the current sequence if it exists for the
+    /// new body, else snap to the first one that does — so the pruned list
+    /// never leaves a stale, body-less selection.
     fn jump_to_body_sequence(&mut self) {
         let seqs = anim::animations();
-        let target = if self.guard == GuardKind::None {
-            seqs.iter().position(|s| s.name == "stand")
-        } else {
-            let guard_frames = |s: &AnimSequence| {
-                s.frames
-                    .iter()
-                    .filter(|f| anim::guard_frame_sprite(f.frame).is_some_and(|sp| sp.chtab == 4))
-                    .count()
-            };
-            seqs.iter()
-                .enumerate()
-                .max_by_key(|(_, s)| guard_frames(s))
-                .filter(|(_, s)| guard_frames(s) > 0)
-                .map(|(i, _)| i)
-        };
-        if let Some(i) = target {
+        if seqs
+            .get(self.selected)
+            .is_some_and(|s| seq_for_body(s, self.guard))
+        {
+            return;
+        }
+        if let Some(i) = seqs.iter().position(|s| seq_for_body(s, self.guard)) {
             self.selected = i;
             self.frame_pos = 0;
             self.last_step = None;
@@ -648,6 +645,21 @@ impl AnimViewer {
             image,
             egui::TextureOptions::NEAREST,
         ))
+    }
+}
+
+/// Whether `seq` exists for the chosen body. The guard-*exclusive* poses are
+/// the `$96..=$bd` "guy" frames; everything else (incl. the `$66..=$6a` band
+/// that also remaps) is shared. So the kid plays any sequence with a frame
+/// outside that range, and a guard plays any sequence with a frame that
+/// remaps to its body (chtable4). Falls / shared moves appear in both.
+fn seq_for_body(seq: &AnimSequence, guard: GuardKind) -> bool {
+    if guard == GuardKind::None {
+        seq.frames.is_empty() || seq.frames.iter().any(|f| !(0x96..=0xbd).contains(&f.frame))
+    } else {
+        seq.frames
+            .iter()
+            .any(|f| anim::guard_frame_sprite(f.frame).is_some_and(|sp| sp.chtab == 4))
     }
 }
 
