@@ -125,12 +125,34 @@ pub fn frame_def(frame: u8) -> Option<FrameDef> {
         .copied()
 }
 
-/// The CHTAB sprite for frame id `frame` (1-based), if any. Guard-range
-/// frames decode straight to the guard CHTABs (5/6/7), so guard sequences
-/// render guards without a per-character remap.
+/// The CHTAB sprite for frame id `frame` (1-based) as the **kid** sees it.
 #[must_use]
 pub fn frame_sprite(frame: u8) -> Option<SpriteRef> {
     frame_def(frame)?.sprite()
+}
+
+/// The `altset1` alternate frames (chtable4 = the guard body). Like the main
+/// table, indexed by frame number (`:150..:189`, the "guy-N" guard poses).
+fn altset1() -> &'static [FrameDef] {
+    sections().get(1).map_or(&[], Vec::as_slice)
+}
+
+/// The CHTAB sprite for frame id `frame` as a **guard** sees it
+/// (`CharID = TypeGd`, `CTRLSUBS.S usealtsets`): the guard-range `CharPosn`
+/// (`$96..=$bd`, with `$66..=$6a` shifted up by `$46`) is rewritten to the
+/// altset1 entry of the *same* frame number, whose `Fsword = $c0+n` decodes
+/// to chtable4 — the loaded guard body. Other frames stay on the shared main
+/// set. So guard sequences render the guard, not the kid.
+#[must_use]
+pub fn guard_frame_sprite(frame: u8) -> Option<SpriteRef> {
+    let mut a = frame;
+    if (0x66..=0x6a).contains(&a) {
+        a = a.wrapping_add(0x46);
+    }
+    if (0x96..=0xbd).contains(&a) {
+        return altset1().get(usize::from(a).checked_sub(1)?)?.sprite();
+    }
+    frame_sprite(frame)
 }
 
 /// All decoded animation sequences, in `SEQTABLE` id order.
@@ -617,6 +639,23 @@ mod tests {
             frame_def(135).and_then(FrameDef::sprite).map(|s| s.chtab),
             Some(3)
         );
+    }
+
+    #[test]
+    fn guard_frames_remap_to_the_guard_body() {
+        // Kid frame 158 ("ready") is CHTAB5 (the kid); a guard's `usealtsets`
+        // rewrites it to altset1 `:158` (guy-10), `Fsword=$c0+8` -> chtable4
+        // (the loaded guard body) at the same image index.
+        assert_eq!(frame_sprite(158).map(|s| s.chtab), Some(5));
+        assert_eq!(
+            guard_frame_sprite(158),
+            Some(SpriteRef { chtab: 4, index: 7 })
+        );
+        // The `$66..=$6a` band shifts up by `$46` before the remap.
+        assert_eq!(guard_frame_sprite(102).map(|s| s.chtab), Some(4));
+        // Out-of-range frames (e.g. the shared run frame 7) stay on the main
+        // set — a guard shares them with the kid.
+        assert_eq!(guard_frame_sprite(7), frame_sprite(7));
     }
 
     #[test]

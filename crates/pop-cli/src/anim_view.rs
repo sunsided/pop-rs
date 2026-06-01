@@ -21,7 +21,7 @@ use eframe::egui::{
     self, Align2, Color32, ColorImage, FontId, Pos2, Rect, Sense, TextureHandle, Vec2,
 };
 
-use pop_assets::anim::{self, AnimSequence};
+use pop_assets::anim::{self, AnimSequence, SpriteRef};
 use pop_assets::bgdata::Biome;
 use pop_assets::discovery;
 use pop_assets::draz::image_table::{Image, ImageTable};
@@ -286,18 +286,35 @@ impl AnimViewer {
         });
     }
 
-    /// Jump the selection to a sequence that suits the chosen body: the first
-    /// one drawing guard art (CHTAB5+) for a guard, else `stand` for the kid.
+    /// The CHTAB sprite for `frame`, resolved for the selected body — the
+    /// `usealtsets` guard remap (to the chtable4 body) when a guard is picked.
+    fn sprite_ref(&self, frame: u8) -> Option<SpriteRef> {
+        if self.guard == GuardKind::None {
+            anim::frame_sprite(frame)
+        } else {
+            anim::guard_frame_sprite(frame)
+        }
+    }
+
+    /// Jump the selection to a sequence that suits the chosen body: the most
+    /// guard-bodied one (most frames remapping to chtable4) for a guard, else
+    /// `stand` for the kid.
     fn jump_to_body_sequence(&mut self) {
         let seqs = anim::animations();
         let target = if self.guard == GuardKind::None {
             seqs.iter().position(|s| s.name == "stand")
         } else {
-            seqs.iter().position(|s| {
+            let guard_frames = |s: &AnimSequence| {
                 s.frames
                     .iter()
-                    .any(|f| anim::frame_sprite(f.frame).is_some_and(|sp| sp.chtab >= 5))
-            })
+                    .filter(|f| anim::guard_frame_sprite(f.frame).is_some_and(|sp| sp.chtab == 4))
+                    .count()
+            };
+            seqs.iter()
+                .enumerate()
+                .max_by_key(|(_, s)| guard_frames(s))
+                .filter(|(_, s)| guard_frames(s) > 0)
+                .map(|(i, _)| i)
         };
         if let Some(i) = target {
             self.selected = i;
@@ -358,7 +375,7 @@ impl AnimViewer {
     fn char_meta(&mut self, ui: &mut egui::Ui, seq: &AnimSequence) {
         let frame = seq.frames.get(self.frame_pos).copied();
         let fid = frame.map_or(0, |f| f.frame);
-        let sprite = anim::frame_sprite(fid).map_or_else(
+        let sprite = self.sprite_ref(fid).map_or_else(
             || "no sprite".to_string(),
             |s| format!("CHTAB{} #{}", s.chtab, s.index),
         );
@@ -596,7 +613,7 @@ impl AnimViewer {
         ntsc: bool,
         mirror: bool,
     ) -> Option<TextureHandle> {
-        let sprite = anim::frame_sprite(frame)?;
+        let sprite = self.sprite_ref(frame)?;
         let table = self
             .tables
             .get(usize::from(sprite.chtab).checked_sub(1)?)?
