@@ -1,17 +1,17 @@
 //! Animation preview pane for the editor (#89).
 //!
-//! A floating window that plays POP's decoded character animations
-//! ([`pop_assets::anim`]): pick a sequence on the left, watch it animate on
-//! the right with play / pause / step / loop and a speed control. Each
-//! frame's sprite is resolved `FRAMEDEF → decodeim → CHTAB` and the parsed
-//! `chx`/`chy` deltas drift the figure so the locomotion shows.
+//! A floating window with two modes:
 //!
-//! `chx` is facing-relative and the in-game facing isn't in SEQTABLE, so the
-//! figure is mirrored to face the way it travels (byte-space flip, so NTSC
-//! colours stay put, unlike an RGBA flip — the #121 half-dot). A `mirror`
-//! toggle flips facing and travel together when the absolute left/right
-//! should swap (e.g. a stair climb up-right). Guard tables (CHTAB4+) preview
-//! when present; otherwise the frame shows a "CHTAB not loaded" note.
+//! * **Characters** — POP's decoded [`pop_assets::anim`] sequences. The
+//!   figure is mirrored to face the way it travels (byte-space flip, so NTSC
+//!   colours stay put — the #121 half-dot). A `mirror` toggle flips facing
+//!   and travel together. A *body* picker swaps the CHTAB4 guard sprite
+//!   (guard / fat / skeleton / shadow / vizier) so guard sequences render.
+//! * **Tiles** — the animated tile pieces (torch flame, loose floor, spike,
+//!   slicer, …) cycled through their phases via the scene compositor
+//!   ([`pop_assets::scene::Anim`]) over a one-tile [`Level::preview_tile`].
+//!
+//! Both modes share the play / pause / step / loop / speed controls.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -22,69 +22,154 @@ use eframe::egui::{
 };
 
 use pop_assets::anim::{self, AnimSequence};
+use pop_assets::bgdata::Biome;
 use pop_assets::discovery;
 use pop_assets::draz::image_table::{Image, ImageTable};
 use pop_assets::hires::{render_linear, RenderMode};
+use pop_assets::level::{Level, Tile, TileKind};
+use pop_assets::scene::{self, Anim, BiomeTables};
 
-/// On-screen magnification of the previewed sprite.
+/// On-screen magnification of the previewed character sprite.
 const PREVIEW_SCALE: f32 = 2.0;
+/// Where the previewed tile sits in the synthetic room.
+const TILE_COL: usize = 4;
+const TILE_ROW: usize = 1;
+/// Room frame dimensions (for fitting the tile preview).
+const ROOM_W: f32 = 280.0;
+const ROOM_H: f32 = 192.0;
+
+/// The animatable / browsable tile kinds offered in Tiles mode.
+const TILE_KINDS: &[(&str, TileKind)] = &[
+    ("torch", TileKind::Torch),
+    ("loose floor", TileKind::LooseFloor),
+    ("spikes", TileKind::Spikes),
+    ("slicer", TileKind::Slicer),
+    ("gate", TileKind::Gate),
+    ("sword", TileKind::Sword),
+    ("exit", TileKind::Exit),
+    ("flask", TileKind::Flask),
+];
+
+/// Which body fills the CHTAB4 slot (guard sprite variant).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum GuardKind {
+    None,
+    Guard,
+    Fat,
+    Skeleton,
+    Shadow,
+    Vizier,
+}
+
+impl GuardKind {
+    const ALL: [GuardKind; 6] = [
+        Self::None,
+        Self::Guard,
+        Self::Fat,
+        Self::Skeleton,
+        Self::Shadow,
+        Self::Vizier,
+    ];
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::None => "Prince",
+            Self::Guard => "Guard",
+            Self::Fat => "Fat",
+            Self::Skeleton => "Skeleton",
+            Self::Shadow => "Shadow",
+            Self::Vizier => "Vizier",
+        }
+    }
+
+    /// The `IMG.CHTAB4.*` body file, or `None` for the Prince (no CHTAB4).
+    fn chtab4_file(self) -> Option<&'static str> {
+        Some(match self {
+            Self::None => return None,
+            Self::Guard => "IMG.CHTAB4.GD",
+            Self::Fat => "IMG.CHTAB4.FAT",
+            Self::Skeleton => "IMG.CHTAB4.SKEL",
+            Self::Shadow => "IMG.CHTAB4.SHAD",
+            Self::Vizier => "IMG.CHTAB4.VIZ",
+        })
+    }
+}
+
+/// Which kind of thing the pane is previewing.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PreviewMode {
+    Characters,
+    Tiles,
+}
 
 /// Editor animation preview window state.
 #[allow(clippy::struct_excessive_bools)] // independent UI toggles
 pub struct AnimViewer {
     /// Whether the window is shown (toggled from the toolbar).
     pub open: bool,
-    /// Data root the CHTAB tables were loaded from, to reload on a change.
-    loaded_root: Option<PathBuf>,
-    /// CHTAB sprite tables, indexed by `chtab - 1` (`None` if absent).
-    tables: Vec<Option<ImageTable>>,
-    /// Selected sequence (index into [`anim::animations`]).
-    selected: usize,
-    /// Current frame within the selected sequence.
-    frame_pos: usize,
+    mode: PreviewMode,
+    // Shared playback.
     playing: bool,
     looping: bool,
-    /// Milliseconds per frame while playing.
     speed_ms: u64,
     last_step: Option<Instant>,
-    /// Manually flip the figure's facing (and its travel) from the
-    /// auto-pick, e.g. to send a stair climb up-right instead of up-left.
+    // Characters.
+    /// CHTAB sprite tables, indexed by `chtab - 1` (`None` if absent).
+    tables: Vec<Option<ImageTable>>,
+    /// `(root, guard)` the CHTABs were loaded for, to reload on a change.
+    chtab_key: Option<(PathBuf, GuardKind)>,
+    guard: GuardKind,
+    selected: usize,
+    frame_pos: usize,
     user_flip: bool,
-    /// Rendered sprite textures, keyed `(frame id, ntsc, mirror)`. Reused
-    /// across frames / loops; cleared when the data root changes.
+    /// Sprite textures keyed `(frame id, ntsc, mirror)`.
     cache: HashMap<(u8, bool, bool), TextureHandle>,
+    // Tiles.
+    bg: Option<BiomeTables>,
+    bg_root: Option<PathBuf>,
+    selected_tile: usize,
+    tick: u32,
+    /// Tile-frame texture for the displayed `(tile, tick, ntsc)`.
+    tile_cache: Option<(usize, u32, bool, TextureHandle)>,
 }
 
 impl Default for AnimViewer {
     fn default() -> Self {
         Self {
             open: false,
-            loaded_root: None,
-            tables: Vec::new(),
-            selected: 0,
-            frame_pos: 0,
+            mode: PreviewMode::Characters,
             playing: true,
             looping: true,
             speed_ms: 90,
             last_step: None,
+            tables: Vec::new(),
+            chtab_key: None,
+            guard: GuardKind::None,
+            selected: 0,
+            frame_pos: 0,
             user_flip: false,
             cache: HashMap::new(),
+            bg: None,
+            bg_root: None,
+            selected_tile: 0,
+            tick: 0,
+            tile_cache: None,
         }
     }
 }
 
 impl AnimViewer {
     /// Draw the window if open. `ntsc` selects the colour mode; `root` is the
-    /// editor's current data root (for the CHTAB sprites).
+    /// editor's current data root (sprites + biome tables).
     pub fn ui(&mut self, ctx: &egui::Context, ntsc: bool, root: Option<&Path>) {
         if !self.open {
             return;
         }
-        self.ensure_tables(root);
+        self.ensure_loaded(root);
         let mut open = self.open;
         egui::Window::new("Animations")
             .open(&mut open)
-            .default_size([540.0, 340.0])
+            .default_size([560.0, 380.0])
             .resizable(true)
             .show(ctx, |ui| self.window_ui(ui, ntsc));
         self.open = open;
@@ -94,25 +179,65 @@ impl AnimViewer {
         }
     }
 
-    /// Load CHTAB1..8 from `root/DRAZ/I` once per data root.
-    fn ensure_tables(&mut self, root: Option<&Path>) {
+    /// (Re)load the biome tables (on root change) and the CHTAB sprites (on
+    /// root / guard change). Each commits its key only once it actually loads,
+    /// so files dropped in later under the same root are still picked up.
+    fn ensure_loaded(&mut self, root: Option<&Path>) {
         let Some(root) = root else { return };
-        if self.loaded_root.as_deref() == Some(root) {
-            return;
+        if self.bg_root.as_deref() != Some(root) {
+            if let Ok(bg) = BiomeTables::load(root, Biome::Dungeon) {
+                self.bg = Some(bg);
+                self.bg_root = Some(root.to_path_buf());
+                self.tile_cache = None;
+            }
         }
-        // Commit (and stop retrying) only once the DRAZ dir actually exists,
-        // so sprites dropped in later, under an unchanged root, get picked up.
-        let Some(dir) = discovery::draz_dir_in(root).map(|d| d.join("I")) else {
-            return;
-        };
-        self.loaded_root = Some(root.to_path_buf());
-        self.cache.clear();
-        self.tables = (1..=8u8)
-            .map(|n| ImageTable::from_file(dir.join(format!("IMG.CHTAB{n}"))).ok())
-            .collect();
+        let key = (root.to_path_buf(), self.guard);
+        if self.chtab_key.as_ref() != Some(&key) {
+            if let Some(dir) = discovery::draz_dir_in(root).map(|d| d.join("I")) {
+                self.tables = load_chtabs(&dir, self.guard);
+                self.chtab_key = Some(key);
+                self.cache.clear();
+            }
+        }
     }
 
     fn window_ui(&mut self, ui: &mut egui::Ui, ntsc: bool) {
+        egui::TopBottomPanel::top("anim_mode").show_inside(ui, |ui| {
+            ui.horizontal(|ui| {
+                if ui
+                    .selectable_label(self.mode == PreviewMode::Characters, "Characters")
+                    .clicked()
+                {
+                    self.mode = PreviewMode::Characters;
+                }
+                if ui
+                    .selectable_label(self.mode == PreviewMode::Tiles, "Tiles")
+                    .clicked()
+                {
+                    self.mode = PreviewMode::Tiles;
+                }
+                if self.mode == PreviewMode::Characters {
+                    ui.separator();
+                    ui.label("body:");
+                    egui::ComboBox::from_id_salt("guard-body")
+                        .selected_text(self.guard.label())
+                        .show_ui(ui, |ui| {
+                            for g in GuardKind::ALL {
+                                ui.selectable_value(&mut self.guard, g, g.label());
+                            }
+                        });
+                }
+            });
+        });
+        match self.mode {
+            PreviewMode::Characters => self.characters_ui(ui, ntsc),
+            PreviewMode::Tiles => self.tiles_ui(ui, ntsc),
+        }
+    }
+
+    // --- Characters --------------------------------------------------------
+
+    fn characters_ui(&mut self, ui: &mut egui::Ui, ntsc: bool) {
         let seqs = anim::animations();
         if seqs.is_empty() {
             ui.label("No animation data parsed.");
@@ -132,112 +257,39 @@ impl AnimViewer {
                             && self.selected != i
                         {
                             self.selected = i;
-                            self.reset();
+                            self.frame_pos = 0;
+                            self.last_step = None;
                         }
                     }
                 });
             });
 
         egui::CentralPanel::default().show_inside(ui, |ui| {
-            // `animations()` is 'static, so the borrow doesn't tie up `self`.
-            let seq = &seqs[self.selected];
-            // Controls + metadata hug the bottom (compact); the preview gets
-            // all the remaining height, so tall cross-cell anims stay visible.
+            let seq = &seqs[self.selected]; // 'static, doesn't tie up `self`
             egui::TopBottomPanel::bottom("anim_footer").show_inside(ui, |ui| {
-                self.controls(ui, seq);
-                self.meta(ui, seq);
+                self.playback_controls(ui, true);
+                self.char_meta(ui, seq);
             });
             egui::CentralPanel::default().show_inside(ui, |ui| {
-                self.advance(seq);
-                self.preview(ui, ntsc, seq);
+                self.advance();
+                self.char_preview(ui, ntsc, seq);
             });
         });
-    }
-
-    fn controls(&mut self, ui: &mut egui::Ui, seq: &AnimSequence) {
-        ui.horizontal(|ui| {
-            let play = if self.playing { "⏸" } else { "▶" };
-            if ui.button(play).clicked() {
-                self.playing = !self.playing;
-                self.last_step = None;
-            }
-            if ui.button("⏮").on_hover_text("step back").clicked() {
-                self.playing = false;
-                self.step_manual(-1, seq);
-            }
-            if ui.button("⏭").on_hover_text("step forward").clicked() {
-                self.playing = false;
-                self.step_manual(1, seq);
-            }
-            ui.checkbox(&mut self.looping, "loop");
-            ui.checkbox(&mut self.user_flip, "mirror")
-                .on_hover_text("Flip the figure's facing and travel direction");
-            ui.add(egui::Slider::new(&mut self.speed_ms, 30..=400).text("ms/frame"));
-        });
-    }
-
-    /// Advance one frame if the per-frame interval has elapsed while playing.
-    fn advance(&mut self, seq: &AnimSequence) {
-        if !self.playing || seq.frames.is_empty() {
-            return;
-        }
-        let now = Instant::now();
-        let due = self.last_step.map_or(true, |t| {
-            now.duration_since(t).as_millis() >= u128::from(self.speed_ms)
-        });
-        if due {
-            self.last_step = Some(now);
-            self.tick(seq);
-        }
-    }
-
-    /// One playback step: to the next frame, looping at the end (to
-    /// `loops_to`, else frame 0) or stopping when not looping.
-    fn tick(&mut self, seq: &AnimSequence) {
-        let len = seq.frames.len();
-        if len == 0 {
-            return;
-        }
-        if self.frame_pos + 1 >= len {
-            if self.looping {
-                self.frame_pos = seq.loops_to.unwrap_or(0).min(len - 1);
-            } else {
-                self.playing = false;
-            }
-        } else {
-            self.frame_pos += 1;
-        }
-    }
-
-    fn step_manual(&mut self, dir: i32, seq: &AnimSequence) {
-        let len = seq.frames.len();
-        if len == 0 {
-            return;
-        }
-        self.frame_pos = if dir > 0 {
-            (self.frame_pos + 1) % len
-        } else {
-            (self.frame_pos + len - 1) % len
-        };
     }
 
     #[allow(clippy::cast_precision_loss)] // small POP pixel deltas
-    fn preview(&mut self, ui: &mut egui::Ui, ntsc: bool, seq: &AnimSequence) {
+    fn char_preview(&mut self, ui: &mut egui::Ui, ntsc: bool, seq: &AnimSequence) {
         let (rect, _) = ui.allocate_exact_size(ui.available_size(), Sense::hover());
         let painter = ui.painter_at(rect);
         painter.rect_filled(rect, 4.0, Color32::from_gray(28));
-        // A ground line near the bottom for a sense of the feet baseline.
         let base_y = rect.bottom() - 28.0;
         painter.hline(rect.x_range(), base_y, (1.0, Color32::from_gray(60)));
 
         let Some(frame) = seq.frames.get(self.frame_pos).copied() else {
             return;
         };
-        // `chx` is facing-relative and the in-game facing isn't in SEQTABLE,
-        // so face the figure the way it actually travels: mirror POP's
-        // left-facing art when the net chx is positive (rightward). The
-        // `mirror` toggle flips both facing and travel together, so it never
-        // moonwalks — only the absolute left/right swaps.
+        // Face the figure the way it travels (mirror the left-facing art when
+        // net chx is positive); the `mirror` toggle flips both together.
         let net_dx: i32 = seq.frames.iter().map(|f| f.dx).sum();
         let mirror = (net_dx > 0) ^ self.user_flip;
         let sx = if self.user_flip { -1.0 } else { 1.0 };
@@ -248,7 +300,6 @@ impl AnimViewer {
                 self.cache.insert(key, tex);
             }
         }
-
         let Some(tex) = self.cache.get(&key) else {
             painter.text(
                 rect.center(),
@@ -260,15 +311,11 @@ impl AnimViewer {
             return;
         };
 
-        // Drift by the chx/chy accumulated to this frame so locomotion shows;
-        // the sprite is already mirrored to face this way. Bounded since
-        // `frame_pos` wraps at the loop.
         let mut off = Vec2::ZERO;
         for f in &seq.frames[..=self.frame_pos] {
             off += Vec2::new(f.dx as f32 * sx, f.dy as f32) * PREVIEW_SCALE;
         }
         let size = tex.size_vec2() * PREVIEW_SCALE;
-        // Feet near the baseline, drifting with the locomotion offset.
         let feet = Pos2::new(rect.center().x + off.x, base_y + off.y);
         let img_rect = Rect::from_min_size(Pos2::new(feet.x - size.x / 2.0, feet.y - size.y), size);
         painter.image(
@@ -279,7 +326,7 @@ impl AnimViewer {
         );
     }
 
-    fn meta(&mut self, ui: &mut egui::Ui, seq: &AnimSequence) {
+    fn char_meta(&mut self, ui: &mut egui::Ui, seq: &AnimSequence) {
         let frame = seq.frames.get(self.frame_pos).copied();
         let fid = frame.map_or(0, |f| f.frame);
         let sprite = anim::frame_sprite(fid).map_or_else(
@@ -312,9 +359,203 @@ impl AnimViewer {
         ui.label(bits.join(" • "));
     }
 
-    fn reset(&mut self) {
-        self.frame_pos = 0;
-        self.last_step = None;
+    // --- Tiles -------------------------------------------------------------
+
+    fn tiles_ui(&mut self, ui: &mut egui::Ui, ntsc: bool) {
+        self.selected_tile = self.selected_tile.min(TILE_KINDS.len() - 1);
+        egui::SidePanel::left("tile_list")
+            .default_width(170.0)
+            .show_inside(ui, |ui| {
+                ui.label("tiles");
+                ui.separator();
+                for (i, (name, _)) in TILE_KINDS.iter().enumerate() {
+                    if ui
+                        .selectable_label(self.selected_tile == i, *name)
+                        .clicked()
+                        && self.selected_tile != i
+                    {
+                        self.selected_tile = i;
+                        self.tick = 0;
+                        self.last_step = None;
+                    }
+                }
+            });
+
+        egui::CentralPanel::default().show_inside(ui, |ui| {
+            egui::TopBottomPanel::bottom("tile_footer").show_inside(ui, |ui| {
+                self.playback_controls(ui, false);
+                let (name, kind) = TILE_KINDS[self.selected_tile];
+                ui.label(format!("{name} • tick {} • {kind:?}", self.tick));
+            });
+            egui::CentralPanel::default().show_inside(ui, |ui| {
+                self.advance();
+                self.tile_preview(ui, ntsc);
+            });
+        });
+    }
+
+    fn tile_preview(&mut self, ui: &mut egui::Ui, ntsc: bool) {
+        let (rect, _) = ui.allocate_exact_size(ui.available_size(), Sense::hover());
+        let painter = ui.painter_at(rect);
+        painter.rect_filled(rect, 4.0, Color32::from_gray(20));
+
+        if self.bg.is_none() {
+            painter.text(
+                rect.center(),
+                Align2::CENTER_CENTER,
+                "biome tables not loaded",
+                FontId::proportional(13.0),
+                Color32::GRAY,
+            );
+            return;
+        }
+
+        let key = (self.selected_tile, self.tick, ntsc);
+        if self.tile_cache.as_ref().map(|(t, k, n, _)| (*t, *k, *n)) != Some(key) {
+            self.tile_cache = self
+                .render_tile(ui.ctx(), self.selected_tile, self.tick, ntsc)
+                .map(|tex| (key.0, key.1, key.2, tex));
+        }
+        let Some((_, _, _, tex)) = &self.tile_cache else {
+            return;
+        };
+        // Fit the 280×192 room frame into the preview, preserving aspect.
+        let avail = rect.size();
+        let scale = (avail.x / ROOM_W).min(avail.y / ROOM_H).max(0.1);
+        let size = Vec2::new(ROOM_W * scale, ROOM_H * scale);
+        let frame_rect = Rect::from_center_size(rect.center(), size);
+        painter.image(
+            tex.id(),
+            frame_rect,
+            Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+            Color32::WHITE,
+        );
+    }
+
+    /// Render the selected tile, animated at `tick`, into a texture.
+    fn render_tile(
+        &self,
+        ctx: &egui::Context,
+        tile_idx: usize,
+        tick: u32,
+        ntsc: bool,
+    ) -> Option<TextureHandle> {
+        let bg = self.bg.as_ref()?;
+        let &(_, kind) = TILE_KINDS.get(tile_idx)?;
+        let tile = Tile {
+            kind,
+            variant: 0,
+            modifier: 0,
+        };
+        let level = Level::preview_tile(tile, TILE_COL, TILE_ROW);
+        let mode = if ntsc {
+            RenderMode::NtscColor
+        } else {
+            RenderMode::Monochrome
+        };
+        let frame = scene::render_room_animated(&level, 1, bg, mode, Anim { tick, traps: true })?;
+        let size = [
+            usize::try_from(frame.width).ok()?,
+            usize::try_from(frame.height).ok()?,
+        ];
+        let image = ColorImage::from_rgba_unmultiplied(size, &frame.pixels);
+        Some(ctx.load_texture(
+            format!("anim-tile-{tile_idx}-{tick}-{ntsc}"),
+            image,
+            egui::TextureOptions::NEAREST,
+        ))
+    }
+
+    // --- Shared playback ---------------------------------------------------
+
+    fn playback_controls(&mut self, ui: &mut egui::Ui, show_mirror: bool) {
+        ui.horizontal(|ui| {
+            let play = if self.playing { "⏸" } else { "▶" };
+            if ui.button(play).clicked() {
+                self.playing = !self.playing;
+                self.last_step = None;
+            }
+            if ui.button("⏮").on_hover_text("step back").clicked() {
+                self.playing = false;
+                self.step_manual(-1);
+            }
+            if ui.button("⏭").on_hover_text("step forward").clicked() {
+                self.playing = false;
+                self.step_manual(1);
+            }
+            ui.checkbox(&mut self.looping, "loop");
+            if show_mirror {
+                ui.checkbox(&mut self.user_flip, "mirror")
+                    .on_hover_text("Flip the figure's facing and travel direction");
+            }
+            ui.add(egui::Slider::new(&mut self.speed_ms, 30..=400).text("ms/frame"));
+        });
+    }
+
+    /// Advance one step if the per-frame interval has elapsed while playing.
+    fn advance(&mut self) {
+        if !self.playing {
+            return;
+        }
+        let now = Instant::now();
+        let due = self.last_step.map_or(true, |t| {
+            now.duration_since(t).as_millis() >= u128::from(self.speed_ms)
+        });
+        if due {
+            self.last_step = Some(now);
+            match self.mode {
+                PreviewMode::Characters => self.tick_char(),
+                PreviewMode::Tiles => self.tick = self.tick.wrapping_add(1),
+            }
+        }
+    }
+
+    /// One character playback step: next frame, looping at the end.
+    fn tick_char(&mut self) {
+        let seqs = anim::animations();
+        let Some(seq) = seqs.get(self.selected) else {
+            return;
+        };
+        let len = seq.frames.len();
+        if len == 0 {
+            return;
+        }
+        if self.frame_pos + 1 >= len {
+            if self.looping {
+                self.frame_pos = seq.loops_to.unwrap_or(0).min(len - 1);
+            } else {
+                self.playing = false;
+            }
+        } else {
+            self.frame_pos += 1;
+        }
+    }
+
+    fn step_manual(&mut self, dir: i32) {
+        match self.mode {
+            PreviewMode::Characters => {
+                let seqs = anim::animations();
+                let Some(seq) = seqs.get(self.selected) else {
+                    return;
+                };
+                let len = seq.frames.len();
+                if len == 0 {
+                    return;
+                }
+                self.frame_pos = if dir > 0 {
+                    (self.frame_pos + 1) % len
+                } else {
+                    (self.frame_pos + len - 1) % len
+                };
+            }
+            PreviewMode::Tiles => {
+                self.tick = if dir > 0 {
+                    self.tick.wrapping_add(1)
+                } else {
+                    self.tick.wrapping_sub(1)
+                };
+            }
+        }
     }
 
     /// Render one frame's CHTAB sprite to an egui texture, mirrored if
@@ -355,14 +596,29 @@ impl AnimViewer {
             usize::try_from(rendered.height).ok()?,
         ];
         let image = ColorImage::from_rgba_unmultiplied(size, &rendered.pixels);
-        // Name the texture by the full cache key — `mirror`/`ntsc` change the
-        // pixels for the same frame id, so they must disambiguate the label.
+        // Name carries the full key so mirror / ntsc variants don't alias.
         Some(ctx.load_texture(
             format!("anim-frame-{frame}-{ntsc}-{mirror}"),
             image,
             egui::TextureOptions::NEAREST,
         ))
     }
+}
+
+/// Load the CHTAB sprite tables into slots 1..8. Slot 4 (the body) is the
+/// selected guard variant, or empty for the Prince.
+fn load_chtabs(dir: &Path, guard: GuardKind) -> Vec<Option<ImageTable>> {
+    let load = |name: &str| ImageTable::from_file(dir.join(name)).ok();
+    vec![
+        load("IMG.CHTAB1"),
+        load("IMG.CHTAB2"),
+        load("IMG.CHTAB3"),
+        guard.chtab4_file().and_then(load),
+        load("IMG.CHTAB5"),
+        load("IMG.CHTAB6.A"),
+        load("IMG.CHTAB7"),
+        None,
+    ]
 }
 
 /// Mirror a CHTAB sprite bitmap horizontally: reverse the byte order within
