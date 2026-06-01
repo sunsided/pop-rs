@@ -318,13 +318,14 @@ impl World {
     /// boundary as a wall when either side's edge tile is solid), so he
     /// stops at the boundary instead of warping into it. No neighbour
     /// (`0`) is the level edge: also a wall.
-    fn cross_horizontal_edge(&mut self) {
+    /// Returns `true` if he actually crossed into a neighbour room.
+    fn cross_horizontal_edge(&mut self) -> bool {
         let Some(&links) = self
             .level
             .room_links()
             .get(usize::from(self.prince.room).saturating_sub(1))
         else {
-            return;
+            return false;
         };
         let row = self.prince.row;
         let crossed = if self.prince.x >= ROOM_W {
@@ -362,6 +363,7 @@ impl World {
                 self.prince.settle_floor(room);
             }
         }
+        crossed
     }
 
     /// One airborne tick: gravity, then carry him into the room below each
@@ -372,7 +374,12 @@ impl World {
         self.prince.feet_y += self.prince.vy;
 
         // Descend through `down`-linked rooms while he's below the floor.
-        while self.prince.feet_y >= ROOM_H {
+        // Bounded by the room count so a cyclic `down` chain in malformed
+        // level data can't spin forever — it lands him at the bottom.
+        for _ in 0..=ROOMS_PER_LEVEL {
+            if self.prince.feet_y < ROOM_H {
+                break;
+            }
             let room_idx = usize::from(self.prince.room).saturating_sub(1);
             let down = self.level.room_links().get(room_idx).map_or(0, |l| l.down);
             if down == 0 {
@@ -403,6 +410,17 @@ impl World {
                 self.prince.landing_row = ROOM_HEIGHT - 1;
                 self.prince.landing_y = ROOM_H + 1;
             }
+        }
+
+        // Still below a room floor after the bounded descent → a cyclic /
+        // degenerate `down` chain. Clamp him to the bottom rather than fall
+        // forever.
+        if self.prince.feet_y >= ROOM_H {
+            self.prince.feet_y = floor_y(ROOM_HEIGHT - 1);
+            self.prince.vy = 0;
+            self.prince.row = ROOM_HEIGHT - 1;
+            self.prince.on_ground = true;
+            return;
         }
 
         // Land once he reaches the floor he's aimed at in the current room.
@@ -495,9 +513,13 @@ impl World {
                     }
                 }
                 // Carry him into a neighbour room if he stepped off an edge.
-                self.cross_horizontal_edge();
+                let crossed = self.cross_horizontal_edge();
                 // A loose floor under his feet gives way — he drops through.
-                self.break_loose_floor_under_feet();
+                // Skip on the tick he just crossed a room edge: he hasn't
+                // stood on the destination's entry tile yet.
+                if !crossed {
+                    self.break_loose_floor_under_feet();
+                }
                 // The room on screen follows the Prince.
                 self.room_id = self.prince.room;
             }
@@ -625,10 +647,12 @@ fn settle(room: &Room, col: usize, from_row: usize) -> Option<(usize, i32)> {
             let top = r.saturating_sub(1);
             return Some((top, floor_y(top)));
         }
-        // The bottom row is the room's floor base, so it supports any tile
-        // standing on it (pillars, torches, …). Only a genuinely `Empty`
-        // bottom cell is a hole the kid falls through to the room below.
-        if r == ROOM_HEIGHT - 1 && kind != TileKind::Empty {
+        // The bottom row is the room's floor base (POP convention: it
+        // closes the room), so it supports decoration tiles standing on it
+        // — pillars, torches, mirrors, arches, … . The only bottom cells
+        // that are holes the kid drops through are `Empty` and the
+        // explicitly floorless `PanelWithoutFloor`.
+        if r == ROOM_HEIGHT - 1 && !matches!(kind, TileKind::Empty | TileKind::PanelWithoutFloor) {
             return Some((r, floor_y(r)));
         }
     }
@@ -759,6 +783,21 @@ mod tests {
         // block top, i.e. row 1's floor line.
         let level = load_level1();
         assert_eq!(settle(&level.rooms[0], 0, 0), Some((1, floor_y(1))));
+    }
+
+    #[test]
+    fn settle_treats_floorless_bottom_tiles_as_holes() {
+        let mut world = landed_world();
+        // LV1 room 1 col 5 row 2 is Posts — a decoration on the bottom-row
+        // floor base, so it's standable.
+        assert_eq!(settle(&world.level.rooms[0], 5, 2), Some((2, floor_y(2))));
+        // PanelWithoutFloor at the bottom row is a hole (like Empty).
+        world.level.rooms[0].tiles[2 * ROOM_WIDTH + 5] = Tile {
+            kind: TileKind::PanelWithoutFloor,
+            variant: 0,
+            modifier: 0,
+        };
+        assert_eq!(settle(&world.level.rooms[0], 5, 2), None);
     }
 
     #[test]
