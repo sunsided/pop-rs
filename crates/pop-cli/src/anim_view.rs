@@ -6,10 +6,12 @@
 //! frame's sprite is resolved `FRAMEDEF → decodeim → CHTAB` and the parsed
 //! `chx`/`chy` deltas drift the figure so the locomotion shows.
 //!
-//! Sprites render in their native (left-facing) orientation; a faithful
-//! mirrored facing needs the byte-space flip the runtime uses (the NTSC
-//! half-dot, #121), so it's left for later. Guard tables (CHTAB4+) preview
-//! too when present; otherwise the frame shows a "CHTAB missing" note.
+//! `chx` is facing-relative and the in-game facing isn't in SEQTABLE, so the
+//! figure is mirrored to face the way it travels (byte-space flip, so NTSC
+//! colours stay put, unlike an RGBA flip — the #121 half-dot). A `mirror`
+//! toggle flips facing and travel together when the absolute left/right
+//! should swap (e.g. a stair climb up-right). Guard tables (CHTAB4+) preview
+//! when present; otherwise the frame shows a "CHTAB not loaded" note.
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -20,13 +22,14 @@ use eframe::egui::{
 
 use pop_assets::anim::{self, AnimSequence};
 use pop_assets::discovery;
-use pop_assets::draz::image_table::ImageTable;
+use pop_assets::draz::image_table::{Image, ImageTable};
 use pop_assets::hires::{render_linear, RenderMode};
 
 /// On-screen magnification of the previewed sprite.
 const PREVIEW_SCALE: f32 = 2.0;
 
 /// Editor animation preview window state.
+#[allow(clippy::struct_excessive_bools)] // independent UI toggles
 pub struct AnimViewer {
     /// Whether the window is shown (toggled from the toolbar).
     pub open: bool,
@@ -43,8 +46,11 @@ pub struct AnimViewer {
     /// Milliseconds per frame while playing.
     speed_ms: u64,
     last_step: Option<Instant>,
-    /// Cached texture for the displayed `(frame id, ntsc)` pair.
-    cached: Option<(u8, bool, TextureHandle)>,
+    /// Manually flip the figure's facing (and its travel) from the
+    /// auto-pick, e.g. to send a stair climb up-right instead of up-left.
+    user_flip: bool,
+    /// Cached texture for the displayed `(frame id, ntsc, mirror)` triple.
+    cached: Option<(u8, bool, bool, TextureHandle)>,
 }
 
 impl Default for AnimViewer {
@@ -59,6 +65,7 @@ impl Default for AnimViewer {
             looping: true,
             speed_ms: 90,
             last_step: None,
+            user_flip: false,
             cached: None,
         }
     }
@@ -130,10 +137,16 @@ impl AnimViewer {
         egui::CentralPanel::default().show_inside(ui, |ui| {
             // `animations()` is 'static, so the borrow doesn't tie up `self`.
             let seq = &seqs[self.selected];
-            self.controls(ui, seq);
-            self.advance(seq);
-            self.preview(ui, ntsc, seq);
-            self.meta(ui, seq);
+            // Controls + metadata hug the bottom (compact); the preview gets
+            // all the remaining height, so tall cross-cell anims stay visible.
+            egui::TopBottomPanel::bottom("anim_footer").show_inside(ui, |ui| {
+                self.controls(ui, seq);
+                self.meta(ui, seq);
+            });
+            egui::CentralPanel::default().show_inside(ui, |ui| {
+                self.advance(seq);
+                self.preview(ui, ntsc, seq);
+            });
         });
     }
 
@@ -153,6 +166,13 @@ impl AnimViewer {
                 self.step_manual(1, seq);
             }
             ui.checkbox(&mut self.looping, "loop");
+            if ui
+                .checkbox(&mut self.user_flip, "mirror")
+                .on_hover_text("Flip the figure's facing and travel direction")
+                .changed()
+            {
+                self.cached = None;
+            }
             ui.add(egui::Slider::new(&mut self.speed_ms, 30..=400).text("ms/frame"));
         });
     }
@@ -204,24 +224,34 @@ impl AnimViewer {
 
     #[allow(clippy::cast_precision_loss)] // small POP pixel deltas
     fn preview(&mut self, ui: &mut egui::Ui, ntsc: bool, seq: &AnimSequence) {
-        let (rect, _) =
-            ui.allocate_exact_size(Vec2::new(ui.available_width(), 180.0), Sense::hover());
+        let (rect, _) = ui.allocate_exact_size(ui.available_size(), Sense::hover());
         let painter = ui.painter_at(rect);
         painter.rect_filled(rect, 4.0, Color32::from_gray(28));
         // A ground line near the bottom for a sense of the feet baseline.
-        let base_y = rect.bottom() - 24.0;
+        let base_y = rect.bottom() - 28.0;
         painter.hline(rect.x_range(), base_y, (1.0, Color32::from_gray(60)));
 
         let Some(frame) = seq.frames.get(self.frame_pos).copied() else {
             return;
         };
-        if self.cached.as_ref().map(|(f, m, _)| (*f, *m)) != Some((frame.frame, ntsc)) {
+        // `chx` is facing-relative and the in-game facing isn't in SEQTABLE,
+        // so face the figure the way it actually travels: mirror POP's
+        // left-facing art when the net chx is positive (rightward). The
+        // `mirror` toggle flips both facing and travel together, so it never
+        // moonwalks — only the absolute left/right swaps.
+        let net_dx: i32 = seq.frames.iter().map(|f| f.dx).sum();
+        let mirror = (net_dx > 0) ^ self.user_flip;
+        let sx = if self.user_flip { -1.0 } else { 1.0 };
+
+        if self.cached.as_ref().map(|(f, n, m, _)| (*f, *n, *m))
+            != Some((frame.frame, ntsc, mirror))
+        {
             self.cached = self
-                .render_sprite(ui.ctx(), frame.frame, ntsc)
-                .map(|t| (frame.frame, ntsc, t));
+                .render_sprite(ui.ctx(), frame.frame, ntsc, mirror)
+                .map(|t| (frame.frame, ntsc, mirror, t));
         }
 
-        let Some((_, _, tex)) = &self.cached else {
+        let Some((_, _, _, tex)) = &self.cached else {
             painter.text(
                 rect.center(),
                 Align2::CENTER_CENTER,
@@ -232,13 +262,12 @@ impl AnimViewer {
             return;
         };
 
-        // Drift the figure by the chx/chy accumulated up to this frame, so a
-        // run cycle visibly travels. Bounded: frame_pos wraps at the loop.
-        // `chx` is forward motion (facing-relative); the sprites face *left*,
-        // so forward is screen-left — negate x or he moonwalks.
+        // Drift by the chx/chy accumulated to this frame so locomotion shows;
+        // the sprite is already mirrored to face this way. Bounded since
+        // `frame_pos` wraps at the loop.
         let mut off = Vec2::ZERO;
         for f in &seq.frames[..=self.frame_pos] {
-            off += Vec2::new(-f.dx as f32, f.dy as f32) * PREVIEW_SCALE;
+            off += Vec2::new(f.dx as f32 * sx, f.dy as f32) * PREVIEW_SCALE;
         }
         let size = tex.size_vec2() * PREVIEW_SCALE;
         // Feet near the baseline, drifting with the locomotion offset.
@@ -253,33 +282,36 @@ impl AnimViewer {
     }
 
     fn meta(&mut self, ui: &mut egui::Ui, seq: &AnimSequence) {
-        ui.separator();
         let frame = seq.frames.get(self.frame_pos).copied();
         let fid = frame.map_or(0, |f| f.frame);
         let sprite = anim::frame_sprite(fid).map_or_else(
-            || " • no sprite".to_string(),
-            |s| format!(" • CHTAB{} #{}", s.chtab, s.index),
+            || "no sprite".to_string(),
+            |s| format!("CHTAB{} #{}", s.chtab, s.index),
         );
         ui.label(format!(
-            "frame {}/{} • id {fid}{sprite}",
+            "{} (#{}) • {}/{} • id {fid} • {sprite}",
+            seq.name,
+            seq.id,
             self.frame_pos + 1,
             seq.frames.len().max(1),
         ));
+        let mut bits: Vec<String> = Vec::new();
         if let Some(f) = frame {
-            let turn = if f.turn { " • turn" } else { "" };
-            let act = f.action.map_or(String::new(), |a| format!(" • act {a}"));
-            ui.label(format!("dx {} dy {}{turn}{act}", f.dx, f.dy));
+            bits.push(format!("dx {} dy {}", f.dx, f.dy));
+            if f.turn {
+                bits.push("turn".to_string());
+            }
+            if let Some(a) = f.action {
+                bits.push(format!("act {a}"));
+            }
         }
-        let mut tail: Vec<String> = Vec::new();
         if let Some(l) = seq.loops_to {
-            tail.push(format!("loops to frame {}", l + 1));
+            bits.push(format!("loops→{}", l + 1));
         }
         if let Some(c) = &seq.chains_to {
-            tail.push(format!("→ chains to {c}"));
+            bits.push(format!("chains→{c}"));
         }
-        if !tail.is_empty() {
-            ui.label(tail.join("   "));
-        }
+        ui.label(bits.join(" • "));
     }
 
     fn reset(&mut self) {
@@ -288,9 +320,15 @@ impl AnimViewer {
         self.cached = None;
     }
 
-    /// Render one frame's CHTAB sprite to an egui texture, or `None` if the
-    /// frame has no sprite or its CHTAB table isn't loaded.
-    fn render_sprite(&self, ctx: &egui::Context, frame: u8, ntsc: bool) -> Option<TextureHandle> {
+    /// Render one frame's CHTAB sprite to an egui texture, mirrored if
+    /// `mirror`. `None` if the frame has no sprite or its CHTAB isn't loaded.
+    fn render_sprite(
+        &self,
+        ctx: &egui::Context,
+        frame: u8,
+        ntsc: bool,
+        mirror: bool,
+    ) -> Option<TextureHandle> {
         let sprite = anim::frame_sprite(frame)?;
         let table = self
             .tables
@@ -305,7 +343,16 @@ impl AnimViewer {
         } else {
             RenderMode::Monochrome
         };
-        let rendered = render_linear(&img.bitmap, img.width_bytes, img.height, mode)?;
+        // Mirror in hi-res *byte* space (reverse byte order + flip each byte's
+        // 7 pixels), not in RGBA — a pixel flip would swap the NTSC colours.
+        let mirrored;
+        let bytes = if mirror {
+            mirrored = mirror_bitmap(img);
+            &mirrored[..]
+        } else {
+            &img.bitmap[..]
+        };
+        let rendered = render_linear(bytes, img.width_bytes, img.height, mode)?;
         let size = [
             usize::try_from(rendered.width).ok()?,
             usize::try_from(rendered.height).ok()?,
@@ -317,4 +364,31 @@ impl AnimViewer {
             egui::TextureOptions::NEAREST,
         ))
     }
+}
+
+/// Mirror a CHTAB sprite bitmap horizontally: reverse the byte order within
+/// each row and flip every byte's 7 pixel bits (keeping bit 7, the palette /
+/// half-dot bit). Matches `pop_assets::sprite::composite_hires`'s `flip_h`.
+fn mirror_bitmap(img: &Image) -> Vec<u8> {
+    let w = usize::from(img.width_bytes);
+    let h = usize::from(img.height);
+    let mut out = vec![0u8; w * h];
+    for y in 0..h {
+        for x in 0..w {
+            out[y * w + (w - 1 - x)] = mirror_byte(img.bitmap[y * w + x]);
+        }
+    }
+    out
+}
+
+/// Reverse the 7 pixel bits of a hi-res byte (bit 0 = leftmost), keeping
+/// bit 7.
+fn mirror_byte(b: u8) -> u8 {
+    let mut out = b & 0x80;
+    for i in 0..7 {
+        if b & (1 << i) != 0 {
+            out |= 1 << (6 - i);
+        }
+    }
+    out
 }
