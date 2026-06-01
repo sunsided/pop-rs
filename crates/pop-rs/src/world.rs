@@ -73,8 +73,16 @@ const LOOSE_FALL_DELAY: u8 = 4;
 /// SHAKEM`): each frame it rolls a couple of scan-lines, sign alternating.
 const SHAKE_TICKS: u8 = 4;
 
-/// Vertical roll of the screen jolt, px.
+/// Vertical roll of the crash / landing jolt, px.
 const SHAKE_AMPLITUDE: i32 = 2;
+
+/// Vertical roll of the gentle tremble while a loose floor wobbles, px —
+/// the visible "this floor is about to give" cue before it drops.
+const WOBBLE_AMPLITUDE: i32 = 1;
+
+/// Minimum downward speed at touchdown that thuds the floor (jolts the
+/// screen, `MOVER.S SHAKEM`). Below it a gentle step-down lands quietly.
+const THUD_VY: i32 = 6;
 
 /// Top-level game mode. Expands toward the full
 /// `Title → Attract → Demo → Playing → Paused → GameOver → Win` machine
@@ -277,7 +285,6 @@ impl Prince {
     }
 }
 
-/// High-level game state for one loaded level.
 /// A loose floor that's been jarred and is counting down to give way
 /// (`MOVER.S` "trob": triggered object). The cell stays solid in the level
 /// until [`World::advance_loose`] runs the countdown out.
@@ -288,6 +295,7 @@ struct LooseArm {
     ticks_left: u8,
 }
 
+/// High-level game state for one loaded level.
 pub struct World {
     level: Level,
     tables: BiomeTables,
@@ -539,7 +547,11 @@ impl World {
             if let Some(r) = self.level.rooms.get_mut(room_idx) {
                 r.tiles[row * ROOM_WIDTH + col] = Tile::default();
             }
-            self.shake = SHAKE_TICKS;
+            // Only jolt the picture if the crash is in the room on screen —
+            // a floor giving way two rooms over shouldn't shake the view.
+            if room == self.room_id {
+                self.shake = SHAKE_TICKS;
+            }
             let on_it = self.prince.on_ground
                 && self.prince.room == room
                 && self.prince.row == row
@@ -661,6 +673,10 @@ impl World {
             Mode::Playing => {
                 let room_idx = usize::from(self.prince.room).saturating_sub(1);
                 let was_climbing = self.prince.climb.is_some();
+                // Capture his fall speed before the step so a touchdown this
+                // tick can jolt the floor by how hard he hit.
+                let airborne = !self.prince.on_ground;
+                let vy_before = self.prince.vy;
                 if was_climbing {
                     self.climb_step();
                 } else if !self.prince.on_ground {
@@ -677,6 +693,12 @@ impl World {
                     } else {
                         self.prince.walk(dir, room);
                     }
+                }
+                // A hard landing thuds the floor — the impact jolt of a fall
+                // or jump. A climb finishes with no downward speed, so it
+                // stays quiet (`vy_before < THUD_VY`).
+                if airborne && self.prince.on_ground && vy_before >= THUD_VY {
+                    self.shake = SHAKE_TICKS;
                 }
                 // Room edges / loose floors don't apply mid-climb — including
                 // the tick a climb starts or finishes (he hasn't stepped on
@@ -766,15 +788,26 @@ impl World {
         Some(self.apply_shake(frame))
     }
 
-    /// Vertical screen-roll for the active jolt, px (0 when idle). The sign
-    /// flips each frame so the picture shudders rather than slides.
+    /// Vertical screen-roll this frame, px (0 when steady). The sign flips
+    /// each frame so the picture shudders rather than slides. A crash or hard
+    /// landing jolt (`SHAKE_AMPLITUDE`, counted down by [`World::shake`])
+    /// outranks the gentle [`WOBBLE_AMPLITUDE`] tremble shown while a loose
+    /// floor in the room on screen is still wobbling.
     fn shake_dy(&self) -> i32 {
-        if self.shake == 0 {
-            0
-        } else if self.shake % 2 == 0 {
-            SHAKE_AMPLITUDE
+        if self.shake > 0 {
+            if self.shake % 2 == 0 {
+                SHAKE_AMPLITUDE
+            } else {
+                -SHAKE_AMPLITUDE
+            }
+        } else if self.loose.iter().any(|l| l.room == self.room_id) {
+            if self.frame % 2 == 0 {
+                WOBBLE_AMPLITUDE
+            } else {
+                -WOBBLE_AMPLITUDE
+            }
         } else {
-            -SHAKE_AMPLITUDE
+            0
         }
     }
 
@@ -1358,6 +1391,39 @@ mod tests {
             steady.pixels, jolted.pixels,
             "the jolt rolls the picture against the steady frame"
         );
+    }
+
+    #[test]
+    fn a_wobbling_loose_floor_trembles_the_view() {
+        let mut world = on_loose_floor();
+        world.shake = 0; // ignore any leftover jolt from the drop-in landing
+        assert_eq!(world.shake_dy(), 0, "steady before he steps on it");
+        world.arm_loose_floor_under_feet();
+        assert_eq!(world.room_id, world.prince.room, "the wobble is in view");
+        assert_ne!(
+            world.shake_dy(),
+            0,
+            "a loose floor in view trembles while it wobbles"
+        );
+    }
+
+    #[test]
+    fn a_hard_landing_thuds_the_screen() {
+        let mut world = landed_world();
+        // Launch a jump; it lands a few ticks later with downward speed.
+        world.tick(InputState {
+            up: true,
+            ..InputState::default()
+        });
+        let mut thudded = false;
+        for _ in 0..20 {
+            world.tick(InputState::default());
+            if world.shake > 0 {
+                thudded = true;
+                break;
+            }
+        }
+        assert!(thudded, "landing the jump jolts the screen");
     }
 
     #[test]
