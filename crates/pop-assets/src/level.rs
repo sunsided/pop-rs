@@ -460,6 +460,24 @@ pub struct Level {
 }
 
 impl Level {
+    /// Build an otherwise-empty level with `tile` placed at `(col, row)` of
+    /// room 1 — for rendering one tile's animation in isolation (the editor's
+    /// tile-animation preview, #89). All links, neighbours and INFO are blank.
+    #[must_use]
+    pub fn preview_tile(tile: Tile, col: usize, row: usize) -> Self {
+        let mut rooms: [Room; ROOMS_PER_LEVEL] = std::array::from_fn(|_| Room::default());
+        if let Some(slot) = rooms[0].tiles.get_mut(row * ROOM_WIDTH + col) {
+            *slot = tile;
+        }
+        Self {
+            rooms,
+            link_loc: Box::new([0; LINKLOC_LEN]),
+            link_map: Box::new([0; LINKMAP_LEN]),
+            neighbours: [RoomNeighbours::default(); ROOMS_PER_LEVEL],
+            info: Box::new([0; INFO_LEN]),
+        }
+    }
+
     /// Parse a level from a 2304-byte buffer.
     ///
     /// # Errors
@@ -843,5 +861,19 @@ mod tests {
                 "LEVEL{n} has no non-empty rooms",
             );
         }
+    }
+
+    #[test]
+    fn preview_tile_places_one_tile_in_an_empty_level() {
+        let tile = Tile {
+            kind: TileKind::Slicer,
+            variant: 0,
+            modifier: 0,
+        };
+        let lv = Level::preview_tile(tile, 4, 1);
+        assert_eq!(lv.rooms[0].tiles[ROOM_WIDTH + 4].kind, TileKind::Slicer);
+        // Everything else is Empty (room 1 elsewhere + all other rooms).
+        assert_eq!(lv.rooms[0].tiles[0].kind, TileKind::Empty);
+        assert!(lv.rooms[1..].iter().all(Room::is_empty));
     }
 }

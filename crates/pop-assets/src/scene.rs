@@ -2139,6 +2139,39 @@ mod tests {
     }
 
     #[test]
+    fn preview_tile_renders_and_animates() {
+        // The editor's tile preview (#89) builds a one-tile level and cycles
+        // it through `Anim.tick`. A torch is the reliable ambient animator:
+        // it must render something and its flame must change across ticks.
+        let tables = BiomeTables::load(&vendor_root(), Biome::Dungeon).unwrap();
+        let tile = Tile {
+            kind: TileKind::Torch,
+            variant: 0,
+            modifier: 0,
+        };
+        let level = Level::preview_tile(tile, 4, 1);
+        let render = |tick| {
+            render_room_animated(
+                &level,
+                1,
+                &tables,
+                RenderMode::Monochrome,
+                Anim { tick, traps: true },
+            )
+            .unwrap()
+        };
+        let f0 = render(0);
+        assert!(
+            f0.pixels.chunks_exact(4).any(|p| p[0] | p[1] | p[2] != 0),
+            "the previewed torch renders (not an all-black frame)"
+        );
+        assert!(
+            (1..16).any(|t| render(t).pixels != f0.pixels),
+            "the torch flame animates across ticks"
+        );
+    }
+
+    #[test]
     fn gate_emits_bars_in_right_cell() {
         // Regression: pre-fix gates rendered as plain floor in the
         // right cell because `drawgateb` wasn't wired. At state=0
