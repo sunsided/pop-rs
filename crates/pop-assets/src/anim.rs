@@ -104,11 +104,17 @@ pub struct AnimSequence {
     pub chains_to: Option<String>,
 }
 
-/// All `FRAMEDEF` records, 0-based (`frame_defs()[n]` is frame `n + 1`).
+/// The `FRAMEDEF.S` 5-byte tables in order: main `Fdef`, then the `altset1`
+/// (chtable4) and `altset2` (chtable6) alternates.
+fn sections() -> &'static [Vec<FrameDef>] {
+    static SECTIONS: OnceLock<Vec<Vec<FrameDef>>> = OnceLock::new();
+    SECTIONS.get_or_init(parse_framedef).as_slice()
+}
+
+/// All main `FRAMEDEF` records, 0-based (`frame_defs()[n]` is frame `n + 1`).
 #[must_use]
 pub fn frame_defs() -> &'static [FrameDef] {
-    static DEFS: OnceLock<Vec<FrameDef>> = OnceLock::new();
-    DEFS.get_or_init(parse_framedef)
+    sections().first().map_or(&[], Vec::as_slice)
 }
 
 /// The `FRAMEDEF` record for frame id `frame` (1-based), if defined.
@@ -119,10 +125,34 @@ pub fn frame_def(frame: u8) -> Option<FrameDef> {
         .copied()
 }
 
-/// The CHTAB sprite for frame id `frame` (1-based), if any.
+/// The CHTAB sprite for frame id `frame` (1-based) as the **kid** sees it.
 #[must_use]
 pub fn frame_sprite(frame: u8) -> Option<SpriteRef> {
     frame_def(frame)?.sprite()
+}
+
+/// The `altset1` alternate frames (chtable4 = the guard body). Like the main
+/// table, indexed by frame number (`:150..:189`, the "guy-N" guard poses).
+fn altset1() -> &'static [FrameDef] {
+    sections().get(1).map_or(&[], Vec::as_slice)
+}
+
+/// The CHTAB sprite for frame id `frame` as a **guard** sees it
+/// (`CharID = TypeGd`, `CTRLSUBS.S usealtsets`): the guard-range `CharPosn`
+/// (`$96..=$bd`, with `$66..=$6a` shifted up by `$46`) is rewritten to the
+/// altset1 entry of the *same* frame number, whose `Fsword = $c0+n` decodes
+/// to chtable4 — the loaded guard body. Other frames stay on the shared main
+/// set. So guard sequences render the guard, not the kid.
+#[must_use]
+pub fn guard_frame_sprite(frame: u8) -> Option<SpriteRef> {
+    let mut a = frame;
+    if (0x66..=0x6a).contains(&a) {
+        a = a.wrapping_add(0x46);
+    }
+    if (0x96..=0xbd).contains(&a) {
+        return altset1().get(usize::from(a).checked_sub(1)?)?.sprite();
+    }
+    frame_sprite(frame)
 }
 
 /// All decoded animation sequences, in `SEQTABLE` id order.
@@ -136,24 +166,27 @@ pub fn animations() -> &'static [AnimSequence] {
 // FRAMEDEF.S
 // ---------------------------------------------------------------------------
 
-fn parse_framedef() -> Vec<FrameDef> {
-    let mut defs: Vec<FrameDef> = Vec::new();
-    let mut in_table = false;
+/// Parse every 5-byte `FRAMEDEF.S` table in order: the main `Fdef`, then the
+/// `altset1` / `altset2` alternates (each its own `:1`-based block, separated
+/// by `ds` padding). The 3-byte `swordtab` yields entries with < 5 values and
+/// is skipped.
+fn parse_framedef() -> Vec<Vec<FrameDef>> {
+    let mut sections: Vec<Vec<FrameDef>> = vec![Vec::new()];
+    let mut started = false;
     for raw in FRAMEDEF_SRC.lines() {
         let line = strip_comment(raw);
         let trimmed = line.trim();
         if trimmed == "Fdef" {
-            in_table = true;
+            started = true;
             continue;
         }
-        if !in_table {
+        if !started {
             continue;
         }
-        // The main frame table runs until the first `ds` padding, which
-        // begins the `altset1`/`altset2`/`swordtab` alternates (each its own
-        // `:1`-based table in a different format).
+        // `ds` padding ends one table and begins the next alternate set.
         if trimmed.starts_with("ds ") {
-            break;
+            sections.push(Vec::new());
+            continue;
         }
         // Entries look like `:N db a,b,c,d,e`.
         let Some(rest) = trimmed.strip_prefix(':') else {
@@ -171,6 +204,7 @@ fn parse_framedef() -> Vec<FrameDef> {
         if vals.len() < 5 {
             continue;
         }
+        let defs = sections.last_mut().expect("at least one section");
         if defs.len() < idx {
             defs.resize(
                 idx,
@@ -194,7 +228,7 @@ fn parse_framedef() -> Vec<FrameDef> {
             check: u8::try_from(vals[4] & 0xff).unwrap_or(0),
         };
     }
-    defs
+    sections
 }
 
 // ---------------------------------------------------------------------------
@@ -605,6 +639,23 @@ mod tests {
             frame_def(135).and_then(FrameDef::sprite).map(|s| s.chtab),
             Some(3)
         );
+    }
+
+    #[test]
+    fn guard_frames_remap_to_the_guard_body() {
+        // Kid frame 158 ("ready") is CHTAB5 (the kid); a guard's `usealtsets`
+        // rewrites it to altset1 `:158` (guy-10), `Fsword=$c0+8` -> chtable4
+        // (the loaded guard body) at the same image index.
+        assert_eq!(frame_sprite(158).map(|s| s.chtab), Some(5));
+        assert_eq!(
+            guard_frame_sprite(158),
+            Some(SpriteRef { chtab: 4, index: 7 })
+        );
+        // The `$66..=$6a` band shifts up by `$46` before the remap.
+        assert_eq!(guard_frame_sprite(102).map(|s| s.chtab), Some(4));
+        // Out-of-range frames (e.g. the shared run frame 7) stay on the main
+        // set — a guard shares them with the kid.
+        assert_eq!(guard_frame_sprite(7), frame_sprite(7));
     }
 
     #[test]
