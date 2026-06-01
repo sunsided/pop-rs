@@ -385,19 +385,23 @@ impl World {
             }
             self.prince.room = down;
             self.prince.feet_y -= ROOM_H;
-            // Re-aim the landing at the column's floor in the new room.
+            // Re-aim the landing at the next floor *at or below his feet* in
+            // the new room — scanning from the top could snap him up onto a
+            // platform he's already fallen past when `vy` is large.
             let col = col_of(self.prince.x);
-            match self
+            let from_row = row_below_feet(self.prince.feet_y);
+            if let Some((lrow, lfeet)) = self
                 .level
                 .rooms
                 .get(usize::from(down).saturating_sub(1))
-                .and_then(|r| settle(r, col, 0))
+                .and_then(|r| settle(r, col, from_row))
             {
-                Some((lrow, lfeet)) => {
-                    self.prince.landing_row = lrow;
-                    self.prince.landing_y = lfeet;
-                }
-                None => self.prince.landing_y = ROOM_H + 1, // open here too → keep falling
+                self.prince.landing_row = lrow;
+                self.prince.landing_y = lfeet;
+            } else {
+                // Open here too → keep falling into the next room.
+                self.prince.landing_row = ROOM_HEIGHT - 1;
+                self.prince.landing_y = ROOM_H + 1;
             }
         }
 
@@ -434,11 +438,23 @@ impl World {
         if let Some(r) = self.level.rooms.get_mut(room_idx) {
             r.tiles[row * ROOM_WIDTH + col] = Tile::default();
         }
-        // Drop through the fresh hole (`fall_step` carries him below).
+        // Drop through the fresh hole. Aim at the next support below it in
+        // this room if there is one; otherwise the column is open to the
+        // bottom and `fall_step` carries him into the room below.
         self.prince.on_ground = false;
         self.prince.vy = 0;
-        self.prince.landing_row = ROOM_HEIGHT - 1;
-        self.prince.landing_y = ROOM_H + 1;
+        if let Some((lrow, lfeet)) = self
+            .level
+            .rooms
+            .get(room_idx)
+            .and_then(|r| settle(r, col, row))
+        {
+            self.prince.landing_row = lrow;
+            self.prince.landing_y = lfeet;
+        } else {
+            self.prince.landing_row = ROOM_HEIGHT - 1;
+            self.prince.landing_y = ROOM_H + 1;
+        }
     }
 
     /// `true` if `(col, row)` of room id `room` is a non-solid tile the
@@ -568,6 +584,15 @@ fn clamp_start_room(screen: u8) -> u8 {
 /// [`VERT_DIST`].
 fn floor_y(row: usize) -> i32 {
     i32::from(BLOCK_BOT_ROW[row.min(ROOM_HEIGHT - 1)]) - VERT_DIST
+}
+
+/// First tile row whose floor line is at or below `feet_y` — where a
+/// downward floor scan should start so it never selects a platform the
+/// Prince has already fallen past. `ROOM_HEIGHT` when he's below them all.
+fn row_below_feet(feet_y: i32) -> usize {
+    (0..ROOM_HEIGHT)
+        .find(|&r| floor_y(r) >= feet_y)
+        .unwrap_or(ROOM_HEIGHT)
 }
 
 /// Tile column containing pixel `x`, clamped to the room.
@@ -928,6 +953,45 @@ mod tests {
         assert_eq!(world.room_id(), 2, "room 1's down link is room 2");
         assert!(world.prince_on_ground(), "he lands in room 2");
         assert!(world.prince.feet_y < ROOM_H, "feet inside the new room");
+    }
+
+    #[test]
+    fn row_below_feet_skips_floors_above() {
+        // Floor lines: row 0 = 55, row 1 = 118, row 2 = 181.
+        assert_eq!(row_below_feet(floor_y(0)), 0);
+        assert_eq!(
+            row_below_feet(floor_y(0) + 1),
+            1,
+            "past row 0 → start at row 1"
+        );
+        assert_eq!(row_below_feet(floor_y(1) + 1), 2);
+        assert_eq!(
+            row_below_feet(floor_y(2) + 1),
+            ROOM_HEIGHT,
+            "below them all"
+        );
+    }
+
+    #[test]
+    fn breaking_a_loose_floor_with_support_below_lands_in_room() {
+        // Put a loose floor at col 0 row 1, which has a Block at row 2 under
+        // it: breaking it drops him onto that block (in-room), not into the
+        // room below.
+        let mut world = landed_world();
+        let loose = *world.level.rooms[0].tile_at(6, 2).unwrap(); // the col-6 loose tile
+        world.level.rooms[0].tiles[ROOM_WIDTH] = loose; // col 0 row 1
+        world.prince.row = 1;
+        world.prince.x = CELL_W / 2;
+        world.prince.on_ground = true;
+
+        world.break_loose_floor_under_feet();
+        assert!(!world.prince_on_ground(), "the floor gave way");
+        assert_eq!(
+            world.prince.landing_row, 1,
+            "lands on the block below, in-room"
+        );
+        assert_eq!(world.prince.landing_y, floor_y(1));
+        assert_ne!(world.prince.landing_y, ROOM_H + 1, "not a cross-room fall");
     }
 
     #[test]
