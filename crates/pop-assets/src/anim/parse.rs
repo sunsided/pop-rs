@@ -1,165 +1,26 @@
-//! Character animation sequences — POP's `SEQTABLE` / `FRAMEDEF` decoded
-//! into a typed list of motions the editor can preview (#89).
-//!
-//! Two vendored tables drive every character animation:
-//!
-//! * **`FRAMEDEF.S`** — one 5-byte record per frame:
-//!   `(Fimage, Fsword, Fdx, Fdy, Fcheck)`. `Fimage`/`Fsword` pick a CHTAB
-//!   sprite via `decodeim` ([`FrameDef::sprite`], `CTRLSUBS.S`); `Fdx`/`Fdy`
-//!   are the per-frame blit offset.
-//! * **`SEQTABLE.S`** — one byte stream per motion: positive bytes are
-//!   frame ids (one displayed per tick), interleaved with negative
-//!   *opcodes* (`chx`/`chy`/`act`/`goto`/`aboutface`/…). The `ANIMCHAR`
-//!   interpreter (`COLL.S`) walks a stream until it hits a frame, draws it,
-//!   and stops for that tick; `goto` chains/loops the streams.
-//!
-//! Both tables are baked in with `include_str!` and parsed once (lazily),
-//! so the editor preview and any later runtime use share one decode. The
-//! opcode set and operand counts are transcribed from `ANIMCHAR`
-//! (`COLL.S`): `chx`/`chy`/`act`/`tap`/`effect` take one operand,
-//! `setfall` two, `goto`/`ifwtless` a `dw` target, the rest none; a frame
-//! byte ends the tick.
+//! The `FRAMEDEF.S` / `SEQTABLE.S` parser — **test-only**. It reads the
+//! vendored Apple II source and produces owned tables, used by the data
+//! generator ([`super::gen`]) and the drift test. The shipped library never
+//! compiles this module (it reads the baked [`super::generated`] statics), so
+//! the runtime build has no `include_str!` / vendor dependency.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::OnceLock;
+
+use super::{AnimFrame, FrameDef};
 
 const FRAMEDEF_SRC: &str =
-    include_str!("../../../vendor/pop-apple2/01 POP Source/Source/FRAMEDEF.S");
+    include_str!("../../../../vendor/pop-apple2/01 POP Source/Source/FRAMEDEF.S");
 const SEQTABLE_SRC: &str =
-    include_str!("../../../vendor/pop-apple2/01 POP Source/Source/SEQTABLE.S");
+    include_str!("../../../../vendor/pop-apple2/01 POP Source/Source/SEQTABLE.S");
 
-/// One `FRAMEDEF.S` record: the sprite + offsets for a single frame.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct FrameDef {
-    /// `Fimage` — image index (bit 7 = high CHTAB bank select).
-    pub image: u8,
-    /// `Fsword` — sword image; bits 6/7 also select the CHTAB bank.
-    pub sword: u8,
-    /// `Fdx` — per-frame horizontal blit offset, px (facing-relative).
-    pub dx: i8,
-    /// `Fdy` — per-frame vertical blit offset, px.
-    pub dy: i8,
-    /// `Fcheck` — collision / draw flags.
-    pub check: u8,
-}
-
-/// A resolved CHTAB sprite: which table and which 0-based image in it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SpriteRef {
-    /// CHTAB number, 1-based (`1` = `IMG.CHTAB1`).
-    pub chtab: u8,
-    /// 0-based index into that table's `images`.
-    pub index: usize,
-}
-
-impl FrameDef {
-    /// `decodeim` (`CTRLSUBS.S`): pick the CHTAB sprite for this frame.
-    ///
-    /// `table = (Fimage.7 << 2) | (Fsword.7 << 1) | Fsword.6`,
-    /// `image = Fimage & $7f` (POP image tables are 1-based, so the 0-based
-    /// index is `image - 1`). `None` for a blank frame (`image == 0`).
-    #[must_use]
-    pub fn sprite(self) -> Option<SpriteRef> {
-        let image = self.image & 0x7f;
-        if image == 0 {
-            return None;
-        }
-        let table = ((self.image >> 7) << 2) | ((self.sword >> 7) << 1) | ((self.sword >> 6) & 1);
-        Some(SpriteRef {
-            chtab: table + 1,
-            index: usize::from(image - 1),
-        })
-    }
-}
-
-/// One step of a sequence: the frame to draw plus the motion / state the
-/// interpreter applied reaching it (since the previous frame).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct AnimFrame {
-    /// POP frame id (1-based `FRAMEDEF` index).
-    pub frame: u8,
-    /// Forward motion since the previous frame (`chx` sum), px.
-    pub dx: i32,
-    /// Vertical motion since the previous frame (`chy` sum), px.
-    pub dy: i32,
-    /// `CharAction` set by an `act` opcode in effect at this frame.
-    pub action: Option<u8>,
-    /// An `aboutface` (turn) happened just before this frame.
-    pub turn: bool,
-}
-
-/// A named animation: the frames it plays and how it ends (self-loop or a
-/// chain into another sequence).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AnimSequence {
-    /// Sequence id (the `SEQTABLE` `:N dw …` index).
-    pub id: u8,
-    /// Label name (`stand`, `startrun`, `climbup`, …).
-    pub name: String,
-    /// Frames in play order.
-    pub frames: Vec<AnimFrame>,
-    /// Frame index a closing `goto` loops back to, if it loops on itself.
-    pub loops_to: Option<usize>,
-    /// Sequence name a closing `goto` chains into, if not a self-loop.
-    pub chains_to: Option<String>,
-}
-
-/// The `FRAMEDEF.S` 5-byte tables in order: main `Fdef`, then the `altset1`
-/// (chtable4) and `altset2` (chtable6) alternates.
-fn sections() -> &'static [Vec<FrameDef>] {
-    static SECTIONS: OnceLock<Vec<Vec<FrameDef>>> = OnceLock::new();
-    SECTIONS.get_or_init(parse_framedef).as_slice()
-}
-
-/// All main `FRAMEDEF` records, 0-based (`frame_defs()[n]` is frame `n + 1`).
-#[must_use]
-pub fn frame_defs() -> &'static [FrameDef] {
-    sections().first().map_or(&[], Vec::as_slice)
-}
-
-/// The `FRAMEDEF` record for frame id `frame` (1-based), if defined.
-#[must_use]
-pub fn frame_def(frame: u8) -> Option<FrameDef> {
-    frame_defs()
-        .get(usize::from(frame).checked_sub(1)?)
-        .copied()
-}
-
-/// The CHTAB sprite for frame id `frame` (1-based) as the **kid** sees it.
-#[must_use]
-pub fn frame_sprite(frame: u8) -> Option<SpriteRef> {
-    frame_def(frame)?.sprite()
-}
-
-/// The `altset1` alternate frames (chtable4 = the guard body). Like the main
-/// table, indexed by frame number (`:150..:189`, the "guy-N" guard poses).
-fn altset1() -> &'static [FrameDef] {
-    sections().get(1).map_or(&[], Vec::as_slice)
-}
-
-/// The CHTAB sprite for frame id `frame` as a **guard** sees it
-/// (`CharID = TypeGd`, `CTRLSUBS.S usealtsets`): the guard-range `CharPosn`
-/// (`$96..=$bd`, with `$66..=$6a` shifted up by `$46`) is rewritten to the
-/// altset1 entry of the *same* frame number, whose `Fsword = $c0+n` decodes
-/// to chtable4 — the loaded guard body. Other frames stay on the shared main
-/// set. So guard sequences render the guard, not the kid.
-#[must_use]
-pub fn guard_frame_sprite(frame: u8) -> Option<SpriteRef> {
-    let mut a = frame;
-    if (0x66..=0x6a).contains(&a) {
-        a = a.wrapping_add(0x46);
-    }
-    if (0x96..=0xbd).contains(&a) {
-        return altset1().get(usize::from(a).checked_sub(1)?)?.sprite();
-    }
-    frame_sprite(frame)
-}
-
-/// All decoded animation sequences, in `SEQTABLE` id order.
-#[must_use]
-pub fn animations() -> &'static [AnimSequence] {
-    static SEQS: OnceLock<Vec<AnimSequence>> = OnceLock::new();
-    SEQS.get_or_init(parse_sequences)
+/// An owned animation sequence — the parser's output before it's baked into
+/// the `'static` [`super::AnimSequence`].
+pub(super) struct OwnedSequence {
+    pub(super) id: u8,
+    pub(super) name: String,
+    pub(super) frames: Vec<AnimFrame>,
+    pub(super) loops_to: Option<usize>,
+    pub(super) chains_to: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +31,7 @@ pub fn animations() -> &'static [AnimSequence] {
 /// `altset1` / `altset2` alternates (each its own `:1`-based block, separated
 /// by `ds` padding). The 3-byte `swordtab` yields entries with < 5 values and
 /// is skipped.
-fn parse_framedef() -> Vec<Vec<FrameDef>> {
+pub(super) fn parse_framedef() -> Vec<Vec<FrameDef>> {
     let mut sections: Vec<Vec<FrameDef>> = vec![Vec::new()];
     let mut started = false;
     for raw in FRAMEDEF_SRC.lines() {
@@ -412,7 +273,7 @@ impl Program {
     }
 }
 
-fn parse_sequences() -> Vec<AnimSequence> {
+pub(super) fn parse_sequences() -> Vec<OwnedSequence> {
     let prog = assemble();
     let id_names: HashSet<&str> = prog.id_table.iter().map(|(_, n)| n.as_str()).collect();
     prog.id_table
@@ -438,7 +299,7 @@ fn walk(
     id: u8,
     name: &str,
     start: usize,
-) -> AnimSequence {
+) -> OwnedSequence {
     let mut pos = start;
     let (mut dx, mut dy) = (0i32, 0i32);
     let mut action: Option<u8> = None;
@@ -550,7 +411,7 @@ fn walk(
         }
     }
 
-    AnimSequence {
+    OwnedSequence {
         id,
         name: name.to_string(),
         frames,
@@ -600,106 +461,5 @@ fn parse_num(term: &str) -> i32 {
         i32::from_str_radix(hex, 16).unwrap_or(0)
     } else {
         t.parse().unwrap_or(0)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn seq(name: &str) -> &'static AnimSequence {
-        animations()
-            .iter()
-            .find(|s| s.name == name)
-            .unwrap_or_else(|| panic!("sequence `{name}` not found"))
-    }
-
-    #[test]
-    fn framedef_decodes_known_frames() {
-        // stand = frame 15 = `$0f,9` -> CHTAB1 image 15 (index 14).
-        let stand = frame_def(15).expect("frame 15");
-        assert_eq!((stand.image, stand.sword), (0x0f, 9));
-        assert_eq!(
-            frame_sprite(15),
-            Some(SpriteRef {
-                chtab: 1,
-                index: 14
-            })
-        );
-        // freefall = frame 106 = `$36,$40` -> CHTAB2 image 54 (index 53).
-        assert_eq!(
-            frame_sprite(106),
-            Some(SpriteRef {
-                chtab: 2,
-                index: 53
-            })
-        );
-        // a climbup frame (Fsword $80) lands in CHTAB3.
-        assert_eq!(
-            frame_def(135).and_then(FrameDef::sprite).map(|s| s.chtab),
-            Some(3)
-        );
-    }
-
-    #[test]
-    fn guard_frames_remap_to_the_guard_body() {
-        // Kid frame 158 ("ready") is CHTAB5 (the kid); a guard's `usealtsets`
-        // rewrites it to altset1 `:158` (guy-10), `Fsword=$c0+8` -> chtable4
-        // (the loaded guard body) at the same image index.
-        assert_eq!(frame_sprite(158).map(|s| s.chtab), Some(5));
-        assert_eq!(
-            guard_frame_sprite(158),
-            Some(SpriteRef { chtab: 4, index: 7 })
-        );
-        // The `$66..=$6a` band shifts up by `$46` before the remap.
-        assert_eq!(guard_frame_sprite(102).map(|s| s.chtab), Some(4));
-        // Out-of-range frames (e.g. the shared run frame 7) stay on the main
-        // set — a guard shares them with the kid.
-        assert_eq!(guard_frame_sprite(7), frame_sprite(7));
-    }
-
-    #[test]
-    fn stand_is_a_single_looping_frame() {
-        let stand = seq("stand");
-        assert_eq!(stand.id, 2);
-        assert_eq!(stand.frames.len(), 1);
-        assert_eq!(stand.frames[0].frame, 15);
-        assert_eq!(stand.frames[0].action, Some(0)); // `act,0`
-        assert_eq!(stand.loops_to, Some(0)); // `goto stand`
-    }
-
-    #[test]
-    fn startrun_runs_through_1_to_14_then_loops_into_the_cycle() {
-        let run = seq("startrun");
-        assert_eq!(run.id, 1);
-        let ids: Vec<u8> = run.frames.iter().map(|f| f.frame).collect();
-        assert_eq!(ids, (1..=14).collect::<Vec<_>>());
-        assert_eq!(run.frames[0].action, Some(1)); // `act,1`
-                                                   // `goto runcyc1` loops back to frame 7 (the start of the cycle).
-        assert_eq!(run.loops_to, Some(6));
-        assert_eq!(run.frames[6].frame, 7);
-    }
-
-    #[test]
-    fn chx_lands_on_the_following_frame() {
-        // `runstt4 db 4,chx,8` / `runstt5 db 5,chx,3`: the chx after frame 4
-        // is the motion carried into frame 5.
-        let run = seq("startrun");
-        assert_eq!(run.frames[3].frame, 4);
-        assert_eq!(run.frames[4].frame, 5);
-        assert_eq!(run.frames[4].dx, 8);
-    }
-
-    #[test]
-    fn every_id_table_entry_decodes() {
-        // All 100+ sequences parse without panicking and most carry frames.
-        let all = animations();
-        assert!(
-            all.len() > 100,
-            "expected the full id table, got {}",
-            all.len()
-        );
-        let with_frames = all.iter().filter(|s| !s.frames.is_empty()).count();
-        assert!(with_frames > 80, "only {with_frames} sequences had frames");
     }
 }

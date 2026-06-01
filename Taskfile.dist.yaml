@@ -134,6 +134,16 @@ tasks:
     cmds:
       - cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged
 
+  gen:anim:
+    desc: "Regenerate crates/pop-assets/src/anim/generated.rs from the vendored FRAMEDEF/SEQTABLE source."
+    deps: [submodules]
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found - install Rust from https://rustup.rs/"
+    cmds:
+      - POP_ANIM_REGEN=1 cargo test -p pop-assets --lib regenerate_anim_data -- --nocapture
+      - cargo fmt -p pop-assets
+
   check:
     desc: Static checks - formatting + clippy. No tests.
     cmds:
