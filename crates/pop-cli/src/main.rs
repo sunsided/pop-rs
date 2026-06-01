@@ -14,6 +14,8 @@
 
 use clap::{Parser, Subcommand};
 
+#[cfg(feature = "editor")]
+mod anim_view;
 mod discover;
 mod draz;
 #[cfg(feature = "editor")]

@@ -50,6 +50,8 @@ use std::time::{Duration, Instant};
 
 use clap::Args as ClapArgs;
 use eframe::egui::{self, Color32, ColorImage, Pos2, Rect, Sense, Stroke, TextureHandle, Vec2};
+
+use crate::anim_view::AnimViewer;
 use pop_assets::{
     bgdata::Biome,
     discovery,
@@ -391,6 +393,8 @@ struct EditorApp {
     /// Toggle between Apple II monochrome and NTSC artifact-colour
     /// modes when rendering sprites.
     ntsc_mode: bool,
+    /// Character animation preview window (#89).
+    anim_view: AnimViewer,
     /// Animate time-varying tiles (torch flames + a non-physical
     /// slicer/spike trap preview). Drives a throttled per-tick re-render
     /// of the rooms in [`Self::animated_rooms`].
@@ -475,6 +479,7 @@ impl EditorApp {
             show_coords: false,
             show_sprites: true,
             ntsc_mode: true,
+            anim_view: AnimViewer::default(),
             animate: false,
             anim_tick: 0,
             last_anim_step: None,
@@ -560,8 +565,7 @@ impl EditorApp {
                     self.biome_cache.get(&biome).expect("just inserted")
                 }
                 Err(e) => {
-                    self.render_status =
-                        format!("failed to load {} sprites: {e}", biome.name());
+                    self.render_status = format!("failed to load {} sprites: {e}", biome.name());
                     return;
                 }
             },
@@ -937,6 +941,8 @@ impl eframe::App for EditorApp {
             .show(ctx, |ui| self.side_panel(ui, ctx));
         egui::TopBottomPanel::bottom("status").show(ctx, |ui| self.status_bar(ui));
         egui::CentralPanel::default().show(ctx, |ui| self.canvas(ui));
+        let root = self.state.root.clone();
+        self.anim_view.ui(ctx, self.ntsc_mode, root.as_deref());
         match toolbar_request {
             ToolbarAction::RefreshTextures => {
                 let anim = self.current_anim();
@@ -990,11 +996,16 @@ impl EditorApp {
                 self.last_anim_step = None;
                 action = ToolbarAction::RefreshTextures;
             }
+            ui.toggle_value(&mut self.anim_view.open, "Animations")
+                .on_hover_text("Preview decoded character animation sequences (#89)");
+            ui.separator();
             ui.checkbox(&mut self.show_labels, "tile labels");
             ui.checkbox(&mut self.show_room_ids, "room IDs");
             ui.checkbox(&mut self.show_coords, "cell coords");
             ui.checkbox(&mut self.show_conflicts, "⚠ conflicts")
-                .on_hover_text("Mark cells whose sprite was truncated in the biome (#112) and worked around");
+                .on_hover_text(
+                    "Mark cells whose sprite was truncated in the biome (#112) and worked around",
+                );
             ui.separator();
             if ui.button("Fit view").clicked() {
                 self.pending_fit = true;
@@ -1450,7 +1461,8 @@ fn draw_cell_coords(
         for col in 0..ROOM_WIDTH {
             // Anchor at the cell's bottom-right so the badge never
             // collides with the top-left tile-name label.
-            let x = panel_origin.x + pan.x + (room_x_tiles as f32 + col as f32 + 1.0) * tile_w - 2.0;
+            let x =
+                panel_origin.x + pan.x + (room_x_tiles as f32 + col as f32 + 1.0) * tile_w - 2.0;
             let y =
                 panel_origin.y + pan.y + (room_top_tiles as f32 + row as f32 + 1.0) * tile_h - 1.0;
             let text = format!("{col},{row}");
