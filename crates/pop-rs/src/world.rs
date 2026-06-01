@@ -10,10 +10,11 @@
 //! for *behaviour* and reuses its *art*, but the runtime is fresh Rust.
 //! He spawns, drops in, runs / jumps / careful-steps, climbs ledges,
 //! walks between rooms, and falls / descends loose floors into the room
-//! below — respecting walls, floors and ledges (#120). Still rough: a
-//! proper per-action animation engine (#95), the shake-then-fall
-//! loose-floor delay (#96), and the NTSC half-dot / figure-offset
-//! character blit (#121 / #123).
+//! below — respecting walls, floors and ledges (#120). Loose floors now
+//! bob their own tile as they wobble, then give way; a crash or hard
+//! landing jolts the screen (#96). Still rough: a proper per-action
+//! animation engine (#95), the falling-rubble mob + rubble tile that round
+//! out #96, and the NTSC half-dot / figure-offset blit (#121 / #123).
 
 use pop_assets::bgdata::{BLOCK_BOT_ROW, CELL_WIDTH_BYTES, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES};
 use pop_assets::draz::image_table::Image;
@@ -61,6 +62,28 @@ const STEP_PX: i32 = 2;
 /// wall — matched to [`VERT_DIST`] so he keeps about the same gap from a
 /// wall as his feet keep from the bottom of the tile he stands on.
 const COLLIDE_HALF: i32 = VERT_DIST;
+
+/// Ticks a jarred loose floor wobbles before it gives way. POP arms it with
+/// a random `1..16`-tick countdown (`SUBS.S :trigloose` → `BREAKLOOSE1`); we
+/// use a fixed short beat — long enough to feel the floor hesitate, short
+/// enough that he can't run clear of a single loose tile before it drops.
+const LOOSE_FALL_DELAY: u8 = 4;
+
+/// Frames the picture jolts after a loose floor crashes down (`MOVER.S
+/// SHAKEM`): each frame it rolls a couple of scan-lines, sign alternating.
+const SHAKE_TICKS: u8 = 4;
+
+/// Vertical roll of the crash / landing jolt, px.
+const SHAKE_AMPLITUDE: i32 = 2;
+
+/// Per-frame downward bob (px) of a loose floor's own tile while it
+/// wobbles — POP's dedicated loose-block shudder (`FRAMEADV.S drawloosed`
+/// offsets the block by `looseby`), local to the tile, not a screen roll.
+const LOOSE_BOB: [usize; 4] = [0, 1, 2, 1];
+
+/// Minimum downward speed at touchdown that thuds the floor (jolts the
+/// screen, `MOVER.S SHAKEM`). Below it a gentle step-down lands quietly.
+const THUD_VY: i32 = 6;
 
 /// Top-level game mode. Expands toward the full
 /// `Title → Attract → Demo → Playing → Paused → GameOver → Win` machine
@@ -263,6 +286,16 @@ impl Prince {
     }
 }
 
+/// A loose floor that's been jarred and is counting down to give way
+/// (`MOVER.S` "trob": triggered object). The cell stays solid in the level
+/// until [`World::advance_loose`] runs the countdown out.
+struct LooseArm {
+    room: u8,
+    col: usize,
+    row: usize,
+    ticks_left: u8,
+}
+
 /// High-level game state for one loaded level.
 pub struct World {
     level: Level,
@@ -277,6 +310,10 @@ pub struct World {
     prev: InputState,
     /// The player character.
     prince: Prince,
+    /// Loose floors mid-wobble, counting down to break (`MOVER.S` trobs).
+    loose: Vec<LooseArm>,
+    /// Screen-jolt frames remaining after a loose floor crashed (`SHAKEM`).
+    shake: u8,
     /// Kid sprites, host-loaded; `None` renders the bare scene.
     art: Option<KidArt>,
 }
@@ -296,6 +333,8 @@ impl World {
             mode: Mode::Playing,
             prev: InputState::default(),
             prince,
+            loose: Vec::new(),
+            shake: 0,
             art: None,
         }
     }
@@ -452,33 +491,83 @@ impl World {
         }
     }
 
-    /// Break a loose floor the grounded Prince stands on: the cell becomes
-    /// a hole (`Empty`) — in the level data, so both the renderer and the
-    /// floor physics see it — and he drops through to the room below.
-    /// Instant for now; the original's shake-then-fall delay is later
-    /// polish (#96 tile interactions).
-    fn break_loose_floor_under_feet(&mut self) {
+    /// Arm the loose floor the grounded Prince stands on, if any: his weight
+    /// jars it (`SUBS.S :trigloose`) and it begins a [`LOOSE_FALL_DELAY`]-tick
+    /// wobble. The cell stays solid until the countdown runs out in
+    /// [`World::advance_loose`]; only then does it become a hole and take him
+    /// with it. Idempotent per cell — re-arming a wobbling floor is a no-op.
+    fn arm_loose_floor_under_feet(&mut self) {
         if !self.prince.on_ground {
             return;
         }
-        let room_idx = usize::from(self.prince.room).saturating_sub(1);
+        let room = self.prince.room;
         let col = col_of(self.prince.x);
         let row = self.prince.row;
         let on_loose = self
             .level
             .rooms
-            .get(room_idx)
+            .get(usize::from(room).saturating_sub(1))
             .and_then(|r| r.tile_at(col, row))
             .is_some_and(|t| t.kind == TileKind::LooseFloor);
         if !on_loose {
             return;
         }
-        if let Some(r) = self.level.rooms.get_mut(room_idx) {
-            r.tiles[row * ROOM_WIDTH + col] = Tile::default();
+        let armed = self
+            .loose
+            .iter()
+            .any(|l| l.room == room && l.col == col && l.row == row);
+        if !armed {
+            self.loose.push(LooseArm {
+                room,
+                col,
+                row,
+                ticks_left: LOOSE_FALL_DELAY,
+            });
         }
-        // Drop through the fresh hole. Aim at the next support below it in
-        // this room if there is one; otherwise the column is open to the
-        // bottom and `fall_step` carries him into the room below.
+    }
+
+    /// Tick every wobbling loose floor (and the screen jolt). When a
+    /// countdown reaches zero the cell becomes a hole (`Empty`) in the level
+    /// data — renderer and floor physics both see it — and the picture jolts
+    /// ([`SHAKE_TICKS`]). If the Prince is still standing on that very cell he
+    /// drops through it; if he ran clear in time it just crumbles behind him.
+    fn advance_loose(&mut self) {
+        self.shake = self.shake.saturating_sub(1);
+        let mut broken: Vec<(u8, usize, usize)> = Vec::new();
+        self.loose.retain_mut(|l| {
+            l.ticks_left = l.ticks_left.saturating_sub(1);
+            if l.ticks_left == 0 {
+                broken.push((l.room, l.col, l.row));
+                false
+            } else {
+                true
+            }
+        });
+        for (room, col, row) in broken {
+            let room_idx = usize::from(room).saturating_sub(1);
+            if let Some(r) = self.level.rooms.get_mut(room_idx) {
+                r.tiles[row * ROOM_WIDTH + col] = Tile::default();
+            }
+            // Only jolt the picture if the crash is in the room on screen —
+            // a floor giving way two rooms over shouldn't shake the view.
+            if room == self.room_id {
+                self.shake = SHAKE_TICKS;
+            }
+            let on_it = self.prince.on_ground
+                && self.prince.room == room
+                && self.prince.row == row
+                && col_of(self.prince.x) == col;
+            if on_it {
+                self.drop_through_hole(room_idx, col, row);
+            }
+        }
+    }
+
+    /// Start the Prince falling through a fresh hole at `(col, row)` of room
+    /// `room_idx`: aim at the next support below it in this room if there is
+    /// one, else leave the column open so [`World::fall_step`] carries him
+    /// into the room below.
+    fn drop_through_hole(&mut self, room_idx: usize, col: usize, row: usize) {
         self.prince.on_ground = false;
         self.prince.vy = 0;
         if let Some((lrow, lfeet)) = self
@@ -585,6 +674,10 @@ impl World {
             Mode::Playing => {
                 let room_idx = usize::from(self.prince.room).saturating_sub(1);
                 let was_climbing = self.prince.climb.is_some();
+                // Capture his fall speed before the step so a touchdown this
+                // tick can jolt the floor by how hard he hit.
+                let airborne = !self.prince.on_ground;
+                let vy_before = self.prince.vy;
                 if was_climbing {
                     self.climb_step();
                 } else if !self.prince.on_ground {
@@ -602,19 +695,28 @@ impl World {
                         self.prince.walk(dir, room);
                     }
                 }
+                // A hard landing thuds the floor — the impact jolt of a fall
+                // or jump. A climb finishes with no downward speed, so it
+                // stays quiet (`vy_before < THUD_VY`).
+                if airborne && self.prince.on_ground && vy_before >= THUD_VY {
+                    self.shake = SHAKE_TICKS;
+                }
                 // Room edges / loose floors don't apply mid-climb — including
                 // the tick a climb starts or finishes (he hasn't stepped on
                 // the landing tile yet).
                 if !was_climbing && self.prince.climb.is_none() {
                     // Carry him into a neighbour room if he stepped off an edge.
                     let crossed = self.cross_horizontal_edge();
-                    // A loose floor under his feet gives way. Skip on the tick
-                    // he just crossed a room edge — he hasn't stood on the
-                    // destination's entry tile yet.
+                    // A loose floor under his feet starts to wobble. Skip on
+                    // the tick he just crossed a room edge — he hasn't stood on
+                    // the destination's entry tile yet.
                     if !crossed {
-                        self.break_loose_floor_under_feet();
+                        self.arm_loose_floor_under_feet();
                     }
                 }
+                // Run out any wobbling loose floors (and the screen jolt);
+                // one may give way and drop him this very tick.
+                self.advance_loose();
                 // The room on screen follows the Prince.
                 self.room_id = self.prince.room;
             }
@@ -634,6 +736,10 @@ impl World {
         // screen column (an RGBA overlay would swap orange/blue on mirror).
         let mut bytes =
             scene::compose_room_bytes(&self.level, self.room_id, &self.tables, Anim::REST)?;
+        // Bob any loose floor that's wobbling — its own tile shudders (POP's
+        // `drawloosed`), done before the Prince so he rides the steady floor
+        // line rather than jittering with it.
+        self.jiggle_loose_tiles(&mut bytes[..]);
         if let Some(art) = &self.art {
             if self.room_id == self.prince.room {
                 let img = if let Some(c) = &self.prince.climb {
@@ -682,7 +788,92 @@ impl World {
                 }
             }
         }
-        hires::render_linear_topdown(&bytes[..], ROOM_WIDTH_BYTES, ROOM_HEIGHT_PX, mode)
+        let frame =
+            hires::render_linear_topdown(&bytes[..], ROOM_WIDTH_BYTES, ROOM_HEIGHT_PX, mode)?;
+        Some(self.apply_shake(frame))
+    }
+
+    /// Bob each wobbling loose floor in the room on screen by shifting its
+    /// own cell down a pixel or two ([`LOOSE_BOB`]) — the dedicated loose-
+    /// block shudder POP draws (`FRAMEADV.S drawloosed`), local to the tile.
+    /// Operates on the composed hi-res *byte* buffer (`ROOM_WIDTH_BYTES`
+    /// wide, row 0 = top); a vertical shift keeps each column's artifact
+    /// parity, so no colour swap. The exposed top band gets the `0x80` CLS
+    /// fill — a thin gap that reads as the block dropping.
+    fn jiggle_loose_tiles(&self, bytes: &mut [u8]) {
+        let dy = LOOSE_BOB[usize::try_from(self.frame).unwrap_or(0) % LOOSE_BOB.len()];
+        if dy == 0 {
+            return;
+        }
+        let w = usize::from(ROOM_WIDTH_BYTES);
+        for arm in self.loose.iter().filter(|l| l.room == self.room_id) {
+            let row = arm.row.min(ROOM_HEIGHT - 1);
+            let bot = usize::from(BLOCK_BOT_ROW[row]);
+            let top = if row == 0 {
+                0
+            } else {
+                usize::from(BLOCK_BOT_ROW[row - 1]) + 1
+            };
+            let x0 = arm.col * usize::from(CELL_WIDTH_BYTES);
+            let x1 = (x0 + usize::from(CELL_WIDTH_BYTES)).min(w);
+            // Descend so each source row is still original when it's read.
+            for y in (top..=bot).rev() {
+                for x in x0..x1 {
+                    bytes[y * w + x] = if y >= top + dy {
+                        bytes[(y - dy) * w + x]
+                    } else {
+                        0x80
+                    };
+                }
+            }
+        }
+    }
+
+    /// Vertical screen-roll this frame, px (0 when steady) — the brief jolt
+    /// of an impact (a loose-floor crash or a hard landing), counted down by
+    /// [`World::shake`]. The sign flips each frame so the picture shudders
+    /// rather than slides. The loose-floor *wobble* is a per-tile bob
+    /// ([`World::jiggle_loose_tiles`]), not a whole-screen roll.
+    fn shake_dy(&self) -> i32 {
+        if self.shake == 0 {
+            0
+        } else if self.shake % 2 == 0 {
+            SHAKE_AMPLITUDE
+        } else {
+            -SHAKE_AMPLITUDE
+        }
+    }
+
+    /// Roll `frame` vertically by [`World::shake_dy`], filling the exposed
+    /// band with opaque black — the `MOVER.S SHAKEM` jolt after a loose floor
+    /// crashes. A no-op while the screen is steady.
+    fn apply_shake(&self, frame: Frame) -> Frame {
+        let dy = self.shake_dy();
+        if dy == 0 {
+            return frame;
+        }
+        let w = usize::try_from(frame.width).unwrap_or(0);
+        let h = usize::try_from(frame.height).unwrap_or(0);
+        let stride = w * 4;
+        let mut pixels = vec![0u8; frame.pixels.len()];
+        for px in pixels.chunks_exact_mut(4) {
+            px[3] = 255; // opaque black, so the exposed band isn't transparent
+        }
+        for y in 0..h {
+            let Ok(src) = usize::try_from(i32::try_from(y).unwrap_or(0) - dy) else {
+                continue; // rolled past the top edge
+            };
+            if src >= h {
+                continue; // rolled past the bottom edge
+            }
+            pixels[y * stride..y * stride + stride]
+                .copy_from_slice(&frame.pixels[src * stride..src * stride + stride]);
+        }
+        Frame {
+            width: frame.width,
+            height: frame.height,
+            pixels,
+        }
     }
 }
 
@@ -1123,8 +1314,18 @@ mod tests {
         world.prince.x = CELL_W / 2;
         world.prince.on_ground = true;
 
-        world.break_loose_floor_under_feet();
-        assert!(!world.prince_on_ground(), "the floor gave way");
+        world.arm_loose_floor_under_feet();
+        assert!(
+            world.prince_on_ground(),
+            "the floor still holds while it wobbles"
+        );
+        for _ in 0..LOOSE_FALL_DELAY {
+            world.advance_loose();
+        }
+        assert!(
+            !world.prince_on_ground(),
+            "the floor gave way after the wobble"
+        );
         assert_eq!(
             world.prince.landing_row, 1,
             "lands on the block below, in-room"
@@ -1154,6 +1355,113 @@ mod tests {
             reached_room_2,
             "the col-6 loose floor should drop him into room 2"
         );
+    }
+
+    /// Stand the Prince squarely on the col-6 row-2 loose floor of room 1.
+    fn on_loose_floor() -> World {
+        let mut world = landed_world();
+        world.prince.room = 1;
+        world.prince.row = 2;
+        world.prince.x = 6 * CELL_W + CELL_W / 2;
+        world.prince.feet_y = floor_y(2);
+        world.prince.on_ground = true;
+        world
+    }
+
+    #[test]
+    fn a_loose_floor_holds_through_its_wobble_then_gives_way() {
+        let mut world = on_loose_floor();
+        world.arm_loose_floor_under_feet();
+        assert_eq!(world.loose.len(), 1, "his weight armed the loose floor");
+        for t in 0..LOOSE_FALL_DELAY {
+            assert!(
+                world.prince_on_ground(),
+                "still standing on tick {t} of the wobble"
+            );
+            world.advance_loose();
+        }
+        assert!(!world.prince_on_ground(), "after the wobble it drops him");
+        assert!(world.loose.is_empty(), "the armed floor is consumed");
+    }
+
+    #[test]
+    fn arming_a_wobbling_loose_floor_does_not_restack_it() {
+        let mut world = on_loose_floor();
+        world.arm_loose_floor_under_feet();
+        world.arm_loose_floor_under_feet();
+        assert_eq!(world.loose.len(), 1, "re-arming the same cell is a no-op");
+    }
+
+    #[test]
+    fn a_loose_floor_crumbles_behind_a_prince_who_runs_clear() {
+        let mut world = on_loose_floor();
+        world.arm_loose_floor_under_feet();
+        // He scrambles two tiles along the row before it gives way.
+        world.prince.x = 8 * CELL_W + CELL_W / 2;
+        for _ in 0..LOOSE_FALL_DELAY {
+            world.advance_loose();
+        }
+        assert!(world.prince_on_ground(), "he stayed on solid ground");
+        assert_ne!(
+            world.level.rooms[0].tile_at(6, 2).unwrap().kind,
+            TileKind::LooseFloor,
+            "the loose floor still fell, behind him"
+        );
+    }
+
+    #[test]
+    fn a_crashing_loose_floor_jolts_the_screen() {
+        let mut world = on_loose_floor();
+        world.arm_loose_floor_under_feet();
+        for _ in 0..LOOSE_FALL_DELAY {
+            world.advance_loose();
+        }
+        assert!(world.shake > 0, "the crash starts the screen jolt");
+        let jolted = world.render(RenderMode::Monochrome).expect("renders");
+        world.shake = 0;
+        let steady = world.render(RenderMode::Monochrome).expect("renders");
+        assert_ne!(
+            steady.pixels, jolted.pixels,
+            "the jolt rolls the picture against the steady frame"
+        );
+    }
+
+    #[test]
+    fn a_wobbling_loose_floor_jiggles_only_its_tile() {
+        let mut world = on_loose_floor();
+        world.shake = 0; // ignore any leftover jolt from the drop-in landing
+        world.frame = 2; // LOOSE_BOB[2] = 2 px down, so the bob is visible
+        let rest = world.render(RenderMode::Monochrome).expect("renders");
+        world.arm_loose_floor_under_feet();
+        let wobbling = world.render(RenderMode::Monochrome).expect("renders");
+        assert_eq!(
+            world.shake_dy(),
+            0,
+            "the wobble no longer rolls the whole screen"
+        );
+        assert_ne!(
+            rest.pixels, wobbling.pixels,
+            "the loose tile itself bobs while it wobbles"
+        );
+    }
+
+    #[test]
+    fn a_hard_landing_thuds_the_screen() {
+        let mut world = landed_world();
+        // Launch a jump; it lands a few ticks later with downward speed.
+        world.tick(InputState {
+            up: true,
+            ..InputState::default()
+        });
+        let mut thudded = false;
+        for _ in 0..20 {
+            world.tick(InputState::default());
+            if world.shake > 0 {
+                thudded = true;
+                break;
+            }
+        }
+        assert!(thudded, "landing the jump jolts the screen");
     }
 
     #[test]
