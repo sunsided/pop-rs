@@ -90,6 +90,37 @@ fn mirror_byte(b: u8) -> u8 {
     (b & 0x80) | (reversed_7 & 0x7f)
 }
 
+/// The first and last **byte column** of `img` carrying any set pixel
+/// (`b & 0x7f != 0`) on any row — the figure's true horizontal extent inside
+/// its (often wider) sprite box. `None` for an empty / zero-size sprite.
+///
+/// Lets a caller centre the *figure* (not the box) on a character's logical x
+/// and size his wall collision to what's actually drawn, so the gap to a wall
+/// is the same whichever way he faces (#123). Uses the same `& 0x7f == 0`
+/// transparency rule as [`composite_hires`].
+#[must_use]
+#[allow(clippy::verbose_bit_mask)]
+pub fn figure_byte_span(img: &Image) -> Option<(u8, u8)> {
+    let w = usize::from(img.width_bytes);
+    let h = usize::from(img.height);
+    if w == 0 || h == 0 || img.bitmap.len() < w * h {
+        return None;
+    }
+    let mut span: Option<(u8, u8)> = None;
+    // `width_bytes` is a `u8`, so the column index is one too — iterate it
+    // directly and avoid a fallible cast (`bx` provably never exceeds 254).
+    for bx in 0..img.width_bytes {
+        let col = usize::from(bx);
+        if (0..h).any(|sy| img.bitmap[sy * w + col] & 0x7f != 0) {
+            span = Some(match span {
+                Some((lo, _)) => (lo, bx),
+                None => (bx, bx),
+            });
+        }
+    }
+    span
+}
+
 /// Blit `img` onto `dst` with its top-left at pixel `(x, y)`,
 /// horizontally mirrored when `flip_h` (POP draws right-facing
 /// characters mirrored — see [`crate::scene`] callers).
@@ -230,6 +261,36 @@ mod tests {
             [0, 0, 0b100_0000, 0],
             "mirrored to column 2, pixel reversed"
         );
+    }
+
+    #[test]
+    fn figure_byte_span_finds_the_used_columns() {
+        // 4-byte-wide, 2-row sprite; only byte cols 1 and 2 carry pixels.
+        let img = Image {
+            width_bytes: 4,
+            height: 2,
+            bitmap: vec![
+                0, 0b000_0001, 0, 0, // row 0: col 1
+                0, 0, 0b100_0000, 0, // row 1: col 2
+            ],
+        };
+        assert_eq!(figure_byte_span(&img), Some((1, 2)));
+
+        // All-empty → None.
+        let empty = Image {
+            width_bytes: 2,
+            height: 1,
+            bitmap: vec![0, 0],
+        };
+        assert_eq!(figure_byte_span(&empty), None);
+
+        // A byte with only the palette/high bit set has no pixels → empty.
+        let hibit = Image {
+            width_bytes: 1,
+            height: 1,
+            bitmap: vec![0x80],
+        };
+        assert_eq!(figure_byte_span(&hibit), None);
     }
 
     #[test]
