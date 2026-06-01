@@ -189,6 +189,10 @@ pub const LOOSE_B_Y: [i8; 11] = [0, 1, 0, -1, -1, 0, 0, 0, -1, -1, -1];
 pub const LOOSE_D: [u8; 11] = [
     0x15, 0x2c, 0x15, 0x2d, 0x2d, 0x15, 0x15, 0x15, 0x2d, 0x2d, 0x2d,
 ];
+// `scene::Anim::loose_state` modulates by `LOOSE_A.len()` and indexes all
+// three with that state — keep them the same length, or it panics at runtime.
+const _: () = assert!(LOOSE_A.len() == LOOSE_D.len());
+const _: () = assert!(LOOSE_A.len() == LOOSE_B_Y.len());
 /// Constant B-piece for loose floor.
 pub const LOOSE_B: u8 = 0x1b;
 

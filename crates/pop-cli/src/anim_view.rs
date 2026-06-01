@@ -185,18 +185,23 @@ impl AnimViewer {
     fn ensure_loaded(&mut self, root: Option<&Path>) {
         let Some(root) = root else { return };
         if self.bg_root.as_deref() != Some(root) {
+            // Root changed: drop the old biome tables first (so a failed load
+            // shows "not loaded" rather than stale tiles), then (re)try.
+            self.bg = None;
+            self.tile_cache = None;
             if let Ok(bg) = BiomeTables::load(root, Biome::Dungeon) {
                 self.bg = Some(bg);
                 self.bg_root = Some(root.to_path_buf());
-                self.tile_cache = None;
             }
         }
         let key = (root.to_path_buf(), self.guard);
         if self.chtab_key.as_ref() != Some(&key) {
+            // Root / body changed: drop the old sprites first, then (re)try.
+            self.tables.clear();
+            self.cache.clear();
             if let Some(dir) = discovery::draz_dir_in(root).map(|d| d.join("I")) {
                 self.tables = load_chtabs(&dir, self.guard);
                 self.chtab_key = Some(key);
-                self.cache.clear();
             }
         }
     }
@@ -511,7 +516,9 @@ impl AnimViewer {
 
     // --- Shared playback ---------------------------------------------------
 
-    fn playback_controls(&mut self, ui: &mut egui::Ui, show_mirror: bool) {
+    /// `characters` gates the controls that only apply in Characters mode:
+    /// the `loop` toggle (tiles cycle endlessly) and the `mirror` toggle.
+    fn playback_controls(&mut self, ui: &mut egui::Ui, characters: bool) {
         ui.horizontal(|ui| {
             let play = if self.playing { "⏸" } else { "▶" };
             if ui.button(play).clicked() {
@@ -526,8 +533,8 @@ impl AnimViewer {
                 self.playing = false;
                 self.step_manual(1);
             }
-            ui.checkbox(&mut self.looping, "loop");
-            if show_mirror {
+            if characters {
+                ui.checkbox(&mut self.looping, "loop");
                 ui.checkbox(&mut self.user_flip, "mirror")
                     .on_hover_text("Flip the figure's facing and travel direction");
             }
@@ -592,10 +599,12 @@ impl AnimViewer {
                 };
             }
             PreviewMode::Tiles => {
+                // Clamp at 0 on step-back — `wrapping_sub` would jump to
+                // `u32::MAX` and teleport the phase.
                 self.tick = if dir > 0 {
                     self.tick.wrapping_add(1)
                 } else {
-                    self.tick.wrapping_sub(1)
+                    self.tick.saturating_sub(1)
                 };
             }
         }
@@ -655,7 +664,8 @@ impl AnimViewer {
 /// remaps to its body (chtable4). Falls / shared moves appear in both.
 fn seq_for_body(seq: &AnimSequence, guard: GuardKind) -> bool {
     if guard == GuardKind::None {
-        seq.frames.is_empty() || seq.frames.iter().any(|f| !(0x96..=0xbd).contains(&f.frame))
+        // A frameless sequence renders nothing — show it for neither body.
+        !seq.frames.is_empty() && seq.frames.iter().any(|f| !(0x96..=0xbd).contains(&f.frame))
     } else {
         seq.frames
             .iter()
@@ -675,7 +685,7 @@ fn load_chtabs(dir: &Path, guard: GuardKind) -> Vec<Option<ImageTable>> {
         load("IMG.CHTAB5"),
         load("IMG.CHTAB6.A"),
         load("IMG.CHTAB7"),
-        None,
+        load("IMG.CHTAB8"), // `decodeim` can select table 8; load it if present
     ]
 }
 
