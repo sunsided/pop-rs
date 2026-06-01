@@ -1519,9 +1519,14 @@ fn draw_exit_door(
     open: i32,
 ) {
     let canvas_h = i32::from(ROOM_HEIGHT_PX);
+    // `drawexitb` sets `XCO = blockxco + 1` once for the stairs and never
+    // resets it, so the door, mask and top-repair share that column — else
+    // the door sits a byte (7 px) left of the opening and the stairs show
+    // through a strip on the right.
+    let door_x = blockxco + 1;
     if draw_stairs && blockxco < 36 {
         if let Some(piece) = bg.resolve(STAIRS) {
-            canvas.blit(piece, blockxco + 1, ay - 12, Opacity::Sta);
+            canvas.blit(piece, door_x, ay - 12, Opacity::Sta);
         }
     }
     let blockthr = dy - 67;
@@ -1535,10 +1540,10 @@ fn draw_exit_door(
         let mut y = ay - 14 - open;
         while y >= blockthr {
             if let Some(mask) = door_mask {
-                canvas.blit(mask, blockxco, y, Opacity::And);
+                canvas.blit(mask, door_x, y, Opacity::And);
             }
             if let Some(piece) = door {
-                canvas.blit(piece, blockxco, y, Opacity::Or);
+                canvas.blit(piece, door_x, y, Opacity::Or);
             }
             y -= 4;
         }
@@ -1546,7 +1551,7 @@ fn draw_exit_door(
     let top_y = ay - 64;
     if (0..canvas_h).contains(&top_y) {
         if let Some(piece) = bg.resolve(TOP_REPAIR) {
-            canvas.blit(piece, blockxco, top_y, Opacity::Sta);
+            canvas.blit(piece, door_x, top_y, Opacity::Sta);
         }
     }
 }
