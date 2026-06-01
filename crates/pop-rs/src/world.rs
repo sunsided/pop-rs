@@ -10,19 +10,23 @@
 //! for *behaviour* and reuses its *art*, but the runtime is fresh Rust.
 //! He spawns, drops in, runs / jumps / careful-steps, climbs ledges,
 //! walks between rooms, and falls / descends loose floors into the room
-//! below — respecting walls, floors and ledges (#120). Loose floors now
-//! bob their own tile as they wobble, then give way; a crash or hard
-//! landing jolts the screen (#96). Still rough: a proper per-action
-//! animation engine (#95), the falling-rubble mob + rubble tile that round
-//! out #96, and the NTSC half-dot / figure-offset blit (#121 / #123).
+//! below — respecting walls, floors and ledges (#120). His drawn frame and
+//! run displacement now come from the decoded SEQTABLE sequences through an
+//! [`AnimCursor`] (the #95 playback engine — stand / run / fall / climb
+//! wired; turn-in-place, faithful jump arcs and combat still to come). Loose
+//! floors bob their own tile as they wobble, then give way; a crash or hard
+//! landing jolts the screen (#96). Still rough: the falling-rubble mob +
+//! rubble tile that round out #96, and the NTSC half-dot / figure-offset
+//! blit (#121 / #123).
 
 use pop_assets::bgdata::{BLOCK_BOT_ROW, CELL_WIDTH_BYTES, ROOM_HEIGHT_PX, ROOM_WIDTH_BYTES};
-use pop_assets::draz::image_table::Image;
+use pop_assets::draz::image_table::{Image, ImageTable};
 use pop_assets::hires::{self, Frame, RenderMode};
 use pop_assets::level::{Level, Room, Tile, TileKind, ROOMS_PER_LEVEL, ROOM_HEIGHT, ROOM_WIDTH};
 use pop_assets::scene::{self, Anim, BiomeTables};
 use pop_assets::sprite;
 
+use crate::anim::AnimCursor;
 use crate::backend::InputState;
 
 /// Downward acceleration applied each logic tick while the Prince is
@@ -45,10 +49,6 @@ const ROOM_W: i32 = ROOM_WIDTH_BYTES as i32 * 7;
 /// Room height in pixels. Falling past it drops the Prince into the room
 /// below (the `down` link).
 const ROOM_H: i32 = ROOM_HEIGHT_PX as i32;
-
-/// Per-frame horizontal step of the run cycle, in pixels — the `chx`
-/// operands of SEQTABLE `runcyc1..8`. Indexed by the run phase.
-const RUN_CHX: [i32; 8] = [5, 1, 2, 4, 5, 2, 3, 4];
 
 /// Initial upward velocity of a jump, px per tick (negative = up). A
 /// simple vertical hop; the running leap and ledge grabs come later (#120).
@@ -98,25 +98,8 @@ pub enum Mode {
     Playing,
 }
 
-/// The kid sprites the host loads: the standing pose, the free-fall pose,
-/// and the 8-frame run cycle. A full FRAMEDEF-driven frame set (turn /
-/// jump / climb) and a sequence interpreter arrive with the rest of the
-/// animation engine (#94 / #95).
-pub struct KidArt {
-    /// `stand` frame (FRAMEDEF 15 → CHTAB1 image 15).
-    pub stand: Image,
-    /// `freefall` frame (FRAMEDEF 106 → CHTAB2 image 54).
-    pub fall: Image,
-    /// The 8-frame run cycle (SEQTABLE `runcyc1..8` = FRAMEDEF 7-14 →
-    /// CHTAB1 images 7-14), paired one-to-one with [`RUN_CHX`].
-    pub run: Vec<Image>,
-    /// The `climbup` pull-up animation (SEQTABLE `climbup` = FRAMEDEF
-    /// 135-149 → CHTAB3 images 13-27), played as he climbs a ledge.
-    pub climb: Vec<Image>,
-}
-
 /// In-progress ledge climb: linearly carries the Prince from where he
-/// stood up onto the ledge over the [`KidArt::climb`] frames.
+/// stood up onto the ledge over the `climbup` animation's frames.
 #[derive(Clone, Copy)]
 struct ClimbState {
     /// Frame / interpolation step (`0..climb.len()`).
@@ -149,10 +132,10 @@ struct Prince {
     on_ground: bool,
     /// Facing right (sprite mirrored) vs left.
     facing_right: bool,
-    /// Phase into the 8-frame run cycle ([`RUN_CHX`] / `KidArt::run`).
-    run_phase: usize,
-    /// `true` while he is stepping this tick (drives run vs stand frame).
-    moving: bool,
+    /// Animation cursor — the sequence + frame the engine plays for him
+    /// (`stand` / `startrun` / `freefall` / `climbup`); the source of his
+    /// drawn frame and per-frame run displacement (#95).
+    cursor: AnimCursor,
     /// `Some` while climbing a ledge (overrides walk / fall).
     climb: Option<ClimbState>,
 }
@@ -184,8 +167,7 @@ impl Prince {
             landing_row,
             on_ground,
             facing_right: faces_right(start.face_raw),
-            run_phase: 0,
-            moving: false,
+            cursor: AnimCursor::new("stand"),
             climb: None,
         }
     }
@@ -196,27 +178,27 @@ impl Prince {
         self.landing_y = self.feet_y;
         self.vy = JUMP_VY;
         self.on_ground = false;
-        self.moving = false;
     }
 
-    /// Run one tick in `dir` (`-1` left, `+1` right, `0` idle): face the
-    /// way he moves, advance the run cycle, and step by that frame's
-    /// `chx`. `dir == 0` returns him to standing.
-    fn walk(&mut self, dir: i32, room: &Room) {
+    /// One grounded locomotion tick in `dir` (`-1` left, `+1` right, `0`
+    /// idle). Idle plays `stand`; otherwise he runs (or careful-steps with
+    /// SHIFT held), facing `dir` and stepping by the run sequence's current
+    /// per-frame `chx` (a fixed [`STEP_PX`] when careful). The cursor was
+    /// advanced for this tick already, so its `current()` frame is the one to
+    /// move and draw by.
+    fn locomote(&mut self, dir: i32, careful: bool, room: &Room) {
         if dir == 0 {
-            self.moving = false;
-            self.run_phase = 0;
+            self.cursor.play("stand");
             return;
         }
-        self.run_phase = (self.run_phase + 1) % RUN_CHX.len();
-        self.move_h(RUN_CHX[self.run_phase] * dir, room);
-    }
-
-    /// Take one careful step in `dir` (SHIFT held): a slow `STEP_PX` move
-    /// with the run animation, for edging up to a gap.
-    fn step(&mut self, dir: i32, room: &Room) {
-        self.run_phase = (self.run_phase + 1) % RUN_CHX.len();
-        self.move_h(STEP_PX * dir, room);
+        self.facing_right = dir > 0;
+        self.cursor.play("startrun");
+        let dx = if careful {
+            STEP_PX
+        } else {
+            self.cursor.current().map_or(0, |f| f.dx)
+        };
+        self.move_h(dx * dir, room);
     }
 
     /// Move horizontally by `dx` px against `room`'s tiles: stop flush at a
@@ -224,8 +206,11 @@ impl Prince {
     /// when he walks off a ledge.
     fn move_h(&mut self, dx: i32, room: &Room) {
         let dir = dx.signum();
-        self.facing_right = dir > 0;
-        self.moving = true;
+        // A zero-`dx` frame (the run cycle's windup) mustn't flip him to
+        // facing left — keep the facing the caller set.
+        if dir != 0 {
+            self.facing_right = dir > 0;
+        }
 
         let mut target_x = self.x + dx;
 
@@ -314,8 +299,10 @@ pub struct World {
     loose: Vec<LooseArm>,
     /// Screen-jolt frames remaining after a loose floor crashed (`SHAKEM`).
     shake: u8,
-    /// Kid sprites, host-loaded; `None` renders the bare scene.
-    art: Option<KidArt>,
+    /// Character sprite tables (`IMG.CHTAB1..8`), host-loaded; slot `i` holds
+    /// CHTAB `i+1`. The animation engine resolves a frame to one of these
+    /// (`pop_assets::anim::frame_sprite`). Empty / missing → bare scene.
+    chtabs: Vec<Option<ImageTable>>,
 }
 
 impl World {
@@ -335,16 +322,30 @@ impl World {
             prince,
             loose: Vec::new(),
             shake: 0,
-            art: None,
+            chtabs: Vec::new(),
         }
     }
 
-    /// Attach the kid sprite set (the host loads it so the engine stays
-    /// free of file I/O). Chainable.
+    /// Attach the character sprite tables (`IMG.CHTAB1..8`; the host loads
+    /// them so the engine stays free of file I/O). Slot `i` is CHTAB `i+1`.
+    /// Chainable.
     #[must_use]
-    pub fn with_kid_art(mut self, art: KidArt) -> Self {
-        self.art = Some(art);
+    pub fn with_chtabs(mut self, chtabs: Vec<Option<ImageTable>>) -> Self {
+        self.chtabs = chtabs;
         self
+    }
+
+    /// Resolve a 1-based animation frame id to its sprite image: decode the
+    /// frame's `(chtab, index)` (`pop_assets::anim::frame_sprite`, the kid's
+    /// view) and look it up in the loaded tables. `None` if the frame has no
+    /// sprite or its table / image isn't loaded.
+    fn frame_image(&self, frame: u8) -> Option<&Image> {
+        let sprite = pop_assets::anim::frame_sprite(frame)?;
+        let table = self
+            .chtabs
+            .get(usize::from(sprite.chtab).checked_sub(1)?)?
+            .as_ref()?;
+        table.images.get(sprite.index)
     }
 
     /// Current room (1-based).
@@ -630,7 +631,6 @@ impl World {
             to_row,
         });
         self.prince.on_ground = false;
-        self.prince.moving = false;
         true
     }
 
@@ -640,7 +640,9 @@ impl World {
         let Some(mut c) = self.prince.climb else {
             return;
         };
-        let frames = self.art.as_ref().map_or(1, |a| a.climb.len().max(1));
+        // Interpolate his position over the `climbup` animation's length so
+        // the pull-up reaches the ledge as the last climb frame draws.
+        let frames = crate::anim::sequence_len("climbup").max(1);
         c.phase += 1;
         if c.phase >= frames {
             self.prince.x = c.to_x;
@@ -678,22 +680,27 @@ impl World {
                 // tick can jolt the floor by how hard he hit.
                 let airborne = !self.prince.on_ground;
                 let vy_before = self.prince.vy;
+                // Play out the frame chosen last tick before this tick's state
+                // re-selects a sequence — so a freshly switched sequence draws
+                // its first frame, not its second.
+                self.prince.cursor.advance();
                 if was_climbing {
                     self.climb_step();
+                    self.prince.cursor.play("climbup");
                 } else if !self.prince.on_ground {
                     self.fall_step();
+                    self.prince.cursor.play("freefall");
                 } else if input.up && !self.prev.up {
                     // Up grabs a ledge above-in-front, else it's a jump.
-                    if !self.try_climb() {
+                    if self.try_climb() {
+                        self.prince.cursor.play("climbup");
+                    } else {
                         self.prince.jump();
+                        self.prince.cursor.play("freefall");
                     }
                 } else if let Some(room) = self.level.rooms.get(room_idx) {
                     let dir = walk_dir(input);
-                    if input.shift && dir != 0 {
-                        self.prince.step(dir, room);
-                    } else {
-                        self.prince.walk(dir, room);
-                    }
+                    self.prince.locomote(dir, input.shift, room);
                 }
                 // A hard landing thuds the floor — the impact jolt of a fall
                 // or jump. A climb finishes with no downward speed, so it
@@ -740,18 +747,15 @@ impl World {
         // `drawloosed`), done before the Prince so he rides the steady floor
         // line rather than jittering with it.
         self.jiggle_loose_tiles(&mut bytes[..]);
-        if let Some(art) = &self.art {
-            if self.room_id == self.prince.room {
-                let img = if let Some(c) = &self.prince.climb {
-                    let last = art.climb.len().saturating_sub(1);
-                    art.climb.get(c.phase.min(last)).unwrap_or(&art.stand)
-                } else if !self.prince.on_ground {
-                    &art.fall
-                } else if self.prince.moving {
-                    art.run.get(self.prince.run_phase).unwrap_or(&art.stand)
-                } else {
-                    &art.stand
-                };
+        // Draw the Prince when the room on screen is the one he's in and his
+        // animation cursor's current frame resolves to a loaded sprite.
+        if self.room_id == self.prince.room {
+            if let Some(img) = self
+                .prince
+                .cursor
+                .current()
+                .and_then(|f| self.frame_image(f.frame))
+            {
                 // The full scene (background + foreground) before the kid.
                 let scene_bytes = bytes.clone();
                 // Centre the sprite's byte span on the Prince's column;
@@ -1017,18 +1021,11 @@ mod tests {
         BiomeTables::load(&vendor_root(), Biome::Dungeon).expect("dungeon tables load")
     }
 
-    fn kid_art() -> KidArt {
-        use pop_assets::draz::image_table::ImageTable;
+    fn chtabs() -> Vec<Option<ImageTable>> {
         let dir = vendor_root().join("DRAZ").join("I");
-        let chtab1 = ImageTable::from_file(dir.join("IMG.CHTAB1")).expect("CHTAB1 loads");
-        let chtab2 = ImageTable::from_file(dir.join("IMG.CHTAB2")).expect("CHTAB2 loads");
-        let chtab3 = ImageTable::from_file(dir.join("IMG.CHTAB3")).expect("CHTAB3 loads");
-        KidArt {
-            stand: chtab1.images.get(14).expect("stand frame").clone(),
-            fall: chtab2.images.get(53).expect("freefall frame").clone(),
-            run: (6..14).map(|i| chtab1.images[i].clone()).collect(),
-            climb: (12..27).map(|i| chtab3.images[i].clone()).collect(),
-        }
+        let load = |name: &str| ImageTable::from_file(dir.join(name)).ok();
+        // CHTAB1-3 cover the kid's stand / run / fall / climb frames.
+        vec![load("IMG.CHTAB1"), load("IMG.CHTAB2"), load("IMG.CHTAB3")]
     }
 
     fn landed_world() -> World {
@@ -1143,15 +1140,27 @@ mod tests {
     fn grounded_prince_runs_right_on_arrow() {
         let mut world = landed_world();
         let x0 = world.prince.x;
-        world.tick(InputState {
-            right: true,
-            ..InputState::default()
-        });
+        // The run opens with a few windup frames (startrun's chx=0 lead-in),
+        // so drive a handful of ticks before checking he's advanced.
+        for _ in 0..8 {
+            world.tick(InputState {
+                right: true,
+                ..InputState::default()
+            });
+        }
         assert!(world.prince.facing_right);
         assert!(world.prince.x > x0, "he advances to the right");
-        assert!(world.prince.moving);
+        assert_eq!(
+            world.prince.cursor.name(),
+            "startrun",
+            "he's running the startrun cycle"
+        );
         world.tick(InputState::default());
-        assert!(!world.prince.moving);
+        assert_eq!(
+            world.prince.cursor.name(),
+            "stand",
+            "releasing the arrow returns him to stand"
+        );
     }
 
     #[test]
@@ -1488,7 +1497,7 @@ mod tests {
 
     #[test]
     fn up_at_a_ledge_climbs_to_the_floor_above() {
-        let mut world = World::new(load_level1(), dungeon_tables()).with_kid_art(kid_art());
+        let mut world = World::new(load_level1(), dungeon_tables()).with_chtabs(chtabs());
         for _ in 0..40 {
             world.tick(InputState::default());
             if world.prince_on_ground() {
@@ -1525,7 +1534,7 @@ mod tests {
         // Row 0 col 8 is a Block. Facing it from row 1 must NOT read as a
         // ledge (the top-row `saturating_sub` quirk) — Up falls back to a
         // jump instead of climbing into the wall.
-        let mut world = World::new(load_level1(), dungeon_tables()).with_kid_art(kid_art());
+        let mut world = World::new(load_level1(), dungeon_tables()).with_chtabs(chtabs());
         for _ in 0..40 {
             world.tick(InputState::default());
             if world.prince_on_ground() {
@@ -1550,7 +1559,7 @@ mod tests {
 
     #[test]
     fn climbing_onto_a_loose_floor_does_not_shatter_on_arrival() {
-        let mut world = World::new(load_level1(), dungeon_tables()).with_kid_art(kid_art());
+        let mut world = World::new(load_level1(), dungeon_tables()).with_chtabs(chtabs());
         for _ in 0..40 {
             world.tick(InputState::default());
             if world.prince_on_ground() {
@@ -1604,7 +1613,7 @@ mod tests {
 
     #[test]
     fn render_returns_full_size_frame() {
-        let world = World::new(load_level1(), dungeon_tables()).with_kid_art(kid_art());
+        let world = World::new(load_level1(), dungeon_tables()).with_chtabs(chtabs());
         let frame = world.render(RenderMode::NtscColor).expect("renders");
         assert_eq!((frame.width, frame.height), (280, 192));
     }

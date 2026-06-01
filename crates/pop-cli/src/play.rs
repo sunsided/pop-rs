@@ -25,7 +25,7 @@ use pop_assets::hires::RenderMode;
 use pop_assets::level::Level;
 use pop_assets::scene::BiomeTables;
 use pop_rs::backend::InputState;
-use pop_rs::{KidArt, World};
+use pop_rs::World;
 
 /// Arguments for the `play` subcommand.
 #[derive(Debug, ClapArgs)]
@@ -73,8 +73,9 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         RenderMode::NtscColor
     };
     let mut world = World::new(level, tables);
-    if let Some(art) = load_kid_art(&root) {
-        world = world.with_kid_art(art);
+    let chtabs = load_chtabs(&root);
+    if chtabs.iter().any(Option::is_some) {
+        world = world.with_chtabs(chtabs);
     }
     let app = GameApp::new(world, mode);
 
@@ -105,43 +106,27 @@ fn load_tables(root: &std::path::Path, biome: Biome) -> anyhow::Result<BiomeTabl
     Ok(tables)
 }
 
-/// CHTAB indices for the kid frames the renderer draws, traced from the
-/// engine. FRAMEDEF maps a frame to `(table, image)` via `Fimage` /
-/// `Fsword` (`CTRLSUBS.S decodeim`); POP image tables are 1-based, so the
-/// 0-based index is `image - 1`. The run frames (`Fsword = 0`) live in
-/// CHTAB1 alongside `stand`.
-///
-/// - `stand` = FRAMEDEF 15 (`$0f,9`) → CHTAB1 image 15 → index 14.
-/// - `run` = SEQTABLE `runcyc1..8` = FRAMEDEF 7-14 → CHTAB1 images 7-14
-///   → indices 6..14.
-/// - `freefall` = FRAMEDEF 106 (`$36,$40`) → CHTAB2 image 54 → index 53.
-/// - `climb` = SEQTABLE `climbup` = FRAMEDEF 135-149 (`$0d-$1b,$80`) →
-///   CHTAB3 images 13-27 → indices 12..27.
-const STAND_INDEX: usize = 14;
-const FALL_INDEX: usize = 53;
-const RUN_INDICES: std::ops::Range<usize> = 6..14;
-const CLIMB_INDICES: std::ops::Range<usize> = 12..27;
-
-/// Load the kid sprite set (`stand` + run cycle + `freefall` + `climb`)
-/// from `DRAZ/I`, or `None` if a table or frame is missing — non-fatal,
-/// the host then renders the bare scene rather than refusing to start.
-fn load_kid_art(root: &std::path::Path) -> Option<KidArt> {
-    let dir = discovery::draz_dir_in(root)?.join("I");
-    let chtab1 = ImageTable::from_file(dir.join("IMG.CHTAB1")).ok()?;
-    let chtab2 = ImageTable::from_file(dir.join("IMG.CHTAB2")).ok()?;
-    let chtab3 = ImageTable::from_file(dir.join("IMG.CHTAB3")).ok()?;
-    let run = RUN_INDICES
-        .map(|i| chtab1.images.get(i).cloned())
-        .collect::<Option<Vec<_>>>()?;
-    let climb = CLIMB_INDICES
-        .map(|i| chtab3.images.get(i).cloned())
-        .collect::<Option<Vec<_>>>()?;
-    Some(KidArt {
-        stand: chtab1.images.get(STAND_INDEX)?.clone(),
-        fall: chtab2.images.get(FALL_INDEX)?.clone(),
-        run,
-        climb,
-    })
+/// Load the character sprite tables (`IMG.CHTAB1..8`) from `DRAZ/I` for the
+/// animation engine to index by frame (`pop_assets::anim::frame_sprite`).
+/// Slot `i` holds CHTAB `i+1`; a missing table is a `None` slot — non-fatal,
+/// an unresolved frame just renders the bare scene rather than refusing to
+/// start. CHTAB1-3 carry the kid; 4-8 (guard / shared art) load best-effort
+/// for later use.
+fn load_chtabs(root: &std::path::Path) -> Vec<Option<ImageTable>> {
+    let Some(dir) = discovery::draz_dir_in(root).map(|d| d.join("I")) else {
+        return Vec::new();
+    };
+    let load = |name: &str| ImageTable::from_file(dir.join(name)).ok();
+    vec![
+        load("IMG.CHTAB1"),
+        load("IMG.CHTAB2"),
+        load("IMG.CHTAB3"),
+        load("IMG.CHTAB4.A"),
+        load("IMG.CHTAB5"),
+        load("IMG.CHTAB6.A"),
+        load("IMG.CHTAB7"),
+        load("IMG.CHTAB8"),
+    ]
 }
 
 /// POP's hi-res frame is 280×192; the window opens at this integer

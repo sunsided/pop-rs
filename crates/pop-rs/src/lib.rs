@@ -2,6 +2,7 @@
 //!
 //! See the repository `README.md` and `docs/architecture.md` for design.
 
+mod anim;
 pub mod backend;
 pub mod data;
 pub mod game;
@@ -9,4 +10,4 @@ pub mod modules;
 pub mod world;
 
 pub use game::Game;
-pub use world::{KidArt, Mode, World};
+pub use world::{Mode, World};
