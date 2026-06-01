@@ -88,10 +88,11 @@ pub(super) fn render_generated() -> String {
             let action = f
                 .action
                 .map_or_else(|| "None".to_string(), |a| format!("Some({a})"));
+            let turn = if f.turn { ".with_turn()" } else { "" };
             let _ = writeln!(
                 out,
-                "    AnimFrame::new({}, {}, {}, {action}, {}),",
-                f.frame, f.dx, f.dy, f.turn,
+                "    AnimFrame::new({}, {}, {}, {action}){turn},",
+                f.frame, f.dx, f.dy,
             );
         }
         out.push_str("];\n\n");

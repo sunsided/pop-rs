@@ -127,16 +127,23 @@ pub struct AnimFrame {
 }
 
 impl AnimFrame {
-    /// Construct one playback step.
+    /// Construct one playback step (not a turn — `turn` defaults `false`;
+    /// chain [`Self::with_turn`] for the rare `aboutface` frame).
     #[must_use]
-    pub const fn new(frame: u8, dx: i32, dy: i32, action: Option<u8>, turn: bool) -> Self {
+    pub const fn new(frame: u8, dx: i32, dy: i32, action: Option<u8>) -> Self {
         Self {
             frame,
             dx,
             dy,
             action,
-            turn,
+            turn: false,
         }
+    }
+
+    /// Mark this step as following an `aboutface` (the figure turned).
+    #[must_use]
+    pub const fn with_turn(self) -> Self {
+        Self { turn: true, ..self }
     }
 }
 
