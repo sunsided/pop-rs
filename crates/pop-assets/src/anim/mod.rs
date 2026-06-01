@@ -27,18 +27,39 @@ mod gen;
 #[cfg(test)]
 mod parse;
 
+/// The `FrameDef::check` (`Fcheck`) bit layout — flag bits 5-7 plus a base-X
+/// offset in bits 0-4. Named so the baked data reads semantically.
+pub mod check {
+    /// Bit 7 — odd-X pixel parity (the half-dot alignment, #121; `CTRLSUBS.S`
+    /// `eor FCharFace`, "look only at the hibits").
+    pub const ODD_X: u8 = 0x80;
+    /// Bit 6 — `Fcheckmark` (`GAMEEQ.S`).
+    pub const MARK: u8 = 0x40;
+    /// Bit 5 — `Fthinmark`: draw the figure 3 px thinner each side
+    /// (`CTRLSUBS.S` "set up sword").
+    pub const THIN: u8 = 0x20;
+    /// Bits 0-4 — base-X collision-offset mask (`GETBASEX`:
+    /// `-(check & BASE_X)`, then `+ Fdx`).
+    pub const BASE_X: u8 = 0x1f;
+}
+
 /// One `FRAMEDEF.S` record: the sprite + offsets for a single frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FrameDef {
-    /// `Fimage` — image index (bit 7 = high CHTAB bank select).
+    /// `Fimage` — 1-based image index in its CHTAB; bit 7 selects the high
+    /// CHTAB bank. Decoded (with `sword`) by [`Self::sprite`], so kept as a
+    /// raw byte here rather than split.
     pub image: u8,
-    /// `Fsword` — sword image; bits 6/7 also select the CHTAB bank.
+    /// `Fsword` — sword image; bits 6/7 (with `Fimage` bit 7) select the
+    /// CHTAB table. Decoded by [`Self::sprite`].
     pub sword: u8,
     /// `Fdx` — per-frame horizontal blit offset, px (facing-relative).
     pub dx: i8,
     /// `Fdy` — per-frame vertical blit offset, px.
     pub dy: i8,
-    /// `Fcheck` — collision / draw flags.
+    /// `Fcheck` — packed flags + offset; see the [`check`](crate::anim::check)
+    /// module ([`ODD_X`](check::ODD_X) / [`MARK`](check::MARK) /
+    /// [`THIN`](check::THIN) / [`BASE_X`](check::BASE_X)).
     pub check: u8,
 }
 
@@ -52,6 +73,18 @@ pub struct SpriteRef {
 }
 
 impl FrameDef {
+    /// Construct a frame record (the 5-byte `FRAMEDEF.S` field order).
+    #[must_use]
+    pub const fn new(image: u8, sword: u8, dx: i8, dy: i8, check: u8) -> Self {
+        Self {
+            image,
+            sword,
+            dx,
+            dy,
+            check,
+        }
+    }
+
     /// `decodeim` (`CTRLSUBS.S`): pick the CHTAB sprite for this frame.
     ///
     /// `table = (Fimage.7 << 2) | (Fsword.7 << 1) | Fsword.6`,
@@ -87,6 +120,20 @@ pub struct AnimFrame {
     pub turn: bool,
 }
 
+impl AnimFrame {
+    /// Construct one playback step.
+    #[must_use]
+    pub const fn new(frame: u8, dx: i32, dy: i32, action: Option<u8>, turn: bool) -> Self {
+        Self {
+            frame,
+            dx,
+            dy,
+            action,
+            turn,
+        }
+    }
+}
+
 /// A named animation: the frames it plays and how it ends (self-loop or a
 /// chain into another sequence). Backed by `'static` generated data.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -101,6 +148,26 @@ pub struct AnimSequence {
     pub loops_to: Option<usize>,
     /// Sequence name a closing `goto` chains into, if not a self-loop.
     pub chains_to: Option<&'static str>,
+}
+
+impl AnimSequence {
+    /// Construct a named animation.
+    #[must_use]
+    pub const fn new(
+        id: u8,
+        name: &'static str,
+        frames: &'static [AnimFrame],
+        loops_to: Option<usize>,
+        chains_to: Option<&'static str>,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            frames,
+            loops_to,
+            chains_to,
+        }
+    }
 }
 
 /// The `FRAMEDEF.S` 5-byte tables in order: main `Fdef`, then the `altset1`
