@@ -421,14 +421,15 @@ impl Prince {
         )
     }
 
-    /// Forward px from his leading edge (`half_w` from his centre — the current
-    /// frame's figure half-width, as the run path uses, #123) to the nearer of
-    /// the next wall face or the brink of the floor he stands on, capped at a
-    /// full stride. Sizes a careful step so it edges flush to an obstacle and
-    /// never carries him off a ledge (`GETFWDDIST`, idiomatic).
+    /// Forward px a careful step may cover before the next obstacle, capped at
+    /// a full stride. A **wall** stops his leading edge (`half_w` from centre,
+    /// as the run path uses, #123) flush against its face. A **ledge** (a gap
+    /// ahead) lets his body overhang: his *centre* edges to the brink — staying
+    /// on the floored cell so he doesn't step off — rather than his leading
+    /// edge, which would halt him `half_w` short of the drop. (`GETFWDDIST`,
+    /// idiomatic.)
     fn forward_clearance(&self, half_w: i32, room: &Room) -> i32 {
         let sign = self.facing_sign();
-        let lead = self.x + sign * half_w;
         let cur = i32::try_from(col_of(self.x)).unwrap_or(0);
         let next = cur + sign;
         if !(0..i32::try_from(ROOM_WIDTH).unwrap_or(0)).contains(&next) {
@@ -436,14 +437,21 @@ impl Prince {
             return CAREFUL_STRIDE;
         }
         let next_u = usize::try_from(next).unwrap_or(0);
-        if is_solid_at(room, next_u, self.row) || !has_floor(room, next_u, self.row) {
-            // Wall or brink at the cur/next boundary: clear up to it.
-            let boundary = if sign > 0 {
-                (cur + 1) * CELL_W
-            } else {
-                cur * CELL_W
-            };
+        let boundary = if sign > 0 {
+            (cur + 1) * CELL_W
+        } else {
+            cur * CELL_W
+        };
+        if is_solid_at(room, next_u, self.row) {
+            // Wall: leading edge stops flush against the cur/next face.
+            let lead = self.x + sign * half_w;
             (sign * (boundary - lead)).clamp(0, CAREFUL_STRIDE)
+        } else if !has_floor(room, next_u, self.row) {
+            // Ledge: his centre edges to the brink (body overhangs the gap),
+            // but stays on the floored cell — the last pixel before the
+            // boundary — so a careful step never carries him over.
+            let limit = boundary - sign;
+            (sign * (limit - self.x)).clamp(0, CAREFUL_STRIDE)
         } else {
             CAREFUL_STRIDE
         }
@@ -2367,5 +2375,92 @@ mod tests {
         let world = World::new(load_level1(), dungeon_tables()).with_chtabs(chtabs());
         let frame = world.render(RenderMode::NtscColor).expect("renders");
         assert_eq!((frame.width, frame.height), (280, 192));
+    }
+
+    /// Build a grounded world with a custom row-2 layout (one tile kind per
+    /// column-2 cell), the Prince standing at col 0 facing right.
+    fn world_with_row2(tiles: &[TileKind]) -> World {
+        let mut world = World::new(load_level1(), dungeon_tables()).with_chtabs(chtabs());
+        for _ in 0..40 {
+            world.tick(InputState::default());
+            if world.prince_on_ground() {
+                break;
+            }
+        }
+        let floor = *world.level.rooms[0].tile_at(8, 2).unwrap();
+        let block = *world.level.rooms[0].tile_at(8, 0).unwrap();
+        for (c, &kind) in tiles.iter().enumerate() {
+            let t = match kind {
+                TileKind::PanelWithoutFloor => Tile {
+                    kind: TileKind::PanelWithoutFloor,
+                    variant: 0,
+                    modifier: 0,
+                },
+                k if tile_is_solid(k) => block,
+                _ => floor,
+            };
+            world.level.rooms[0].tiles[2 * ROOM_WIDTH + c] = t;
+        }
+        world.prince.room = 1;
+        world.prince.row = 2;
+        world.prince.x = CELL_W / 2;
+        world.prince.feet_y = floor_y(2);
+        world.prince.on_ground = true;
+        world.prince.facing_right = true;
+        world
+    }
+
+    #[test]
+    fn careful_step_edges_up_to_a_ledge_not_short_of_it() {
+        use TileKind::{Floor, PanelWithoutFloor as Gap};
+        // Floored through col 5, a drop from col 6 on; brink at col5/col6.
+        let mut world =
+            world_with_row2(&[Floor, Floor, Floor, Floor, Floor, Floor, Gap, Gap, Gap, Gap]);
+        for _ in 0..300 {
+            world.tick(InputState {
+                right: true,
+                shift: true,
+                ..InputState::default()
+            });
+        }
+        let brink = 6 * CELL_W;
+        // His body reaches *over* the brink (he stands at the edge), rather than
+        // halting a body-width short of it as the leading-edge stop did.
+        assert!(
+            world.prince.x + COLLIDE_HALF > brink,
+            "careful step stopped short of the ledge: x={}, brink={brink}",
+            world.prince.x,
+        );
+        // But his centre stays on the floored cell, and he never steps off.
+        assert!(world.prince.x < brink, "his centre stays on the floor side");
+        assert!(
+            world.prince_on_ground(),
+            "a careful step never walks him off the ledge"
+        );
+        assert_eq!(world.prince.row, 2);
+    }
+
+    #[test]
+    fn careful_step_stops_out_of_a_wall() {
+        use TileKind::{Block, Floor};
+        // Floored, with a Block wall at col 6.
+        let mut world = world_with_row2(&[
+            Floor, Floor, Floor, Floor, Floor, Floor, Block, Floor, Floor, Floor,
+        ]);
+        for _ in 0..300 {
+            world.tick(InputState {
+                right: true,
+                shift: true,
+                ..InputState::default()
+            });
+        }
+        // He stops in the cell before the wall — centre never enters col 6.
+        assert!(
+            col_of(world.prince.x) < 6,
+            "careful step entered the wall column: x={}",
+            world.prince.x
+        );
+        assert!(world.prince_on_ground());
+        assert_eq!(world.prince.row, 2);
     }
 }
