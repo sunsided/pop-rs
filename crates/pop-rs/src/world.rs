@@ -273,12 +273,23 @@ impl Prince {
             // down — would hover through the whole jump and only fall after.
             _ => {
                 if self.feet_y < floor_y(self.row) {
+                    // Rising above his launch line — the hop has lifted him.
                     self.on_ground = false;
                     self.mid_jump_air = true;
-                } else {
+                } else if self.mid_jump_air {
+                    // The hop has played and the arc has brought him back down
+                    // over the drop → fall the rest of the way (`settle_floor`
+                    // aims him at the lower floor, or beyond it).
                     self.mid_jump_air = false;
                     self.settle_floor(room);
                     self.cursor.play("freefall");
+                } else {
+                    // Grounded wind-up that has shuffled forward over the edge
+                    // but hasn't leapt yet — hold the jump; the hop comes next.
+                    // (Without this the forward wind-up frames, still at his
+                    // launch line, would trip the drop and abort the jump a
+                    // half-tile in.)
+                    self.on_ground = false;
                 }
             }
         }
@@ -2548,7 +2559,8 @@ mod tests {
         }
         world.prince.room = 1;
         world.prince.row = 1;
-        world.prince.x = 3 * CELL_W + CELL_W / 2;
+        let launch_x = 3 * CELL_W + CELL_W / 2;
+        world.prince.x = launch_x;
         world.prince.feet_y = floor_y(1);
         world.prince.on_ground = true;
         world.prince.facing_right = true;
@@ -2568,6 +2580,13 @@ mod tests {
         assert!(
             landed_below,
             "a jump over a step-down should fall to the lower floor"
+        );
+        // And he should leap the full arc forward first, not abort a half-tile
+        // in during the wind-up.
+        assert!(
+            world.prince.x >= launch_x + CELL_W,
+            "the jump barely advanced ({} from {launch_x}) — it aborted instead of leaping",
+            world.prince.x
         );
     }
 }
