@@ -243,41 +243,53 @@ impl Prince {
 
         let col = col_of(self.x);
         match settle(room, col, self.row) {
-            // A floor below his feet here → still airborne (the hop's rise).
-            Some((_, lfeet)) if self.feet_y < lfeet => {
+            // A floor at *his own row*, still below his feet → the hop's rise.
+            Some((lrow, lfeet)) if lrow == self.row && self.feet_y < lfeet => {
                 self.on_ground = false;
                 self.mid_jump_air = true;
             }
-            // He has reached a floor → touch down on it. `settle` may return a
-            // different row (a lower floor, or a block top), so adopt it, or
-            // the next `settle_floor` would read him as falling again.
-            Some((lrow, lfeet)) => {
+            // A floor at his own row, reached → touch down on it.
+            Some((lrow, lfeet)) if lrow == self.row => {
                 self.feet_y = lfeet;
-                self.row = lrow;
                 let leapt = self.mid_jump_air;
                 self.mid_jump_air = false;
                 self.on_ground = true;
                 // A running leap returns to the run controller; a standing
-                // jump plays out its own recovery frames into `stand`. (Since
-                // every arc's `dy` nets to zero, a `runjump` always returns to
-                // its launch line within its aerial frames — touching down on a
-                // floor here, or falling through the gap arm below — so it can
-                // never hover in its `loops_to` run-cycle frames forever.)
+                // jump plays out its own recovery frames into `stand`. (Every
+                // arc's `dy` nets to zero, so a `runjump` always returns to its
+                // launch line within its aerial frames — landing here or
+                // falling through the drop arm below — never hovering in its
+                // `loops_to` run-cycle frames forever.)
                 if running_jump && leapt {
                     self.cursor.play("startrun");
                 }
             }
-            // No floor at his row in this column. Still rising/cresting → keep
-            // arcing; once the arc brings him back down to his launch line he
-            // is over a gap, so fall the rest of the way.
+            // No floor at his row here — only a gap, or a floor a row or more
+            // *below* (a drop he's leaping over). While still rising above his
+            // launch line, keep arcing; once the arc brings him back down to it
+            // he's over the drop, so fall the rest of the way (`settle_floor`
+            // aims him at the lower floor, or beyond it). Without this a leap
+            // over a tile that has a floor below — Empty-over-Rubble, a step
+            // down — would hover through the whole jump and only fall after.
             _ => {
                 if self.feet_y < floor_y(self.row) {
+                    // Rising above his launch line — the hop has lifted him.
                     self.on_ground = false;
                     self.mid_jump_air = true;
-                } else {
+                } else if self.mid_jump_air {
+                    // The hop has played and the arc has brought him back down
+                    // over the drop → fall the rest of the way (`settle_floor`
+                    // aims him at the lower floor, or beyond it).
                     self.mid_jump_air = false;
                     self.settle_floor(room);
                     self.cursor.play("freefall");
+                } else {
+                    // Grounded wind-up that has shuffled forward over the edge
+                    // but hasn't leapt yet — hold the jump; the hop comes next.
+                    // (Without this the forward wind-up frames, still at his
+                    // launch line, would trip the drop and abort the jump a
+                    // half-tile in.)
+                    self.on_ground = false;
                 }
             }
         }
@@ -421,13 +433,15 @@ impl Prince {
         )
     }
 
-    /// Forward px from his leading edge to the nearer of the next wall face or
-    /// the brink of the floor he stands on, capped at a full stride. Sizes a
-    /// careful step so it edges flush to an obstacle and never carries him off
-    /// a ledge (`GETFWDDIST`, idiomatic).
+    /// Forward px a careful step may cover before the next obstacle — a wall
+    /// face or a floor brink — capped at a full stride. His leading edge stops
+    /// flush at the cur/next cell boundary, leaving his toes at a ledge edge or
+    /// against a wall while his body stays on the floored cell. Uses the fixed
+    /// [`COLLIDE_HALF`] (not the per-frame figure width) so the stop point
+    /// doesn't jitter as the step animation's frame widths vary. (`GETFWDDIST`,
+    /// idiomatic.)
     fn forward_clearance(&self, room: &Room) -> i32 {
         let sign = self.facing_sign();
-        let lead = self.x + sign * COLLIDE_HALF;
         let cur = i32::try_from(col_of(self.x)).unwrap_or(0);
         let next = cur + sign;
         if !(0..i32::try_from(ROOM_WIDTH).unwrap_or(0)).contains(&next) {
@@ -436,7 +450,8 @@ impl Prince {
         }
         let next_u = usize::try_from(next).unwrap_or(0);
         if is_solid_at(room, next_u, self.row) || !has_floor(room, next_u, self.row) {
-            // Wall or brink at the cur/next boundary: clear up to it.
+            // Wall or brink at the cur/next boundary: edge his leading side to it.
+            let lead = self.x + sign * COLLIDE_HALF;
             let boundary = if sign > 0 {
                 (cur + 1) * CELL_W
             } else {
@@ -471,18 +486,20 @@ impl Prince {
         }
     }
 
-    /// Advance a careful step by the current frame's `dx`. A forward frame is
-    /// clamped to the remaining clearance so he stops flush at a wall / ledge;
-    /// a backward (negative) frame is part of the authored stride and applied
-    /// as-is. Moves via `slide_x` (no floor-follow), so a step can't carry him
-    /// off the ledge.
+    /// Advance a careful step *monotonically* toward the obstacle by the
+    /// current frame's stride magnitude, clamped to the remaining clearance.
+    /// He never moves backward: a step sequence's backward foot-shuffle frames
+    /// (e.g. `testfoot`'s retraction `dx`s) animate but must not drag his
+    /// logical position back, or he oscillates against a wall / brink instead
+    /// of settling at it. Moves via `slide_x` (no floor-follow), so a step
+    /// can't carry him off a ledge. At zero clearance he holds (e.g. peeking).
     fn step_advance(&mut self, room: &Room) {
+        let clearance = self.forward_clearance(room).max(0);
+        if clearance == 0 {
+            return;
+        }
         let dx = self.cursor.current().map_or(0, |f| f.dx);
-        let step = if dx > 0 {
-            dx.min(self.forward_clearance(room).max(0))
-        } else {
-            dx
-        };
+        let step = dx.abs().min(clearance);
         if step != 0 {
             self.slide_x(self.facing_sign() * step, COLLIDE_HALF, room);
         }
@@ -1127,8 +1144,7 @@ impl World {
                 // Centre the figure (its true span within the box, mirror-
                 // aware) on the Prince's column; sit its bottom scan-line on
                 // his feet.
-                let byte_x =
-                    self.prince.x / 7 - figure_center_offset(img, self.prince.facing_right);
+                let byte_x = figure_byte_x(img, self.prince.x, self.prince.facing_right);
                 let top_y = self.prince.feet_y - i32::from(img.height) + 1;
                 sprite::composite_hires(
                     &mut bytes[..],
@@ -1285,25 +1301,32 @@ fn col_of(x: i32) -> usize {
         .min(ROOM_WIDTH - 1)
 }
 
-/// Byte-column offset to subtract from a character's logical byte column
-/// (`x / 7`) so the drawn *figure* — its true span within the sprite box
-/// ([`sprite::figure_byte_span`]), mirrored when `flip` — is centred on him
-/// rather than the (often wider) box. Falls back to half the box width (the
-/// pre-#123 box-centring) when the sprite has no set pixels. Byte-granular;
-/// the sub-byte residual is the #121 half-dot concern.
-fn figure_center_offset(img: &Image, flip: bool) -> i32 {
+/// Destination byte column for the left edge of a character sprite so its
+/// drawn *figure* — its true span within the (often wider) box
+/// ([`sprite::figure_byte_span`]), mirrored when `flip` — is centred on his
+/// logical pixel `x`. The figure's pixel span is centred and **rounded to the
+/// nearest byte the same way for both facings**, so an even-width box no longer
+/// swings the figure half a byte left/right depending on which way he faces
+/// (the bug behind the facing-dependent wall/ledge overlap). The remaining
+/// sub-byte residual is the #121 preshift concern. Centres the whole box when
+/// the sprite has no set pixels.
+fn figure_byte_x(img: &Image, x: i32, flip: bool) -> i32 {
     let w = i32::from(img.width_bytes);
-    match sprite::figure_byte_span(img) {
-        Some((lo, hi)) => {
-            let mid = (i32::from(lo) + i32::from(hi)) / 2;
-            if flip {
-                (w - 1) - mid
-            } else {
-                mid
-            }
-        }
-        None => w / 2,
-    }
+    let Some((lo, hi)) = sprite::figure_byte_span(img) else {
+        return x / 7 - w / 2;
+    };
+    let (lo, hi) = (i32::from(lo), i32::from(hi));
+    // Box byte columns the figure occupies once drawn (mirrored if `flip`).
+    let (a, b) = if flip {
+        (w - 1 - hi, w - 1 - lo)
+    } else {
+        (lo, hi)
+    };
+    // Centre of that span, in half-pixels relative to the box's left edge.
+    let fig_centre_2px = (a + b) * 7 + 6;
+    // byte_x = round((x - fig_centre_px) / 7), kept exact via half-pixels so
+    // the rounding is identical for both facings (no half-byte swing).
+    (2 * x - fig_centre_2px + 7).div_euclid(14)
 }
 
 /// Half the drawn figure's width in px — the per-frame wall-collision
@@ -1487,10 +1510,10 @@ mod tests {
             bitmap: vec![0, 0b000_0001, 0b000_0001, 0b000_0001, 0],
         };
         let (lo, hi) = sprite::figure_byte_span(&img).expect("non-empty figure");
-        let x_byte = 20;
-        // Replicate how `composite_hires` maps a source byte to a drawn column.
+        let x = 140; // px — byte column 20.
+                     // Replicate how `composite_hires` maps a source byte to a drawn column.
         let drawn_centre = |flip: bool| {
-            let byte_x = x_byte - figure_center_offset(&img, flip);
+            let byte_x = figure_byte_x(&img, x, flip);
             let w = i32::from(img.width_bytes);
             let col = |c: i32| {
                 if flip {
@@ -1505,32 +1528,37 @@ mod tests {
         // the asymmetry the box-centring caused is gone.
         assert_eq!(
             drawn_centre(false),
-            x_byte,
+            x / 7,
             "left-facing figure centred on x"
         );
         assert_eq!(
             drawn_centre(true),
-            x_byte,
+            x / 7,
             "right-facing figure centred on x"
         );
     }
 
     #[test]
-    fn even_span_centre_truncates_and_half_extent_is_exact() {
+    fn even_width_box_does_not_swing_between_facings() {
         use pop_assets::draz::image_table::Image;
         // 4-byte box, figure on byte cols 1..=2 (even span → fractional byte
-        // centre at 1.5). `figure_center_offset` truncates *down* to 1, so the
-        // drawn figure shifts a half-byte between facings — the byte-granular
-        // residual deferred to #121.
+        // centre at 1.5). The old floored centring drew it half a byte left or
+        // right depending on facing; `figure_byte_x` now rounds identically, so
+        // the placement is the same whichever way he faces. (Sub-byte residual
+        // is the #121 preshift concern.)
         let img = Image {
             width_bytes: 4,
             height: 1,
             bitmap: vec![0, 0b000_0001, 0b000_0001, 0],
         };
         assert_eq!(sprite::figure_byte_span(&img), Some((1, 2)));
-        assert_eq!(figure_center_offset(&img, false), 1, "(1+2)/2 truncated");
-        assert_eq!(figure_center_offset(&img, true), 2, "(w-1) - 1");
-        // Even span → the half-extent divides cleanly: 2 bytes = 14px → 7.
+        let x = 137; // px — deliberately off the byte grid.
+        assert_eq!(
+            figure_byte_x(&img, x, false),
+            figure_byte_x(&img, x, true),
+            "even-width box must not swing the figure between facings"
+        );
+        // The half-extent is facing-symmetric: 2 bytes = 14px → 7.
         assert_eq!(figure_half_width(&img), 7);
     }
 
@@ -2355,5 +2383,210 @@ mod tests {
         let world = World::new(load_level1(), dungeon_tables()).with_chtabs(chtabs());
         let frame = world.render(RenderMode::NtscColor).expect("renders");
         assert_eq!((frame.width, frame.height), (280, 192));
+    }
+
+    /// Build a grounded world with a custom row-2 layout (one tile kind per
+    /// column-2 cell), the Prince standing at col 0 facing right.
+    fn world_with_row2(tiles: &[TileKind]) -> World {
+        let mut world = World::new(load_level1(), dungeon_tables()).with_chtabs(chtabs());
+        for _ in 0..40 {
+            world.tick(InputState::default());
+            if world.prince_on_ground() {
+                break;
+            }
+        }
+        let floor = *world.level.rooms[0].tile_at(8, 2).unwrap();
+        let block = *world.level.rooms[0].tile_at(8, 0).unwrap();
+        for (c, &kind) in tiles.iter().enumerate() {
+            let t = match kind {
+                TileKind::PanelWithoutFloor => Tile {
+                    kind: TileKind::PanelWithoutFloor,
+                    variant: 0,
+                    modifier: 0,
+                },
+                k if tile_is_solid(k) => block,
+                _ => floor,
+            };
+            world.level.rooms[0].tiles[2 * ROOM_WIDTH + c] = t;
+        }
+        world.prince.room = 1;
+        world.prince.row = 2;
+        world.prince.x = CELL_W / 2;
+        world.prince.feet_y = floor_y(2);
+        world.prince.on_ground = true;
+        world.prince.facing_right = true;
+        world
+    }
+
+    #[test]
+    fn careful_step_edges_up_to_a_ledge_not_short_of_it() {
+        use TileKind::{Floor, PanelWithoutFloor as Gap};
+        // Floored through col 5, a drop from col 6 on; brink at col5/col6.
+        let mut world =
+            world_with_row2(&[Floor, Floor, Floor, Floor, Floor, Floor, Gap, Gap, Gap, Gap]);
+        for _ in 0..300 {
+            world.tick(InputState {
+                right: true,
+                shift: true,
+                ..InputState::default()
+            });
+        }
+        let brink = 6 * CELL_W;
+        // His leading edge (toes) reaches the brink — he isn't left a body-width
+        // short of the drop as the un-closed step did.
+        assert!(
+            world.prince.x + COLLIDE_HALF >= brink - 1,
+            "careful step stopped short of the ledge: x={}, brink={brink}",
+            world.prince.x,
+        );
+        // But his centre stays on the floored cell, so he doesn't perch over the
+        // gap (and never steps off).
+        assert!(world.prince.x < brink, "his centre stays on the floor side");
+        assert!(
+            world.prince_on_ground(),
+            "a careful step never walks him off the ledge"
+        );
+        assert_eq!(world.prince.row, 2);
+    }
+
+    #[test]
+    fn careful_step_advances_monotonically_to_a_ledge() {
+        use TileKind::{Floor, PanelWithoutFloor as Gap};
+        let mut world =
+            world_with_row2(&[Floor, Floor, Floor, Floor, Floor, Floor, Gap, Gap, Gap, Gap]);
+        // Holding SHIFT+right, his x must never move backward — the careful
+        // step settles at the brink instead of oscillating against it.
+        let mut prev = world.prince.x;
+        for _ in 0..300 {
+            world.tick(InputState {
+                right: true,
+                shift: true,
+                ..InputState::default()
+            });
+            assert!(
+                world.prince.x >= prev,
+                "careful step moved backward: {} -> {}",
+                prev,
+                world.prince.x
+            );
+            prev = world.prince.x;
+        }
+        assert!(world.prince_on_ground());
+    }
+
+    #[test]
+    fn careful_step_stops_out_of_a_wall() {
+        use TileKind::{Block, Floor};
+        // Floored, with a Block wall at col 6.
+        let mut world = world_with_row2(&[
+            Floor, Floor, Floor, Floor, Floor, Floor, Block, Floor, Floor, Floor,
+        ]);
+        for _ in 0..300 {
+            world.tick(InputState {
+                right: true,
+                shift: true,
+                ..InputState::default()
+            });
+        }
+        // He stops in the cell before the wall — centre never enters col 6.
+        assert!(
+            col_of(world.prince.x) < 6,
+            "careful step entered the wall column: x={}",
+            world.prince.x
+        );
+        assert!(world.prince_on_ground());
+        assert_eq!(world.prince.row, 2);
+    }
+
+    #[test]
+    fn careful_step_left_edges_up_to_a_ledge_without_stepping_off() {
+        use TileKind::{Floor, PanelWithoutFloor as Gap};
+        // Gap at cols 0..=2, floored from col 3 on; brink at col2/col3.
+        let mut world = world_with_row2(&[
+            Gap, Gap, Gap, Floor, Floor, Floor, Floor, Floor, Floor, Floor,
+        ]);
+        world.prince.x = 7 * CELL_W + CELL_W / 2;
+        world.prince.facing_right = false;
+        let mut prev = world.prince.x;
+        for _ in 0..300 {
+            world.tick(InputState {
+                left: true,
+                shift: true,
+                ..InputState::default()
+            });
+            assert!(
+                world.prince.x <= prev,
+                "careful step moved backward (rightward): {prev} -> {}",
+                world.prince.x
+            );
+            prev = world.prince.x;
+        }
+        let brink = 3 * CELL_W; // col2/col3 boundary
+                                // Toes reach the brink, centre stays on the floored col-3 side, and he
+                                // never steps off into the gap.
+        assert!(
+            world.prince.x - COLLIDE_HALF <= brink + 1,
+            "left careful step stopped short of the ledge: x={}",
+            world.prince.x
+        );
+        assert!(world.prince.x > brink, "his centre stays on the floor side");
+        assert!(world.prince_on_ground(), "never steps off the left ledge");
+        assert_eq!(world.prince.row, 2);
+    }
+
+    #[test]
+    fn jump_over_a_step_down_falls_to_the_lower_floor() {
+        // Row 1 floored through col 3, then a drop (Empty over a row-2 floor) —
+        // a step-down, not a clean gap. A forward jump off the edge must fall to
+        // the lower floor, not hover at his launch height through the whole arc.
+        let mut world = World::new(load_level1(), dungeon_tables()).with_chtabs(chtabs());
+        for _ in 0..40 {
+            world.tick(InputState::default());
+            if world.prince_on_ground() {
+                break;
+            }
+        }
+        let floor = *world.level.rooms[0].tile_at(8, 2).unwrap();
+        let gap = Tile {
+            kind: TileKind::PanelWithoutFloor,
+            variant: 0,
+            modifier: 0,
+        };
+        for c in 0..ROOM_WIDTH {
+            world.level.rooms[0].tiles[c] = gap; // clear row 0 so `up` jumps, not climbs
+            world.level.rooms[0].tiles[ROOM_WIDTH + c] = if c <= 3 { floor } else { gap };
+            world.level.rooms[0].tiles[2 * ROOM_WIDTH + c] = floor;
+        }
+        world.prince.room = 1;
+        world.prince.row = 1;
+        let launch_x = 3 * CELL_W + CELL_W / 2;
+        world.prince.x = launch_x;
+        world.prince.feet_y = floor_y(1);
+        world.prince.on_ground = true;
+        world.prince.facing_right = true;
+        world.tick(InputState {
+            up: true,
+            right: true,
+            ..InputState::default()
+        });
+        let mut landed_below = false;
+        for _ in 0..40 {
+            world.tick(InputState::default());
+            if world.prince_on_ground() && world.prince.row == 2 {
+                landed_below = true;
+                break;
+            }
+        }
+        assert!(
+            landed_below,
+            "a jump over a step-down should fall to the lower floor"
+        );
+        // And he should leap the full arc forward first, not abort a half-tile
+        // in during the wind-up.
+        assert!(
+            world.prince.x >= launch_x + CELL_W,
+            "the jump barely advanced ({} from {launch_x}) — it aborted instead of leaping",
+            world.prince.x
+        );
     }
 }
