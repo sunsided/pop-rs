@@ -218,24 +218,33 @@ impl Prince {
         };
         let (dx, dy) = (frame.dx, frame.dy);
         let running_jump = self.cursor.name() == "runjump";
-        self.glide(dx * self.facing_sign(), half_w, room);
+        // Horizontal only (wall-stopped) — *not* `glide`, whose floor-follow
+        // would snap his feet back each tick and erase the `dy` arc.
+        self.slide_x(dx * self.facing_sign(), half_w, room);
         self.feet_y += dy;
 
         let col = col_of(self.x);
         match settle(room, col, self.row) {
-            // His row has a floor here. Above it → still airborne (the hop);
-            // at or below it → he has touched down.
+            // A floor below his feet here → still airborne (the hop's rise).
             Some((_, lfeet)) if self.feet_y < lfeet => {
                 self.on_ground = false;
                 self.mid_jump_air = true;
             }
-            Some((_, lfeet)) => {
+            // He has reached a floor → touch down on it. `settle` may return a
+            // different row (a lower floor, or a block top), so adopt it, or
+            // the next `settle_floor` would read him as falling again.
+            Some((lrow, lfeet)) => {
                 self.feet_y = lfeet;
+                self.row = lrow;
                 let leapt = self.mid_jump_air;
                 self.mid_jump_air = false;
                 self.on_ground = true;
                 // A running leap returns to the run controller; a standing
-                // jump plays out its own recovery frames into `stand`.
+                // jump plays out its own recovery frames into `stand`. (Since
+                // every arc's `dy` nets to zero, a `runjump` always returns to
+                // its launch line within its aerial frames — touching down on a
+                // floor here, or falling through the gap arm below — so it can
+                // never hover in its `loops_to` run-cycle frames forever.)
                 if running_jump && leapt {
                     self.cursor.play("startrun");
                 }
@@ -260,6 +269,13 @@ impl Prince {
     /// his impact speed — `softland` for a gentle drop, `medland` for a harder
     /// one (`CTRL.S hitflr`). The fatal `hardland` tier needs HP and is folded
     /// into `medland` for now (#96).
+    ///
+    /// `softland` holds a near-stand frame and is deliberately *not* an
+    /// [`Self::in_transition`] sequence, so the next tick's locomotion resumes
+    /// at once (a soft landing doesn't lock control); `medland`'s stagger does
+    /// own the cursor. Edge case: a fall through a bottom-row hole with no room
+    /// below reaches here with barely-accumulated `vy`, so it reads as a
+    /// `softland` and skips the thud — accepted until #96.
     fn land(&mut self) {
         self.on_ground = true;
         let seq = if self.vy < LAND_SOFT_VY {
@@ -368,12 +384,13 @@ impl Prince {
         self.glide(dx, half_w, room);
     }
 
-    /// Translate by `dx` world px against `room` **without** changing facing:
-    /// stop flush at a solid wall on the leading edge, follow the floor, fall
-    /// off a ledge. Used by the run step (via [`Self::move_h`]) and by the
-    /// turn / runstop transitions, whose frames can edge *backward* (negative
-    /// `dx`) without turning him around.
-    fn glide(&mut self, dx: i32, half_w: i32, room: &Room) {
+    /// Translate by `dx` world px, stopping flush at a solid wall on the
+    /// leading edge — **without** changing facing or following the floor. The
+    /// horizontal half of a move: [`Self::glide`] adds floor-following on top
+    /// for grounded motion, while a jump arc drives the vertical itself and
+    /// calls this directly so its per-frame `dy` isn't snapped back to the
+    /// floor each tick ([`Self::jump_step`]).
+    fn slide_x(&mut self, dx: i32, half_w: i32, room: &Room) {
         let dir = dx.signum();
         let mut target_x = self.x + dx;
 
@@ -397,6 +414,15 @@ impl Prince {
         }
 
         self.x = target_x;
+    }
+
+    /// Translate by `dx` world px against `room` **without** changing facing,
+    /// then follow the floor of the column he lands in: rest on it, or begin a
+    /// fall off a ledge. Used by the run step (via [`Self::move_h`]) and by the
+    /// turn / runstop transitions, whose frames can edge *backward* (negative
+    /// `dx`) without turning him around.
+    fn glide(&mut self, dx: i32, half_w: i32, room: &Room) {
+        self.slide_x(dx, half_w, room);
 
         // Follow the floor in the (possibly new) column; fall if it
         // dropped. Skip while he's stepping across the room edge — the
@@ -877,6 +903,12 @@ impl World {
                     if let Some(room) = self.level.rooms.get(room_idx) {
                         let half_w = self.current_figure_half_width();
                         self.prince.jump_step(half_w, room);
+                    } else {
+                        // Room id out of range — abandon the arc into a fall
+                        // rather than freeze the cursor mid-jump (and, for
+                        // `runjump`, loop its run frames forever).
+                        self.prince.on_ground = false;
+                        self.prince.cursor.play("freefall");
                     }
                 } else if !self.prince.on_ground {
                     self.fall_step();
@@ -886,9 +918,11 @@ impl World {
                     if !self.prince.on_ground {
                         self.prince.cursor.play("freefall");
                     }
-                } else if input.up && !self.prev.up {
+                } else if input.up && !self.prev.up && !self.prince.in_transition() {
                     // Up grabs a ledge above-in-front, else it launches a jump:
-                    // a running leap, or a forward standing jump.
+                    // a running leap, or a forward standing jump. A turn /
+                    // runstop / medland transition owns the cursor, so Up
+                    // can't interrupt it (it falls through to play out below).
                     if self.try_climb() {
                         self.prince.cursor.play("climbup");
                     } else {
