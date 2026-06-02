@@ -195,11 +195,12 @@ impl Prince {
             // from there its (and runstop's) per-frame `dx` carries him in the
             // facing direction. Drive it with `glide` so a backward (negative)
             // frame edges him without flipping his facing.
-            if self.cursor.current().is_some_and(|f| f.turn) {
-                self.facing_right = !self.facing_right;
+            if let Some(frame) = self.cursor.current() {
+                if frame.turn {
+                    self.facing_right = !self.facing_right;
+                }
+                self.glide(frame.dx * self.facing_sign(), half_w, room);
             }
-            let step = self.cursor.current().map_or(0, |f| f.dx);
-            self.glide(step * self.facing_sign(), half_w, room);
             return;
         }
         if dir == 0 {
@@ -270,7 +271,7 @@ impl Prince {
     fn move_h(&mut self, dx: i32, half_w: i32, room: &Room) {
         // A zero-`dx` frame (the run cycle's windup) mustn't flip him to
         // facing left — keep the facing the caller set.
-        if dx.signum() != 0 {
+        if dx != 0 {
             self.facing_right = dx > 0;
         }
         self.glide(dx, half_w, room);
@@ -290,9 +291,12 @@ impl Prince {
         // reaches the wall before his centre crosses the cell boundary. If
         // the column under the leading edge is solid, stop the edge flush
         // against the wall. (Off-room columns aren't walls — they're the
-        // doorway to a neighbour, handled by `cross_horizontal`.)
+        // doorway to a neighbour, handled by `cross_horizontal`.) A zero-`dx`
+        // frame has no leading edge and can't hit a wall, so skip the clamp —
+        // its `dir == 0` would otherwise take the left-clamp arm and shove him
+        // right.
         let lead = target_x + dir * half_w;
-        if (0..ROOM_W).contains(&lead) && is_solid_at(room, col_of(lead), self.row) {
+        if dir != 0 && (0..ROOM_W).contains(&lead) && is_solid_at(room, col_of(lead), self.row) {
             let wall = i32::try_from(col_of(lead)).unwrap_or(0);
             target_x = if dir > 0 {
                 wall * CELL_W - half_w
@@ -1370,8 +1374,8 @@ mod tests {
             "runstop",
             "releasing mid-run skids to a stop"
         );
-        // runstop is 8 frames and chains to stand; run it out.
-        for _ in 0..10 {
+        // The skid chains to stand; run out its frames (+ the chain tick).
+        for _ in 0..crate::anim::sequence_len("runstop") + 2 {
             world.tick(InputState::default());
         }
         assert_eq!(
@@ -1398,7 +1402,8 @@ mod tests {
             "an opposite press starts a turn"
         );
         // The turn flips his facing and chains to stand, then he runs left.
-        for _ in 0..12 {
+        // Run out the turn's frames plus a margin for the chain + run start.
+        for _ in 0..crate::anim::sequence_len("turn") + 4 {
             world.tick(InputState {
                 left: true,
                 ..InputState::default()
@@ -1429,13 +1434,40 @@ mod tests {
         let x_release = world.prince.x;
         world.tick(InputState::default());
         assert_eq!(world.prince.cursor.name(), "runstop", "the release skids");
-        for _ in 0..10 {
+        for _ in 0..crate::anim::sequence_len("runstop") + 2 {
             world.tick(InputState::default());
         }
         assert_eq!(world.prince.cursor.name(), "stand", "the skid settles to stand");
         assert!(
             world.prince.x >= x_release,
             "the skid carried him forward, not backward"
+        );
+    }
+
+    #[test]
+    fn pressing_opposite_while_running_flips_immediately() {
+        // Documents the *current* behaviour (guards against a silent regression
+        // when `runturn` lands): turning while running has no `runturn` / skid
+        // transition yet, so an opposite press mid-run flips his facing and
+        // keeps the `startrun` cycle going the new way in one tick.
+        let mut world = landed_world();
+        for _ in 0..8 {
+            world.tick(InputState {
+                right: true,
+                ..InputState::default()
+            });
+        }
+        assert_eq!(world.prince.cursor.name(), "startrun");
+        assert!(world.prince.facing_right);
+        world.tick(InputState {
+            left: true,
+            ..InputState::default()
+        });
+        assert!(!world.prince.facing_right, "flips to face left at once");
+        assert_eq!(
+            world.prince.cursor.name(),
+            "startrun",
+            "no runturn/runstop yet — keeps running the new way"
         );
     }
 
