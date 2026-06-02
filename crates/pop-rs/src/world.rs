@@ -121,6 +121,25 @@ pub enum Mode {
     Playing,
 }
 
+/// Debug snapshot of the Prince's geometry for the `pop play` overlay
+/// ([`World::prince_debug`]). All values are pixels in the 280×192 frame.
+#[derive(Clone, Copy, Debug)]
+pub struct PrinceDebug {
+    /// Logical centre x.
+    pub x: i32,
+    /// Feet line y.
+    pub feet_y: i32,
+    /// Cell column of his centre.
+    pub col: usize,
+    /// Wall-collision half-width (current frame).
+    pub half_w: i32,
+    /// Drawn figure's left / right edge x.
+    pub fig_left: i32,
+    pub fig_right: i32,
+    /// Cell width (for the grid).
+    pub cell_w: i32,
+}
+
 /// In-progress ledge climb: linearly carries the Prince from where he
 /// stood up onto the ledge over the `climbup` animation's frames.
 #[derive(Clone, Copy)]
@@ -716,6 +735,31 @@ impl World {
     #[must_use]
     pub fn mode(&self) -> Mode {
         self.mode
+    }
+
+    /// Debug snapshot of the Prince's collision-vs-drawn-figure geometry for
+    /// the `pop play` overlay. All values are px in the 280×192 frame.
+    #[must_use]
+    pub fn prince_debug(&self) -> PrinceDebug {
+        let half_w = self.current_figure_half_width();
+        let (fig_left, fig_right) = self
+            .prince
+            .cursor
+            .current()
+            .and_then(|f| self.frame_image(f.frame))
+            .map_or((self.prince.x - half_w, self.prince.x + half_w), |img| {
+                let bx = figure_byte_x(img, self.prince.x, self.prince.facing_right);
+                (bx * 7, (bx + i32::from(img.width_bytes)) * 7 - 1)
+            });
+        PrinceDebug {
+            x: self.prince.x,
+            feet_y: self.prince.feet_y,
+            col: col_of(self.prince.x),
+            half_w,
+            fig_left,
+            fig_right,
+            cell_w: CELL_W,
+        }
     }
 
     /// `true` once the Prince has landed on the floor.

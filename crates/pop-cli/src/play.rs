@@ -16,7 +16,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::anyhow;
 use clap::Args as ClapArgs;
-use eframe::egui::{self, Color32, ColorImage, Pos2, Rect, TextureHandle, Vec2};
+use eframe::egui::{self, Color32, ColorImage, Pos2, Rect, Stroke, TextureHandle, Vec2};
 
 use pop_assets::bgdata::Biome;
 use pop_assets::discovery;
@@ -25,7 +25,7 @@ use pop_assets::hires::RenderMode;
 use pop_assets::level::Level;
 use pop_assets::scene::BiomeTables;
 use pop_rs::backend::InputState;
-use pop_rs::World;
+use pop_rs::{PrinceDebug, World};
 
 /// Arguments for the `play` subcommand.
 #[derive(Debug, ClapArgs)]
@@ -153,6 +153,9 @@ struct GameApp {
     texture: Option<TextureHandle>,
     /// Wall-clock time of the last logic tick; `None` until the first.
     last_tick: Option<Instant>,
+    /// Debug overlay (cell grid + the Prince's logical-x / collision / figure
+    /// edges), toggled with `G`.
+    debug: bool,
 }
 
 impl GameApp {
@@ -162,6 +165,7 @@ impl GameApp {
             mode,
             texture: None,
             last_tick: None,
+            debug: false,
         }
     }
 
@@ -184,7 +188,7 @@ impl eframe::App for GameApp {
         // Read input inside the `ctx.input` closure; act on Escape
         // afterwards — calling `ctx` methods while the input lock is
         // held can deadlock.
-        let (input, quit) = ctx.input(|i| {
+        let (input, quit, toggle_debug) = ctx.input(|i| {
             let state = InputState {
                 left: i.key_down(egui::Key::ArrowLeft),
                 right: i.key_down(egui::Key::ArrowRight),
@@ -192,10 +196,17 @@ impl eframe::App for GameApp {
                 down: i.key_down(egui::Key::ArrowDown),
                 shift: i.modifiers.shift,
             };
-            (state, i.key_pressed(egui::Key::Escape))
+            (
+                state,
+                i.key_pressed(egui::Key::Escape),
+                i.key_pressed(egui::Key::G),
+            )
         });
         if quit {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+        if toggle_debug {
+            self.debug = !self.debug;
         }
 
         // Advance the world at a fixed cadence rather than at the host
@@ -231,9 +242,48 @@ impl eframe::App for GameApp {
                     Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
                     Color32::WHITE,
                 );
+                if self.debug {
+                    draw_debug_overlay(ui, &self.world.prince_debug(), origin, draw, scale);
+                }
             });
 
         // Wake again in time for the next logic tick (no busy-spin).
         ctx.request_repaint_after(TICK);
     }
+}
+
+/// Draw the debug overlay over the scaled frame: a dim-yellow cell grid, the
+/// Prince's collision-box edges (cyan), his drawn-figure edges (magenta), his
+/// logical centre x (green) and his feet line (white). Lets you see, in the
+/// running game, exactly where his logical position and the cell boundaries
+/// sit relative to the figure that's drawn.
+#[allow(clippy::cast_precision_loss)]
+fn draw_debug_overlay(ui: &egui::Ui, d: &PrinceDebug, origin: Pos2, draw: Vec2, scale: f32) {
+    let painter = ui.painter();
+    let (top, bot) = (origin.y, origin.y + draw.y);
+    let sx = |px: i32| origin.x + px as f32 * scale;
+    for c in 0..=i32::from(FRAME_W) / d.cell_w {
+        painter.vline(
+            sx(c * d.cell_w),
+            top..=bot,
+            Stroke::new(1.0, Color32::from_rgb(80, 80, 0)),
+        );
+    }
+    let cyan = Color32::from_rgb(0, 210, 210);
+    painter.vline(sx(d.x - d.half_w), top..=bot, Stroke::new(1.0, cyan));
+    painter.vline(sx(d.x + d.half_w), top..=bot, Stroke::new(1.0, cyan));
+    let magenta = Color32::from_rgb(255, 0, 255);
+    painter.vline(sx(d.fig_left), top..=bot, Stroke::new(1.0, magenta));
+    painter.vline(sx(d.fig_right), top..=bot, Stroke::new(1.0, magenta));
+    painter.vline(
+        sx(d.x),
+        top..=bot,
+        Stroke::new(1.5, Color32::from_rgb(0, 255, 0)),
+    );
+    let fy = origin.y + d.feet_y as f32 * scale;
+    painter.hline(
+        origin.x..=origin.x + draw.x,
+        fy,
+        Stroke::new(1.0, Color32::WHITE),
+    );
 }
