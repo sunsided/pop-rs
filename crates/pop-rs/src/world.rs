@@ -243,33 +243,34 @@ impl Prince {
 
         let col = col_of(self.x);
         match settle(room, col, self.row) {
-            // A floor below his feet here → still airborne (the hop's rise).
-            Some((_, lfeet)) if self.feet_y < lfeet => {
+            // A floor at *his own row*, still below his feet → the hop's rise.
+            Some((lrow, lfeet)) if lrow == self.row && self.feet_y < lfeet => {
                 self.on_ground = false;
                 self.mid_jump_air = true;
             }
-            // He has reached a floor → touch down on it. `settle` may return a
-            // different row (a lower floor, or a block top), so adopt it, or
-            // the next `settle_floor` would read him as falling again.
-            Some((lrow, lfeet)) => {
+            // A floor at his own row, reached → touch down on it.
+            Some((lrow, lfeet)) if lrow == self.row => {
                 self.feet_y = lfeet;
-                self.row = lrow;
                 let leapt = self.mid_jump_air;
                 self.mid_jump_air = false;
                 self.on_ground = true;
                 // A running leap returns to the run controller; a standing
-                // jump plays out its own recovery frames into `stand`. (Since
-                // every arc's `dy` nets to zero, a `runjump` always returns to
-                // its launch line within its aerial frames — touching down on a
-                // floor here, or falling through the gap arm below — so it can
-                // never hover in its `loops_to` run-cycle frames forever.)
+                // jump plays out its own recovery frames into `stand`. (Every
+                // arc's `dy` nets to zero, so a `runjump` always returns to its
+                // launch line within its aerial frames — landing here or
+                // falling through the drop arm below — never hovering in its
+                // `loops_to` run-cycle frames forever.)
                 if running_jump && leapt {
                     self.cursor.play("startrun");
                 }
             }
-            // No floor at his row in this column. Still rising/cresting → keep
-            // arcing; once the arc brings him back down to his launch line he
-            // is over a gap, so fall the rest of the way.
+            // No floor at his row here — only a gap, or a floor a row or more
+            // *below* (a drop he's leaping over). While still rising above his
+            // launch line, keep arcing; once the arc brings him back down to it
+            // he's over the drop, so fall the rest of the way (`settle_floor`
+            // aims him at the lower floor, or beyond it). Without this a leap
+            // over a tile that has a floor below — Empty-over-Rubble, a step
+            // down — would hover through the whole jump and only fall after.
             _ => {
                 if self.feet_y < floor_y(self.row) {
                     self.on_ground = false;
@@ -2520,5 +2521,53 @@ mod tests {
         assert!(world.prince.x > brink, "his centre stays on the floor side");
         assert!(world.prince_on_ground(), "never steps off the left ledge");
         assert_eq!(world.prince.row, 2);
+    }
+
+    #[test]
+    fn jump_over_a_step_down_falls_to_the_lower_floor() {
+        // Row 1 floored through col 3, then a drop (Empty over a row-2 floor) —
+        // a step-down, not a clean gap. A forward jump off the edge must fall to
+        // the lower floor, not hover at his launch height through the whole arc.
+        let mut world = World::new(load_level1(), dungeon_tables()).with_chtabs(chtabs());
+        for _ in 0..40 {
+            world.tick(InputState::default());
+            if world.prince_on_ground() {
+                break;
+            }
+        }
+        let floor = *world.level.rooms[0].tile_at(8, 2).unwrap();
+        let gap = Tile {
+            kind: TileKind::PanelWithoutFloor,
+            variant: 0,
+            modifier: 0,
+        };
+        for c in 0..ROOM_WIDTH {
+            world.level.rooms[0].tiles[c] = gap; // clear row 0 so `up` jumps, not climbs
+            world.level.rooms[0].tiles[ROOM_WIDTH + c] = if c <= 3 { floor } else { gap };
+            world.level.rooms[0].tiles[2 * ROOM_WIDTH + c] = floor;
+        }
+        world.prince.room = 1;
+        world.prince.row = 1;
+        world.prince.x = 3 * CELL_W + CELL_W / 2;
+        world.prince.feet_y = floor_y(1);
+        world.prince.on_ground = true;
+        world.prince.facing_right = true;
+        world.tick(InputState {
+            up: true,
+            right: true,
+            ..InputState::default()
+        });
+        let mut landed_below = false;
+        for _ in 0..40 {
+            world.tick(InputState::default());
+            if world.prince_on_ground() && world.prince.row == 2 {
+                landed_below = true;
+                break;
+            }
+        }
+        assert!(
+            landed_below,
+            "a jump over a step-down should fall to the lower floor"
+        );
     }
 }
