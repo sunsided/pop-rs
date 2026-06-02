@@ -995,8 +995,11 @@ impl World {
         let Some(mut c) = self.prince.climb else {
             return;
         };
-        // Interpolate his position over the `climbup` animation's length so
-        // the pull-up reaches the ledge as the last climb frame draws.
+        // Move along an **L-shaped** path over the `climbup` animation's length:
+        // rise straight up the wall first, then mount onto the ledge. A
+        // straight diagonal would cut the floor corner — he'd visibly glide
+        // *through* the ledge tile (the original pulls up vertically, then
+        // settles forward onto the ledge).
         let frames = crate::anim::sequence_len("climbup").max(1);
         c.phase += 1;
         if c.phase >= frames {
@@ -1006,10 +1009,18 @@ impl World {
             self.prince.on_ground = true;
             self.prince.climb = None;
         } else {
-            let t = i32::try_from(c.phase).unwrap_or(0);
+            let p = i32::try_from(c.phase).unwrap_or(0);
             let n = i32::try_from(frames).unwrap_or(1).max(1);
-            self.prince.x = c.from_x + (c.to_x - c.from_x) * t / n;
-            self.prince.feet_y = c.from_feet + (c.to_feet - c.from_feet) * t / n;
+            // Spend the first two-thirds rising at his launch column, the last
+            // third stepping across onto the ledge.
+            let rise = (n * 2 / 3).max(1);
+            if p <= rise {
+                self.prince.x = c.from_x;
+                self.prince.feet_y = c.from_feet + (c.to_feet - c.from_feet) * p / rise;
+            } else {
+                self.prince.feet_y = c.to_feet;
+                self.prince.x = c.from_x + (c.to_x - c.from_x) * (p - rise) / (n - rise);
+            }
             self.prince.climb = Some(c);
         }
     }
@@ -2588,5 +2599,49 @@ mod tests {
             "the jump barely advanced ({} from {launch_x}) — it aborted instead of leaping",
             world.prince.x
         );
+    }
+
+    #[test]
+    fn climb_rises_before_mounting_no_diagonal_glide() {
+        let mut world = World::new(load_level1(), dungeon_tables()).with_chtabs(chtabs());
+        for _ in 0..40 {
+            world.tick(InputState::default());
+            if world.prince_on_ground() {
+                break;
+            }
+        }
+        // Stand row 1 col 2 facing the row-0 col-3 Floor ledge.
+        world.prince.row = 1;
+        world.prince.x = 2 * CELL_W + CELL_W / 2;
+        world.prince.feet_y = floor_y(1);
+        world.prince.facing_right = true;
+        world.prince.on_ground = true;
+        let from_x = world.prince.x;
+        world.tick(InputState {
+            up: true,
+            ..InputState::default()
+        });
+        // The path is L-shaped: he must not drift sideways until he has risen
+        // (nearly) to the ledge floor — a diagonal would cut the floor corner.
+        let mut sideways_at_feet = None;
+        for _ in 0..30 {
+            world.tick(InputState::default());
+            if world.prince.x != from_x && sideways_at_feet.is_none() {
+                sideways_at_feet = Some(world.prince.feet_y);
+            }
+            if world.prince.climb.is_none() {
+                break;
+            }
+        }
+        if let Some(feet) = sideways_at_feet {
+            assert!(
+                feet <= floor_y(0) + VERT_DIST,
+                "he moved sideways mid-climb (diagonal glide): feet={feet}, ledge={}",
+                floor_y(0)
+            );
+        }
+        assert_eq!(world.prince.row, 0, "he reaches the upper floor");
+        assert!(world.prince_on_ground());
+        assert_eq!(world.prince.feet_y, floor_y(0));
     }
 }
