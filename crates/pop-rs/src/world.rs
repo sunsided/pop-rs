@@ -315,7 +315,7 @@ impl Prince {
     /// already, so its `current()` frame is the one to move and draw by.
     fn locomote(&mut self, dir: i32, careful: bool, half_w: i32, room: &Room) {
         if self.in_step() {
-            self.step_advance(room);
+            self.step_advance(half_w, room);
             return;
         }
         if self.in_transition() {
@@ -345,7 +345,7 @@ impl Prince {
             return;
         }
         if careful {
-            self.start_careful_step(dir, room);
+            self.start_careful_step(dir, half_w, room);
             return;
         }
         let dx = self.cursor.current().map_or(0, |f| f.dx);
@@ -421,13 +421,14 @@ impl Prince {
         )
     }
 
-    /// Forward px from his leading edge to the nearer of the next wall face or
-    /// the brink of the floor he stands on, capped at a full stride. Sizes a
-    /// careful step so it edges flush to an obstacle and never carries him off
-    /// a ledge (`GETFWDDIST`, idiomatic).
-    fn forward_clearance(&self, room: &Room) -> i32 {
+    /// Forward px from his leading edge (`half_w` from his centre — the current
+    /// frame's figure half-width, as the run path uses, #123) to the nearer of
+    /// the next wall face or the brink of the floor he stands on, capped at a
+    /// full stride. Sizes a careful step so it edges flush to an obstacle and
+    /// never carries him off a ledge (`GETFWDDIST`, idiomatic).
+    fn forward_clearance(&self, half_w: i32, room: &Room) -> i32 {
         let sign = self.facing_sign();
-        let lead = self.x + sign * COLLIDE_HALF;
+        let lead = self.x + sign * half_w;
         let cur = i32::try_from(col_of(self.x)).unwrap_or(0);
         let next = cur + sign;
         if !(0..i32::try_from(ROOM_WIDTH).unwrap_or(0)).contains(&next) {
@@ -452,9 +453,9 @@ impl Prince {
     /// at the wall / ledge edge (`step1`..`step13` by clearance), or `testfoot`
     /// to peek when he's already at the brink. The sequence then plays out via
     /// [`Self::step_advance`].
-    fn start_careful_step(&mut self, dir: i32, room: &Room) {
+    fn start_careful_step(&mut self, dir: i32, half_w: i32, room: &Room) {
         self.facing_right = dir > 0;
-        let clearance = self.forward_clearance(room);
+        let clearance = self.forward_clearance(half_w, room);
         if clearance <= 0 {
             // Already flush against a wall / brink — peek over it, don't step.
             self.cursor.play("testfoot");
@@ -476,15 +477,15 @@ impl Prince {
     /// a backward (negative) frame is part of the authored stride and applied
     /// as-is. Moves via `slide_x` (no floor-follow), so a step can't carry him
     /// off the ledge.
-    fn step_advance(&mut self, room: &Room) {
+    fn step_advance(&mut self, half_w: i32, room: &Room) {
         let dx = self.cursor.current().map_or(0, |f| f.dx);
         let step = if dx > 0 {
-            dx.min(self.forward_clearance(room).max(0))
+            dx.min(self.forward_clearance(half_w, room).max(0))
         } else {
             dx
         };
         if step != 0 {
-            self.slide_x(self.facing_sign() * step, COLLIDE_HALF, room);
+            self.slide_x(self.facing_sign() * step, half_w, room);
         }
     }
 
@@ -1127,8 +1128,7 @@ impl World {
                 // Centre the figure (its true span within the box, mirror-
                 // aware) on the Prince's column; sit its bottom scan-line on
                 // his feet.
-                let byte_x =
-                    self.prince.x / 7 - figure_center_offset(img, self.prince.facing_right);
+                let byte_x = figure_byte_x(img, self.prince.x, self.prince.facing_right);
                 let top_y = self.prince.feet_y - i32::from(img.height) + 1;
                 sprite::composite_hires(
                     &mut bytes[..],
@@ -1285,25 +1285,32 @@ fn col_of(x: i32) -> usize {
         .min(ROOM_WIDTH - 1)
 }
 
-/// Byte-column offset to subtract from a character's logical byte column
-/// (`x / 7`) so the drawn *figure* — its true span within the sprite box
-/// ([`sprite::figure_byte_span`]), mirrored when `flip` — is centred on him
-/// rather than the (often wider) box. Falls back to half the box width (the
-/// pre-#123 box-centring) when the sprite has no set pixels. Byte-granular;
-/// the sub-byte residual is the #121 half-dot concern.
-fn figure_center_offset(img: &Image, flip: bool) -> i32 {
+/// Destination byte column for the left edge of a character sprite so its
+/// drawn *figure* — its true span within the (often wider) box
+/// ([`sprite::figure_byte_span`]), mirrored when `flip` — is centred on his
+/// logical pixel `x`. The figure's pixel span is centred and **rounded to the
+/// nearest byte the same way for both facings**, so an even-width box no longer
+/// swings the figure half a byte left/right depending on which way he faces
+/// (the bug behind the facing-dependent wall/ledge overlap). The remaining
+/// sub-byte residual is the #121 preshift concern. Centres the whole box when
+/// the sprite has no set pixels.
+fn figure_byte_x(img: &Image, x: i32, flip: bool) -> i32 {
     let w = i32::from(img.width_bytes);
-    match sprite::figure_byte_span(img) {
-        Some((lo, hi)) => {
-            let mid = (i32::from(lo) + i32::from(hi)) / 2;
-            if flip {
-                (w - 1) - mid
-            } else {
-                mid
-            }
-        }
-        None => w / 2,
-    }
+    let Some((lo, hi)) = sprite::figure_byte_span(img) else {
+        return x / 7 - w / 2;
+    };
+    let (lo, hi) = (i32::from(lo), i32::from(hi));
+    // Box byte columns the figure occupies once drawn (mirrored if `flip`).
+    let (a, b) = if flip {
+        (w - 1 - hi, w - 1 - lo)
+    } else {
+        (lo, hi)
+    };
+    // Centre of that span, in half-pixels relative to the box's left edge.
+    let fig_centre_2px = (a + b) * 7 + 6;
+    // byte_x = round((x - fig_centre_px) / 7), kept exact via half-pixels so
+    // the rounding is identical for both facings (no half-byte swing).
+    (2 * x - fig_centre_2px + 7).div_euclid(14)
 }
 
 /// Half the drawn figure's width in px — the per-frame wall-collision
@@ -1487,10 +1494,10 @@ mod tests {
             bitmap: vec![0, 0b000_0001, 0b000_0001, 0b000_0001, 0],
         };
         let (lo, hi) = sprite::figure_byte_span(&img).expect("non-empty figure");
-        let x_byte = 20;
-        // Replicate how `composite_hires` maps a source byte to a drawn column.
+        let x = 140; // px — byte column 20.
+                     // Replicate how `composite_hires` maps a source byte to a drawn column.
         let drawn_centre = |flip: bool| {
-            let byte_x = x_byte - figure_center_offset(&img, flip);
+            let byte_x = figure_byte_x(&img, x, flip);
             let w = i32::from(img.width_bytes);
             let col = |c: i32| {
                 if flip {
@@ -1505,32 +1512,37 @@ mod tests {
         // the asymmetry the box-centring caused is gone.
         assert_eq!(
             drawn_centre(false),
-            x_byte,
+            x / 7,
             "left-facing figure centred on x"
         );
         assert_eq!(
             drawn_centre(true),
-            x_byte,
+            x / 7,
             "right-facing figure centred on x"
         );
     }
 
     #[test]
-    fn even_span_centre_truncates_and_half_extent_is_exact() {
+    fn even_width_box_does_not_swing_between_facings() {
         use pop_assets::draz::image_table::Image;
         // 4-byte box, figure on byte cols 1..=2 (even span → fractional byte
-        // centre at 1.5). `figure_center_offset` truncates *down* to 1, so the
-        // drawn figure shifts a half-byte between facings — the byte-granular
-        // residual deferred to #121.
+        // centre at 1.5). The old floored centring drew it half a byte left or
+        // right depending on facing; `figure_byte_x` now rounds identically, so
+        // the placement is the same whichever way he faces. (Sub-byte residual
+        // is the #121 preshift concern.)
         let img = Image {
             width_bytes: 4,
             height: 1,
             bitmap: vec![0, 0b000_0001, 0b000_0001, 0],
         };
         assert_eq!(sprite::figure_byte_span(&img), Some((1, 2)));
-        assert_eq!(figure_center_offset(&img, false), 1, "(1+2)/2 truncated");
-        assert_eq!(figure_center_offset(&img, true), 2, "(w-1) - 1");
-        // Even span → the half-extent divides cleanly: 2 bytes = 14px → 7.
+        let x = 137; // px — deliberately off the byte grid.
+        assert_eq!(
+            figure_byte_x(&img, x, false),
+            figure_byte_x(&img, x, true),
+            "even-width box must not swing the figure between facings"
+        );
+        // The half-extent is facing-symmetric: 2 bytes = 14px → 7.
         assert_eq!(figure_half_width(&img), 7);
     }
 
