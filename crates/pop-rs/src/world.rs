@@ -51,9 +51,13 @@ const ROOM_W: i32 = ROOM_WIDTH_BYTES as i32 * 7;
 /// below (the `down` link).
 const ROOM_H: i32 = ROOM_HEIGHT_PX as i32;
 
-/// Initial upward velocity of a jump, px per tick (negative = up). A
-/// simple vertical hop; the running leap and ledge grabs come later (#120).
-const JUMP_VY: i32 = -12;
+/// Impact speed (px/tick) below which a fall touchdown plays `softland`
+/// rather than `medland`. Our gravity puts a ~1-row drop just under this and
+/// a ~2-row drop just over, matching the original soft / medium split in
+/// `CTRL.S hitflr` (`CharYVel < $16` soft, `< $21` medium). The fatal tier
+/// (`>= $21` → `hardland` + death) needs HP, so a deep fall currently
+/// recovers as `medland` (deferred to #96).
+const LAND_SOFT_VY: i32 = 22;
 
 /// Distance per tick of a careful step (SHIFT held), px — slower than the
 /// run so he can edge up to gaps.
@@ -139,6 +143,11 @@ struct Prince {
     cursor: AnimCursor,
     /// `Some` while climbing a ledge (overrides walk / fall).
     climb: Option<ClimbState>,
+    /// `true` once a jump arc (`standjump` / `runjump`) has lifted his feet off
+    /// the floor — so a `runjump` knows it has actually leapt and should hand
+    /// back to the run controller when it touches down (not on its grounded
+    /// windup frames).
+    mid_jump_air: bool,
 }
 
 impl Prince {
@@ -170,15 +179,112 @@ impl Prince {
             facing_right: faces_right(start.face_raw),
             cursor: AnimCursor::new("stand"),
             climb: None,
+            mid_jump_air: false,
         }
     }
 
-    /// Launch a standing jump — a vertical hop back onto the current floor.
-    fn jump(&mut self) {
-        self.landing_row = self.row;
-        self.landing_y = self.feet_y;
-        self.vy = JUMP_VY;
-        self.on_ground = false;
+    /// Begin a jump for `dir`: a running leap (`runjump`) when he's already
+    /// running, otherwise a forward standing jump (`standjump`, facing `dir`
+    /// if one is held). Mirrors `DoRunjump` / `DoStandjump`, which just select
+    /// the sequence — the arc is scripted in the frames, so [`Self::jump_step`]
+    /// carries it out. He stays grounded for the windup; the frames lift him.
+    fn start_jump(&mut self, dir: i32) {
+        self.mid_jump_air = false;
+        if self.is_running() {
+            self.cursor.play("runjump");
+        } else {
+            if dir != 0 {
+                self.facing_right = dir > 0;
+            }
+            self.cursor.play("standjump");
+        }
+    }
+
+    /// A `standjump` / `runjump` arc is playing — its frames script the whole
+    /// trajectory, so [`Self::jump_step`] drives him, not gravity.
+    fn in_jump(&self) -> bool {
+        matches!(self.cursor.name(), "standjump" | "runjump")
+    }
+
+    /// Advance one scripted jump frame: move by the frame's `dx` (forward,
+    /// facing-signed, wall-stopped via [`Self::glide`]) and `dy` (vertical),
+    /// then reconcile with the floor. He rests when the descending arc meets
+    /// his row's floor; a `runjump` that has actually leapt hands back to the
+    /// run cycle on touchdown. If the arc carries him out over a gap (down to
+    /// his launch line with no floor under him), he drops into a `freefall`.
+    fn jump_step(&mut self, half_w: i32, room: &Room) {
+        let Some(frame) = self.cursor.current() else {
+            return;
+        };
+        let (dx, dy) = (frame.dx, frame.dy);
+        let running_jump = self.cursor.name() == "runjump";
+        // Horizontal only (wall-stopped) — *not* `glide`, whose floor-follow
+        // would snap his feet back each tick and erase the `dy` arc.
+        self.slide_x(dx * self.facing_sign(), half_w, room);
+        self.feet_y += dy;
+
+        let col = col_of(self.x);
+        match settle(room, col, self.row) {
+            // A floor below his feet here → still airborne (the hop's rise).
+            Some((_, lfeet)) if self.feet_y < lfeet => {
+                self.on_ground = false;
+                self.mid_jump_air = true;
+            }
+            // He has reached a floor → touch down on it. `settle` may return a
+            // different row (a lower floor, or a block top), so adopt it, or
+            // the next `settle_floor` would read him as falling again.
+            Some((lrow, lfeet)) => {
+                self.feet_y = lfeet;
+                self.row = lrow;
+                let leapt = self.mid_jump_air;
+                self.mid_jump_air = false;
+                self.on_ground = true;
+                // A running leap returns to the run controller; a standing
+                // jump plays out its own recovery frames into `stand`. (Since
+                // every arc's `dy` nets to zero, a `runjump` always returns to
+                // its launch line within its aerial frames — touching down on a
+                // floor here, or falling through the gap arm below — so it can
+                // never hover in its `loops_to` run-cycle frames forever.)
+                if running_jump && leapt {
+                    self.cursor.play("startrun");
+                }
+            }
+            // No floor at his row in this column. Still rising/cresting → keep
+            // arcing; once the arc brings him back down to his launch line he
+            // is over a gap, so fall the rest of the way.
+            _ => {
+                if self.feet_y < floor_y(self.row) {
+                    self.on_ground = false;
+                    self.mid_jump_air = true;
+                } else {
+                    self.mid_jump_air = false;
+                    self.settle_floor(room);
+                    self.cursor.play("freefall");
+                }
+            }
+        }
+    }
+
+    /// Touch down from a fall: ground him and play the landing cushion sized to
+    /// his impact speed — `softland` for a gentle drop, `medland` for a harder
+    /// one (`CTRL.S hitflr`). The fatal `hardland` tier needs HP and is folded
+    /// into `medland` for now (#96).
+    ///
+    /// `softland` holds a near-stand frame and is deliberately *not* an
+    /// [`Self::in_transition`] sequence, so the next tick's locomotion resumes
+    /// at once (a soft landing doesn't lock control); `medland`'s stagger does
+    /// own the cursor. Edge case: a fall through a bottom-row hole with no room
+    /// below reaches here with barely-accumulated `vy`, so it reads as a
+    /// `softland` and skips the thud — accepted until #96.
+    fn land(&mut self) {
+        self.on_ground = true;
+        let seq = if self.vy < LAND_SOFT_VY {
+            "softland"
+        } else {
+            "medland"
+        };
+        self.vy = 0;
+        self.cursor.play(seq);
     }
 
     /// One grounded locomotion step in `dir` (`-1` left, `+1` right, `0`
@@ -243,11 +349,12 @@ impl Prince {
         }
     }
 
-    /// A turn / runstop transition is playing: it advances and moves on its
-    /// own and must not be re-selected or interrupted until it chains back to
-    /// `stand`.
+    /// A grounded transition that owns the cursor until it chains back to
+    /// `stand` and must not be re-selected or interrupted: the `turn` /
+    /// `runstop` transitions and the `medland` landing recovery (its long
+    /// stagger plays out before he regains control).
     fn in_transition(&self) -> bool {
-        matches!(self.cursor.name(), "turn" | "runstop")
+        matches!(self.cursor.name(), "turn" | "runstop" | "medland")
     }
 
     /// He is in the run cycle — the only state a released stick skids out of.
@@ -277,12 +384,13 @@ impl Prince {
         self.glide(dx, half_w, room);
     }
 
-    /// Translate by `dx` world px against `room` **without** changing facing:
-    /// stop flush at a solid wall on the leading edge, follow the floor, fall
-    /// off a ledge. Used by the run step (via [`Self::move_h`]) and by the
-    /// turn / runstop transitions, whose frames can edge *backward* (negative
-    /// `dx`) without turning him around.
-    fn glide(&mut self, dx: i32, half_w: i32, room: &Room) {
+    /// Translate by `dx` world px, stopping flush at a solid wall on the
+    /// leading edge — **without** changing facing or following the floor. The
+    /// horizontal half of a move: [`Self::glide`] adds floor-following on top
+    /// for grounded motion, while a jump arc drives the vertical itself and
+    /// calls this directly so its per-frame `dy` isn't snapped back to the
+    /// floor each tick ([`Self::jump_step`]).
+    fn slide_x(&mut self, dx: i32, half_w: i32, room: &Room) {
         let dir = dx.signum();
         let mut target_x = self.x + dx;
 
@@ -306,6 +414,15 @@ impl Prince {
         }
 
         self.x = target_x;
+    }
+
+    /// Translate by `dx` world px against `room` **without** changing facing,
+    /// then follow the floor of the column he lands in: rest on it, or begin a
+    /// fall off a ledge. Used by the run step (via [`Self::move_h`]) and by the
+    /// turn / runstop transitions, whose frames can edge *backward* (negative
+    /// `dx`) without turning him around.
+    fn glide(&mut self, dx: i32, half_w: i32, room: &Room) {
+        self.slide_x(dx, half_w, room);
 
         // Follow the floor in the (possibly new) column; fall if it
         // dropped. Skip while he's stepping across the room edge — the
@@ -538,9 +655,8 @@ impl World {
             if down == 0 {
                 // Bottom of the level: land on the bottom-row floor.
                 self.prince.feet_y = floor_y(ROOM_HEIGHT - 1);
-                self.prince.vy = 0;
                 self.prince.row = ROOM_HEIGHT - 1;
-                self.prince.on_ground = true;
+                self.prince.land();
                 return;
             }
             self.prince.room = down;
@@ -570,18 +686,16 @@ impl World {
         // forever.
         if self.prince.feet_y >= ROOM_H {
             self.prince.feet_y = floor_y(ROOM_HEIGHT - 1);
-            self.prince.vy = 0;
             self.prince.row = ROOM_HEIGHT - 1;
-            self.prince.on_ground = true;
+            self.prince.land();
             return;
         }
 
         // Land once he reaches the floor he's aimed at in the current room.
         if self.prince.vy >= 0 && self.prince.feet_y >= self.prince.landing_y {
             self.prince.feet_y = self.prince.landing_y;
-            self.prince.vy = 0;
             self.prince.row = self.prince.landing_row;
-            self.prince.on_ground = true;
+            self.prince.land();
         }
     }
 
@@ -783,16 +897,36 @@ impl World {
                     // chains `climbup → stand` (as the climb lands) would snap
                     // the cursor back to climbup's first frame.
                     self.climb_step();
+                } else if self.prince.in_jump() {
+                    // A jump arc is in flight — its frames script his motion
+                    // (horizontal + vertical), so drive it instead of gravity.
+                    if let Some(room) = self.level.rooms.get(room_idx) {
+                        let half_w = self.current_figure_half_width();
+                        self.prince.jump_step(half_w, room);
+                    } else {
+                        // Room id out of range — abandon the arc into a fall
+                        // rather than freeze the cursor mid-jump (and, for
+                        // `runjump`, loop its run frames forever).
+                        self.prince.on_ground = false;
+                        self.prince.cursor.play("freefall");
+                    }
                 } else if !self.prince.on_ground {
                     self.fall_step();
-                    self.prince.cursor.play("freefall");
-                } else if input.up && !self.prev.up {
-                    // Up grabs a ledge above-in-front, else it's a jump.
+                    // Keep falling as `freefall` — unless this step touched
+                    // down, in which case `fall_step` already chose the landing
+                    // cushion and must not be clobbered back to `freefall`.
+                    if !self.prince.on_ground {
+                        self.prince.cursor.play("freefall");
+                    }
+                } else if input.up && !self.prev.up && !self.prince.in_transition() {
+                    // Up grabs a ledge above-in-front, else it launches a jump:
+                    // a running leap, or a forward standing jump. A turn /
+                    // runstop / medland transition owns the cursor, so Up
+                    // can't interrupt it (it falls through to play out below).
                     if self.try_climb() {
                         self.prince.cursor.play("climbup");
                     } else {
-                        self.prince.jump();
-                        self.prince.cursor.play("freefall");
+                        self.prince.start_jump(walk_dir(input));
                     }
                 } else if let Some(room) = self.level.rooms.get(room_idx) {
                     let dir = walk_dir(input);
@@ -1437,7 +1571,11 @@ mod tests {
         for _ in 0..crate::anim::sequence_len("runstop") + 2 {
             world.tick(InputState::default());
         }
-        assert_eq!(world.prince.cursor.name(), "stand", "the skid settles to stand");
+        assert_eq!(
+            world.prince.cursor.name(),
+            "stand",
+            "the skid settles to stand"
+        );
         assert!(
             world.prince.x >= x_release,
             "the skid carried him forward, not backward"
@@ -1765,42 +1903,56 @@ mod tests {
     #[test]
     fn a_hard_landing_thuds_the_screen() {
         let mut world = landed_world();
-        // Launch a jump; it lands a few ticks later with downward speed.
-        world.tick(InputState {
-            up: true,
-            ..InputState::default()
-        });
+        // Drop him a couple of rows: a real fall lands with downward speed and
+        // jolts the screen (a gentle jump arc no longer thuds — only a fall).
+        world.prince.row = 0;
+        world.prince.feet_y = floor_y(0);
+        world.prince.on_ground = false;
+        world.prince.vy = 0;
+        world.prince.landing_row = 2;
+        world.prince.landing_y = floor_y(2);
         let mut thudded = false;
-        for _ in 0..20 {
+        for _ in 0..40 {
             world.tick(InputState::default());
             if world.shake > 0 {
                 thudded = true;
                 break;
             }
         }
-        assert!(thudded, "landing the jump jolts the screen");
+        assert!(thudded, "a multi-row fall jolts the screen on impact");
     }
 
     #[test]
     fn up_arrow_jumps_and_lands_back() {
         let mut world = landed_world();
         let floor = world.prince.feet_y;
+        let x0 = world.prince.x;
+        // Up from a stand launches a forward standing jump. Its windup is on
+        // the ground, so he isn't airborne the instant Up is pressed.
         world.tick(InputState {
             up: true,
             ..InputState::default()
         });
-        assert!(!world.prince_on_ground(), "Up launches a jump");
-        world.tick(InputState::default());
-        world.tick(InputState::default());
-        assert!(world.prince.feet_y < floor, "the jump rises off the floor");
-        for _ in 0..40 {
+        assert_eq!(
+            world.prince.cursor.name(),
+            "standjump",
+            "Up launches a standing jump"
+        );
+        let mut rose = false;
+        for _ in 0..30 {
             world.tick(InputState::default());
-            if world.prince_on_ground() {
+            if world.prince.feet_y < floor {
+                rose = true;
+            }
+            if world.prince.cursor.name() == "stand" {
                 break;
             }
         }
-        assert!(world.prince_on_ground(), "the jump lands");
-        assert_eq!(world.prince.feet_y, floor, "back on the same floor");
+        assert!(rose, "the jump's hop rises off the floor");
+        assert!(world.prince_on_ground(), "and lands back down");
+        assert_eq!(world.prince.feet_y, floor, "on the same floor line");
+        assert!(world.prince.x > x0, "the standing jump carries him forward");
+        assert_eq!(world.prince.cursor.name(), "stand", "and recovers to stand");
     }
 
     #[test]
@@ -1862,7 +2014,99 @@ mod tests {
             world.prince.climb.is_none(),
             "no climb into a solid top tile"
         );
-        assert!(!world.prince_on_ground(), "Up there jumps instead");
+        assert_eq!(
+            world.prince.cursor.name(),
+            "standjump",
+            "Up there launches a jump instead"
+        );
+    }
+
+    #[test]
+    fn up_while_running_leaps_and_keeps_running() {
+        let mut world = landed_world();
+        // Flat floor to leap across (row 2), with the row above cleared so Up
+        // launches a jump rather than grabbing a ledge.
+        let floor_tile = *world.level.rooms[0].tile_at(8, 2).unwrap();
+        let hole = Tile {
+            kind: TileKind::PanelWithoutFloor,
+            variant: 0,
+            modifier: 0,
+        };
+        for c in 0..ROOM_WIDTH {
+            world.level.rooms[0].tiles[2 * ROOM_WIDTH + c] = floor_tile;
+            world.level.rooms[0].tiles[ROOM_WIDTH + c] = hole;
+        }
+        world.prince.row = 2;
+        world.prince.x = CELL_W / 2;
+        world.prince.feet_y = floor_y(2);
+        world.prince.on_ground = true;
+        world.prince.facing_right = true;
+        // Get him running, then leap.
+        for _ in 0..8 {
+            world.tick(InputState {
+                right: true,
+                ..InputState::default()
+            });
+        }
+        assert_eq!(world.prince.cursor.name(), "startrun");
+        let x_launch = world.prince.x;
+        world.tick(InputState {
+            up: true,
+            right: true,
+            ..InputState::default()
+        });
+        assert_eq!(
+            world.prince.cursor.name(),
+            "runjump",
+            "Up while running launches a running leap"
+        );
+        // Hold the direction; the leap lands and hands back to the run cycle.
+        let mut grounded_running = false;
+        for _ in 0..20 {
+            world.tick(InputState {
+                right: true,
+                ..InputState::default()
+            });
+            if world.prince_on_ground() && world.prince.cursor.name() == "startrun" {
+                grounded_running = true;
+                break;
+            }
+        }
+        assert!(grounded_running, "the leap lands and he resumes running");
+        assert!(world.prince.x > x_launch, "the leap carried him forward");
+    }
+
+    #[test]
+    fn fall_landing_cushion_scales_with_height() {
+        // The landing animation reflects how far he dropped: a short fall lands
+        // soft, a deeper one needs the medium recovery. (`hardland` + death is
+        // deferred with HP, #96, so a deep fall currently folds into medland.)
+        let land_after_drop = |rows: usize| -> &'static str {
+            let mut world = landed_world();
+            world.prince.row = 0;
+            world.prince.feet_y = floor_y(0);
+            world.prince.on_ground = false;
+            world.prince.vy = 0;
+            world.prince.landing_row = rows;
+            world.prince.landing_y = floor_y(rows);
+            for _ in 0..40 {
+                world.tick(InputState::default());
+                if world.prince_on_ground() {
+                    break;
+                }
+            }
+            world.prince.cursor.name()
+        };
+        assert_eq!(
+            land_after_drop(1),
+            "softland",
+            "a one-row drop lands softly"
+        );
+        assert_eq!(
+            land_after_drop(2),
+            "medland",
+            "a deeper drop needs the medium recovery"
+        );
     }
 
     #[test]
