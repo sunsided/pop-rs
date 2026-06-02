@@ -60,10 +60,18 @@ const ROOM_H: i32 = ROOM_HEIGHT_PX as i32;
 const LAND_SOFT_VY: i32 = 22;
 
 /// Full careful-step stride, px — the distance an unobstructed `SHIFT` step
-/// covers (`fullstep`/`step13` span ~13-14 px). A step against a wall or a
-/// floor brink is shortened to the clearance so he edges flush without
-/// overshooting (`DoStepfwd` sizes the stride to `GETFWDDIST`).
+/// covers (`fullstep` spans 14 px). A step against a wall or a floor brink is
+/// shortened to the clearance so he edges flush without overshooting
+/// (`DoStepfwd` sizes the stride to `GETFWDDIST`).
 const CAREFUL_STRIDE: i32 = 14;
+
+// `forward_clearance` only looks one column ahead, which is sufficient only
+// while a single stride can't skip past an adjacent cell — i.e. the stride is
+// at most half a cell. Enforce that invariant at compile time.
+const _: () = assert!(
+    CAREFUL_STRIDE <= CELL_W / 2,
+    "a careful stride longer than half a cell could step over a one-cell obstacle"
+);
 
 /// Careful-step sequences by stride length: `STEP_SEQS[n - 1]` covers ~`n` px
 /// (`step1`..`step13`), picked from the forward clearance so the foot lands at
@@ -318,9 +326,12 @@ impl Prince {
             if let Some(frame) = self.cursor.current() {
                 if frame.turn {
                     self.facing_right = !self.facing_right;
-                    // `runturn` loops back onto this flip frame; hand off to the
-                    // run cycle the new way rather than re-triggering the turn.
+                    // `runturn` loops back onto this flip frame; apply its pivot
+                    // recoil (the `dx = -14` carry, now in the new facing) this
+                    // tick, then hand off to the run cycle the new way rather
+                    // than re-triggering the turn on the loop.
                     if self.cursor.name() == "runturn" {
+                        self.glide(frame.dx * self.facing_sign(), half_w, room);
                         self.cursor.play("startrun");
                         return;
                     }
@@ -386,9 +397,9 @@ impl Prince {
         )
     }
 
-    /// A careful step (`SHIFT`) is playing out: a `step1`..`step13` stride, or
-    /// `testfoot` peeking over a brink. Owns the cursor until it chains to
-    /// `stand`; driven by [`Self::step_advance`].
+    /// A careful step (`SHIFT`) is playing out: a `step1`..`step13` stride, a
+    /// `fullstep` (open field), or `testfoot` peeking over a brink. Owns the
+    /// cursor until it chains to `stand`; driven by [`Self::step_advance`].
     fn in_step(&self) -> bool {
         matches!(
             self.cursor.name(),
@@ -445,23 +456,34 @@ impl Prince {
         self.facing_right = dir > 0;
         let clearance = self.forward_clearance(room);
         if clearance <= 0 {
+            // Already flush against a wall / brink — peek over it, don't step.
             self.cursor.play("testfoot");
+        } else if clearance >= CAREFUL_STRIDE {
+            // Open field: the full 14-px stride (`DoStepfwd`'s open step).
+            self.cursor.play("fullstep");
         } else {
+            // The branches above handle the extremes, so `clearance` is in
+            // `1..=13` here — `step1`..`step13` land his foot at the obstacle.
+            // (`try_from` rather than `as`: the latter trips `clippy::pedantic`
+            // `cast_sign_loss`; the clamp makes the fallback unreachable.)
             let n = usize::try_from(clearance.clamp(1, 13)).unwrap_or(1);
             self.cursor.play(STEP_SEQS[n - 1]);
         }
     }
 
-    /// Advance a careful step: edge forward by the current frame's `dx`, but
-    /// never past the remaining clearance, and without following the floor — so
-    /// he stops flush at a wall / ledge and can't be carried off it.
+    /// Advance a careful step by the current frame's `dx`. A forward frame is
+    /// clamped to the remaining clearance so he stops flush at a wall / ledge;
+    /// a backward (negative) frame is part of the authored stride and applied
+    /// as-is. Moves via `slide_x` (no floor-follow), so a step can't carry him
+    /// off the ledge.
     fn step_advance(&mut self, room: &Room) {
         let dx = self.cursor.current().map_or(0, |f| f.dx);
-        if dx <= 0 {
-            return;
-        }
-        let step = dx.min(self.forward_clearance(room).max(0));
-        if step > 0 {
+        let step = if dx > 0 {
+            dx.min(self.forward_clearance(room).max(0))
+        } else {
+            dx
+        };
+        if step != 0 {
             self.slide_x(self.facing_sign() * step, COLLIDE_HALF, room);
         }
     }
