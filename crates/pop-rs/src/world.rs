@@ -59,9 +59,27 @@ const ROOM_H: i32 = ROOM_HEIGHT_PX as i32;
 /// recovers as `medland` (deferred to #96).
 const LAND_SOFT_VY: i32 = 22;
 
-/// Distance per tick of a careful step (SHIFT held), px — slower than the
-/// run so he can edge up to gaps.
-const STEP_PX: i32 = 2;
+/// Full careful-step stride, px — the distance an unobstructed `SHIFT` step
+/// covers (`fullstep` spans 14 px). A step against a wall or a floor brink is
+/// shortened to the clearance so he edges flush without overshooting
+/// (`DoStepfwd` sizes the stride to `GETFWDDIST`).
+const CAREFUL_STRIDE: i32 = 14;
+
+// `forward_clearance` only looks one column ahead, which is sufficient only
+// while a single stride can't skip past an adjacent cell — i.e. the stride is
+// at most half a cell. Enforce that invariant at compile time.
+const _: () = assert!(
+    CAREFUL_STRIDE <= CELL_W / 2,
+    "a careful stride longer than half a cell could step over a one-cell obstacle"
+);
+
+/// Careful-step sequences by stride length: `STEP_SEQS[n - 1]` covers ~`n` px
+/// (`step1`..`step13`), picked from the forward clearance so the foot lands at
+/// the wall / ledge edge.
+const STEP_SEQS: [&str; 13] = [
+    "step1", "step2", "step3", "step4", "step5", "step6", "step7", "step8", "step9", "step10",
+    "step11", "step12", "step13",
+];
 
 /// Half the Prince's collision width, px. His centre stops this far from a
 /// wall — matched to [`VERT_DIST`] so he keeps about the same gap from a
@@ -289,21 +307,34 @@ impl Prince {
 
     /// One grounded locomotion step in `dir` (`-1` left, `+1` right, `0`
     /// idle), once [`Self::select_locomotion`] has chosen this tick's
-    /// sequence. A turn / runstop transition plays out on its own frame
-    /// displacement (the skid carries forward, the turn shuffles in place) and
-    /// flips facing on its `turn`-flagged frame; idle holds position; otherwise
-    /// he steps by the run sequence's current per-frame `chx` (a fixed
-    /// [`STEP_PX`] when careful). The cursor was advanced for this tick
+    /// sequence. A careful step plays out via [`Self::step_advance`]; a turn /
+    /// runstop / runturn transition moves on its own frame displacement and
+    /// flips facing on its `turn`-flagged frame; idle holds position; a bare
+    /// `SHIFT`+dir starts a careful step; otherwise he steps by the run
+    /// sequence's per-frame `chx`. The cursor was advanced for this tick
     /// already, so its `current()` frame is the one to move and draw by.
     fn locomote(&mut self, dir: i32, careful: bool, half_w: i32, room: &Room) {
+        if self.in_step() {
+            self.step_advance(room);
+            return;
+        }
         if self.in_transition() {
-            // The `turn` sequence reverses his facing on its flagged frame;
-            // from there its (and runstop's) per-frame `dx` carries him in the
-            // facing direction. Drive it with `glide` so a backward (negative)
-            // frame edges him without flipping his facing.
+            // The `turn` / `runturn` sequences reverse facing on their flagged
+            // frame; from there each transition's per-frame `dx` carries him in
+            // the facing direction. Drive it with `glide` so a backward
+            // (negative) frame edges him without flipping his facing.
             if let Some(frame) = self.cursor.current() {
                 if frame.turn {
                     self.facing_right = !self.facing_right;
+                    // `runturn` loops back onto this flip frame; apply its pivot
+                    // recoil (the `dx = -14` carry, now in the new facing) this
+                    // tick, then hand off to the run cycle the new way rather
+                    // than re-triggering the turn on the loop.
+                    if self.cursor.name() == "runturn" {
+                        self.glide(frame.dx * self.facing_sign(), half_w, room);
+                        self.cursor.play("startrun");
+                        return;
+                    }
                 }
                 self.glide(frame.dx * self.facing_sign(), half_w, room);
             }
@@ -313,26 +344,27 @@ impl Prince {
             // Idle — `select_locomotion` already set `stand`; hold position.
             return;
         }
-        let dx = if careful {
-            STEP_PX
-        } else {
-            self.cursor.current().map_or(0, |f| f.dx)
-        };
+        if careful {
+            self.start_careful_step(dir, room);
+            return;
+        }
+        let dx = self.cursor.current().map_or(0, |f| f.dx);
         self.move_h(dx * dir, half_w, room);
     }
 
     /// Pick this tick's locomotion sequence (and facing) for `dir`, unless a
-    /// turn / runstop transition is mid-play — it owns the cursor until it
-    /// chains back to `stand`. Releasing the stick out of a run skids to a stop
-    /// (`runstop`), else he stands; pressing *toward* his facing runs
-    /// (`startrun`); pressing *away* from a stand turns in place (`turn`, which
-    /// flips facing on its flagged frame and chains to `stand`). Mirrors the
-    /// original `standing` / `arunning` dispatch (`DoStartrun` / `DoTurn` /
-    /// `runstop`); the frame-gated stop point and `runturn` are deferred.
-    /// Split from [`Self::locomote`] so the caller can size collision from the
-    /// *selected* frame, not the one just advanced off (#134).
-    fn select_locomotion(&mut self, dir: i32) {
-        if self.in_transition() {
+    /// transition or careful step is mid-play (it owns the cursor until it
+    /// chains back to `stand`). Releasing the stick out of a run skids to a stop
+    /// (`runstop`), else he stands; `SHIFT`+dir faces the way he'll carefully
+    /// step (the step itself is started in [`Self::locomote`], which has the
+    /// room to size it); reversing mid-run plays the running turn-around
+    /// (`runturn`); pressing *away* from a stand turns in place (`turn`);
+    /// otherwise he runs (`startrun`). Mirrors the original `standing` /
+    /// `arunning` dispatch. Split from [`Self::locomote`] so the caller can
+    /// size collision from the *selected* frame, not the one just advanced off
+    /// (#134).
+    fn select_locomotion(&mut self, dir: i32, careful: bool) {
+        if self.in_transition() || self.in_step() {
             return;
         }
         if dir == 0 {
@@ -341,7 +373,12 @@ impl Prince {
             } else {
                 self.cursor.play("stand");
             }
-        } else if (dir > 0) != self.facing_right && !self.is_running() {
+        } else if careful {
+            // The careful step is started in `locomote`; just face it here.
+            self.facing_right = dir > 0;
+        } else if self.is_running() && (dir > 0) != self.facing_right {
+            self.cursor.play("runturn");
+        } else if (dir > 0) != self.facing_right {
             self.cursor.play("turn");
         } else {
             self.facing_right = dir > 0;
@@ -351,10 +388,104 @@ impl Prince {
 
     /// A grounded transition that owns the cursor until it chains back to
     /// `stand` and must not be re-selected or interrupted: the `turn` /
-    /// `runstop` transitions and the `medland` landing recovery (its long
-    /// stagger plays out before he regains control).
+    /// `runstop` / `runturn` transitions and the `medland` landing recovery
+    /// (its long stagger plays out before he regains control).
     fn in_transition(&self) -> bool {
-        matches!(self.cursor.name(), "turn" | "runstop" | "medland")
+        matches!(
+            self.cursor.name(),
+            "turn" | "runstop" | "medland" | "runturn"
+        )
+    }
+
+    /// A careful step (`SHIFT`) is playing out: a `step1`..`step13` stride, a
+    /// `fullstep` (open field), or `testfoot` peeking over a brink. Owns the
+    /// cursor until it chains to `stand`; driven by [`Self::step_advance`].
+    fn in_step(&self) -> bool {
+        matches!(
+            self.cursor.name(),
+            "step1"
+                | "step2"
+                | "step3"
+                | "step4"
+                | "step5"
+                | "step6"
+                | "step7"
+                | "step8"
+                | "step9"
+                | "step10"
+                | "step11"
+                | "step12"
+                | "step13"
+                | "fullstep"
+                | "testfoot"
+        )
+    }
+
+    /// Forward px from his leading edge to the nearer of the next wall face or
+    /// the brink of the floor he stands on, capped at a full stride. Sizes a
+    /// careful step so it edges flush to an obstacle and never carries him off
+    /// a ledge (`GETFWDDIST`, idiomatic).
+    fn forward_clearance(&self, room: &Room) -> i32 {
+        let sign = self.facing_sign();
+        let lead = self.x + sign * COLLIDE_HALF;
+        let cur = i32::try_from(col_of(self.x)).unwrap_or(0);
+        let next = cur + sign;
+        if !(0..i32::try_from(ROOM_WIDTH).unwrap_or(0)).contains(&next) {
+            // Room edge — let a full stride run into the edge crossing.
+            return CAREFUL_STRIDE;
+        }
+        let next_u = usize::try_from(next).unwrap_or(0);
+        if is_solid_at(room, next_u, self.row) || !has_floor(room, next_u, self.row) {
+            // Wall or brink at the cur/next boundary: clear up to it.
+            let boundary = if sign > 0 {
+                (cur + 1) * CELL_W
+            } else {
+                cur * CELL_W
+            };
+            (sign * (boundary - lead)).clamp(0, CAREFUL_STRIDE)
+        } else {
+            CAREFUL_STRIDE
+        }
+    }
+
+    /// Begin a careful step toward `dir`: pick the stride that lands his foot
+    /// at the wall / ledge edge (`step1`..`step13` by clearance), or `testfoot`
+    /// to peek when he's already at the brink. The sequence then plays out via
+    /// [`Self::step_advance`].
+    fn start_careful_step(&mut self, dir: i32, room: &Room) {
+        self.facing_right = dir > 0;
+        let clearance = self.forward_clearance(room);
+        if clearance <= 0 {
+            // Already flush against a wall / brink — peek over it, don't step.
+            self.cursor.play("testfoot");
+        } else if clearance >= CAREFUL_STRIDE {
+            // Open field: the full 14-px stride (`DoStepfwd`'s open step).
+            self.cursor.play("fullstep");
+        } else {
+            // The branches above handle the extremes, so `clearance` is in
+            // `1..=13` here — `step1`..`step13` land his foot at the obstacle.
+            // (`try_from` rather than `as`: the latter trips `clippy::pedantic`
+            // `cast_sign_loss`; the clamp makes the fallback unreachable.)
+            let n = usize::try_from(clearance.clamp(1, 13)).unwrap_or(1);
+            self.cursor.play(STEP_SEQS[n - 1]);
+        }
+    }
+
+    /// Advance a careful step by the current frame's `dx`. A forward frame is
+    /// clamped to the remaining clearance so he stops flush at a wall / ledge;
+    /// a backward (negative) frame is part of the authored stride and applied
+    /// as-is. Moves via `slide_x` (no floor-follow), so a step can't carry him
+    /// off the ledge.
+    fn step_advance(&mut self, room: &Room) {
+        let dx = self.cursor.current().map_or(0, |f| f.dx);
+        let step = if dx > 0 {
+            dx.min(self.forward_clearance(room).max(0))
+        } else {
+            dx
+        };
+        if step != 0 {
+            self.slide_x(self.facing_sign() * step, COLLIDE_HALF, room);
+        }
     }
 
     /// He is in the run cycle — the only state a released stick skids out of.
@@ -933,7 +1064,7 @@ impl World {
                     // Choose the sequence first, then size collision from the
                     // frame we're about to move and draw by — not the one we
                     // just advanced off (a stand→run switch changes it) (#134).
-                    self.prince.select_locomotion(dir);
+                    self.prince.select_locomotion(dir, input.shift);
                     let half_w = self.current_figure_half_width();
                     self.prince.locomote(dir, input.shift, half_w, room);
                 }
@@ -1194,6 +1325,13 @@ fn figure_half_width(img: &Image) -> i32 {
 fn is_solid_at(room: &Room, col: usize, row: usize) -> bool {
     room.tile_at(col, row)
         .is_some_and(|t| tile_is_solid(t.kind))
+}
+
+/// `true` if `(col, row)` carries a floor a standing kid rests on — i.e.
+/// [`settle`] finds support at his own `row` (not a lower one). Used to spot
+/// the brink of the floor a careful step must not walk off.
+fn has_floor(room: &Room, col: usize, row: usize) -> bool {
+    settle(room, col, row).is_some_and(|(r, _)| r == row)
 }
 
 /// Where the kid's feet rest when dropped straight down from
@@ -1583,11 +1721,7 @@ mod tests {
     }
 
     #[test]
-    fn pressing_opposite_while_running_flips_immediately() {
-        // Documents the *current* behaviour (guards against a silent regression
-        // when `runturn` lands): turning while running has no `runturn` / skid
-        // transition yet, so an opposite press mid-run flips his facing and
-        // keeps the `startrun` cycle going the new way in one tick.
+    fn reversing_mid_run_plays_runturn_then_runs_the_new_way() {
         let mut world = landed_world();
         for _ in 0..8 {
             world.tick(InputState {
@@ -1597,16 +1731,30 @@ mod tests {
         }
         assert_eq!(world.prince.cursor.name(), "startrun");
         assert!(world.prince.facing_right);
+        // Pressing the opposite way now plays the running turn-around rather
+        // than flipping his facing instantly (#95 slice 4).
         world.tick(InputState {
             left: true,
             ..InputState::default()
         });
-        assert!(!world.prince.facing_right, "flips to face left at once");
         assert_eq!(
             world.prince.cursor.name(),
-            "startrun",
-            "no runturn/runstop yet — keeps running the new way"
+            "runturn",
+            "reversing mid-run plays the turn-around"
         );
+        // It flips his facing and hands back to the run cycle the new way.
+        let mut faced_left_running = false;
+        for _ in 0..20 {
+            world.tick(InputState {
+                left: true,
+                ..InputState::default()
+            });
+            if !world.prince.facing_right && world.prince.cursor.name() == "startrun" {
+                faced_left_running = true;
+                break;
+            }
+        }
+        assert!(faced_left_running, "he turns around and runs the new way");
     }
 
     #[test]
@@ -2154,13 +2302,52 @@ mod tests {
     fn shift_arrow_takes_a_careful_step() {
         let mut world = landed_world();
         let x0 = world.prince.x;
-        world.tick(InputState {
-            shift: true,
-            right: true,
-            ..InputState::default()
-        });
+        let mut ran = false;
+        for _ in 0..10 {
+            world.tick(InputState {
+                shift: true,
+                right: true,
+                ..InputState::default()
+            });
+            if world.prince.cursor.name() == "startrun" {
+                ran = true;
+            }
+        }
         assert!(world.prince.facing_right);
-        assert_eq!(world.prince.x - x0, STEP_PX, "careful step moves STEP_PX");
+        assert!(world.prince.x > x0, "careful steps edge him forward");
+        assert!(
+            !ran,
+            "SHIFT walks carefully (step sequences), never breaks into a run"
+        );
+    }
+
+    #[test]
+    fn careful_step_stops_at_a_ledge_brink() {
+        // Stand at row 1 col 3 — the last floored column before the col-4 gap —
+        // facing the gap. Careful-stepping must edge up to the brink and stop,
+        // never carrying him off (the whole point of SHIFT).
+        let mut world = landed_world();
+        world.prince.row = 1;
+        world.prince.x = 3 * CELL_W + CELL_W / 2;
+        world.prince.feet_y = floor_y(1);
+        world.prince.on_ground = true;
+        world.prince.facing_right = true;
+        for _ in 0..20 {
+            world.tick(InputState {
+                shift: true,
+                right: true,
+                ..InputState::default()
+            });
+        }
+        assert!(
+            world.prince_on_ground(),
+            "careful steps never walk him off the ledge"
+        );
+        assert_eq!(world.prince.row, 1, "he stays on the upper floor");
+        assert!(
+            world.prince.x <= 4 * CELL_W,
+            "he stops at the brink rather than crossing it"
+        );
     }
 
     #[test]
