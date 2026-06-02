@@ -315,7 +315,7 @@ impl Prince {
     /// already, so its `current()` frame is the one to move and draw by.
     fn locomote(&mut self, dir: i32, careful: bool, half_w: i32, room: &Room) {
         if self.in_step() {
-            self.step_advance(half_w, room);
+            self.step_advance(room);
             return;
         }
         if self.in_transition() {
@@ -345,7 +345,7 @@ impl Prince {
             return;
         }
         if careful {
-            self.start_careful_step(dir, half_w, room);
+            self.start_careful_step(dir, room);
             return;
         }
         let dx = self.cursor.current().map_or(0, |f| f.dx);
@@ -421,14 +421,14 @@ impl Prince {
         )
     }
 
-    /// Forward px a careful step may cover before the next obstacle, capped at
-    /// a full stride. A **wall** stops his leading edge (`half_w` from centre,
-    /// as the run path uses, #123) flush against its face. A **ledge** (a gap
-    /// ahead) lets his body overhang: his *centre* edges to the brink — staying
-    /// on the floored cell so he doesn't step off — rather than his leading
-    /// edge, which would halt him `half_w` short of the drop. (`GETFWDDIST`,
+    /// Forward px a careful step may cover before the next obstacle — a wall
+    /// face or a floor brink — capped at a full stride. His leading edge stops
+    /// flush at the cur/next cell boundary, leaving his toes at a ledge edge or
+    /// against a wall while his body stays on the floored cell. Uses the fixed
+    /// [`COLLIDE_HALF`] (not the per-frame figure width) so the stop point
+    /// doesn't jitter as the step animation's frame widths vary. (`GETFWDDIST`,
     /// idiomatic.)
-    fn forward_clearance(&self, half_w: i32, room: &Room) -> i32 {
+    fn forward_clearance(&self, room: &Room) -> i32 {
         let sign = self.facing_sign();
         let cur = i32::try_from(col_of(self.x)).unwrap_or(0);
         let next = cur + sign;
@@ -437,21 +437,15 @@ impl Prince {
             return CAREFUL_STRIDE;
         }
         let next_u = usize::try_from(next).unwrap_or(0);
-        let boundary = if sign > 0 {
-            (cur + 1) * CELL_W
-        } else {
-            cur * CELL_W
-        };
-        if is_solid_at(room, next_u, self.row) {
-            // Wall: leading edge stops flush against the cur/next face.
-            let lead = self.x + sign * half_w;
+        if is_solid_at(room, next_u, self.row) || !has_floor(room, next_u, self.row) {
+            // Wall or brink at the cur/next boundary: edge his leading side to it.
+            let lead = self.x + sign * COLLIDE_HALF;
+            let boundary = if sign > 0 {
+                (cur + 1) * CELL_W
+            } else {
+                cur * CELL_W
+            };
             (sign * (boundary - lead)).clamp(0, CAREFUL_STRIDE)
-        } else if !has_floor(room, next_u, self.row) {
-            // Ledge: his centre edges to the brink (body overhangs the gap),
-            // but stays on the floored cell — the last pixel before the
-            // boundary — so a careful step never carries him over.
-            let limit = boundary - sign;
-            (sign * (limit - self.x)).clamp(0, CAREFUL_STRIDE)
         } else {
             CAREFUL_STRIDE
         }
@@ -461,9 +455,9 @@ impl Prince {
     /// at the wall / ledge edge (`step1`..`step13` by clearance), or `testfoot`
     /// to peek when he's already at the brink. The sequence then plays out via
     /// [`Self::step_advance`].
-    fn start_careful_step(&mut self, dir: i32, half_w: i32, room: &Room) {
+    fn start_careful_step(&mut self, dir: i32, room: &Room) {
         self.facing_right = dir > 0;
-        let clearance = self.forward_clearance(half_w, room);
+        let clearance = self.forward_clearance(room);
         if clearance <= 0 {
             // Already flush against a wall / brink — peek over it, don't step.
             self.cursor.play("testfoot");
@@ -480,20 +474,22 @@ impl Prince {
         }
     }
 
-    /// Advance a careful step by the current frame's `dx`. A forward frame is
-    /// clamped to the remaining clearance so he stops flush at a wall / ledge;
-    /// a backward (negative) frame is part of the authored stride and applied
-    /// as-is. Moves via `slide_x` (no floor-follow), so a step can't carry him
-    /// off the ledge.
-    fn step_advance(&mut self, half_w: i32, room: &Room) {
+    /// Advance a careful step *monotonically* toward the obstacle by the
+    /// current frame's stride magnitude, clamped to the remaining clearance.
+    /// He never moves backward: a step sequence's backward foot-shuffle frames
+    /// (e.g. `testfoot`'s retraction `dx`s) animate but must not drag his
+    /// logical position back, or he oscillates against a wall / brink instead
+    /// of settling at it. Moves via `slide_x` (no floor-follow), so a step
+    /// can't carry him off a ledge. At zero clearance he holds (e.g. peeking).
+    fn step_advance(&mut self, room: &Room) {
+        let clearance = self.forward_clearance(room).max(0);
+        if clearance == 0 {
+            return;
+        }
         let dx = self.cursor.current().map_or(0, |f| f.dx);
-        let step = if dx > 0 {
-            dx.min(self.forward_clearance(half_w, room).max(0))
-        } else {
-            dx
-        };
+        let step = dx.abs().min(clearance);
         if step != 0 {
-            self.slide_x(self.facing_sign() * step, half_w, room);
+            self.slide_x(self.facing_sign() * step, COLLIDE_HALF, room);
         }
     }
 
@@ -2424,20 +2420,46 @@ mod tests {
             });
         }
         let brink = 6 * CELL_W;
-        // His body reaches *over* the brink (he stands at the edge), rather than
-        // halting a body-width short of it as the leading-edge stop did.
+        // His leading edge (toes) reaches the brink — he isn't left a body-width
+        // short of the drop as the un-closed step did.
         assert!(
-            world.prince.x + COLLIDE_HALF > brink,
+            world.prince.x + COLLIDE_HALF >= brink - 1,
             "careful step stopped short of the ledge: x={}, brink={brink}",
             world.prince.x,
         );
-        // But his centre stays on the floored cell, and he never steps off.
+        // But his centre stays on the floored cell, so he doesn't perch over the
+        // gap (and never steps off).
         assert!(world.prince.x < brink, "his centre stays on the floor side");
         assert!(
             world.prince_on_ground(),
             "a careful step never walks him off the ledge"
         );
         assert_eq!(world.prince.row, 2);
+    }
+
+    #[test]
+    fn careful_step_advances_monotonically_to_a_ledge() {
+        use TileKind::{Floor, PanelWithoutFloor as Gap};
+        let mut world =
+            world_with_row2(&[Floor, Floor, Floor, Floor, Floor, Floor, Gap, Gap, Gap, Gap]);
+        // Holding SHIFT+right, his x must never move backward — the careful
+        // step settles at the brink instead of oscillating against it.
+        let mut prev = world.prince.x;
+        for _ in 0..300 {
+            world.tick(InputState {
+                right: true,
+                shift: true,
+                ..InputState::default()
+            });
+            assert!(
+                world.prince.x >= prev,
+                "careful step moved backward: {} -> {}",
+                prev,
+                world.prince.x
+            );
+            prev = world.prince.x;
+        }
+        assert!(world.prince_on_ground());
     }
 
     #[test]
@@ -2461,6 +2483,42 @@ mod tests {
             world.prince.x
         );
         assert!(world.prince_on_ground());
+        assert_eq!(world.prince.row, 2);
+    }
+
+    #[test]
+    fn careful_step_left_edges_up_to_a_ledge_without_stepping_off() {
+        use TileKind::{Floor, PanelWithoutFloor as Gap};
+        // Gap at cols 0..=2, floored from col 3 on; brink at col2/col3.
+        let mut world = world_with_row2(&[
+            Gap, Gap, Gap, Floor, Floor, Floor, Floor, Floor, Floor, Floor,
+        ]);
+        world.prince.x = 7 * CELL_W + CELL_W / 2;
+        world.prince.facing_right = false;
+        let mut prev = world.prince.x;
+        for _ in 0..300 {
+            world.tick(InputState {
+                left: true,
+                shift: true,
+                ..InputState::default()
+            });
+            assert!(
+                world.prince.x <= prev,
+                "careful step moved backward (rightward): {prev} -> {}",
+                world.prince.x
+            );
+            prev = world.prince.x;
+        }
+        let brink = 3 * CELL_W; // col2/col3 boundary
+                                // Toes reach the brink, centre stays on the floored col-3 side, and he
+                                // never steps off into the gap.
+        assert!(
+            world.prince.x - COLLIDE_HALF <= brink + 1,
+            "left careful step stopped short of the ledge: x={}",
+            world.prince.x
+        );
+        assert!(world.prince.x > brink, "his centre stays on the floor side");
+        assert!(world.prince_on_ground(), "never steps off the left ledge");
         assert_eq!(world.prince.row, 2);
     }
 }
