@@ -10,4 +10,4 @@ pub mod modules;
 pub mod world;
 
 pub use game::Game;
-pub use world::{Mode, World};
+pub use world::{Mode, PrinceDebug, World};
