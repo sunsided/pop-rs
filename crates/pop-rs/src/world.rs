@@ -1019,7 +1019,9 @@ impl World {
                 self.prince.feet_y = c.from_feet + (c.to_feet - c.from_feet) * p / rise;
             } else {
                 self.prince.feet_y = c.to_feet;
-                self.prince.x = c.from_x + (c.to_x - c.from_x) * (p - rise) / (n - rise);
+                // `.max(1)`: the `p <= rise` branch + `p < frames` guard keep
+                // `n - rise >= 1` today, but make the divisor safe regardless.
+                self.prince.x = c.from_x + (c.to_x - c.from_x) * (p - rise) / (n - rise).max(1);
             }
             self.prince.climb = Some(c);
         }
@@ -2633,13 +2635,14 @@ mod tests {
                 break;
             }
         }
-        if let Some(feet) = sideways_at_feet {
-            assert!(
-                feet <= floor_y(0) + VERT_DIST,
-                "he moved sideways mid-climb (diagonal glide): feet={feet}, ledge={}",
-                floor_y(0)
-            );
-        }
+        // The climb must actually move him sideways (onto the front ledge), or
+        // the L-path invariant below would pass vacuously.
+        let feet = sideways_at_feet.expect("climb never stepped sideways — L-path not exercised");
+        assert!(
+            feet <= floor_y(0) + VERT_DIST,
+            "he moved sideways mid-climb (diagonal glide): feet={feet}, ledge={}",
+            floor_y(0)
+        );
         assert_eq!(world.prince.row, 0, "he reaches the upper floor");
         assert!(world.prince_on_ground());
         assert_eq!(world.prince.feet_y, floor_y(0));
