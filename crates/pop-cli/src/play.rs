@@ -262,12 +262,16 @@ fn draw_debug_overlay(ui: &egui::Ui, d: &PrinceDebug, origin: Pos2, draw: Vec2, 
     let painter = ui.painter();
     let (top, bot) = (origin.y, origin.y + draw.y);
     let sx = |px: i32| origin.x + px as f32 * scale;
-    for c in 0..=i32::from(FRAME_W) / d.cell_w {
-        painter.vline(
-            sx(c * d.cell_w),
-            top..=bot,
-            Stroke::new(1.0, Color32::from_rgb(80, 80, 0)),
-        );
+    // Guard the grid divisor (`cell_w` is always 28 today, but it's a plain
+    // public field — a zero would panic the loop).
+    if d.cell_w > 0 {
+        for c in 0..=i32::from(FRAME_W) / d.cell_w {
+            painter.vline(
+                sx(c * d.cell_w),
+                top..=bot,
+                Stroke::new(1.0, Color32::from_rgb(80, 80, 0)),
+            );
+        }
     }
     let cyan = Color32::from_rgb(0, 210, 210);
     painter.vline(sx(d.x - d.half_w), top..=bot, Stroke::new(1.0, cyan));
